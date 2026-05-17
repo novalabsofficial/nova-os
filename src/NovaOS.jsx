@@ -42,7 +42,15 @@ const BOOT = [
   "System ready.",
 ];
 
-const ACCENT_PRESETS = ["#4f9eff","#ff6b6b","#4cef90","#ffcc44","#cc44ff","#ff8c44","#44ddcc","#ff44aa"];
+useEffect(() => {
+    // This tells Vercel to wait until the browser is loaded
+    document.addEventListener('contextmenu', handleContextMenu);
+    
+    // This is a safety cleanup so your app doesn't glitch when closing
+    return () => {
+      document.removeEventListener('contextmenu', handleContextMenu);
+    };
+  }, []);
 
 // ─── STORAGE ─────────────────────────────────────────────────────────────────
 const COLL = "nova_storage";
