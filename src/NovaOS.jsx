@@ -529,7 +529,7 @@ function FilesApp({ data, updateData, showToast }) {
         <div style={sHd}>📄 Notes</div>
       </div>
       {notes.length===0&&<div style={{color:"rgba(255,255,255,0.2)",fontSize:13,fontStyle:"italic",padding:"20px 0"}}>No notes saved yet.</div>}
-      <div style={{display:"flex",gap:12"}}>
+      <div style={{display:"flex",gap:12}}>
         <div style={{flex:1}}>
           {notes.map(n=>(
             <div key={n.id} className="file-row" onClick={()=>setPreview(n)}
