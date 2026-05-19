@@ -120,6 +120,18 @@ function defaultIconPos(i) {
   };
 }
  
+// Snap a free (x,y) position to the nearest grid cell so icons stay aligned
+function snapToGrid(x, y) {
+  const cellW = ICON_W + ICON_GAP;
+  const cellH = ICON_H + ICON_GAP;
+  const col   = Math.round((x - ICON_PAD_X) / cellW);
+  const row   = Math.round((y - ICON_PAD_Y) / cellH);
+  return {
+    x: Math.max(0, Math.min(ICON_PAD_X + col * cellW, window.innerWidth  - ICON_W)),
+    y: Math.max(0, Math.min(ICON_PAD_Y + row * cellH, window.innerHeight - TASKBAR_H - ICON_H)),
+  };
+}
+ 
 // ─── FONTS & STYLES ───────────────────────────────────────────────────────────
 const FF ="'DM Sans',sans-serif";
 const FFB="'Space Grotesk',sans-serif";
@@ -339,8 +351,14 @@ export default function NovaOS(){
       setIconPos(prev=>({...prev,[iconDrag.id]:{x:newX,y:newY}}));
     }
     function onUp(){
-      // Persist final positions to Firebase (use ref to get latest without dep)
-      db.set("user:"+iconDrag.user+":iconpos",iconPosRef.current).catch(()=>{});
+      // Snap to nearest grid cell before persisting
+      const raw = iconPosRef.current[iconDrag.id];
+      const snapped = raw ? snapToGrid(raw.x, raw.y) : null;
+      const finalPos = snapped
+        ? { ...iconPosRef.current, [iconDrag.id]: snapped }
+        : iconPosRef.current;
+      setIconPos(finalPos);
+      db.set("user:"+iconDrag.user+":iconpos", finalPos).catch(()=>{});
       setIconDrag(null);
     }
     window.addEventListener("mousemove",onMove);
@@ -991,3 +1009,4 @@ function ProfileApp({user,data,updateData,showToast,AC}){
     </div>
   );
 }
+ 
