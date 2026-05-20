@@ -1,4 +1,4 @@
-// NOVA OS v3.4 — Nova Systems
+// NOVA OS v3.5 — Nova Systems
 // Drop this into src/NovaOS.jsx
  
 import { useState, useEffect, useRef, useCallback } from "react";
@@ -11,32 +11,37 @@ const COLL       = "nova_storage";
 const TASKBAR_H  = 52;
 const MIN_W      = 280;
 const MIN_H      = 200;
-const ICON_W     = 76;   // icon cell width  (px)
-const ICON_H     = 92;   // icon cell height (px)
-const ICON_GAP   = 4;    // gap between icons (px)
-const ICON_PAD_X = 10;   // left edge padding
-const ICON_PAD_Y = 14;   // top edge padding
+const ICON_W     = 76;
+const ICON_H     = 92;
+const ICON_GAP   = 4;
+const ICON_PAD_X = 10;
+const ICON_PAD_Y = 14;
+ 
+const DEFAULT_WIDGET_POS = {
+  clock:   { x: 220, y: 90 },
+  weather: { x: 420, y: 90 },
+};
  
 const DEFAULT_SIZES = {
-  notes:{w:500,h:520}, tasks:{w:460,h:520}, files:{w:540,h:520},
-  paint:{w:700,h:560}, browser:{w:760,h:620},
-  snake:{w:460,h:560}, "2048":{w:480,h:580},
-  store:{w:680,h:600}, terminal:{w:580,h:460},
-  settings:{w:480,h:600}, profile:{w:440,h:540},
+  notes:{w:500,h:520},tasks:{w:460,h:520},files:{w:540,h:520},
+  paint:{w:700,h:560},browser:{w:760,h:620},
+  snake:{w:460,h:560},"2048":{w:480,h:580},
+  store:{w:680,h:600},terminal:{w:580,h:460},
+  settings:{w:480,h:600},profile:{w:440,h:540},
 };
  
 const APPS = [
-  { id:"notes",    icon:"📝", label:"Notes",    desc:"Write & save notes" },
-  { id:"tasks",    icon:"✅", label:"Tasks",    desc:"Manage to-dos" },
-  { id:"files",    icon:"📁", label:"Files",    desc:"Browse your files" },
-  { id:"paint",    icon:"🎨", label:"Paint",    desc:"Draw & create" },
-  { id:"browser",  icon:"🌐", label:"Browser",  desc:"Nova Search & Browse" },
-  { id:"snake",    icon:"🐍", label:"Snake",    desc:"Classic snake game" },
-  { id:"2048",     icon:"🎮", label:"2048",     desc:"Sliding tile puzzle" },
-  { id:"store",    icon:"🏪", label:"Store",    desc:"Nova App Store" },
-  { id:"terminal", icon:"💻", label:"Terminal", desc:"System terminal" },
-  { id:"settings", icon:"⚙️", label:"Settings", desc:"Customize Nova OS" },
-  { id:"profile",  icon:"👤", label:"Profile",  desc:"Your account" },
+  {id:"notes",   icon:"📝",label:"Notes",   desc:"Write & save notes"},
+  {id:"tasks",   icon:"✅",label:"Tasks",   desc:"Manage to-dos"},
+  {id:"files",   icon:"📁",label:"Files",   desc:"Browse your files"},
+  {id:"paint",   icon:"🎨",label:"Paint",   desc:"Draw & create"},
+  {id:"browser", icon:"🌐",label:"Browser", desc:"Nova Search & Browse"},
+  {id:"snake",   icon:"🐍",label:"Snake",   desc:"Classic snake game"},
+  {id:"2048",    icon:"🎮",label:"2048",    desc:"Sliding tile puzzle"},
+  {id:"store",   icon:"🏪",label:"Store",   desc:"Nova App Store"},
+  {id:"terminal",icon:"💻",label:"Terminal",desc:"System terminal"},
+  {id:"settings",icon:"⚙️",label:"Settings",desc:"Customize Nova OS"},
+  {id:"profile", icon:"👤",label:"Profile", desc:"Your account"},
 ];
  
 const STORE_CATALOG = [
@@ -64,37 +69,33 @@ const STORE_CATALOG = [
 ];
  
 const STORE_CATS = ["All","Games","Media","Tools","Social","News"];
- 
-const BOOT_MSGS = [
-  "NOVA OS v3.4 — Nova Systems",
+const BOOT_MSGS  = [
+  "NOVA OS v3.5 — Nova Systems",
   "Initializing kernel... OK",
   "Loading hardware abstraction layer... OK",
   "Mounting filesystems... OK",
-  "Starting window compositor... OK",
+  "Starting widget engine... OK",
   "Loading user environment... OK",
   "System ready.",
 ];
- 
 const ACCENT_PRESETS = ["#4f9eff","#ff6b6b","#4cef90","#ffcc44","#cc44ff","#ff8c44","#44ddcc","#ff44aa"];
- 
-const BOOKMARKS = [
+const BOOKMARKS      = [
   {label:"Hacker News",url:"https://news.ycombinator.com"},
   {label:"Wikipedia",  url:"https://en.m.wikipedia.org"},
   {label:"Archive.org",url:"https://archive.org"},
   {label:"itch.io",    url:"https://itch.io"},
 ];
- 
 const PAINT_COLORS = ["#fff","#000","#ff4444","#ff8800","#ffdd00","#44dd44","#00ccff","#4466ff","#cc44ff","#ff44aa","#8b4513","#888"];
- 
-const WALLPAPERS = {
+const WALLPAPERS   = {
   nova:  {name:"Nova",  preview:"radial-gradient(ellipse at 25% 20%,#0ea5e9 0%,transparent 55%),radial-gradient(ellipse at 80% 85%,#7c3aed 0%,transparent 50%),linear-gradient(135deg,#07080f,#0d0a1a)"},
   bliss: {name:"Bliss", preview:"linear-gradient(180deg,#4a9fd1 44%,#6ec82e 44%)"},
   night: {name:"Night", preview:"radial-gradient(#1a0f40,#03020d)", grad:"radial-gradient(ellipse at 50% 0%,#1a0f40,#03020d)"},
-  sakura:{name:"Sakura",preview:"linear-gradient(155deg,#ffd6e7,#ff8fa3)", grad:"linear-gradient(155deg,#ffd6e7,#ffb3c6,#ff8fa3)"},
-  forest:{name:"Forest",preview:"radial-gradient(#1a5010,#051204)", grad:"radial-gradient(ellipse at 50% 100%,#1a5010,#051204)"},
-  slate: {name:"Slate", preview:"linear-gradient(135deg,#1e2235,#0f1219)", grad:"linear-gradient(135deg,#1e2235,#0f1219)"},
+  sakura:{name:"Sakura",preview:"linear-gradient(155deg,#ffd6e7,#ff8fa3)",grad:"linear-gradient(155deg,#ffd6e7,#ffb3c6,#ff8fa3)"},
+  forest:{name:"Forest",preview:"radial-gradient(#1a5010,#051204)",grad:"radial-gradient(ellipse at 50% 100%,#1a5010,#051204)"},
+  slate: {name:"Slate", preview:"linear-gradient(135deg,#1e2235,#0f1219)",grad:"linear-gradient(135deg,#1e2235,#0f1219)"},
   custom:{name:"Custom",preview:"conic-gradient(#888,#555)"},
 };
+const WMO_ICONS = {0:"☀️",1:"🌤️",2:"⛅",3:"☁️",45:"🌫️",48:"🌫️",51:"🌦️",53:"🌦️",55:"🌧️",61:"🌧️",63:"🌧️",65:"🌧️",71:"🌨️",73:"🌨️",75:"❄️",80:"🌦️",81:"🌧️",82:"⛈️",95:"⛈️",99:"⛈️"};
  
 // ─── STORAGE ──────────────────────────────────────────────────────────────────
 const db = {
@@ -104,32 +105,49 @@ const db = {
  
 // ─── HELPERS ──────────────────────────────────────────────────────────────────
 function hexRgb(h){const c=h.replace("#","");return parseInt(c.slice(0,2),16)+","+parseInt(c.slice(2,4),16)+","+parseInt(c.slice(4,6),16);}
-function fill(ac) {return "rgba("+hexRgb(ac)+",0.16)";}
-function bdr(ac)  {return "rgba("+hexRgb(ac)+",0.55)";}
-function isUrl(s) {const t=s.trim();return /^https?:\/\//i.test(t)||/^[\w-]+\.[\w]{2,}(\/|$)/.test(t);}
+function fill(ac){return "rgba("+hexRgb(ac)+",0.16)";}
+function bdr(ac) {return "rgba("+hexRgb(ac)+",0.55)";}
+function isUrl(s){const t=s.trim();return /^https?:\/\//i.test(t)||/^[\w-]+\.[\w]{2,}(\/|$)/.test(t);}
  
-// Calculate the default grid position for icon at index i (multi-column, top→down then next column)
-function defaultIconPos(i) {
-  const availH   = window.innerHeight - TASKBAR_H - ICON_PAD_Y - 10;
-  const rows     = Math.max(1, Math.floor(availH / (ICON_H + ICON_GAP)));
-  const col      = Math.floor(i / rows);
-  const row      = i % rows;
-  return {
-    x: ICON_PAD_X + col * (ICON_W + ICON_GAP),
-    y: ICON_PAD_Y + row * (ICON_H + ICON_GAP),
-  };
+// Default grid position for icon index i
+function defaultIconPos(i){
+  const availH=window.innerHeight-TASKBAR_H-ICON_PAD_Y-10;
+  const rows=Math.max(1,Math.floor(availH/(ICON_H+ICON_GAP)));
+  const col=Math.floor(i/rows), row=i%rows;
+  return {x:ICON_PAD_X+col*(ICON_W+ICON_GAP), y:ICON_PAD_Y+row*(ICON_H+ICON_GAP)};
 }
  
-// Snap a free (x,y) position to the nearest grid cell so icons stay aligned
-function snapToGrid(x, y) {
-  const cellW = ICON_W + ICON_GAP;
-  const cellH = ICON_H + ICON_GAP;
-  const col   = Math.round((x - ICON_PAD_X) / cellW);
-  const row   = Math.round((y - ICON_PAD_Y) / cellH);
-  return {
-    x: Math.max(0, Math.min(ICON_PAD_X + col * cellW, window.innerWidth  - ICON_W)),
-    y: Math.max(0, Math.min(ICON_PAD_Y + row * cellH, window.innerHeight - TASKBAR_H - ICON_H)),
-  };
+// Snap (x,y) to nearest unoccupied grid cell — BFS outward from target cell
+// allPos = { appId: {x,y} } for every icon (including defaults)
+function snapToFreeGrid(dragId, rawX, rawY, allPos){
+  const cellW=ICON_W+ICON_GAP, cellH=ICON_H+ICON_GAP;
+  const maxCols=Math.floor((window.innerWidth -ICON_PAD_X)/cellW);
+  const maxRows=Math.floor((window.innerHeight-TASKBAR_H-ICON_PAD_Y)/cellH);
+  const tc=Math.max(0,Math.min(Math.round((rawX-ICON_PAD_X)/cellW),maxCols-1));
+  const tr=Math.max(0,Math.min(Math.round((rawY-ICON_PAD_Y)/cellH),maxRows-1));
+ 
+  // Build set of occupied cells (excluding the icon being dragged)
+  const occupied=new Set();
+  Object.entries(allPos).forEach(([id,pos])=>{
+    if(id===dragId)return;
+    const c=Math.round((pos.x-ICON_PAD_X)/cellW);
+    const r=Math.round((pos.y-ICON_PAD_Y)/cellH);
+    occupied.add(c+","+r);
+  });
+ 
+  // BFS
+  const visited=new Set([tc+","+tr]);
+  const queue=[[tc,tr]];
+  while(queue.length>0){
+    const [c,r]=queue.shift();
+    if(c>=0&&r>=0&&c<maxCols&&r<maxRows&&!occupied.has(c+","+r))
+      return {x:ICON_PAD_X+c*cellW, y:ICON_PAD_Y+r*cellH};
+    for(const [dc,dr] of [[0,1],[1,0],[0,-1],[-1,0],[1,1],[1,-1],[-1,1],[-1,-1]]){
+      const nc=c+dc,nr=r+dr,nk=nc+","+nr;
+      if(!visited.has(nk)){visited.add(nk);queue.push([nc,nr]);}
+    }
+  }
+  return {x:ICON_PAD_X+tc*cellW, y:ICON_PAD_Y+tr*cellH};
 }
  
 // ─── FONTS & STYLES ───────────────────────────────────────────────────────────
@@ -167,6 +185,7 @@ const CSS=`
   .ad:hover{transform:scale(1.15);}
   .ws:hover{border-color:rgba(255,255,255,0.5)!important;}
   .sc:hover{background:rgba(255,255,255,0.06)!important;}
+  .wgt:hover{border-color:rgba(255,255,255,0.22)!important;}
 `;
  
 // ─── BACKGROUNDS ─────────────────────────────────────────────────────────────
@@ -182,11 +201,10 @@ function NovaBg(){
       <rect width="1440" height="900" fill="#07080f"/>
       <rect width="1440" height="900" fill="url(#nb1)"/><rect width="1440" height="900" fill="url(#nb2)"/>
       <rect width="1440" height="900" fill="url(#nb3)"/><rect width="1440" height="900" fill="url(#nb4)"/>
-      {[...Array(55)].map((_,i)=>{const x=(i*137.5)%1440,y=(i*97.3)%900;return<circle key={i} cx={x} cy={y} r={i%3===0?1.5:1} fill="rgba(255,255,255,0.3)"/>;  })}
+      {[...Array(55)].map((_,i)=>{const x=(i*137.5)%1440,y=(i*97.3)%900;return<circle key={i} cx={x} cy={y} r={i%3===0?1.5:1} fill="rgba(255,255,255,0.3)"/>;})}
     </svg>
   );
 }
- 
 function BlissBg(){
   return(
     <svg style={{position:"absolute",inset:0,width:"100%",height:"100%"}} viewBox="0 0 1440 900" preserveAspectRatio="xMidYMid slice">
@@ -208,7 +226,6 @@ function BlissBg(){
     </svg>
   );
 }
- 
 function Wallpaper({id,customUrl}){
   if(id==="custom"&&customUrl)return<div style={{position:"absolute",inset:0,background:'url("'+customUrl+'") center/cover no-repeat'}}/>;
   if(!id||id==="nova")return<NovaBg/>;
@@ -218,7 +235,7 @@ function Wallpaper({id,customUrl}){
   return<NovaBg/>;
 }
  
-// ─── SHARED COMPONENTS ────────────────────────────────────────────────────────
+// ─── SHARED UI ────────────────────────────────────────────────────────────────
 function Toggle({label,value,onChange,ac}){
   const c=ac||DEFAULT_AC;
   return(
@@ -230,7 +247,6 @@ function Toggle({label,value,onChange,ac}){
     </div>
   );
 }
- 
 function BrowserNav({bar,setBar,onGo,onBack,onFwd,canBack,canFwd,AC}){
   return(
     <div style={{display:"flex",gap:6,marginBottom:8,alignItems:"center"}}>
@@ -241,7 +257,6 @@ function BrowserNav({bar,setBar,onGo,onBack,onFwd,canBack,canFwd,AC}){
     </div>
   );
 }
- 
 const HANDLE_DEFS=[
   {id:"n", s:{top:0,left:8,right:8,height:5,cursor:"n-resize"}},
   {id:"s", s:{bottom:0,left:8,right:8,height:5,cursor:"s-resize"}},
@@ -256,6 +271,78 @@ function ResizeHandles({winId,onStartResize}){
   return HANDLE_DEFS.map(h=>(
     <div key={h.id} onMouseDown={e=>{e.stopPropagation();onStartResize(e,winId,h.id);}} style={{position:"absolute",...h.s,zIndex:20}}/>
   ));
+}
+ 
+// ─── DESKTOP WIDGETS ─────────────────────────────────────────────────────────
+function ClockWidget({pos,onDragStart,AC,tick,use24h}){
+  const t=use24h
+    ?tick.toLocaleTimeString([],{hour:"2-digit",minute:"2-digit",second:"2-digit",hour12:false})
+    :tick.toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"});
+  const d=tick.toLocaleDateString([],{weekday:"long",month:"long",day:"numeric"});
+  return(
+    <div className="wgt" onMouseDown={e=>{e.stopPropagation();onDragStart(e,"clock");}}
+      style={{position:"absolute",left:pos.x,top:pos.y,zIndex:4,background:"rgba(7,8,18,0.7)",backdropFilter:"blur(20px)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:16,padding:"18px 26px",cursor:"grab",userSelect:"none",minWidth:210,boxShadow:"0 8px 32px rgba(0,0,0,0.4)",transition:"border 0.15s"}}>
+      <div style={{fontFamily:FFM,fontSize:38,fontWeight:400,color:"#fff",lineHeight:1,letterSpacing:1}}>{t}</div>
+      <div style={{fontFamily:FF,fontWeight:500,fontSize:12,color:"rgba(255,255,255,0.45)",marginTop:6}}>{d}</div>
+    </div>
+  );
+}
+ 
+function WeatherWidget({pos,onDragStart,AC}){
+  const [weather,setWeather]=useState(null);
+  const [loc,setLoc]=useState("");
+  const [status,setStatus]=useState("loading"); // loading | ok | error
+ 
+  useEffect(()=>{
+    if(!navigator.geolocation){setStatus("error");return;}
+    navigator.geolocation.getCurrentPosition(
+      async({coords:{latitude:lat,longitude:lon}})=>{
+        try{
+          const [wRes,gRes]=await Promise.allSettled([
+            fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,weathercode,windspeed_10m&temperature_unit=celsius&timezone=auto`).then(r=>r.json()),
+            fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&accept-language=en`).then(r=>r.json()),
+          ]);
+          if(wRes.status==="fulfilled"&&wRes.value?.current) setWeather(wRes.value.current);
+          if(gRes.status==="fulfilled"){
+            const a=gRes.value?.address;
+            setLoc(a?.city||a?.town||a?.village||a?.county||"");
+          }
+          setStatus("ok");
+        }catch{setStatus("error");}
+      },
+      ()=>setStatus("error"),
+      {timeout:8000}
+    );
+  },[]);
+ 
+  return(
+    <div className="wgt" onMouseDown={e=>{e.stopPropagation();onDragStart(e,"weather");}}
+      style={{position:"absolute",left:pos.x,top:pos.y,zIndex:4,background:"rgba(7,8,18,0.7)",backdropFilter:"blur(20px)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:16,padding:"16px 22px",cursor:"grab",userSelect:"none",minWidth:180,boxShadow:"0 8px 32px rgba(0,0,0,0.4)",transition:"border 0.15s"}}>
+      {status==="loading"&&(
+        <div style={{display:"flex",alignItems:"center",gap:8}}>
+          <div style={{width:18,height:18,border:"2px solid rgba(255,255,255,0.15)",borderTopColor:"#fff",borderRadius:"50%",animation:"spin 0.8s linear infinite"}}/>
+          <span style={{fontFamily:FF,fontSize:12,color:"rgba(255,255,255,0.4)"}}>Getting weather…</span>
+        </div>
+      )}
+      {status==="error"&&(
+        <div style={{fontFamily:FF,fontSize:12,color:"rgba(255,255,255,0.4)"}}>🌡️ Weather unavailable<br/><span style={{fontSize:10,opacity:0.6}}>Allow location access & refresh</span></div>
+      )}
+      {status==="ok"&&weather&&(
+        <>
+          <div style={{display:"flex",alignItems:"center",gap:12}}>
+            <span style={{fontSize:36,lineHeight:1}}>{WMO_ICONS[weather.weathercode]||"🌡️"}</span>
+            <div>
+              <div style={{fontFamily:FFM,fontSize:30,fontWeight:400,color:"#fff",lineHeight:1}}>{Math.round(weather.temperature_2m)}°C</div>
+              {loc&&<div style={{fontFamily:FF,fontSize:11,color:"rgba(255,255,255,0.45)",marginTop:4}}>{loc}</div>}
+            </div>
+          </div>
+          {weather.windspeed_10m!=null&&(
+            <div style={{fontFamily:FF,fontSize:10,color:"rgba(255,255,255,0.3)",marginTop:8}}>💨 {weather.windspeed_10m} km/h</div>
+          )}
+        </>
+      )}
+    </div>
+  );
 }
  
 // ─── ROOT ─────────────────────────────────────────────────────────────────────
@@ -274,28 +361,29 @@ export default function NovaOS(){
   const [maxZ,      setMaxZ]      = useState(100);
   const [tick,      setTick]      = useState(new Date());
   const [toast,     setToast]     = useState(null);
-  const [drag,      setDrag]      = useState(null);  // window drag/resize
+  const [drag,      setDrag]      = useState(null);     // window drag/resize
   const [menuOpen,  setMenuOpen]  = useState(false);
   const [menuSrch,  setMenuSrch]  = useState("");
+  const [iconPos,   setIconPos]   = useState({});       // saved icon positions
+  const [iconDrag,  setIconDrag]  = useState(null);     // { id, ox, oy, user, allIcons }
+  const [widgetPos, setWidgetPos] = useState(DEFAULT_WIDGET_POS); // { clock:{x,y}, weather:{x,y} }
+  const [widgetDrag,setWidgetDrag]= useState(null);     // { id, ox, oy }
  
-  // ── Icon drag state ────────────────────────────────────────────────────────
-  // iconPos: { appId: { x, y } } — saved positions for each icon
-  // iconDrag: { id, ox, oy } | null — currently dragged icon
-  const [iconPos,  setIconPos]  = useState({});
-  const [iconDrag, setIconDrag] = useState(null);
-  const iconPosRef  = useRef({});
-  useEffect(()=>{ iconPosRef.current = iconPos; },[iconPos]);
+  const iconPosRef   = useRef({});
+  const widgetPosRef = useRef(DEFAULT_WIDGET_POS);
+  const menuRef      = useRef(null);
+  const winsRef      = useRef(wins);
+  useEffect(()=>{ iconPosRef.current   = iconPos;   },[iconPos]);
+  useEffect(()=>{ widgetPosRef.current = widgetPos; },[widgetPos]);
+  useEffect(()=>{ winsRef.current      = wins;      },[wins]);
  
-  const menuRef  = useRef(null);
-  const winsRef  = useRef(wins);
-  useEffect(()=>{ winsRef.current = wins; },[wins]);
- 
-  const settings  = data?.settings||{};
-  const AC        = settings.accent    || DEFAULT_AC;
-  const use24h    = settings.clock24h  || false;
-  const winBlur   = settings.winBlur   ?? 18;
-  const largeFnt  = settings.largeFont || false;
-  const wpId      = settings.wallpaper || data?.wallpaper || "nova";
+  const settings = data?.settings||{};
+  const AC       = settings.accent    || DEFAULT_AC;
+  const use24h   = settings.clock24h  || false;
+  const winBlur  = settings.winBlur   ?? 18;
+  const largeFnt = settings.largeFont || false;
+  const wpId     = settings.wallpaper || data?.wallpaper || "nova";
+  const widgets  = settings.widgets   || {};
  
   // Boot
   useEffect(()=>{
@@ -310,6 +398,7 @@ export default function NovaOS(){
     if(user&&wpId==="custom")db.get("user:"+user+":wpimg").then(url=>{if(url)setCustomWp(url);});
   },[user,wpId]);
  
+  // Close start menu on outside click
   useEffect(()=>{
     if(!menuOpen)return;
     function h(e){if(menuRef.current&&!menuRef.current.contains(e.target))setMenuOpen(false);}
@@ -317,7 +406,7 @@ export default function NovaOS(){
     return()=>document.removeEventListener("mousedown",h);
   },[menuOpen]);
  
-  // ── Window drag / resize (global) ─────────────────────────────────────────
+  // ── Window drag/resize ────────────────────────────────────────────────────
   useEffect(()=>{
     function onMove(e){
       if(!drag)return;
@@ -341,30 +430,48 @@ export default function NovaOS(){
     return()=>{window.removeEventListener("mousemove",onMove);window.removeEventListener("mouseup",onUp);};
   },[drag]);
  
-  // ── Icon drag (global, separate effect) ───────────────────────────────────
-  // Runs only while an icon is being dragged. Stops listening when drag ends.
+  // ── Icon drag — free movement, snap-to-free-grid on release ───────────────
   useEffect(()=>{
     if(!iconDrag)return;
     function onMove(e){
-      const newX=Math.max(0,Math.min(e.clientX-iconDrag.ox,window.innerWidth-ICON_W));
-      const newY=Math.max(0,Math.min(e.clientY-iconDrag.oy,window.innerHeight-TASKBAR_H-ICON_H));
-      setIconPos(prev=>({...prev,[iconDrag.id]:{x:newX,y:newY}}));
+      const nx=Math.max(0,Math.min(e.clientX-iconDrag.ox,window.innerWidth-ICON_W));
+      const ny=Math.max(0,Math.min(e.clientY-iconDrag.oy,window.innerHeight-TASKBAR_H-ICON_H));
+      setIconPos(prev=>({...prev,[iconDrag.id]:{x:nx,y:ny}}));
     }
     function onUp(){
-      // Snap to nearest grid cell before persisting
-      const raw = iconPosRef.current[iconDrag.id];
-      const snapped = raw ? snapToGrid(raw.x, raw.y) : null;
-      const finalPos = snapped
-        ? { ...iconPosRef.current, [iconDrag.id]: snapped }
-        : iconPosRef.current;
+      // Build full position map (saved + defaults for unsaved)
+      const allPos={};
+      (iconDrag.allIcons||[]).forEach((app,idx)=>{
+        allPos[app.id]=iconPosRef.current[app.id]||defaultIconPos(idx);
+      });
+      const raw=iconPosRef.current[iconDrag.id]||allPos[iconDrag.id];
+      const snapped=raw?snapToFreeGrid(iconDrag.id,raw.x,raw.y,allPos):null;
+      const finalPos=snapped?{...iconPosRef.current,[iconDrag.id]:snapped}:iconPosRef.current;
       setIconPos(finalPos);
-      db.set("user:"+iconDrag.user+":iconpos", finalPos).catch(()=>{});
+      db.set("user:"+iconDrag.user+":iconpos",finalPos).catch(()=>{});
       setIconDrag(null);
     }
-    window.addEventListener("mousemove",onMove);
-    window.addEventListener("mouseup",onUp);
+    window.addEventListener("mousemove",onMove);window.addEventListener("mouseup",onUp);
     return()=>{window.removeEventListener("mousemove",onMove);window.removeEventListener("mouseup",onUp);};
   },[iconDrag]);
+ 
+  // ── Widget drag — free movement, save on release ───────────────────────────
+  useEffect(()=>{
+    if(!widgetDrag)return;
+    function onMove(e){
+      const nx=Math.max(0,Math.min(e.clientX-widgetDrag.ox,window.innerWidth-220));
+      const ny=Math.max(0,Math.min(e.clientY-widgetDrag.oy,window.innerHeight-TASKBAR_H-120));
+      setWidgetPos(prev=>({...prev,[widgetDrag.id]:{x:nx,y:ny}}));
+    }
+    function onUp(){
+      // Persist widget positions inside settings
+      const pos=widgetPosRef.current;
+      updateData(prev=>({...prev,settings:{...(prev.settings||{}),widgetPos:pos}}));
+      setWidgetDrag(null);
+    }
+    window.addEventListener("mousemove",onMove);window.addEventListener("mouseup",onUp);
+    return()=>{window.removeEventListener("mousemove",onMove);window.removeEventListener("mouseup",onUp);};
+  },[widgetDrag]);
  
   const showToast     = useCallback((msg)=>{setToast(msg);setTimeout(()=>setToast(null),2500);},[]);
   const saveData      = useCallback(async(d)=>{if(user)await db.set("user:"+user+":data",d);},[user]);
@@ -417,14 +524,20 @@ export default function NovaOS(){
     }));
   }
  
-  // ── Icon drag start ─────────────────────────────────────────────────────────
-  function onIconMouseDown(e,appId){
+  // Icon drag start — passes allIcons snapshot for collision detection on drop
+  function onIconMouseDown(e,appId,allIcons){
     if(e.button!==0)return;
-    e.stopPropagation();
-    e.preventDefault(); // prevent text selection during drag
-    const pos=iconPos[appId]||defaultIconPos(allDesktopIcons.findIndex(a=>a.id===appId));
-    // Attach the current user into the drag object so the onUp handler can save
-    setIconDrag({id:appId,ox:e.clientX-pos.x,oy:e.clientY-pos.y,user});
+    e.stopPropagation();e.preventDefault();
+    const idx=allIcons.findIndex(a=>a.id===appId);
+    const pos=iconPos[appId]||defaultIconPos(idx);
+    setIconDrag({id:appId,ox:e.clientX-pos.x,oy:e.clientY-pos.y,user,allIcons:[...allIcons]});
+  }
+ 
+  function onWidgetDragStart(e,id){
+    if(e.button!==0)return;
+    e.stopPropagation();e.preventDefault();
+    const pos=widgetPos[id]||DEFAULT_WIDGET_POS[id]||{x:200,y:100};
+    setWidgetDrag({id,ox:e.clientX-pos.x,oy:e.clientY-pos.y});
   }
  
   async function handleAuth(){
@@ -437,16 +550,18 @@ export default function NovaOS(){
       await db.set("user:"+u+":pw",p);
       const init={notes:[],tasks:[],wallpaper:"nova",bio:"",joined:Date.now(),settings:{},installedApps:[]};
       await db.set("user:"+u+":data",init);
-      setUser(u);setData(init);setIconPos({});setScreen("desktop");
+      setUser(u);setData(init);setIconPos({});setWidgetPos(DEFAULT_WIDGET_POS);setScreen("desktop");
     }else{
       const stored=await db.get("user:"+u+":pw");if(stored===null){setAuthErr("Account not found.");setBusy(false);return;}
       if(stored!==p){setAuthErr("Incorrect password.");setBusy(false);return;}
       const d=await db.get("user:"+u+":data");
-      // Load saved icon positions from separate doc
       const savedIconPos=await db.get("user:"+u+":iconpos");
       setUser(u);
       setData(d||{notes:[],tasks:[],wallpaper:"nova",bio:"",joined:Date.now(),settings:{},installedApps:[]});
       setIconPos(savedIconPos||{});
+      // Restore widget positions from settings if saved
+      const savedWidgetPos=d?.settings?.widgetPos;
+      setWidgetPos(savedWidgetPos?{...DEFAULT_WIDGET_POS,...savedWidgetPos}:DEFAULT_WIDGET_POS);
       setScreen("desktop");
     }
     setBusy(false);
@@ -454,28 +569,25 @@ export default function NovaOS(){
  
   function logout(){
     setUser(null);setData(null);setCustomWp(null);setWins([]);setMaxZ(100);setMenuOpen(false);
-    setIconPos({});setIconDrag(null);
+    setIconPos({});setIconDrag(null);setWidgetPos(DEFAULT_WIDGET_POS);setWidgetDrag(null);
     setUname("");setPass("");setAuthErr("");setMode("login");setScreen("login");
   }
  
   const fmtTime=d=>use24h?d.toLocaleTimeString([],{hour:"2-digit",minute:"2-digit",hour12:false}):d.toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"});
   const fmtDate=d=>d.toLocaleDateString([],{weekday:"short",month:"short",day:"numeric"});
  
-  // Build full icon list: built-in APPS + installed store apps
   const installedApps=data?.installedApps||[];
   const storeIcons=STORE_CATALOG.filter(a=>installedApps.includes(a.id)).map(a=>({id:"store_"+a.id,icon:a.icon,label:a.name,desc:a.desc,storeApp:a}));
   const allDesktopIcons=[...APPS,...storeIcons];
- 
   const filteredMenu=allDesktopIcons.filter(a=>a.label.toLowerCase().includes(menuSrch.toLowerCase())||a.desc?.toLowerCase().includes(menuSrch.toLowerCase()));
+  const dragCursor=drag?(drag.type==="move"?"grabbing":drag.edge+"-resize"):iconDrag||widgetDrag?"grabbing":"default";
  
-  const dragCursor=drag?(drag.type==="move"?"grabbing":drag.edge+"-resize"):iconDrag?"grabbing":"default";
- 
-  // ── BOOT ──────────────────────────────────────────────────────────────────
+  // ── BOOT ─────────────────────────────────────────────────────────────────
   if(screen==="boot")return(
     <div style={{width:"100%",height:"100vh",background:"#07080f",display:"flex",flexDirection:"column",justifyContent:"center",padding:"10vh 12%"}}>
       <style>{CSS}</style>
       <div style={{fontFamily:FFB,fontWeight:700,fontSize:66,letterSpacing:4,color:"#fff",marginBottom:4,lineHeight:1}}>NOVA</div>
-      <div style={{fontFamily:FF,fontSize:12,color:"rgba(255,255,255,0.22)",letterSpacing:5,marginBottom:46}}>OPERATING SYSTEM  ·  v3.4</div>
+      <div style={{fontFamily:FF,fontSize:12,color:"rgba(255,255,255,0.22)",letterSpacing:5,marginBottom:46}}>OPERATING SYSTEM  ·  v3.5</div>
       {bootLines.map((l,i)=>(
         <div key={i} style={{fontFamily:FFM,fontSize:12,color:l.includes("ready")?"#4f9eff":"rgba(255,255,255,0.42)",marginBottom:5,animation:"boot-in 0.13s ease-out"}}>
           {l.includes("OK")?<>{l.replace("... OK","")}... <span style={{color:"#4cef90"}}>OK</span></>:l}
@@ -484,7 +596,7 @@ export default function NovaOS(){
     </div>
   );
  
-  // ── LOGIN ─────────────────────────────────────────────────────────────────
+  // ── LOGIN ────────────────────────────────────────────────────────────────
   if(screen==="login")return(
     <div style={{width:"100%",height:"100vh",position:"relative",overflow:"hidden"}}>
       <style>{CSS}</style><NovaBg/>
@@ -492,7 +604,7 @@ export default function NovaOS(){
         <div style={{background:"rgba(8,10,22,0.86)",backdropFilter:"blur(24px)",border:"1px solid rgba(255,255,255,0.11)",borderRadius:16,padding:"44px 40px",width:376,boxShadow:"0 40px 100px rgba(0,0,0,0.6)",position:"relative",overflow:"hidden"}}>
           <div style={{position:"absolute",top:0,left:0,right:0,height:2,background:"linear-gradient(90deg,transparent,"+DEFAULT_AC+",transparent)"}}/>
           <div style={{fontFamily:FFB,fontWeight:700,fontSize:38,color:"#fff",textAlign:"center",letterSpacing:4,marginBottom:4}}>NOVA</div>
-          <div style={{fontFamily:FF,fontSize:11,color:"rgba(255,255,255,0.22)",textAlign:"center",letterSpacing:4,marginBottom:36}}>OPERATING SYSTEM  ·  v3.4</div>
+          <div style={{fontFamily:FF,fontSize:11,color:"rgba(255,255,255,0.22)",textAlign:"center",letterSpacing:4,marginBottom:36}}>OPERATING SYSTEM  ·  v3.5</div>
           <div style={{display:"flex",borderBottom:"1px solid rgba(255,255,255,0.09)",marginBottom:24}}>
             {["login","register"].map(m=>(
               <button key={m} className="lt" onClick={()=>{setMode(m);setAuthErr("");}}
@@ -514,7 +626,7 @@ export default function NovaOS(){
     </div>
   );
  
-  // ── DESKTOP ───────────────────────────────────────────────────────────────
+  // ── DESKTOP ──────────────────────────────────────────────────────────────
   return(
     <div style={{width:"100%",height:"100vh",position:"relative",overflow:"hidden",cursor:dragCursor,fontSize:largeFnt?15:13}}>
       <style>{CSS}</style>
@@ -522,40 +634,29 @@ export default function NovaOS(){
  
       {toast&&<div style={{position:"fixed",top:14,right:14,zIndex:99999,padding:"10px 18px",background:"rgba(8,10,22,0.97)",border:"1px solid "+AC,borderRadius:9,fontFamily:FFB,fontWeight:600,fontSize:13,color:"#fff",animation:"toast-in 0.17s ease-out",boxShadow:"0 8px 36px rgba(0,0,0,0.6)"}}>{toast}</div>}
  
-      {/* ── Desktop icons — absolutely positioned, multi-column by default ── */}
-      {allDesktopIcons.map((app,idx)=>{
-        // Use saved position if available, otherwise calculate default grid position
-        const pos = iconPos[app.id] || defaultIconPos(idx);
-        const isDrg = iconDrag?.id === app.id;
+      {/* Desktop widgets — rendered below icons & windows */}
+      {widgets.clock&&(
+        <ClockWidget pos={widgetPos.clock||DEFAULT_WIDGET_POS.clock} onDragStart={onWidgetDragStart} AC={AC} tick={tick} use24h={use24h}/>
+      )}
+      {widgets.weather&&(
+        <WeatherWidget pos={widgetPos.weather||DEFAULT_WIDGET_POS.weather} onDragStart={onWidgetDragStart} AC={AC}/>
+      )}
  
+      {/* Desktop icons — absolutely positioned, multi-column by default, snap-to-free-grid on drop */}
+      {allDesktopIcons.map((app,idx)=>{
+        const pos=iconPos[app.id]||defaultIconPos(idx);
+        const isDrg=iconDrag?.id===app.id;
         function launch(){
           if(app.storeApp){if(app.storeApp.newTab)window.open(app.storeApp.url,"_blank");else openApp("browser");}
           else openApp(app.id);
         }
- 
         return(
           <div key={app.id}
-            style={{
-              position:"absolute",
-              left:pos.x,
-              top:pos.y,
-              width:ICON_W,
-              zIndex:isDrg?500:1,
-              cursor:isDrg?"grabbing":"grab",
-              userSelect:"none",
-              display:"flex",flexDirection:"column",alignItems:"center",gap:4,
-              padding:"8px 4px",borderRadius:9,
-              background:"rgba(0,0,0,0.1)",
-              border:"1px solid transparent",
-              transition:isDrg?"none":"background 0.12s",
-              // Slightly lifted shadow while dragging
-              boxShadow:isDrg?"0 8px 32px rgba(0,0,0,0.6)":"none",
-            }}
+            style={{position:"absolute",left:pos.x,top:pos.y,width:ICON_W,zIndex:isDrg?500:2,cursor:isDrg?"grabbing":"grab",userSelect:"none",display:"flex",flexDirection:"column",alignItems:"center",gap:4,padding:"8px 4px",borderRadius:9,background:"rgba(0,0,0,0.1)",border:"1px solid transparent",transition:isDrg?"none":"background 0.12s",boxShadow:isDrg?"0 8px 32px rgba(0,0,0,0.6)":"none"}}
             className={isDrg?"":"di"}
             title={app.desc+" (drag to move · double-click to open)"}
-            onMouseDown={e=>onIconMouseDown(e,app.id)}
-            onDoubleClick={launch}
-          >
+            onMouseDown={e=>onIconMouseDown(e,app.id,allDesktopIcons)}
+            onDoubleClick={launch}>
             <span style={{fontSize:24,filter:"drop-shadow(0 2px 5px rgba(0,0,0,0.8))",pointerEvents:"none"}}>{app.icon}</span>
             <span style={{fontFamily:FF,fontWeight:600,fontSize:10,color:"#fff",textAlign:"center",lineHeight:1.2,textShadow:"0 1px 4px #000",pointerEvents:"none"}}>{app.label}</span>
           </div>
@@ -578,10 +679,7 @@ export default function NovaOS(){
             <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:4}}>
               {filteredMenu.map(app=>(
                 <div key={app.id} className="ma"
-                  onClick={()=>{
-                    if(app.storeApp){if(app.storeApp.newTab)window.open(app.storeApp.url,"_blank");else openApp("browser");}
-                    else openApp(app.id);
-                  }}
+                  onClick={()=>{if(app.storeApp){if(app.storeApp.newTab)window.open(app.storeApp.url,"_blank");else openApp("browser");}else openApp(app.id);}}
                   style={{display:"flex",flexDirection:"column",alignItems:"center",gap:5,padding:"13px 4px",borderRadius:9,cursor:"pointer",transition:"background 0.12s",position:"relative"}}>
                   {wins.some(w=>w.app===app.id)&&<div style={{position:"absolute",bottom:4,left:"50%",transform:"translateX(-50%)",width:4,height:4,borderRadius:"50%",background:AC}}/>}
                   <span style={{fontSize:22}}>{app.icon}</span>
@@ -593,7 +691,7 @@ export default function NovaOS(){
           </div>
           <div style={{padding:"10px 16px",borderTop:"1px solid rgba(255,255,255,0.07)",display:"flex",alignItems:"center",gap:10}}>
             <div style={{width:32,height:32,borderRadius:"50%",background:fill(AC),border:"1.5px solid "+AC,display:"flex",alignItems:"center",justifyContent:"center",fontSize:15,flexShrink:0}}>👤</div>
-            <div style={{flex:1}}><div style={{fontFamily:FFB,fontWeight:600,fontSize:13,color:"#fff"}}>@{user}</div><div style={{fontFamily:FF,fontSize:10,color:"rgba(255,255,255,0.3)"}}>Nova OS v3.4</div></div>
+            <div style={{flex:1}}><div style={{fontFamily:FFB,fontWeight:600,fontSize:13,color:"#fff"}}>@{user}</div><div style={{fontFamily:FF,fontSize:10,color:"rgba(255,255,255,0.3)"}}>Nova OS v3.5</div></div>
             <button onClick={logout} style={{padding:"6px 12px",background:"rgba(200,40,40,0.12)",border:"1px solid rgba(200,40,40,0.3)",borderRadius:6,cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:11,color:"rgba(255,140,140,0.9)"}}>Logout</button>
           </div>
         </div>
@@ -602,9 +700,7 @@ export default function NovaOS(){
       {/* Windows */}
       {wins.map(win=>{
         const app=APPS.find(a=>a.id===win.app);
-        const isMax=win.state==="maximized";
-        const isMin=win.state==="minimized";
-        const isDrg=drag&&drag.winId===win.id;
+        const isMax=win.state==="maximized",isMin=win.state==="minimized",isDrg=drag&&drag.winId===win.id;
         if(isMin)return null;
         const winStyle=isMax
           ?{position:"fixed",top:0,left:0,right:0,bottom:TASKBAR_H+"px",zIndex:win.z,borderRadius:0}
@@ -649,7 +745,7 @@ export default function NovaOS(){
         {wins.map(win=>{
           const app=APPS.find(a=>a.id===win.app);
           const isMin=win.state==="minimized";
-          const isTop=win.z===Math.max(...wins.map(w=>w.z));
+          const isTop=wins.length>0&&win.z===Math.max(...wins.map(w=>w.z));
           return(
             <button key={win.id} className="tb" onClick={()=>{
               if(isMin){setWins(ws=>ws.map(w=>w.id===win.id?{...w,state:"normal"}:w));focusWin(win.id);}
@@ -675,8 +771,7 @@ export default function NovaOS(){
   );
 }
  
-// ─── APP COMPONENTS (unchanged from v3.3) ─────────────────────────────────────
- 
+// ─── NOTES ────────────────────────────────────────────────────────────────────
 function NotesApp({data,updateData,showToast,AC}){
   const [title,setTitle]=useState("");const [body,setBody]=useState("");
   function add(){if(!title.trim())return;updateData(p=>({...p,notes:[{id:Date.now(),title:title.trim(),body:body.trim(),ts:Date.now()},...(p.notes||[])]}));setTitle("");setBody("");showToast("Note saved ✓");}
@@ -703,6 +798,7 @@ function NotesApp({data,updateData,showToast,AC}){
   );
 }
  
+// ─── TASKS ────────────────────────────────────────────────────────────────────
 function TasksApp({data,updateData,showToast,AC}){
   const [input,setInput]=useState("");
   function add(){if(!input.trim())return;updateData(p=>({...p,tasks:[...(p.tasks||[]),{id:Date.now(),text:input.trim(),done:false}]}));setInput("");showToast("Task added ✓");}
@@ -734,6 +830,7 @@ function TRow({t,onToggle,onDel,AC}){
   );
 }
  
+// ─── FILES ────────────────────────────────────────────────────────────────────
 function FilesApp({data,updateData,showToast}){
   const [path,setPath]=useState("home");const [preview,setPreview]=useState(null);
   const notes=data?.notes||[];const tasks=data?.tasks||[];
@@ -785,17 +882,16 @@ function FilesApp({data,updateData,showToast}){
   );
 }
  
+// ─── PAINT ────────────────────────────────────────────────────────────────────
 function PaintApp({showToast,AC}){
-  const CANVAS_W=1000,CANVAS_H=600;
+  const CW=1000,CH=600;
   const canvasRef=useRef(null);const lastPos=useRef(null);
   const [color,setColor]=useState("#000000");const [size,setSize]=useState(6);const [tool,setTool]=useState("pen");const [drawing,setDrawing]=useState(false);
-  useEffect(()=>{const c=canvasRef.current;if(!c)return;const ctx=c.getContext("2d");ctx.fillStyle="#ffffff";ctx.fillRect(0,0,CANVAS_W,CANVAS_H);},[]);
-  function gp(e){const c=canvasRef.current;const r=c.getBoundingClientRect();const sx=CANVAS_W/r.width,sy=CANVAS_H/r.height;return{x:(e.clientX-r.left)*sx,y:(e.clientY-r.top)*sy};}
+  useEffect(()=>{const c=canvasRef.current;if(!c)return;const ctx=c.getContext("2d");ctx.fillStyle="#ffffff";ctx.fillRect(0,0,CW,CH);},[]);
+  function gp(e){const c=canvasRef.current;const r=c.getBoundingClientRect();return{x:(e.clientX-r.left)*(CW/r.width),y:(e.clientY-r.top)*(CH/r.height)};}
   function down(e){e.stopPropagation();setDrawing(true);const pos=gp(e);lastPos.current=pos;const ctx=canvasRef.current.getContext("2d");ctx.beginPath();ctx.arc(pos.x,pos.y,size/2,0,Math.PI*2);ctx.fillStyle=tool==="eraser"?"#fff":color;ctx.fill();}
   function move(e){if(!drawing||!lastPos.current)return;e.stopPropagation();const pos=gp(e);const ctx=canvasRef.current.getContext("2d");ctx.beginPath();ctx.moveTo(lastPos.current.x,lastPos.current.y);ctx.lineTo(pos.x,pos.y);ctx.strokeStyle=tool==="eraser"?"#fff":color;ctx.lineWidth=size;ctx.lineCap="round";ctx.lineJoin="round";ctx.stroke();lastPos.current=pos;}
   function up(e){e.stopPropagation();setDrawing(false);lastPos.current=null;}
-  function clear(){const c=canvasRef.current;const ctx=c.getContext("2d");ctx.fillStyle="#fff";ctx.fillRect(0,0,CANVAS_W,CANVAS_H);}
-  function download(){const a=document.createElement("a");a.download="nova-paint.png";a.href=canvasRef.current.toDataURL();a.click();showToast("Saved ✓");}
   function TBtn({id,lbl}){return<button onClick={()=>setTool(id)} style={{padding:"6px 11px",background:tool===id?fill(AC):"rgba(255,255,255,0.06)",border:"1px solid "+(tool===id?bdr(AC):"rgba(255,255,255,0.11)"),borderRadius:6,cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:11,color:tool===id?AC:"rgba(255,255,255,0.6)"}}>{lbl}</button>;}
   return(
     <div style={{width:"100%",display:"flex",flexDirection:"column",gap:10,fontFamily:FF}}>
@@ -807,20 +903,19 @@ function PaintApp({showToast,AC}){
           <span style={{fontSize:10,color:"rgba(255,255,255,0.5)",width:20}}>{size}</span>
         </div>
         <div style={{flex:1}}/>
-        <button onClick={clear} style={{padding:"6px 11px",background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.11)",borderRadius:6,cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:11,color:"rgba(255,255,255,0.55)"}}>Clear</button>
-        <button onClick={download} style={{padding:"6px 11px",background:fill(AC),border:"1px solid "+bdr(AC),borderRadius:6,cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:11,color:AC}}>⬇ Save</button>
+        <button onClick={()=>{const c=canvasRef.current;const ctx=c.getContext("2d");ctx.fillStyle="#fff";ctx.fillRect(0,0,CW,CH);}} style={{padding:"6px 11px",background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.11)",borderRadius:6,cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:11,color:"rgba(255,255,255,0.55)"}}>Clear</button>
+        <button onClick={()=>{const a=document.createElement("a");a.download="nova-paint.png";a.href=canvasRef.current.toDataURL();a.click();showToast("Saved ✓");}} style={{padding:"6px 11px",background:fill(AC),border:"1px solid "+bdr(AC),borderRadius:6,cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:11,color:AC}}>⬇ Save</button>
       </div>
-      <canvas ref={canvasRef} width={CANVAS_W} height={CANVAS_H} style={{width:"100%",height:"auto",borderRadius:7,cursor:tool==="eraser"?"cell":"crosshair",display:"block",border:"1px solid rgba(255,255,255,0.1)"}} onMouseDown={down} onMouseMove={move} onMouseUp={up} onMouseLeave={up}/>
+      <canvas ref={canvasRef} width={CW} height={CH} style={{width:"100%",height:"auto",borderRadius:7,cursor:tool==="eraser"?"cell":"crosshair",display:"block",border:"1px solid rgba(255,255,255,0.1)"}} onMouseDown={down} onMouseMove={move} onMouseUp={up} onMouseLeave={up}/>
       <div style={{display:"flex",alignItems:"center",gap:5,flexWrap:"wrap"}}>
-        {PAINT_COLORS.map(c=>(
-          <div key={c} className="ps" onClick={()=>{setColor(c);setTool("pen");}} style={{width:22,height:22,borderRadius:5,background:c,cursor:"pointer",border:(color===c&&tool==="pen")?"2.5px solid #fff":"2px solid rgba(255,255,255,0.14)",transition:"transform 0.1s",boxSizing:"border-box"}}/>
-        ))}
+        {PAINT_COLORS.map(c=><div key={c} className="ps" onClick={()=>{setColor(c);setTool("pen");}} style={{width:22,height:22,borderRadius:5,background:c,cursor:"pointer",border:(color===c&&tool==="pen")?"2.5px solid #fff":"2px solid rgba(255,255,255,0.14)",transition:"transform 0.1s",boxSizing:"border-box"}}/>)}
         <input type="color" value={color} onChange={e=>{setColor(e.target.value);setTool("pen");}} style={{width:26,height:26,borderRadius:5,border:"1px solid rgba(255,255,255,0.15)",cursor:"pointer",background:"none",marginLeft:4}}/>
       </div>
     </div>
   );
 }
  
+// ─── BROWSER ─────────────────────────────────────────────────────────────────
 function BrowserApp({AC}){
   const [bar,setBar]=useState("");const [view,setView]=useState("home");
   const [results,setResults]=useState(null);const [frameUrl,setFrameUrl]=useState("");
@@ -831,7 +926,7 @@ function BrowserApp({AC}){
     try{const[d,w]=await Promise.allSettled([fetch("https://api.duckduckgo.com/?q="+encodeURIComponent(q)+"&format=json&no_html=1&skip_disambig=1").then(r=>r.json()),fetch("https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch="+encodeURIComponent(q)+"&format=json&origin=*&srlimit=7").then(r=>r.json())]);setResults({q,ddg:d.status==="fulfilled"?d.value:null,wiki:w.status==="fulfilled"?w.value:null});}
     catch{setResults({q,ddg:null,wiki:null});}setLoading(false);
   }
-  function go(input){const q=(input||bar).trim();if(!q)return;if(isUrl(q))browse(q);else novaSearch(q);}
+  function go(i){const q=(i||bar).trim();if(!q)return;if(isUrl(q))browse(q);else novaSearch(q);}
   function back(){if(hIdx>0){const i=hIdx-1;setHIdx(i);setFrameUrl(hist[i]);setBar(hist[i]);setView("browse");}}
   function fwd(){if(hIdx<hist.length-1){const i=hIdx+1;setHIdx(i);setFrameUrl(hist[i]);setBar(hist[i]);setView("browse");}}
   const Nav=<BrowserNav bar={bar} setBar={setBar} onGo={()=>go()} onBack={back} onFwd={fwd} canBack={hIdx>0} canFwd={hIdx<hist.length-1} AC={AC}/>;
@@ -842,14 +937,14 @@ function BrowserApp({AC}){
   return(<div style={{width:"100%",fontFamily:FF}}>{Nav}{Bkm}{loading?(<div style={{display:"flex",alignItems:"center",justifyContent:"center",minHeight:280,gap:12,flexDirection:"column"}}><div style={{width:28,height:28,border:"3px solid rgba(255,255,255,0.1)",borderTopColor:AC,borderRadius:"50%",animation:"spin 0.8s linear infinite"}}/><div style={{fontSize:12,color:"rgba(255,255,255,0.35)"}}>Searching…</div></div>):(<div style={{overflowY:"auto"}}><div style={{...SEC,marginBottom:10}}>Results for "{results?.q}"</div>{ddg?.AbstractText&&<div style={{padding:"13px 14px",marginBottom:10,background:fill(AC),border:"1px solid "+bdr(AC),borderRadius:9}}><div style={{fontFamily:FFB,fontWeight:600,fontSize:13,color:AC,marginBottom:5}}>{ddg.Heading}</div><div style={{fontSize:12,color:"rgba(255,255,255,0.7)",lineHeight:1.65}}>{ddg.AbstractText}</div>{ddg.AbstractURL&&<a href={ddg.AbstractURL} target="_blank" rel="noreferrer" style={{fontSize:10,color:AC,opacity:0.7,marginTop:6,display:"inline-block",fontFamily:FFM}}>Source ↗</a>}</div>}{wikiH.length>0&&<><div style={SEC}>Wikipedia</div>{wikiH.map(h=><div key={h.pageid} className="sr" onClick={()=>browse("https://en.wikipedia.org/wiki/"+encodeURIComponent(h.title))} style={{padding:"10px 12px",marginBottom:5,background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:8,cursor:"pointer",transition:"background 0.12s"}}><div style={{fontWeight:600,fontSize:13,color:"rgba(255,255,255,0.9)",marginBottom:3}}>{h.title}</div><div style={{fontSize:11,color:"rgba(255,255,255,0.45)",lineHeight:1.55}}>{h.snippet?h.snippet.replace(/<[^>]*>/g,"")+"…":""}</div></div>)}</>}{ddgT.length>0&&<><div style={{...SEC,marginTop:10}}>Related</div>{ddgT.map((t,i)=><div key={i} className="sr" onClick={()=>browse(t.FirstURL)} style={{padding:"9px 12px",marginBottom:4,background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.07)",borderRadius:7,cursor:"pointer",transition:"background 0.12s"}}><div style={{fontSize:12,color:"rgba(255,255,255,0.75)",lineHeight:1.55}}>{t.Text}</div><div style={{fontSize:9,fontFamily:FFM,color:"rgba(255,255,255,0.2)",marginTop:3,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t.FirstURL}</div></div>)}</>}{!ddg?.AbstractText&&wikiH.length===0&&ddgT.length===0&&<div style={{textAlign:"center",padding:"40px 0",color:"rgba(255,255,255,0.2)",fontSize:13,fontStyle:"italic"}}>No results found.</div>}</div>)}</div>);
 }
  
+// ─── SNAKE ────────────────────────────────────────────────────────────────────
 function SnakeApp({AC}){
   const GRID=20,CELL=18,W=GRID*CELL,H=GRID*CELL;
-  const canvasRef=useRef(null);
-  const [phase,setPhase]=useState("idle");const [score,setScore]=useState(0);const [best,setBest]=useState(0);
+  const canvasRef=useRef(null);const [phase,setPhase]=useState("idle");const [score,setScore]=useState(0);const [best,setBest]=useState(0);
   const st=useRef({snake:[{x:10,y:10},{x:9,y:10},{x:8,y:10}],dir:{x:1,y:0},nextDir:{x:1,y:0},food:{x:15,y:8},score:0});
   const intv=useRef(null);
-  function randFood(snake){let p;do{p={x:Math.floor(Math.random()*GRID),y:Math.floor(Math.random()*GRID)};}while(snake.some(s=>s.x===p.x&&s.y===p.y));return p;}
-  function draw(){const c=canvasRef.current;if(!c)return;const ctx=c.getContext("2d");ctx.fillStyle="#0a0a14";ctx.fillRect(0,0,W,H);ctx.strokeStyle="rgba(255,255,255,0.03)";for(let i=0;i<GRID;i++){ctx.beginPath();ctx.moveTo(i*CELL,0);ctx.lineTo(i*CELL,H);ctx.stroke();ctx.beginPath();ctx.moveTo(0,i*CELL);ctx.lineTo(W,i*CELL);ctx.stroke();}const f=st.current.food;ctx.fillStyle="#ff4444";ctx.beginPath();ctx.arc(f.x*CELL+CELL/2,f.y*CELL+CELL/2,CELL/2-2,0,Math.PI*2);ctx.fill();st.current.snake.forEach((seg,i)=>{ctx.fillStyle=i===0?AC:"rgba("+hexRgb(AC)+","+(Math.max(0.3,0.9-i*0.015))+")";ctx.beginPath();if(typeof ctx.roundRect==="function")ctx.roundRect(seg.x*CELL+1,seg.y*CELL+1,CELL-2,CELL-2,3);else ctx.rect(seg.x*CELL+1,seg.y*CELL+1,CELL-2,CELL-2);ctx.fill();});}
+  function randFood(s){let p;do{p={x:Math.floor(Math.random()*GRID),y:Math.floor(Math.random()*GRID)};}while(s.some(x=>x.x===p.x&&x.y===p.y));return p;}
+  function draw(){const c=canvasRef.current;if(!c)return;const ctx=c.getContext("2d");ctx.fillStyle="#0a0a14";ctx.fillRect(0,0,W,H);ctx.strokeStyle="rgba(255,255,255,0.03)";for(let i=0;i<GRID;i++){ctx.beginPath();ctx.moveTo(i*CELL,0);ctx.lineTo(i*CELL,H);ctx.stroke();ctx.beginPath();ctx.moveTo(0,i*CELL);ctx.lineTo(W,i*CELL);ctx.stroke();}const f=st.current.food;ctx.fillStyle="#ff4444";ctx.beginPath();ctx.arc(f.x*CELL+CELL/2,f.y*CELL+CELL/2,CELL/2-2,0,Math.PI*2);ctx.fill();st.current.snake.forEach((seg,i)=>{ctx.fillStyle=i===0?AC:"rgba("+hexRgb(AC)+","+(Math.max(0.3,0.9-i*0.015))+")";ctx.beginPath();if(ctx.roundRect)ctx.roundRect(seg.x*CELL+1,seg.y*CELL+1,CELL-2,CELL-2,3);else ctx.rect(seg.x*CELL+1,seg.y*CELL+1,CELL-2,CELL-2);ctx.fill();});}
   function tick(){const s=st.current;s.dir=s.nextDir;const head={x:s.snake[0].x+s.dir.x,y:s.snake[0].y+s.dir.y};if(head.x<0||head.x>=GRID||head.y<0||head.y>=GRID||s.snake.some(seg=>seg.x===head.x&&seg.y===head.y)){clearInterval(intv.current);setBest(b=>Math.max(b,s.score));setPhase("over");return;}s.snake.unshift(head);if(head.x===s.food.x&&head.y===s.food.y){s.score++;setScore(s.score);s.food=randFood(s.snake);}else s.snake.pop();draw();}
   function start(){st.current={snake:[{x:10,y:10},{x:9,y:10},{x:8,y:10}],dir:{x:1,y:0},nextDir:{x:1,y:0},food:randFood([]),score:0};setScore(0);setPhase("playing");clearInterval(intv.current);intv.current=setInterval(tick,130);draw();}
   useEffect(()=>{
@@ -874,6 +969,7 @@ function SnakeApp({AC}){
   );
 }
  
+// ─── 2048 ─────────────────────────────────────────────────────────────────────
 function Game2048App({AC}){
   const TC={0:"rgba(255,255,255,0.05)",2:"#eee4da",4:"#ede0c8",8:"#f2b179",16:"#f59563",32:"#f67c5f",64:"#f65e3b",128:"#edcf72",256:"#edcc61",512:"#edc850",1024:"#edc53f",2048:"#edc22e"};
   const TT={0:"rgba(255,255,255,0.1)",2:"#776e65",4:"#776e65",8:"#f9f6f2",16:"#f9f6f2",32:"#f9f6f2",64:"#f9f6f2",128:"#f9f6f2",256:"#f9f6f2",512:"#f9f6f2",1024:"#f9f6f2",2048:"#f9f6f2"};
@@ -906,6 +1002,7 @@ function Game2048App({AC}){
   );
 }
  
+// ─── STORE ────────────────────────────────────────────────────────────────────
 function StoreApp({data,updateData,showToast,AC}){
   const [cat,setCat]=useState("All");const [search,setSearch]=useState("");
   const installed=data?.installedApps||[];
@@ -913,23 +1010,15 @@ function StoreApp({data,updateData,showToast,AC}){
   function toggleInstall(appId){const isIn=installed.includes(appId);updateData(p=>({...p,installedApps:isIn?p.installedApps.filter(id=>id!==appId):[...(p.installedApps||[]),appId]}));showToast(isIn?"App removed from desktop":"Added to desktop ✓");}
   return(
     <div style={{width:"100%",fontFamily:FF}}>
-      <div style={{marginBottom:16}}><div style={{fontFamily:FFB,fontWeight:700,fontSize:22,color:"#fff",marginBottom:4}}>🏪 Nova Store</div><div style={{fontSize:12,color:"rgba(255,255,255,0.35)"}}>Discover apps. ✓ In-App opens inside Nova Browser; ↗ New Tab opens externally.</div></div>
+      <div style={{marginBottom:16}}><div style={{fontFamily:FFB,fontWeight:700,fontSize:22,color:"#fff",marginBottom:4}}>🏪 Nova Store</div><div style={{fontSize:12,color:"rgba(255,255,255,0.35)"}}>✓ In-App opens inside Nova Browser · ↗ New Tab opens externally.</div></div>
       <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search apps…" style={{...INP,marginBottom:12}}/>
-      <div style={{display:"flex",gap:6,marginBottom:16,flexWrap:"wrap"}}>
-        {STORE_CATS.map(c=><button key={c} onClick={()=>setCat(c)} style={{padding:"5px 13px",background:cat===c?fill(AC):"rgba(255,255,255,0.06)",border:"1px solid "+(cat===c?bdr(AC):"rgba(255,255,255,0.1)"),borderRadius:20,cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:11,letterSpacing:0.5,color:cat===c?AC:"rgba(255,255,255,0.55)",transition:"all 0.12s"}}>{c}</button>)}
-      </div>
+      <div style={{display:"flex",gap:6,marginBottom:16,flexWrap:"wrap"}}>{STORE_CATS.map(c=><button key={c} onClick={()=>setCat(c)} style={{padding:"5px 13px",background:cat===c?fill(AC):"rgba(255,255,255,0.06)",border:"1px solid "+(cat===c?bdr(AC):"rgba(255,255,255,0.1)"),borderRadius:20,cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:11,color:cat===c?AC:"rgba(255,255,255,0.55)",transition:"all 0.12s"}}>{c}</button>)}</div>
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(260px,1fr))",gap:10}}>
         {filtered.map(app=>{const isIn=installed.includes(app.id);return(
           <div key={app.id} className="sc" style={{padding:"14px",background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:10,transition:"background 0.12s"}}>
             <div style={{display:"flex",alignItems:"flex-start",gap:12,marginBottom:10}}>
               <div style={{width:44,height:44,borderRadius:10,background:"rgba(255,255,255,0.07)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,flexShrink:0}}>{app.icon}</div>
-              <div style={{flex:1,minWidth:0}}>
-                <div style={{fontFamily:FFB,fontWeight:600,fontSize:14,color:"rgba(255,255,255,0.92)",marginBottom:2}}>{app.name}</div>
-                <div style={{display:"flex",alignItems:"center",gap:6}}>
-                  <span style={{fontSize:9,fontFamily:FFM,padding:"2px 6px",background:app.newTab?"rgba(255,180,0,0.12)":"rgba(79,200,100,0.12)",border:"1px solid "+(app.newTab?"rgba(255,180,0,0.3)":"rgba(79,200,100,0.3)"),borderRadius:4,color:app.newTab?"rgba(255,200,80,0.9)":"rgba(100,220,120,0.9)"}}>{app.badge}</span>
-                  <span style={{fontSize:10,color:"rgba(255,255,255,0.3)"}}>{app.cat}</span>
-                </div>
-              </div>
+              <div style={{flex:1,minWidth:0}}><div style={{fontFamily:FFB,fontWeight:600,fontSize:14,color:"rgba(255,255,255,0.92)",marginBottom:2}}>{app.name}</div><div style={{display:"flex",alignItems:"center",gap:6}}><span style={{fontSize:9,fontFamily:FFM,padding:"2px 6px",background:app.newTab?"rgba(255,180,0,0.12)":"rgba(79,200,100,0.12)",border:"1px solid "+(app.newTab?"rgba(255,180,0,0.3)":"rgba(79,200,100,0.3)"),borderRadius:4,color:app.newTab?"rgba(255,200,80,0.9)":"rgba(100,220,120,0.9)"}}>{app.badge}</span><span style={{fontSize:10,color:"rgba(255,255,255,0.3)"}}>{app.cat}</span></div></div>
             </div>
             <div style={{fontSize:12,color:"rgba(255,255,255,0.5)",lineHeight:1.55,marginBottom:12}}>{app.desc}</div>
             <div style={{display:"flex",gap:7}}>
@@ -945,12 +1034,13 @@ function StoreApp({data,updateData,showToast,AC}){
   );
 }
  
+// ─── TERMINAL ─────────────────────────────────────────────────────────────────
 function TerminalApp({user,AC}){
-  const [lines,setLines]=useState([{t:"out",v:"NOVA Terminal v3.4.0"},{t:"out",v:"Session: "+user+" — "+new Date().toLocaleString()},{t:"out",v:'Type "help" for commands.'},{t:"gap"}]);
+  const [lines,setLines]=useState([{t:"out",v:"NOVA Terminal v3.5.0"},{t:"out",v:"Session: "+user+" — "+new Date().toLocaleString()},{t:"out",v:'Type "help" for commands.'},{t:"gap"}]);
   const [cmd,setCmd]=useState("");const [hist,setHist]=useState([]);const [hIdx,setHIdx]=useState(-1);
   const endRef=useRef(null);
   useEffect(()=>{endRef.current?.scrollIntoView({behavior:"smooth"});},[lines]);
-  const CMDS={help:()=>["Commands: help, whoami, date, echo <text>, version, sysinfo, ls, neofetch, clear"],whoami:()=>[user],date:()=>[new Date().toLocaleString()],version:()=>["NOVA OS v3.4.0 — Nova Systems Inc."],sysinfo:()=>["CPU: Nova Virtual Core™","RAM: 8.0 GB","Storage: Firebase Firestore","Resolution: "+window.innerWidth+"x"+window.innerHeight,"Uptime: "+Math.floor(performance.now()/1000)+"s"],ls:()=>["notes/  tasks/  files/  paint/  browser/  snake/  2048/  store/  terminal/  settings/"],neofetch:()=>[" ███╗   ██╗ ██████╗ ██╗   ██╗ █████╗ "," ████╗  ██║██╔═══██╗██║   ██║██╔══██╗"," ██╔██╗ ██║██║   ██║██║   ██║███████║"," ██║╚██╗██║██║   ██║╚██╗ ██╔╝██╔══██║"," ██║ ╚████║╚██████╔╝ ╚████╔╝ ██║  ██║","OS: Nova v3.4  User: "+user,"Icons: Draggable · Multi-column · "+APPS.length+" built-in · "+STORE_CATALOG.length+" in store"],echo:args=>[args.join(" ")||"(empty)"],clear:()=>"__clear__"};
+  const CMDS={help:()=>["Commands: help, whoami, date, echo <text>, version, sysinfo, ls, neofetch, clear"],whoami:()=>[user],date:()=>[new Date().toLocaleString()],version:()=>["NOVA OS v3.5.0 — Nova Systems Inc."],sysinfo:()=>["CPU: Nova Virtual Core™","RAM: 8.0 GB","Storage: Firebase Firestore","Resolution: "+window.innerWidth+"x"+window.innerHeight,"Uptime: "+Math.floor(performance.now()/1000)+"s"],ls:()=>["notes/  tasks/  files/  paint/  browser/  snake/  2048/  store/  terminal/  settings/"],neofetch:()=>[" ███╗   ██╗ ██████╗ ██╗   ██╗ █████╗ "," ████╗  ██║██╔═══██╗██║   ██║██╔══██╗"," ██╔██╗ ██║██║   ██║██║   ██║███████║"," ██║╚██╗██║██║   ██║╚██╗ ██╔╝██╔══██║"," ██║ ╚████║╚██████╔╝ ╚████╔╝ ██║  ██║","OS: Nova v3.5  User: "+user,"Widgets: Clock · Weather  Icons: Snap-to-grid · No-overlap"],echo:args=>[args.join(" ")||"(empty)"],clear:()=>"__clear__"};
   function run(){const raw=cmd.trim();if(!raw)return;const parts=raw.split(" ");const c=parts[0].toLowerCase();const args=parts.slice(1);setHist(h=>[raw,...h]);setHIdx(-1);setCmd("");const nl=[...lines,{t:"in",v:raw}];const h=CMDS[c];if(!h){nl.push({t:"err",v:c+': not found. Try "help".'});}else{const r=h(args);if(r==="__clear__"){setLines([]);return;}r.forEach(v=>nl.push({t:"out",v}));}nl.push({t:"gap"});setLines(nl);}
   function onKey(e){if(e.key==="Enter"){run();return;}if(e.key==="ArrowUp"){const i=Math.min(hIdx+1,hist.length-1);setHIdx(i);if(hist[i])setCmd(hist[i]);}if(e.key==="ArrowDown"){const i=Math.max(hIdx-1,-1);setHIdx(i);setCmd(i===-1?"":(hist[i]||""));}}
   return(
@@ -964,30 +1054,51 @@ function TerminalApp({user,AC}){
   );
 }
  
+// ─── SETTINGS ─────────────────────────────────────────────────────────────────
 function SettingsApp({user,data,updateSettings,showToast,AC,onCustomWallpaper}){
   const settings=data?.settings||{};const fileRef=useRef(null);
   function handleUpload(e){const file=e.target.files[0];if(!file)return;if(file.size>8*1024*1024){showToast("File too large (max 8MB)");return;}const reader=new FileReader();reader.onload=ev=>{const img=new Image();img.onload=()=>{const canvas=document.createElement("canvas");const MAX=900;const ratio=Math.min(MAX/img.width,MAX/img.height,1);canvas.width=Math.round(img.width*ratio);canvas.height=Math.round(img.height*ratio);canvas.getContext("2d").drawImage(img,0,0,canvas.width,canvas.height);onCustomWallpaper(canvas.toDataURL("image/jpeg",0.72));};img.src=ev.target.result;};reader.readAsDataURL(file);e.target.value="";}
   const wpId=settings.wallpaper||data?.wallpaper||"nova";
+  const widgets=settings.widgets||{};
+  function setWidget(id,val){updateSettings({widgets:{...widgets,[id]:val}});}
   return(
     <div style={{width:"100%",fontFamily:FF}}>
+ 
+      {/* Accent */}
       <div style={SEC}>Accent Color</div>
       <div style={{display:"flex",gap:7,marginBottom:6,flexWrap:"wrap"}}>{ACCENT_PRESETS.map(c=><div key={c} className="ad" onClick={()=>{updateSettings({accent:c});showToast("Accent updated ✓");}} style={{width:28,height:28,borderRadius:7,background:c,cursor:"pointer",border:AC===c?"2.5px solid #fff":"2.5px solid transparent",transition:"transform 0.12s,border 0.12s",boxSizing:"border-box"}}/>)}<input type="color" value={AC} onChange={e=>updateSettings({accent:e.target.value})} style={{width:28,height:28,borderRadius:7,border:"1px solid rgba(255,255,255,0.15)",cursor:"pointer",background:"none"}} title="Custom color"/></div>
       <div style={{fontSize:10,color:"rgba(255,255,255,0.22)",marginBottom:20,fontFamily:FFM}}>Current: {AC}</div>
+ 
+      {/* Wallpaper */}
       <div style={SEC}>Wallpaper</div>
       <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8,marginBottom:10}}>{Object.entries(WALLPAPERS).filter(([k])=>k!=="custom").map(([k,w])=>(<div key={k} className="ws" onClick={()=>{updateSettings({wallpaper:k});showToast("Wallpaper: "+w.name+" ✓");}} style={{height:52,borderRadius:8,background:w.preview,cursor:"pointer",border:wpId===k?"2.5px solid #fff":"2px solid transparent",transition:"border 0.14s",boxSizing:"border-box",display:"flex",alignItems:"flex-end",padding:"5px 7px"}}><span style={{fontSize:9,fontFamily:FFB,fontWeight:600,color:"rgba(255,255,255,0.85)",textShadow:"0 1px 4px rgba(0,0,0,0.9)"}}>{w.name}</span></div>))}</div>
       <input ref={fileRef} type="file" accept="image/*" onChange={handleUpload} style={{display:"none"}}/>
       <button onClick={()=>fileRef.current.click()} style={{width:"100%",padding:"10px",background:wpId==="custom"?fill(AC):"rgba(255,255,255,0.06)",border:"1px solid "+(wpId==="custom"?bdr(AC):"rgba(255,255,255,0.12)"),borderRadius:8,cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:12,color:wpId==="custom"?AC:"rgba(255,255,255,0.6)",marginBottom:22}}>{wpId==="custom"?"✓ Custom Wallpaper Active — Click to Change":"📁 Upload Custom Wallpaper (PNG / JPG)"}</button>
-      <div style={SEC}>Window Blur</div>
+ 
+      {/* Desktop Widgets */}
+      <div style={SEC}>Desktop Widgets</div>
+      <div style={{fontSize:11,color:"rgba(255,255,255,0.3)",marginBottom:10,fontFamily:FF}}>Widgets float on the desktop and can be dragged anywhere.</div>
+      <Toggle label="🕐  Clock Widget"   value={!!widgets.clock}   onChange={v=>setWidget("clock",v)}   ac={AC}/>
+      <Toggle label="🌤️  Weather Widget" value={!!widgets.weather} onChange={v=>setWidget("weather",v)} ac={AC}/>
+      {widgets.weather&&<div style={{fontSize:11,color:"rgba(255,200,80,0.7)",fontFamily:FF,padding:"7px 10px",background:"rgba(255,200,0,0.06)",border:"1px solid rgba(255,200,0,0.15)",borderRadius:6,marginBottom:6}}>⚠ Weather requires location access — allow it in your browser when prompted.</div>}
+ 
+      {/* Window blur */}
+      <div style={{...SEC,marginTop:20}}>Window Blur</div>
       <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:20}}><input type="range" min={0} max={30} value={settings.winBlur??18} onChange={e=>updateSettings({winBlur:+e.target.value})} style={{flex:1,accentColor:AC}}/><span style={{fontSize:11,fontFamily:FFM,color:"rgba(255,255,255,0.4)",width:32}}>{settings.winBlur??18}px</span></div>
+ 
+      {/* Display */}
       <div style={SEC}>Display</div>
       <Toggle label="24-Hour Clock" value={!!settings.clock24h}  onChange={v=>updateSettings({clock24h:v})}  ac={AC}/>
       <Toggle label="Large Text"    value={!!settings.largeFont} onChange={v=>updateSettings({largeFont:v})} ac={AC}/>
+ 
+      {/* Account */}
       <div style={{...SEC,marginTop:22}}>Account</div>
       <div style={{padding:"11px 14px",background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:8}}><div style={{fontSize:11,color:"rgba(255,255,255,0.35)",marginBottom:2}}>Signed in as</div><div style={{fontFamily:FFB,fontWeight:600,fontSize:16,color:"#fff"}}>@{user}</div></div>
     </div>
   );
 }
  
+// ─── PROFILE ──────────────────────────────────────────────────────────────────
 function ProfileApp({user,data,updateData,showToast,AC}){
   const [bio,setBio]=useState(data?.bio||"");
   const joined=data?.joined?new Date(data.joined).toLocaleDateString([],{year:"numeric",month:"long",day:"numeric"}):"Unknown";
