@@ -1003,7 +1003,13 @@ function Stars({appId, ratings, rateApp, ac}){
 function AppCard({app, isIn, ac, ratings, rateApp, toggleInstall, currentUser, onDeleteApp}){
   // Only the user who submitted a community app can remove it from the store.
   // Official (catalog) apps have no `submitter`, so this is always false for them.
-  const canDeleteFromStore = app.submitter && app.submitter === currentUser;
+  // Defensive checks: submitter must be a non-empty string that matches the
+  // current logged-in user exactly. The final authority is the re-fetch in
+  // deleteApp — this just hides the button when it shouldn't be clickable.
+  const canDeleteFromStore =
+    typeof app.submitter === "string" && app.submitter.length > 0 &&
+    typeof currentUser === "string" && currentUser.length > 0 &&
+    app.submitter === currentUser;
   return(
     <div className="sc" style={{padding:"14px",background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:10,display:"flex",flexDirection:"column",gap:0,transition:"background 0.12s"}}>
       <div style={{display:"flex",alignItems:"flex-start",gap:11,marginBottom:8}}>
@@ -1096,10 +1102,21 @@ function StoreApp({user,data,updateData,showToast,AC}){
   }
 
   async function deleteApp(app){
-    // Submitter-only delete for community apps. Browser confirm is rough but
-    // adequate; the action is recoverable (you can resubmit) so not catastrophic.
-    if(app.submitter!==user)return;
-    if(!window.confirm("Remove \""+app.name+"\" from the store? This can't be undone."))return;
+    // Defense in depth: re-fetch the document so we check the AUTHORITATIVE
+    // submitter from Firestore, not the prop (which could be stale or wrong).
+    // The prop-level guard above the UI is the first gate; this is the second.
+    if(!app?.id){showToast("Missing app id");return;}
+    let fresh;
+    try{
+      const snap=await getDoc(doc(firestoreDb,"nova_user_apps",app.id));
+      if(!snap.exists()){showToast("App already removed");return;}
+      fresh=snap.data();
+    }catch{showToast("Couldn't verify owner — try again");return;}
+    if(!fresh.submitter||fresh.submitter!==user){
+      showToast("Only @"+(fresh.submitter||"the submitter")+" can delete this app");
+      return;
+    }
+    if(!window.confirm("Remove \""+(fresh.name||app.name)+"\" from the store? This can't be undone."))return;
     try{
       await deleteDoc(doc(firestoreDb,"nova_user_apps",app.id));
       showToast("App removed from store ✓");
