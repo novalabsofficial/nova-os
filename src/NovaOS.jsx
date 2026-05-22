@@ -1,4 +1,5 @@
-// NOVA OS v3.5 — Nova Systems
+
+// NOVA OS v4.0 — Nova Systems
 // Drop this into src/NovaOS.jsx
  
 import { useState, useEffect, useRef, useCallback } from "react";
@@ -85,7 +86,7 @@ const STORE_CATALOG = [
 ];
  
 const STORE_CATS    = ["All","Games","Media","Tools","Social","News"];
-const BOOT_MSGS     = ["NOVA OS v3.5 — Nova Systems","Initializing kernel... OK","Loading hardware abstraction layer... OK","Mounting filesystems... OK","Starting widget engine... OK","Loading user environment... OK","System ready."];
+const BOOT_MSGS     = ["NOVA OS v4.0 — Nova Systems","Initializing kernel... OK","Loading hardware abstraction layer... OK","Mounting filesystems... OK","Starting widget engine... OK","Initializing Nova Store... OK","Loading user environment... OK","System ready."];
 const ACCENT_PRESETS= ["#4f9eff","#ff6b6b","#4cef90","#ffcc44","#cc44ff","#ff8c44","#44ddcc","#ff44aa"];
 const BOOKMARKS     = [{label:"Hacker News",url:"https://news.ycombinator.com"},{label:"Wikipedia",url:"https://en.m.wikipedia.org"},{label:"Archive.org",url:"https://archive.org"},{label:"itch.io",url:"https://itch.io"}];
 const PAINT_COLORS  = ["#fff","#000","#ff4444","#ff8800","#ffdd00","#44dd44","#00ccff","#4466ff","#cc44ff","#ff44aa","#8b4513","#888"];
@@ -173,8 +174,39 @@ const CSS=`
 `;
  
 // ─── BACKGROUNDS ─────────────────────────────────────────────────────────────
-function NovaBg(){return(<svg style={{position:"absolute",inset:0,width:"100%",height:"100%"}} viewBox="0 0 1440 900" preserveAspectRatio="xMidYMid slice"><defs><radialGradient id="nb1" cx="22%" cy="18%" r="60%"><stop offset="0%" stopColor="#0ea5e9" stopOpacity="0.55"/><stop offset="100%" stopColor="#0ea5e9" stopOpacity="0"/></radialGradient><radialGradient id="nb2" cx="82%" cy="82%" r="55%"><stop offset="0%" stopColor="#7c3aed" stopOpacity="0.5"/><stop offset="100%" stopColor="#7c3aed" stopOpacity="0"/></radialGradient><radialGradient id="nb3" cx="72%" cy="8%" r="40%"><stop offset="0%" stopColor="#ec4899" stopOpacity="0.35"/><stop offset="100%" stopColor="#ec4899" stopOpacity="0"/></radialGradient><radialGradient id="nb4" cx="8%" cy="78%" r="35%"><stop offset="0%" stopColor="#14b8a6" stopOpacity="0.3"/><stop offset="100%" stopColor="#14b8a6" stopOpacity="0"/></radialGradient></defs><rect width="1440" height="900" fill="#07080f"/><rect width="1440" height="900" fill="url(#nb1)"/><rect width="1440" height="900" fill="url(#nb2)"/><rect width="1440" height="900" fill="url(#nb3)"/><rect width="1440" height="900" fill="url(#nb4)"/>{[...Array(55)].map((_,i)=>{const x=(i*137.5)%1440,y=(i*97.3)%900;return<circle key={i} cx={x} cy={y} r={i%3===0?1.5:1} fill="rgba(255,255,255,0.3)"/>;})}</svg>);}
- 
+function NovaBg(){
+  return(
+    <svg style={{position:"absolute",inset:0,width:"100%",height:"100%"}} viewBox="0 0 1440 900" preserveAspectRatio="xMidYMid slice">
+      <defs>
+        <radialGradient id="n1" cx="15%" cy="25%" r="70%"><stop offset="0%" stopColor="#1d4ed8" stopOpacity="0.9"/><stop offset="60%" stopColor="#3b0764" stopOpacity="0.5"/><stop offset="100%" stopColor="#030712" stopOpacity="0"/></radialGradient>
+        <radialGradient id="n2" cx="85%" cy="80%" r="65%"><stop offset="0%" stopColor="#7c3aed" stopOpacity="0.85"/><stop offset="55%" stopColor="#1e1b4b" stopOpacity="0.4"/><stop offset="100%" stopColor="#030712" stopOpacity="0"/></radialGradient>
+        <radialGradient id="n3" cx="80%" cy="10%" r="50%"><stop offset="0%" stopColor="#0891b2" stopOpacity="0.7"/><stop offset="100%" stopColor="#0891b2" stopOpacity="0"/></radialGradient>
+        <radialGradient id="n4" cx="45%" cy="55%" r="40%"><stop offset="0%" stopColor="#4f46e5" stopOpacity="0.3"/><stop offset="100%" stopColor="#4f46e5" stopOpacity="0"/></radialGradient>
+        <radialGradient id="n5" cx="5%"  cy="90%" r="35%"><stop offset="0%" stopColor="#0d9488" stopOpacity="0.5"/><stop offset="100%" stopColor="#0d9488" stopOpacity="0"/></radialGradient>
+        <radialGradient id="n6" cx="55%" cy="5%"  r="30%"><stop offset="0%" stopColor="#db2777" stopOpacity="0.45"/><stop offset="100%" stopColor="#db2777" stopOpacity="0"/></radialGradient>
+        <filter id="nblur"><feGaussianBlur stdDeviation="28"/></filter>
+      </defs>
+      {/* Deep base */}
+      <rect width="1440" height="900" fill="#020510"/>
+      {/* Bloom layers - filtered for soft glow */}
+      <g filter="url(#nblur)">
+        <rect width="1440" height="900" fill="url(#n1)"/>
+        <rect width="1440" height="900" fill="url(#n2)"/>
+        <rect width="1440" height="900" fill="url(#n3)"/>
+        <rect width="1440" height="900" fill="url(#n4)"/>
+        <rect width="1440" height="900" fill="url(#n5)"/>
+        <rect width="1440" height="900" fill="url(#n6)"/>
+      </g>
+      {/* Subtle horizon shimmer */}
+      <rect x="0" y="420" width="1440" height="1" fill="rgba(139,92,246,0.15)"/>
+      {/* Stars */}
+      {[...Array(80)].map((_,i)=>{
+        const x=(i*173.7+31)%1440, y=(i*97.3+17)%900, r=i%5===0?1.8:i%3===0?1.2:0.7;
+        return <circle key={i} cx={x} cy={y} r={r} fill="rgba(255,255,255,0.55)"/>;
+      })}
+    </svg>
+  );
+}
 function BlissBg(){return(<svg style={{position:"absolute",inset:0,width:"100%",height:"100%"}} viewBox="0 0 1440 900" preserveAspectRatio="xMidYMid slice"><defs><linearGradient id="gsky" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#1b5c90"/><stop offset="30%" stopColor="#3990cc"/><stop offset="65%" stopColor="#6ab6e8"/><stop offset="100%" stopColor="#a4d4f0"/></linearGradient><linearGradient id="ghb" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#478c18"/><stop offset="100%" stopColor="#1e5007"/></linearGradient><linearGradient id="ghm" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#57b820"/><stop offset="100%" stopColor="#27680e"/></linearGradient><linearGradient id="ghf" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#6cca2c"/><stop offset="100%" stopColor="#337a14"/></linearGradient><linearGradient id="gfg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#3d8814"/><stop offset="100%" stopColor="#194807"/></linearGradient></defs><rect width="1440" height="900" fill="url(#gsky)"/>{[[310,165,150,50],[278,158,100,37],[350,155,85,40],[970,128,120,40],[940,121,78,29],[1170,200,130,44]].map(([cx,cy,rx,ry],i)=><ellipse key={i} cx={cx} cy={cy} rx={rx} ry={ry} fill={"rgba(255,255,255,"+(0.42+(i%3)*0.09)+")"}/>)}<path d="M0 590 Q200 450 430 530 Q630 610 860 480 Q1040 365 1210 445 Q1350 505 1440 460 L1440 900 L0 900Z" fill="url(#ghb)"/><path d="M0 645 Q170 515 380 585 Q570 655 775 540 Q955 425 1155 505 Q1305 565 1440 522 L1440 900 L0 900Z" fill="url(#ghm)"/><path d="M-10 725 Q70 640 190 658 Q310 678 440 730 Q615 796 808 682 Q955 598 1090 628 Q1230 658 1360 618 L1460 610 L1460 900 L-10 900Z" fill="url(#ghf)"/><path d="M0 818 Q370 778 720 795 Q1020 810 1440 778 L1440 900 L0 900Z" fill="url(#gfg)"/></svg>);}
  
 function Wallpaper({id,customUrl}){
@@ -520,13 +552,13 @@ export default function NovaOS(){
     setBusy(true);setAuthErr("");
     if(mode==="register"){
       const ex=await db.get("user:"+u+":pw");if(ex!==null){setAuthErr("Username taken.");setBusy(false);return;}
-      await db.set("user:"+u+":pw",p);const init={notes:[],tasks:[],wallpaper:"nova",bio:"",joined:Date.now(),settings:{},installedApps:[]};
+      await db.set("user:"+u+":pw",p);const init={notes:[],tasks:[],wallpaper:"nova",bio:"",joined:Date.now(),settings:{},installedApps:[],folders:[]};
       await db.set("user:"+u+":data",init);setUser(u);setData(init);setIconPos({});setWidgetState(DEFAULT_WIDGET_STATE);setScreen("desktop");
     }else{
       const stored=await db.get("user:"+u+":pw");if(stored===null){setAuthErr("Account not found.");setBusy(false);return;}
       if(stored!==p){setAuthErr("Incorrect password.");setBusy(false);return;}
       const d=await db.get("user:"+u+":data");const savedIconPos=await db.get("user:"+u+":iconpos");
-      setUser(u);setData(d||{notes:[],tasks:[],wallpaper:"nova",bio:"",joined:Date.now(),settings:{},installedApps:[]});
+      setUser(u);setData(d||{notes:[],tasks:[],wallpaper:"nova",bio:"",joined:Date.now(),settings:{},installedApps:[],folders:[]});
       setIconPos(savedIconPos||{});
       if(d?.settings?.widgetState)setWidgetState({...DEFAULT_WIDGET_STATE,...d.settings.widgetState});
       setScreen("desktop");
@@ -545,10 +577,10 @@ export default function NovaOS(){
   const dragCursor=drag?(drag.type==="move"?"grabbing":drag.edge+"-resize"):widgetResize?(widgetResize.edge+"-resize"):isAnyDrag?"grabbing":"default";
  
   // ── BOOT ─────────────────────────────────────────────────────────────────
-  if(screen==="boot")return(<div style={{width:"100%",height:"100vh",background:"#07080f",display:"flex",flexDirection:"column",justifyContent:"center",padding:"10vh 12%"}}><style>{CSS}</style><div style={{fontFamily:FFB,fontWeight:700,fontSize:66,letterSpacing:4,color:"#fff",marginBottom:4,lineHeight:1}}>NOVA</div><div style={{fontFamily:FF,fontSize:12,color:"rgba(255,255,255,0.22)",letterSpacing:5,marginBottom:46}}>OPERATING SYSTEM  ·  v3.5</div>{bootLines.map((l,i)=><div key={i} style={{fontFamily:FFM,fontSize:12,color:l.includes("ready")?"#4f9eff":"rgba(255,255,255,0.42)",marginBottom:5,animation:"boot-in 0.13s ease-out"}}>{l.includes("OK")?<>{l.replace("... OK","")}... <span style={{color:"#4cef90"}}>OK</span></>:l}</div>)}</div>);
+  if(screen==="boot")return(<div style={{width:"100%",height:"100vh",background:"#07080f",display:"flex",flexDirection:"column",justifyContent:"center",padding:"10vh 12%"}}><style>{CSS}</style><div style={{fontFamily:FFB,fontWeight:700,fontSize:66,letterSpacing:4,color:"#fff",marginBottom:4,lineHeight:1}}>NOVA</div><div style={{fontFamily:FF,fontSize:12,color:"rgba(255,255,255,0.22)",letterSpacing:5,marginBottom:46}}>OPERATING SYSTEM  ·  v4.0</div>{bootLines.map((l,i)=><div key={i} style={{fontFamily:FFM,fontSize:12,color:l.includes("ready")?"#4f9eff":"rgba(255,255,255,0.42)",marginBottom:5,animation:"boot-in 0.13s ease-out"}}>{l.includes("OK")?<>{l.replace("... OK","")}... <span style={{color:"#4cef90"}}>OK</span></>:l}</div>)}</div>);
  
   // ── LOGIN ────────────────────────────────────────────────────────────────
-  if(screen==="login")return(<div style={{width:"100%",height:"100vh",position:"relative",overflow:"hidden"}}><style>{CSS}</style><NovaBg/><div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center"}}><div style={{background:"rgba(8,10,22,0.86)",backdropFilter:"blur(24px)",border:"1px solid rgba(255,255,255,0.11)",borderRadius:16,padding:"44px 40px",width:376,boxShadow:"0 40px 100px rgba(0,0,0,0.6)",position:"relative",overflow:"hidden"}}><div style={{position:"absolute",top:0,left:0,right:0,height:2,background:"linear-gradient(90deg,transparent,"+DEFAULT_AC+",transparent)"}}/><div style={{fontFamily:FFB,fontWeight:700,fontSize:38,color:"#fff",textAlign:"center",letterSpacing:4,marginBottom:4}}>NOVA</div><div style={{fontFamily:FF,fontSize:11,color:"rgba(255,255,255,0.22)",textAlign:"center",letterSpacing:4,marginBottom:36}}>OPERATING SYSTEM  ·  v3.5</div><div style={{display:"flex",borderBottom:"1px solid rgba(255,255,255,0.09)",marginBottom:24}}>{["login","register"].map(m=><button key={m} className="lt" onClick={()=>{setMode(m);setAuthErr("");}} style={{flex:1,padding:"10px 0",background:"none",border:"none",borderBottom:mode===m?"2px solid "+DEFAULT_AC:"2px solid transparent",cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:12,letterSpacing:1,color:mode===m?DEFAULT_AC:"rgba(255,255,255,0.28)",transition:"color 0.15s"}}>{m==="login"?"SIGN IN":"REGISTER"}</button>)}</div><input style={{...INP,marginBottom:11}} placeholder="Username" value={uname} onChange={e=>setUname(e.target.value)} onKeyDown={e=>e.key==="Enter"&&handleAuth()} autoFocus/><input style={INP} type="password" placeholder="Password" value={pass} onChange={e=>setPass(e.target.value)} onKeyDown={e=>e.key==="Enter"&&handleAuth()}/><button className="ls" disabled={busy} onClick={handleAuth} style={{width:"100%",padding:"12px",background:fill(DEFAULT_AC),border:"1px solid "+bdr(DEFAULT_AC),borderRadius:8,cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:14,letterSpacing:1,color:"#fff",marginTop:14,transition:"opacity 0.15s"}}>{busy?"AUTHENTICATING…":mode==="login"?"SIGN IN →":"CREATE ACCOUNT →"}</button>{authErr&&<div style={{color:"#ff7878",fontFamily:FF,fontSize:13,textAlign:"center",marginTop:12}}>⚠ {authErr}</div>}<div style={{marginTop:20,fontFamily:FF,fontStyle:"italic",fontSize:11,color:"rgba(255,255,255,0.14)",textAlign:"center"}}>Don't reuse real passwords — demo auth only.</div></div></div></div>);
+  if(screen==="login")return(<div style={{width:"100%",height:"100vh",position:"relative",overflow:"hidden"}}><style>{CSS}</style><NovaBg/><div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center"}}><div style={{background:"rgba(8,10,22,0.86)",backdropFilter:"blur(24px)",border:"1px solid rgba(255,255,255,0.11)",borderRadius:16,padding:"44px 40px",width:376,boxShadow:"0 40px 100px rgba(0,0,0,0.6)",position:"relative",overflow:"hidden"}}><div style={{position:"absolute",top:0,left:0,right:0,height:2,background:"linear-gradient(90deg,transparent,"+DEFAULT_AC+",transparent)"}}/><div style={{fontFamily:FFB,fontWeight:700,fontSize:38,color:"#fff",textAlign:"center",letterSpacing:4,marginBottom:4}}>NOVA</div><div style={{fontFamily:FF,fontSize:11,color:"rgba(255,255,255,0.22)",textAlign:"center",letterSpacing:4,marginBottom:36}}>OPERATING SYSTEM  ·  v4.0</div><div style={{display:"flex",borderBottom:"1px solid rgba(255,255,255,0.09)",marginBottom:24}}>{["login","register"].map(m=><button key={m} className="lt" onClick={()=>{setMode(m);setAuthErr("");}} style={{flex:1,padding:"10px 0",background:"none",border:"none",borderBottom:mode===m?"2px solid "+DEFAULT_AC:"2px solid transparent",cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:12,letterSpacing:1,color:mode===m?DEFAULT_AC:"rgba(255,255,255,0.28)",transition:"color 0.15s"}}>{m==="login"?"SIGN IN":"REGISTER"}</button>)}</div><input style={{...INP,marginBottom:11}} placeholder="Username" value={uname} onChange={e=>setUname(e.target.value)} onKeyDown={e=>e.key==="Enter"&&handleAuth()} autoFocus/><input style={INP} type="password" placeholder="Password" value={pass} onChange={e=>setPass(e.target.value)} onKeyDown={e=>e.key==="Enter"&&handleAuth()}/><button className="ls" disabled={busy} onClick={handleAuth} style={{width:"100%",padding:"12px",background:fill(DEFAULT_AC),border:"1px solid "+bdr(DEFAULT_AC),borderRadius:8,cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:14,letterSpacing:1,color:"#fff",marginTop:14,transition:"opacity 0.15s"}}>{busy?"AUTHENTICATING…":mode==="login"?"SIGN IN →":"CREATE ACCOUNT →"}</button>{authErr&&<div style={{color:"#ff7878",fontFamily:FF,fontSize:13,textAlign:"center",marginTop:12}}>⚠ {authErr}</div>}<div style={{marginTop:20,fontFamily:FF,fontStyle:"italic",fontSize:11,color:"rgba(255,255,255,0.14)",textAlign:"center"}}>Don't reuse real passwords — demo auth only.</div></div></div></div>);
  
   // ── DESKTOP ──────────────────────────────────────────────────────────────
   return(
@@ -607,7 +639,7 @@ export default function NovaOS(){
         </div>
         <div style={{padding:"10px 16px",borderTop:"1px solid rgba(255,255,255,0.07)",display:"flex",alignItems:"center",gap:10}}>
           <div style={{width:32,height:32,borderRadius:"50%",background:fill(AC),border:"1.5px solid "+AC,display:"flex",alignItems:"center",justifyContent:"center",fontSize:15,flexShrink:0}}>👤</div>
-          <div style={{flex:1}}><div style={{fontFamily:FFB,fontWeight:600,fontSize:13,color:"#fff"}}>@{user}</div><div style={{fontFamily:FF,fontSize:10,color:"rgba(255,255,255,0.3)"}}>Nova OS v3.5</div></div>
+          <div style={{flex:1}}><div style={{fontFamily:FFB,fontWeight:600,fontSize:13,color:"#fff"}}>@{user}</div><div style={{fontFamily:FF,fontSize:10,color:"rgba(255,255,255,0.3)"}}>Nova OS v4.0</div></div>
           <button onClick={logout} style={{padding:"6px 12px",background:"rgba(200,40,40,0.12)",border:"1px solid rgba(200,40,40,0.3)",borderRadius:6,cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:11,color:"rgba(255,140,140,0.9)"}}>Logout</button>
         </div>
       </div>)}
@@ -636,7 +668,7 @@ export default function NovaOS(){
               {win.app==="browser"  &&<BrowserApp  AC={AC}/>}
               {win.app==="snake"    &&<SnakeApp    AC={AC}/>}
               {win.app==="2048"     &&<Game2048App AC={AC}/>}
-              {win.app==="store"    &&<StoreApp    data={data} updateData={updateData} showToast={showToast} AC={AC}/>}
+              {win.app==="store"    &&<StoreApp    user={user} data={data} updateData={updateData} showToast={showToast} AC={AC}/>}
               {win.app==="terminal" &&<TerminalApp user={user} AC={AC}/>}
               {win.app==="chat"     &&<ChatApp     user={user} AC={AC}/>}
               {win.app==="settings" &&<SettingsApp user={user} data={data} updateSettings={updateSettings} showToast={showToast} AC={AC} onCustomWallpaper={handleCustomWallpaper}/>}
@@ -680,12 +712,190 @@ function TasksApp({data,updateData,showToast,AC}){
 }
 function TRow({t,onToggle,onDel,AC}){return(<div style={{display:"flex",alignItems:"center",gap:9,padding:"8px 11px",marginBottom:4,background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.07)",borderRadius:7,opacity:t.done?0.4:1,transition:"opacity 0.2s"}}><div onClick={()=>onToggle(t.id)} style={{width:17,height:17,borderRadius:5,border:"1.5px solid "+(t.done?AC:"rgba(255,255,255,0.22)"),background:t.done?AC:"transparent",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,transition:"all 0.14s"}}>{t.done&&<span style={{color:"#000",fontSize:9,fontWeight:900}}>✓</span>}</div><span style={{flex:1,fontFamily:FF,fontSize:13,color:"rgba(255,255,255,0.88)",textDecoration:t.done?"line-through":"none"}}>{t.text}</span><button className="dl" onClick={()=>onDel(t.id)} style={{background:"none",border:"none",cursor:"pointer",color:"rgba(255,80,80,0.28)",fontSize:12,padding:0,transition:"color 0.12s"}}>✕</button></div>);}
  
-function FilesApp({data,updateData,showToast}){
-  const [path,setPath]=useState("home");const [preview,setPreview]=useState(null);
-  const notes=data?.notes||[];const tasks=data?.tasks||[];
-  if(path==="home")return(<div style={{width:"100%",fontFamily:FF}}><div style={SEC}>File Explorer</div><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:9}}>{[{id:"notes",icon:"📄",label:"Notes",count:notes.length},{id:"tasks",icon:"📋",label:"Tasks",count:tasks.length}].map(f=>(<div key={f.id} className="fr" onClick={()=>setPath(f.id)} style={{display:"flex",alignItems:"center",gap:11,padding:"13px 14px",background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:8,cursor:"pointer",transition:"background 0.12s"}}><span style={{fontSize:26}}>{f.icon}</span><div><div style={{fontWeight:600,fontSize:13,color:"rgba(255,255,255,0.9)"}}>{f.label}</div><div style={{fontSize:10,color:"rgba(255,255,255,0.35)",marginTop:2}}>{f.count} file{f.count!==1?"s":""}</div></div></div>))}</div></div>);
-  if(path==="notes")return(<div style={{width:"100%",fontFamily:FF}}><div style={{display:"flex",alignItems:"center",gap:8,marginBottom:14}}><button onClick={()=>{setPath("home");setPreview(null);}} style={{padding:"4px 11px",background:"rgba(255,255,255,0.07)",border:"1px solid rgba(255,255,255,0.11)",borderRadius:6,cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:10,color:"rgba(255,255,255,0.55)"}}>← Back</button><div style={SEC}>📄 Notes</div></div>{notes.length===0&&<div style={{color:"rgba(255,255,255,0.2)",fontSize:12,fontStyle:"italic"}}>No notes yet.</div>}{notes.map(n=>(<div key={n.id} className="fr" onClick={()=>setPreview(n)} style={{display:"flex",alignItems:"center",gap:9,padding:"9px 12px",marginBottom:4,background:preview?.id===n.id?"rgba(79,158,255,0.1)":"rgba(255,255,255,0.03)",border:"1px solid "+(preview?.id===n.id?"rgba(79,158,255,0.35)":"rgba(255,255,255,0.07)"),borderRadius:7,cursor:"pointer",transition:"background 0.12s"}}><span style={{fontSize:14}}>📄</span><div style={{flex:1,minWidth:0}}><div style={{fontWeight:600,fontSize:12,color:"rgba(255,255,255,0.88)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{n.title}</div><div style={{fontSize:9,color:"rgba(255,255,255,0.28)",fontFamily:FFM}}>{new Date(n.ts).toLocaleDateString()}</div></div><button className="dl" onClick={e=>{e.stopPropagation();updateData(p=>({...p,notes:p.notes.filter(x=>x.id!==n.id)}));if(preview?.id===n.id)setPreview(null);showToast("Deleted");}} style={{background:"none",border:"none",cursor:"pointer",color:"rgba(255,80,80,0.28)",fontSize:12,padding:0,transition:"color 0.12s",flexShrink:0}}>✕</button></div>))}{preview&&<div style={{marginTop:12,padding:"13px 14px",background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:8}}><div style={{fontWeight:600,fontSize:14,color:"rgba(255,255,255,0.92)",marginBottom:7}}>{preview.title}</div><div style={{fontSize:12,color:"rgba(255,255,255,0.52)",lineHeight:1.7,whiteSpace:"pre-wrap"}}>{preview.body||"(no content)"}</div></div>}</div>);
-  return(<div style={{width:"100%",fontFamily:FF}}><div style={{display:"flex",alignItems:"center",gap:8,marginBottom:14}}><button onClick={()=>setPath("home")} style={{padding:"4px 11px",background:"rgba(255,255,255,0.07)",border:"1px solid rgba(255,255,255,0.11)",borderRadius:6,cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:10,color:"rgba(255,255,255,0.55)"}}>← Back</button><div style={SEC}>📋 Tasks</div></div>{tasks.length===0&&<div style={{color:"rgba(255,255,255,0.2)",fontSize:12,fontStyle:"italic"}}>No tasks yet.</div>}{tasks.map(t=>(<div key={t.id} style={{display:"flex",alignItems:"center",gap:9,padding:"8px 11px",marginBottom:4,background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.07)",borderRadius:7,opacity:t.done?0.42:1}}><span style={{fontSize:12}}>{t.done?"✅":"⬜"}</span><span style={{flex:1,fontSize:12,color:"rgba(255,255,255,0.85)",textDecoration:t.done?"line-through":"none"}}>{t.text}</span><span style={{fontSize:9,fontFamily:FFM,color:"rgba(255,255,255,0.22)"}}>{t.done?"done":"open"}</span></div>))}</div>);
+function FilesApp({data,updateData,showToast,AC}){
+  const [curId,setCurId]=useState(null); // null = root
+  const [preview,setPreview]=useState(null);
+  const [newFolderName,setNewFolderName]=useState("");
+  const [showNewFolder,setShowNewFolder]=useState(false);
+  const [showNewNote,setShowNewNote]=useState(false);
+  const [newNoteTitle,setNewNoteTitle]=useState("");
+  const [newNoteBody,setNewNoteBody]=useState("");
+  const [movingItem,setMovingItem]=useState(null); // {type,id,name}
+  const [editingFolder,setEditingFolder]=useState(null); // {id,name}
+ 
+  const ac=AC||DEFAULT_AC;
+  const folders=data?.folders||[];
+  const notes=data?.notes||[];
+  const tasks=data?.tasks||[];
+ 
+  // Build breadcrumb path
+  function buildPath(id){
+    if(!id)return [];
+    const path=[];let cur=id;
+    while(cur){const f=folders.find(x=>x.id===cur);if(!f)break;path.unshift(f);cur=f.parentId;}
+    return path;
+  }
+  const breadcrumb=buildPath(curId);
+  const subFolders=folders.filter(f=>f.parentId===curId);
+  const curNotes=notes.filter(n=>(n.folderId||null)===curId);
+  const curTasks=tasks.filter(t=>(t.folderId||null)===curId);
+ 
+  function createFolder(){
+    if(!newFolderName.trim())return;
+    const f={id:"f"+Date.now(),name:newFolderName.trim(),parentId:curId,created:Date.now()};
+    updateData(p=>({...p,folders:[...(p.folders||[]),f]}));
+    setNewFolderName("");setShowNewFolder(false);showToast("Folder created \u2713");
+  }
+  function deleteFolder(fid){
+    function desc(id){const ch=folders.filter(f=>f.parentId===id);return[id,...ch.flatMap(c=>desc(c.id))];}
+    const dead=new Set(desc(fid));
+    if(!window.confirm("Delete this folder and move its contents to root?"))return;
+    updateData(p=>({...p,
+      folders:p.folders.filter(f=>!dead.has(f.id)),
+      notes:p.notes.map(n=>dead.has(n.folderId)?{...n,folderId:null}:n),
+      tasks:p.tasks.map(t=>dead.has(t.folderId)?{...t,folderId:null}:t),
+    }));
+    showToast("Folder deleted");
+  }
+  function renameFolder(id,name){
+    if(!name.trim())return;
+    updateData(p=>({...p,folders:p.folders.map(f=>f.id===id?{...f,name:name.trim()}:f)}));
+    setEditingFolder(null);showToast("Renamed \u2713");
+  }
+  function createNote(){
+    if(!newNoteTitle.trim())return;
+    updateData(p=>({...p,notes:[{id:Date.now(),title:newNoteTitle.trim(),body:newNoteBody.trim(),ts:Date.now(),folderId:curId},...(p.notes||[])]}));
+    setNewNoteTitle("");setNewNoteBody("");setShowNewNote(false);showToast("Note created \u2713");
+  }
+  function deleteNote(id){updateData(p=>({...p,notes:p.notes.filter(n=>n.id!==id)}));if(preview?.id===id)setPreview(null);showToast("Deleted");}
+  function deleteTask(id){updateData(p=>({...p,tasks:p.tasks.filter(t=>t.id!==id)}));showToast("Deleted");}
+  function toggleTask(id){updateData(p=>({...p,tasks:p.tasks.map(t=>t.id===id?{...t,done:!t.done}:t)}));}
+  function moveNote(noteId,fid){updateData(p=>({...p,notes:p.notes.map(n=>n.id===noteId?{...n,folderId:fid}:n)}));setMovingItem(null);showToast("Moved \u2713");}
+  function moveTask(taskId,fid){updateData(p=>({...p,tasks:p.tasks.map(t=>t.id===taskId?{...t,folderId:fid}:t)}));setMovingItem(null);showToast("Moved \u2713");}
+ 
+  // All folder options for move dropdown
+  const folderOpts=[{id:null,label:"\ud83c\udfe0 Home (root)"}];
+  function addOpt(fid,depth){
+    const f=folders.find(x=>x.id===fid);if(!f)return;
+    folderOpts.push({id:fid,label:"\u00a0".repeat(depth*3)+"\ud83d\udcc1 "+f.name});
+    folders.filter(x=>x.parentId===fid).forEach(c=>addOpt(c.id,depth+1));
+  }
+  folders.filter(f=>!f.parentId).forEach(f=>addOpt(f.id,1));
+ 
+  const itemCount=(fid)=>folders.filter(x=>x.parentId===fid).length+notes.filter(n=>n.folderId===fid).length+tasks.filter(t=>t.folderId===fid).length;
+  const btStyle=(active)=>({padding:"5px 11px",background:active?fill(ac):"rgba(255,255,255,0.06)",border:"1px solid "+(active?bdr(ac):"rgba(255,255,255,0.11)"),borderRadius:6,cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:11,color:active?ac:"rgba(255,255,255,0.6)"});
+ 
+  return(
+    <div style={{width:"100%",fontFamily:FF}}>
+      {/* Breadcrumb + action buttons */}
+      <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:12,flexWrap:"wrap"}}>
+        <div style={{display:"flex",alignItems:"center",gap:4,flex:1,flexWrap:"wrap",fontFamily:FFB,fontWeight:600,fontSize:12}}>
+          <span style={{cursor:"pointer",color:curId?ac:"rgba(255,255,255,0.6)"}} onClick={()=>setCurId(null)}>\ud83c\udfe0 Home</span>
+          {breadcrumb.map((f,i)=>(
+            <span key={f.id} style={{display:"flex",alignItems:"center",gap:4}}>
+              <span style={{color:"rgba(255,255,255,0.2)"}}>{">"}</span>
+              <span style={{cursor:"pointer",color:i===breadcrumb.length-1?"rgba(255,255,255,0.7)":ac}} onClick={()=>setCurId(f.id)}>{f.name}</span>
+            </span>
+          ))}
+        </div>
+        <button onClick={()=>{setShowNewFolder(v=>!v);setShowNewNote(false);}} style={btStyle(showNewFolder)}>\ud83d\udcc1 New Folder</button>
+        <button onClick={()=>{setShowNewNote(v=>!v);setShowNewFolder(false);}} style={btStyle(showNewNote)}>\ud83d\udcc4 New Note</button>
+      </div>
+ 
+      {/* New folder input */}
+      {showNewFolder&&(
+        <div style={{display:"flex",gap:7,marginBottom:10}}>
+          <input autoFocus value={newFolderName} onChange={e=>setNewFolderName(e.target.value)} onKeyDown={e=>e.key==="Enter"&&createFolder()} placeholder="Folder name\u2026" style={{...INP,flex:1}}/>
+          <button onClick={createFolder} style={{padding:"7px 14px",background:fill(ac),border:"1px solid "+bdr(ac),borderRadius:7,cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:12,color:ac}}>Create</button>
+          <button onClick={()=>setShowNewFolder(false)} style={{padding:"7px 11px",background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.11)",borderRadius:7,cursor:"pointer",color:"rgba(255,255,255,0.5)",fontFamily:FFB,fontSize:12}}>\u2715</button>
+        </div>
+      )}
+ 
+      {/* New note input */}
+      {showNewNote&&(
+        <div style={{padding:12,background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:8,marginBottom:10,display:"flex",flexDirection:"column",gap:7}}>
+          <input autoFocus value={newNoteTitle} onChange={e=>setNewNoteTitle(e.target.value)} onKeyDown={e=>e.key==="Enter"&&createNote()} placeholder="Note title\u2026" style={INP}/>
+          <textarea value={newNoteBody} onChange={e=>setNewNoteBody(e.target.value)} placeholder="Content\u2026 (optional)" style={{...INP,minHeight:55}}/>
+          <div style={{display:"flex",gap:7}}>
+            <button onClick={createNote} style={{flex:1,padding:"7px",background:fill(ac),border:"1px solid "+bdr(ac),borderRadius:7,cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:12,color:ac}}>Create Note</button>
+            <button onClick={()=>setShowNewNote(false)} style={{padding:"7px 12px",background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.11)",borderRadius:7,cursor:"pointer",color:"rgba(255,255,255,0.5)",fontFamily:FFB,fontSize:12}}>Cancel</button>
+          </div>
+        </div>
+      )}
+ 
+      {/* Move dialog */}
+      {movingItem&&(
+        <div style={{padding:12,background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:8,marginBottom:10}}>
+          <div style={{fontSize:12,color:"rgba(255,255,255,0.6)",marginBottom:7}}>Move "<b>{movingItem.name}</b>" to:</div>
+          <select onChange={e=>{const tid=e.target.value==="null"?null:e.target.value;movingItem.type==="note"?moveNote(movingItem.id,tid):moveTask(movingItem.id,tid);}} style={{...INP,cursor:"pointer",marginBottom:8}} defaultValue={movingItem.folderId||"null"}>
+            {folderOpts.map(o=><option key={String(o.id)} value={String(o.id)}>{o.label}</option>)}
+          </select>
+          <button onClick={()=>setMovingItem(null)} style={{padding:"5px 12px",background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.11)",borderRadius:6,cursor:"pointer",fontFamily:FFB,fontSize:11,color:"rgba(255,255,255,0.5)"}}>Cancel</button>
+        </div>
+      )}
+ 
+      {/* Empty state */}
+      {subFolders.length===0&&curNotes.length===0&&curTasks.length===0&&!showNewFolder&&!showNewNote&&(
+        <div style={{textAlign:"center",color:"rgba(255,255,255,0.18)",fontSize:13,fontStyle:"italic",padding:"32px 0"}}>
+          {curId?"This folder is empty":"No files yet"}<br/>
+          <span style={{fontSize:11}}>Use the buttons above to create folders or notes</span>
+        </div>
+      )}
+ 
+      {/* Subfolders */}
+      {subFolders.length>0&&<div style={SEC}>Folders ({subFolders.length})</div>}
+      {subFolders.map(f=>(
+        <div key={f.id} className="fr" style={{display:"flex",alignItems:"center",gap:9,padding:"9px 12px",marginBottom:4,background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:8,cursor:"pointer",transition:"background 0.12s"}}>
+          <span style={{fontSize:20,pointerEvents:"none"}}>\ud83d\udcc1</span>
+          {editingFolder?.id===f.id?(
+            <input autoFocus value={editingFolder.name} onChange={e=>setEditingFolder(x=>({...x,name:e.target.value}))} onKeyDown={e=>{if(e.key==="Enter")renameFolder(f.id,editingFolder.name);if(e.key==="Escape")setEditingFolder(null);}} onBlur={()=>renameFolder(f.id,editingFolder.name)} style={{...INP,flex:1,padding:"3px 8px",fontSize:13}}/>
+          ):(
+            <div style={{flex:1}} onClick={()=>setCurId(f.id)} onDoubleClick={()=>setCurId(f.id)}>
+              <div style={{fontFamily:FFB,fontWeight:600,fontSize:13,color:"rgba(255,255,255,0.9)"}}>{f.name}</div>
+              <div style={{fontSize:10,color:"rgba(255,255,255,0.28)",marginTop:1}}>{itemCount(f.id)} items</div>
+            </div>
+          )}
+          <button onClick={e=>{e.stopPropagation();setEditingFolder({id:f.id,name:f.name});}} style={{background:"none",border:"none",cursor:"pointer",color:"rgba(255,255,255,0.28)",fontSize:12,padding:"3px 6px"}} title="Rename">\u270f\ufe0f</button>
+          <button className="dl" onClick={e=>{e.stopPropagation();deleteFolder(f.id);}} style={{background:"none",border:"none",cursor:"pointer",color:"rgba(255,80,80,0.3)",fontSize:13,padding:"3px 6px",transition:"color 0.12s"}} title="Delete">\u2715</button>
+        </div>
+      ))}
+ 
+      {/* Notes */}
+      {curNotes.length>0&&<div style={{...SEC,marginTop:subFolders.length>0?12:0}}>Notes ({curNotes.length})</div>}
+      {curNotes.map(n=>(
+        <div key={n.id}>
+          <div className="fr" onClick={()=>setPreview(preview?.id===n.id?null:n)} style={{display:"flex",alignItems:"center",gap:9,padding:"9px 12px",marginBottom:3,background:preview?.id===n.id?"rgba(79,158,255,0.1)":"rgba(255,255,255,0.03)",border:"1px solid "+(preview?.id===n.id?"rgba(79,158,255,0.35)":"rgba(255,255,255,0.07)"),borderRadius:7,cursor:"pointer",transition:"background 0.12s"}}>
+            <span style={{fontSize:14}}>\ud83d\udcc4</span>
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{fontFamily:FFB,fontWeight:600,fontSize:12,color:"rgba(255,255,255,0.88)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{n.title}</div>
+              <div style={{fontSize:9,color:"rgba(255,255,255,0.28)",fontFamily:FFM}}>{new Date(n.ts).toLocaleDateString()}{n.body?" \u00b7 "+n.body.slice(0,28)+"\u2026":""}</div>
+            </div>
+            <button onClick={e=>{e.stopPropagation();setMovingItem({type:"note",id:n.id,name:n.title,folderId:n.folderId||null});}} style={{background:"none",border:"none",cursor:"pointer",color:"rgba(255,255,255,0.25)",fontSize:11,padding:"3px 5px"}} title="Move to folder">\u21aa</button>
+            <button className="dl" onClick={e=>{e.stopPropagation();deleteNote(n.id);}} style={{background:"none",border:"none",cursor:"pointer",color:"rgba(255,80,80,0.28)",fontSize:12,padding:"3px 5px",transition:"color 0.12s"}}>\u2715</button>
+          </div>
+          {preview?.id===n.id&&(
+            <div style={{marginBottom:6,padding:"11px 14px",background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:7}}>
+              <div style={{fontWeight:600,fontSize:13,color:"rgba(255,255,255,0.9)",marginBottom:5}}>{n.title}</div>
+              <div style={{fontSize:12,color:"rgba(255,255,255,0.5)",lineHeight:1.65,whiteSpace:"pre-wrap"}}>{n.body||"(no content)"}</div>
+            </div>
+          )}
+        </div>
+      ))}
+ 
+      {/* Tasks */}
+      {curTasks.length>0&&<div style={{...SEC,marginTop:curNotes.length>0||subFolders.length>0?12:0}}>Tasks ({curTasks.length})</div>}
+      {curTasks.map(t=>(
+        <div key={t.id} style={{display:"flex",alignItems:"center",gap:9,padding:"8px 12px",marginBottom:4,background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.07)",borderRadius:7,opacity:t.done?0.45:1}}>
+          <div onClick={()=>toggleTask(t.id)} style={{width:17,height:17,borderRadius:5,border:"1.5px solid "+(t.done?ac:"rgba(255,255,255,0.22)"),background:t.done?ac:"transparent",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+            {t.done&&<span style={{color:"#000",fontSize:9,fontWeight:900}}>\u2713</span>}
+          </div>
+          <span style={{flex:1,fontFamily:FF,fontSize:12,color:"rgba(255,255,255,0.88)",textDecoration:t.done?"line-through":"none",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t.text}</span>
+          <button onClick={()=>setMovingItem({type:"task",id:t.id,name:t.text,folderId:t.folderId||null})} style={{background:"none",border:"none",cursor:"pointer",color:"rgba(255,255,255,0.25)",fontSize:11,padding:"3px 5px"}} title="Move">\u21aa</button>
+          <button className="dl" onClick={()=>deleteTask(t.id)} style={{background:"none",border:"none",cursor:"pointer",color:"rgba(255,80,80,0.28)",fontSize:12,padding:"3px 5px",transition:"color 0.12s"}}>\u2715</button>
+        </div>
+      ))}
+    </div>
+  );
 }
  
 function PaintApp({showToast,AC}){
@@ -744,19 +954,205 @@ function Game2048App({AC}){
   return(<div style={{width:"100%",fontFamily:FF,display:"flex",flexDirection:"column",gap:12}}><div style={{display:"flex",alignItems:"center",gap:10}}><div style={{fontFamily:FFB,fontWeight:700,fontSize:22,color:AC}}>2048</div><div style={{flex:1}}/>{[["SCORE",score],["BEST",best]].map(([l,v])=>(<div key={l} style={{padding:"5px 12px",background:"rgba(255,255,255,0.08)",borderRadius:6,textAlign:"center"}}><div style={{fontFamily:FFM,fontSize:9,color:"rgba(255,255,255,0.4)",letterSpacing:1}}>{l}</div><div style={{fontFamily:FFB,fontWeight:700,fontSize:15,color:"#fff"}}>{v}</div></div>))}<button onClick={restart} style={{padding:"6px 13px",background:fill(AC),border:"1px solid "+bdr(AC),borderRadius:7,cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:12,color:AC}}>New</button></div><div style={{position:"relative"}}><div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:"1.5%",background:"rgba(255,255,255,0.08)",padding:"1.5%",borderRadius:10}}>{grid.flat().map((v,i)=>(<div key={i} style={{aspectRatio:"1",borderRadius:"8%",background:TC[v]||"#3c3a32",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:FFB,fontWeight:700,fontSize:"clamp(14px,4vw,28px)",color:TT[v]||"#f9f6f2",transition:"background 0.1s"}}>{v>0?v:""}</div>))}</div>{(over||won)&&(<div style={{position:"absolute",inset:0,background:"rgba(7,8,15,0.78)",borderRadius:10,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:12}}><div style={{fontFamily:FFB,fontWeight:700,fontSize:22,color:won?"#edcf72":"#ff7878"}}>{won?"You Win! 🎉":"Game Over"}</div><button onClick={restart} style={{padding:"10px 28px",background:fill(AC),border:"1px solid "+bdr(AC),borderRadius:8,cursor:"pointer",fontFamily:FFB,fontWeight:700,fontSize:14,color:AC}}>Try Again</button></div>)}</div><div style={{fontSize:11,color:"rgba(255,255,255,0.28)",fontFamily:FF,textAlign:"center"}}>Arrow keys or WASD · Combine to reach 2048</div></div>);
 }
  
-function StoreApp({data,updateData,showToast,AC}){
-  const [cat,setCat]=useState("All");const [search,setSearch]=useState("");
+function StoreApp({user,data,updateData,showToast,AC}){
+  const ac=AC||DEFAULT_AC;
+  const [tab,setTab]=useState("official");
+  const [cat,setCat]=useState("All");
+  const [search,setSearch]=useState("");
+  const [ratings,setRatings]=useState({});
+  const [commApps,setCommApps]=useState([]);
+  const [loadingComm,setLoadingComm]=useState(true);
+  const [sName,setSName]=useState(""); const [sUrl,setSUrl]=useState("");
+  const [sDesc,setSDesc]=useState(""); const [sCat,setSCat]=useState("Tools");
+  const [sIcon,setSIcon]=useState("\ud83d\ude80"); const [submitting,setSubmitting]=useState(false);
   const installed=data?.installedApps||[];
-  const filtered=STORE_CATALOG.filter(a=>{if(cat!=="All"&&a.cat!==cat)return false;if(search&&!a.name.toLowerCase().includes(search.toLowerCase())&&!a.desc.toLowerCase().includes(search.toLowerCase()))return false;return true;});
-  function toggleInstall(appId){const isIn=installed.includes(appId);updateData(p=>({...p,installedApps:isIn?p.installedApps.filter(id=>id!==appId):[...(p.installedApps||[]),appId]}));showToast(isIn?"App removed from desktop":"Added to desktop ✓");}
-  return(<div style={{width:"100%",fontFamily:FF}}><div style={{marginBottom:16}}><div style={{fontFamily:FFB,fontWeight:700,fontSize:22,color:"#fff",marginBottom:4}}>🏪 Nova Store</div><div style={{fontSize:12,color:"rgba(255,255,255,0.35)"}}>Icons via Clearbit · ✓ In-App opens in Nova Browser · ↗ New Tab opens externally.</div></div><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search apps…" style={{...INP,marginBottom:12}}/><div style={{display:"flex",gap:6,marginBottom:16,flexWrap:"wrap"}}>{STORE_CATS.map(c=><button key={c} onClick={()=>setCat(c)} style={{padding:"5px 13px",background:cat===c?fill(AC):"rgba(255,255,255,0.06)",border:"1px solid "+(cat===c?bdr(AC):"rgba(255,255,255,0.1)"),borderRadius:20,cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:11,color:cat===c?AC:"rgba(255,255,255,0.55)",transition:"all 0.12s"}}>{c}</button>)}</div><div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(260px,1fr))",gap:10}}>{filtered.map(app=>{const isIn=installed.includes(app.id);return(<div key={app.id} className="sc" style={{padding:"14px",background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:10,transition:"background 0.12s"}}><div style={{display:"flex",alignItems:"flex-start",gap:12,marginBottom:10}}><div style={{width:44,height:44,borderRadius:10,background:"rgba(255,255,255,0.07)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,overflow:"hidden"}}><StoreIcon domain={app.domain} fallback={app.icon} size={32}/></div><div style={{flex:1,minWidth:0}}><div style={{fontFamily:FFB,fontWeight:600,fontSize:14,color:"rgba(255,255,255,0.92)",marginBottom:2}}>{app.name}</div><div style={{display:"flex",alignItems:"center",gap:6}}><span style={{fontSize:9,fontFamily:FFM,padding:"2px 6px",background:app.newTab?"rgba(255,180,0,0.12)":"rgba(79,200,100,0.12)",border:"1px solid "+(app.newTab?"rgba(255,180,0,0.3)":"rgba(79,200,100,0.3)"),borderRadius:4,color:app.newTab?"rgba(255,200,80,0.9)":"rgba(100,220,120,0.9)"}}>{app.badge}</span><span style={{fontSize:10,color:"rgba(255,255,255,0.3)"}}>{app.cat}</span></div></div></div><div style={{fontSize:12,color:"rgba(255,255,255,0.5)",lineHeight:1.55,marginBottom:12}}>{app.desc}</div><div style={{display:"flex",gap:7}}><button onClick={()=>toggleInstall(app.id)} style={{flex:1,padding:"7px",background:isIn?"rgba(255,80,80,0.1)":"rgba(255,255,255,0.06)",border:"1px solid "+(isIn?"rgba(255,80,80,0.3)":"rgba(255,255,255,0.12)"),borderRadius:6,cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:11,color:isIn?"rgba(255,130,130,0.9)":"rgba(255,255,255,0.6)"}}>{isIn?"– Remove":"+ Desktop"}</button><button onClick={()=>window.open(app.url,"_blank")} style={{flex:1,padding:"7px",background:fill(AC),border:"1px solid "+bdr(AC),borderRadius:6,cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:11,color:AC}}>Launch ↗</button></div></div>);})}  {filtered.length===0&&<div style={{gridColumn:"span 2",color:"rgba(255,255,255,0.2)",fontFamily:FF,fontStyle:"italic",fontSize:13,textAlign:"center",padding:"40px 0"}}>No apps match your search.</div>}</div>{installed.length>0&&<div style={{marginTop:16,padding:"10px 14px",background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.07)",borderRadius:8,fontFamily:FF,fontSize:12,color:"rgba(255,255,255,0.4)"}}>{installed.length} app{installed.length!==1?"s":""} on desktop · Double-click to launch</div>}</div>);
+ 
+  // Real-time ratings from Firestore
+  useEffect(()=>{
+    const unsub=onSnapshot(collection(firestoreDb,"nova_ratings"),snap=>{
+      const agg={};
+      snap.docs.forEach(d=>{
+        const r=d.data();
+        if(!agg[r.appId])agg[r.appId]={total:0,count:0,mine:0};
+        agg[r.appId].total+=r.rating; agg[r.appId].count++;
+        if(r.user===user)agg[r.appId].mine=r.rating;
+      });
+      const out={};
+      Object.entries(agg).forEach(([id,v])=>{out[id]={avg:v.total/v.count,count:v.count,mine:v.mine};});
+      setRatings(out);
+    },()=>{});
+    return()=>unsub();
+  },[user]);
+ 
+  // Real-time community apps
+  useEffect(()=>{
+    const q=query(collection(firestoreDb,"nova_user_apps"),orderBy("ts","desc"),limit(60));
+    const unsub=onSnapshot(q,snap=>{setCommApps(snap.docs.map(d=>({id:d.id,...d.data()})));setLoadingComm(false);},()=>setLoadingComm(false));
+    return()=>unsub();
+  },[]);
+ 
+  async function rateApp(appId,rating){
+    try{await setDoc(doc(firestoreDb,"nova_ratings",appId+"_"+user),{appId,user,rating,ts:Date.now()});showToast("Rated "+rating+"\u2605 \u2713");}
+    catch{showToast("Rating failed");}
+  }
+  async function submitApp(){
+    const name=sName.trim(), desc=sDesc.trim();
+    let url=sUrl.trim();
+    if(!name||!url||!desc){showToast("All fields required");return;}
+    if(!url.startsWith("http"))url="https://"+url;
+    setSubmitting(true);
+    try{
+      await addDoc(collection(firestoreDb,"nova_user_apps"),{name,url,desc,cat:sCat,icon:sIcon,submitter:user,ts:Date.now(),newTab:true,badge:"\u2197 New Tab"});
+      showToast("App submitted! \u2713");setSName("");setSUrl("");setSDesc("");setSIcon("\ud83d\ude80");setTab("community");
+    }catch{showToast("Submission failed");}
+    setSubmitting(false);
+  }
+  function toggleInstall(appId){
+    const isIn=installed.includes(appId);
+    updateData(p=>({...p,installedApps:isIn?p.installedApps.filter(id=>id!==appId):[...(p.installedApps||[]),appId]}));
+    showToast(isIn?"App removed":"Added to desktop \u2713");
+  }
+ 
+  function Stars({appId}){
+    const r=ratings[appId]||{avg:0,count:0,mine:0};
+    const display=r.mine>0?r.mine:r.avg;
+    return(
+      <div style={{display:"flex",alignItems:"center",gap:6,marginTop:4}}>
+        {[1,2,3,4,5].map(s=>(
+          <span key={s} onClick={e=>{e.stopPropagation();rateApp(appId,s);}}
+            style={{cursor:"pointer",fontSize:15,color:s<=Math.round(display)?"#ffcc44":"rgba(255,255,255,0.18)",transition:"color 0.1s,transform 0.1s",lineHeight:1}}
+            onMouseEnter={e=>e.target.style.transform="scale(1.25)"}
+            onMouseLeave={e=>e.target.style.transform="scale(1)"}>
+            \u2605
+          </span>
+        ))}
+        {r.count>0&&<span style={{fontSize:10,fontFamily:FFM,color:"rgba(255,255,255,0.35)"}}>{r.avg.toFixed(1)} ({r.count})</span>}
+        {r.count===0&&<span style={{fontSize:10,fontFamily:FF,color:"rgba(255,255,255,0.2)",fontStyle:"italic"}}>Rate this</span>}
+        {r.mine>0&&<span style={{fontSize:9,fontFamily:FF,color:ac,opacity:0.8}}>your: {r.mine}\u2605</span>}
+      </div>
+    );
+  }
+ 
+  function AppCard({app,isIn}){
+    return(
+      <div className="sc" style={{padding:"14px",background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:10,display:"flex",flexDirection:"column",gap:0,transition:"background 0.12s"}}>
+        <div style={{display:"flex",alignItems:"flex-start",gap:11,marginBottom:8}}>
+          <div style={{width:44,height:44,borderRadius:10,background:"rgba(255,255,255,0.07)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,overflow:"hidden",fontSize:app.domain?undefined:22}}>
+            {app.domain?<StoreIcon domain={app.domain} fallback={app.icon} size={32}/>:app.icon}
+          </div>
+          <div style={{flex:1,minWidth:0}}>
+            <div style={{fontFamily:FFB,fontWeight:600,fontSize:13,color:"rgba(255,255,255,0.92)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{app.name}</div>
+            <div style={{display:"flex",alignItems:"center",gap:5,marginTop:2,flexWrap:"wrap"}}>
+              <span style={{fontSize:9,fontFamily:FFM,padding:"1px 6px",background:app.newTab?"rgba(255,180,0,0.12)":"rgba(79,200,100,0.12)",border:"1px solid "+(app.newTab?"rgba(255,180,0,0.3)":"rgba(79,200,100,0.3)"),borderRadius:4,color:app.newTab?"rgba(255,200,80,0.9)":"rgba(100,220,120,0.9)"}}>{app.badge||"\u2197 New Tab"}</span>
+              <span style={{fontSize:9,color:"rgba(255,255,255,0.28)"}}>{app.cat}</span>
+              {app.submitter&&<span style={{fontSize:9,color:"rgba(255,255,255,0.22)",fontFamily:FFM}}>by @{app.submitter}</span>}
+            </div>
+            <Stars appId={app.id}/>
+          </div>
+        </div>
+        <div style={{fontSize:12,color:"rgba(255,255,255,0.48)",lineHeight:1.5,marginBottom:10,flex:1}}>{app.desc}</div>
+        <div style={{display:"flex",gap:7}}>
+          <button onClick={()=>toggleInstall(app.id)} style={{flex:1,padding:"6px",background:isIn?"rgba(255,80,80,0.1)":"rgba(255,255,255,0.06)",border:"1px solid "+(isIn?"rgba(255,80,80,0.3)":"rgba(255,255,255,0.12)"),borderRadius:6,cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:11,color:isIn?"rgba(255,130,130,0.9)":"rgba(255,255,255,0.6)"}}>{isIn?"\u2013 Remove":"+ Desktop"}</button>
+          <button onClick={()=>window.open(app.url,"_blank")} style={{flex:1,padding:"6px",background:fill(ac),border:"1px solid "+bdr(ac),borderRadius:6,cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:11,color:ac}}>Launch \u2197</button>
+        </div>
+      </div>
+    );
+  }
+ 
+  const filtered=STORE_CATALOG.filter(a=>{
+    if(cat!=="All"&&a.cat!==cat)return false;
+    if(search&&!a.name.toLowerCase().includes(search.toLowerCase())&&!a.desc.toLowerCase().includes(search.toLowerCase()))return false;
+    return true;
+  });
+  const filtComm=commApps.filter(a=>!search||a.name.toLowerCase().includes(search.toLowerCase())||a.desc.toLowerCase().includes(search.toLowerCase()));
+ 
+  return(
+    <div style={{width:"100%",fontFamily:FF}}>
+      {/* Header + search */}
+      <div style={{marginBottom:12}}>
+        <div style={{fontFamily:FFB,fontWeight:700,fontSize:20,color:"#fff",marginBottom:8}}>\ud83c\udfea Nova Store 4.0</div>
+        <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search all apps\u2026" style={INP}/>
+      </div>
+ 
+      {/* Tab bar */}
+      <div style={{display:"flex",borderBottom:"1px solid rgba(255,255,255,0.08)",marginBottom:14}}>
+        {[["official","\ud83c\udfc6 Official"],["community","\ud83c\udf0d Community"+(commApps.length>0?" ("+commApps.length+")":"")],["submit","+ Submit App"]].map(([id,lbl])=>(
+          <button key={id} onClick={()=>setTab(id)} style={{padding:"8px 14px",background:"none",border:"none",borderBottom:tab===id?"2px solid "+ac:"2px solid transparent",cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:12,color:tab===id?ac:"rgba(255,255,255,0.38)",transition:"all 0.15s",whiteSpace:"nowrap"}}>{lbl}</button>
+        ))}
+      </div>
+ 
+      {/* Official tab */}
+      {tab==="official"&&(<>
+        <div style={{display:"flex",gap:5,marginBottom:12,flexWrap:"wrap"}}>
+          {STORE_CATS.map(c=><button key={c} onClick={()=>setCat(c)} style={{padding:"4px 11px",background:cat===c?fill(ac):"rgba(255,255,255,0.06)",border:"1px solid "+(cat===c?bdr(ac):"rgba(255,255,255,0.1)"),borderRadius:20,cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:11,color:cat===c?ac:"rgba(255,255,255,0.5)",transition:"all 0.12s"}}>{c}</button>)}
+        </div>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(250px,1fr))",gap:9}}>
+          {filtered.map(app=><AppCard key={app.id} app={app} isIn={installed.includes(app.id)}/>)}
+          {filtered.length===0&&<div style={{gridColumn:"span 2",color:"rgba(255,255,255,0.2)",fontFamily:FF,fontStyle:"italic",fontSize:13,textAlign:"center",padding:"40px 0"}}>No apps match.</div>}
+        </div>
+        {installed.length>0&&<div style={{marginTop:14,padding:"8px 12px",background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.07)",borderRadius:8,fontFamily:FF,fontSize:11,color:"rgba(255,255,255,0.35)"}}>{installed.length} app{installed.length!==1?"s":""} on desktop</div>}
+      </>)}
+ 
+      {/* Community tab */}
+      {tab==="community"&&(<>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12}}>
+          <span style={{fontSize:11,color:"rgba(255,255,255,0.3)"}}>Apps submitted by Nova users \u00b7 click \u2605 to rate</span>
+          <button onClick={()=>setTab("submit")} style={{padding:"5px 12px",background:fill(ac),border:"1px solid "+bdr(ac),borderRadius:6,cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:11,color:ac}}>+ Submit</button>
+        </div>
+        {loadingComm&&<div style={{textAlign:"center",padding:"36px 0"}}><div style={{width:24,height:24,border:"3px solid rgba(255,255,255,0.1)",borderTopColor:ac,borderRadius:"50%",animation:"spin 0.8s linear infinite",margin:"0 auto"}}/></div>}
+        {!loadingComm&&filtComm.length===0&&<div style={{color:"rgba(255,255,255,0.18)",fontFamily:FF,fontStyle:"italic",fontSize:13,textAlign:"center",padding:"40px 0"}}>No community apps yet \u2014 be the first! \ud83d\ude80</div>}
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(250px,1fr))",gap:9}}>
+          {filtComm.map(app=><AppCard key={app.id} app={app} isIn={installed.includes(app.id)}/>)}
+        </div>
+      </>)}
+ 
+      {/* Submit tab */}
+      {tab==="submit"&&(
+        <div style={{maxWidth:460}}>
+          <div style={{fontFamily:FFB,fontWeight:700,fontSize:16,color:"#fff",marginBottom:4}}>Submit Your App</div>
+          <div style={{fontSize:12,color:"rgba(255,255,255,0.35)",marginBottom:18}}>Share any web app or website with the Nova community. It appears instantly in the Community tab.</div>
+          <div style={{display:"flex",flexDirection:"column",gap:10}}>
+            <div style={{display:"flex",gap:9}}>
+              <div style={{display:"flex",flexDirection:"column",gap:4}}>
+                <label style={{...SEC,marginBottom:0}}>Icon</label>
+                <input value={sIcon} onChange={e=>setSIcon(e.target.value)} maxLength={2} style={{...INP,width:54,textAlign:"center",fontSize:22,padding:"6px 4px"}}/>
+              </div>
+              <div style={{display:"flex",flexDirection:"column",gap:4,flex:1}}>
+                <label style={{...SEC,marginBottom:0}}>App Name</label>
+                <input value={sName} onChange={e=>setSName(e.target.value)} placeholder="My Cool App" style={INP} maxLength={50}/>
+              </div>
+            </div>
+            <div style={{display:"flex",flexDirection:"column",gap:4}}>
+              <label style={{...SEC,marginBottom:0}}>URL</label>
+              <input value={sUrl} onChange={e=>setSUrl(e.target.value)} placeholder="https://myapp.com" style={INP}/>
+            </div>
+            <div style={{display:"flex",flexDirection:"column",gap:4}}>
+              <label style={{...SEC,marginBottom:0}}>Description</label>
+              <textarea value={sDesc} onChange={e=>setSDesc(e.target.value)} placeholder="What does your app do?" style={{...INP,minHeight:66}} maxLength={200}/>
+            </div>
+            <div style={{display:"flex",flexDirection:"column",gap:4}}>
+              <label style={{...SEC,marginBottom:0}}>Category</label>
+              <select value={sCat} onChange={e=>setSCat(e.target.value)} style={{...INP,cursor:"pointer"}}>
+                {["Games","Media","Tools","Social","News","Other"].map(c=><option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
+            <button onClick={submitApp} disabled={submitting||!sName.trim()||!sUrl.trim()||!sDesc.trim()}
+              style={{padding:"11px",background:fill(ac),border:"1px solid "+bdr(ac),borderRadius:8,cursor:submitting?"default":"pointer",fontFamily:FFB,fontWeight:700,fontSize:13,color:ac,opacity:submitting||!sName.trim()||!sUrl.trim()||!sDesc.trim()?0.4:1}}>
+              {submitting?"Submitting\u2026":"Submit App \u2192"}
+            </button>
+            <div style={{fontSize:10,color:"rgba(255,255,255,0.2)",fontFamily:FF,fontStyle:"italic"}}>Submissions are public and visible to all Nova OS users. Keep it appropriate.</div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
  
 function TerminalApp({user,AC}){
-  const [lines,setLines]=useState([{t:"out",v:"NOVA Terminal v3.5.0"},{t:"out",v:"Session: "+user+" — "+new Date().toLocaleString()},{t:"out",v:'Type "help" for commands.'},{t:"gap"}]);
+  const [lines,setLines]=useState([{t:"out",v:"NOVA Terminal v4.0.0"},{t:"out",v:"Session: "+user+" — "+new Date().toLocaleString()},{t:"out",v:'Type "help" for commands.'},{t:"gap"}]);
   const [cmd,setCmd]=useState("");const [hist,setHist]=useState([]);const [hIdx,setHIdx]=useState(-1);const endRef=useRef(null);
   useEffect(()=>{endRef.current?.scrollIntoView({behavior:"smooth"});},[lines]);
-  const CMDS={help:()=>["Commands: help, whoami, date, echo <text>, version, sysinfo, ls, neofetch, clear"],whoami:()=>[user],date:()=>[new Date().toLocaleString()],version:()=>["NOVA OS v3.5.0 — Nova Systems Inc."],sysinfo:()=>["CPU: Nova Virtual Core™","RAM: 8.0 GB","Storage: Firebase Firestore","Resolution: "+window.innerWidth+"x"+window.innerHeight,"Uptime: "+Math.floor(performance.now()/1000)+"s"],ls:()=>["notes/ tasks/ files/ paint/ browser/ snake/ 2048/ store/ terminal/ settings/"],neofetch:()=>[" ███╗   ██╗ ██████╗ ██╗   ██╗ █████╗ "," ████╗  ██║██╔═══██╗██║   ██║██╔══██╗"," ██╔██╗ ██║██║   ██║██║   ██║███████║"," ██║╚██╗██║██║   ██║╚██╗ ██╔╝██╔══██║"," ██║ ╚████║╚██████╔╝ ╚████╔╝ ██║  ██║","OS: Nova v3.5  User: "+user,"Widgets: Clock·Weather·Notes·Tasks·Calendar·SysInfo"],echo:args=>[args.join(" ")||"(empty)"],clear:()=>"__clear__"};
+  const CMDS={help:()=>["Commands: help, whoami, date, echo <text>, version, sysinfo, ls, neofetch, clear"],whoami:()=>[user],date:()=>[new Date().toLocaleString()],version:()=>["NOVA OS v4.0.0 — Nova Systems Inc."],sysinfo:()=>["CPU: Nova Virtual Core™","RAM: 8.0 GB","Storage: Firebase Firestore","Resolution: "+window.innerWidth+"x"+window.innerHeight,"Uptime: "+Math.floor(performance.now()/1000)+"s"],ls:()=>["notes/ tasks/ files/ paint/ browser/ snake/ 2048/ store/ terminal/ settings/"],neofetch:()=>[" ███╗   ██╗ ██████╗ ██╗   ██╗ █████╗ "," ████╗  ██║██╔═══██╗██║   ██║██╔══██╗"," ██╔██╗ ██║██║   ██║██║   ██║███████║"," ██║╚██╗██║██║   ██║╚██╗ ██╔╝██╔══██║"," ██║ ╚████║╚██████╔╝ ╚████╔╝ ██║  ██║","OS: Nova v3.5  User: "+user,"Widgets: Clock·Weather·Notes·Tasks·Calendar·SysInfo"],echo:args=>[args.join(" ")||"(empty)"],clear:()=>"__clear__"};
   function run(){const raw=cmd.trim();if(!raw)return;const parts=raw.split(" ");const c=parts[0].toLowerCase();const args=parts.slice(1);setHist(h=>[raw,...h]);setHIdx(-1);setCmd("");const nl=[...lines,{t:"in",v:raw}];const h=CMDS[c];if(!h){nl.push({t:"err",v:c+': not found. Try "help".'});}else{const r=h(args);if(r==="__clear__"){setLines([]);return;}r.forEach(v=>nl.push({t:"out",v}));}nl.push({t:"gap"});setLines(nl);}
   function onKey(e){if(e.key==="Enter"){run();return;}if(e.key==="ArrowUp"){const i=Math.min(hIdx+1,hist.length-1);setHIdx(i);if(hist[i])setCmd(hist[i]);}if(e.key==="ArrowDown"){const i=Math.max(hIdx-1,-1);setHIdx(i);setCmd(i===-1?"":(hist[i]||""));}}
   return(<div style={{width:"100%",fontFamily:FFM}}><div style={{background:"#030407",borderRadius:8,padding:"13px 15px",height:"100%",minHeight:280,overflowY:"auto",border:"1px solid rgba(255,255,255,0.07)"}}>{lines.map((l,i)=><div key={i} style={{color:l.t==="in"?AC:l.t==="err"?"#ff7878":"rgba(180,210,255,0.58)",fontSize:12,marginBottom:l.t==="gap"?5:2,minHeight:l.t==="gap"?4:undefined,whiteSpace:"pre"}}>{l.t==="in"?"$ "+l.v:l.t==="gap"?null:l.v}</div>)}<div style={{display:"flex",alignItems:"center"}}><span style={{color:"#4cef90",marginRight:7,fontSize:12}}>$</span><input value={cmd} onChange={e=>setCmd(e.target.value)} onKeyDown={onKey} autoFocus style={{flex:1,background:"none",border:"none",outline:"none",color:AC,fontFamily:FFM,fontSize:12,caretColor:AC}}/></div><div ref={endRef}/></div></div>);
