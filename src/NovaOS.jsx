@@ -1,5 +1,5 @@
 
-// NOVA OS v4.0 — Nova Systems
+// NOVA OS v4.1 — Nova Systems
 // Drop this into src/NovaOS.jsx
  
 import { useState, useEffect, useRef, useCallback } from "react";
@@ -84,11 +84,12 @@ const STORE_CATALOG = [
 ];
  
 const STORE_CATS    = ["All","Games","Media","Tools","Social","News"];
-const BOOT_MSGS     = ["NOVA OS v4.0 — Nova Systems","Initializing kernel... OK","Loading hardware abstraction layer... OK","Mounting filesystems... OK","Starting widget engine... OK","Initializing Nova Store... OK","Loading user environment... OK","System ready."];
+const BOOT_MSGS     = ["NOVA OS v4.1 — Nova Systems","Initializing kernel... OK","Loading hardware abstraction layer... OK","Mounting filesystems... OK","Starting widget engine... OK","Initializing Nova Store... OK","Loading user environment... OK","System ready."];
 const ACCENT_PRESETS= ["#4f9eff","#ff6b6b","#4cef90","#ffcc44","#cc44ff","#ff8c44","#44ddcc","#ff44aa"];
 const BOOKMARKS     = [{label:"Hacker News",url:"https://news.ycombinator.com"},{label:"Wikipedia",url:"https://en.m.wikipedia.org"},{label:"Archive.org",url:"https://archive.org"},{label:"itch.io",url:"https://itch.io"}];
 const PAINT_COLORS  = ["#fff","#000","#ff4444","#ff8800","#ffdd00","#44dd44","#00ccff","#4466ff","#cc44ff","#ff44aa","#8b4513","#888"];
 const WALLPAPERS    = {
+  aurora:{name:"Aurora",preview:"linear-gradient(180deg,#0a0218 0%,#3b1d6a 35%,#10b981 60%,#0a0218 100%),radial-gradient(ellipse at 50% 90%,#a855f7 0%,transparent 50%)"},
   nova:  {name:"Nova",  preview:"radial-gradient(ellipse at 25% 20%,#0ea5e9 0%,transparent 55%),radial-gradient(ellipse at 80% 85%,#7c3aed 0%,transparent 50%),linear-gradient(135deg,#07080f,#0d0a1a)"},
   bliss: {name:"Bliss", preview:"linear-gradient(180deg,#4a9fd1 44%,#6ec82e 44%)"},
   night: {name:"Night", preview:"radial-gradient(#1a0f40,#03020d)",  grad:"radial-gradient(ellipse at 50% 0%,#1a0f40,#03020d)"},
@@ -169,10 +170,62 @@ function NovaBg(){
 }
 function BlissBg(){return(<svg style={{position:"absolute",inset:0,width:"100%",height:"100%"}} viewBox="0 0 1440 900" preserveAspectRatio="xMidYMid slice"><defs><linearGradient id="gsky" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#1b5c90"/><stop offset="30%" stopColor="#3990cc"/><stop offset="65%" stopColor="#6ab6e8"/><stop offset="100%" stopColor="#a4d4f0"/></linearGradient><linearGradient id="ghb" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#478c18"/><stop offset="100%" stopColor="#1e5007"/></linearGradient><linearGradient id="ghm" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#57b820"/><stop offset="100%" stopColor="#27680e"/></linearGradient><linearGradient id="ghf" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#6cca2c"/><stop offset="100%" stopColor="#337a14"/></linearGradient><linearGradient id="gfg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#3d8814"/><stop offset="100%" stopColor="#194807"/></linearGradient></defs><rect width="1440" height="900" fill="url(#gsky)"/>{[[310,165,150,50],[278,158,100,37],[350,155,85,40],[970,128,120,40],[940,121,78,29],[1170,200,130,44]].map(([cx,cy,rx,ry],i)=><ellipse key={i} cx={cx} cy={cy} rx={rx} ry={ry} fill={"rgba(255,255,255,"+(0.42+(i%3)*0.09)+")"}/>)}<path d="M0 590 Q200 450 430 530 Q630 610 860 480 Q1040 365 1210 445 Q1350 505 1440 460 L1440 900 L0 900Z" fill="url(#ghb)"/><path d="M0 645 Q170 515 380 585 Q570 655 775 540 Q955 425 1155 505 Q1305 565 1440 522 L1440 900 L0 900Z" fill="url(#ghm)"/><path d="M-10 725 Q70 640 190 658 Q310 678 440 730 Q615 796 808 682 Q955 598 1090 628 Q1230 658 1360 618 L1460 610 L1460 900 L-10 900Z" fill="url(#ghf)"/><path d="M0 818 Q370 778 720 795 Q1020 810 1440 778 L1440 900 L0 900Z" fill="url(#gfg)"/></svg>);}
  
+// Aurora: vertical jewel-toned aurora streaks against a deep purple base, with
+// a magenta horizon glow at the bottom. Default wallpaper for NOVA OS 4.1.
+function AuroraBg(){
+  return(
+    <svg style={{position:"absolute",inset:0,width:"100%",height:"100%"}} viewBox="0 0 1440 900" preserveAspectRatio="xMidYMid slice">
+      <defs>
+        <linearGradient id="au1" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%"  stopColor="#0a0218" stopOpacity="0"/>
+          <stop offset="28%" stopColor="#10b981" stopOpacity="0.7"/>
+          <stop offset="58%" stopColor="#06b6d4" stopOpacity="0.5"/>
+          <stop offset="100%" stopColor="#0a0218" stopOpacity="0"/>
+        </linearGradient>
+        <linearGradient id="au2" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%"  stopColor="#0a0218" stopOpacity="0"/>
+          <stop offset="32%" stopColor="#a855f7" stopOpacity="0.6"/>
+          <stop offset="68%" stopColor="#ec4899" stopOpacity="0.4"/>
+          <stop offset="100%" stopColor="#0a0218" stopOpacity="0"/>
+        </linearGradient>
+        <linearGradient id="au3" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%"  stopColor="#0a0218" stopOpacity="0"/>
+          <stop offset="38%" stopColor="#22d3ee" stopOpacity="0.55"/>
+          <stop offset="78%" stopColor="#3b82f6" stopOpacity="0.35"/>
+          <stop offset="100%" stopColor="#0a0218" stopOpacity="0"/>
+        </linearGradient>
+        <radialGradient id="auhz" cx="50%" cy="95%" r="55%">
+          <stop offset="0%"   stopColor="#7c3aed" stopOpacity="0.55"/>
+          <stop offset="60%"  stopColor="#1e1b4b" stopOpacity="0.18"/>
+          <stop offset="100%" stopColor="#080318" stopOpacity="0"/>
+        </radialGradient>
+        <filter id="aublur"><feGaussianBlur stdDeviation="44"/></filter>
+        <filter id="aublur2"><feGaussianBlur stdDeviation="22"/></filter>
+      </defs>
+      <rect width="1440" height="900" fill="#080318"/>
+      <g filter="url(#aublur)">
+        <ellipse cx="280"  cy="450" rx="220" ry="560" fill="url(#au1)"/>
+        <ellipse cx="720"  cy="450" rx="260" ry="640" fill="url(#au2)"/>
+        <ellipse cx="1180" cy="450" rx="240" ry="560" fill="url(#au3)"/>
+      </g>
+      <g filter="url(#aublur2)">
+        <rect width="1440" height="900" fill="url(#auhz)"/>
+      </g>
+      {[...Array(55)].map((_,i)=>{
+        const x=(i*191.3+47)%1440, y=(i*113.7+29)%900, r=i%6===0?1.5:i%3===0?1:0.6;
+        const op=0.32+(i%4)*0.13;
+        return <circle key={i} cx={x} cy={y} r={r} fill={"rgba(255,255,255,"+op+")"}/>;
+      })}
+    </svg>
+  );
+}
+
 function Wallpaper({id,customUrl}){
   if(id==="custom"&&customUrl)return<div style={{position:"absolute",inset:0,background:'url("'+customUrl+'") center/cover no-repeat'}}/>;
-  if(!id||id==="nova")return<NovaBg/>;if(id==="bliss")return<BlissBg/>;
-  const wp=WALLPAPERS[id];if(wp&&wp.grad)return<div style={{position:"absolute",inset:0,background:wp.grad}}/>;return<NovaBg/>;
+  if(!id||id==="aurora")return<AuroraBg/>;
+  if(id==="nova")return<NovaBg/>;
+  if(id==="bliss")return<BlissBg/>;
+  const wp=WALLPAPERS[id];if(wp&&wp.grad)return<div style={{position:"absolute",inset:0,background:wp.grad}}/>;return<AuroraBg/>;
 }
  
 // ─── ICONS ────────────────────────────────────────────────────────────────────
@@ -435,7 +488,7 @@ export default function NovaOS(){
   const use24h  =settings.clock24h  ||false;
   const winBlur =settings.winBlur   ??18;
   const largeFnt=settings.largeFont ||false;
-  const wpId    =settings.wallpaper ||data?.wallpaper||"nova";
+  const wpId    =settings.wallpaper ||data?.wallpaper||"aurora";
   const widgets =settings.widgets   ||{};
  
   useEffect(()=>{let i=0,dead=false;function nxt(){if(dead)return;if(i>=BOOT_MSGS.length){setTimeout(()=>{if(!dead)setScreen("login");},700);return;}setBootLines(p=>[...p,BOOT_MSGS[i++]]);setTimeout(nxt,i<2?90:230);}setTimeout(nxt,380);return()=>{dead=true;};},[]);
@@ -512,13 +565,13 @@ export default function NovaOS(){
     setBusy(true);setAuthErr("");
     if(mode==="register"){
       const ex=await db.get("user:"+u+":pw");if(ex!==null){setAuthErr("Username taken.");setBusy(false);return;}
-      await db.set("user:"+u+":pw",p);const init={notes:[],tasks:[],wallpaper:"nova",bio:"",joined:Date.now(),settings:{},installedApps:[],folders:[]};
+      await db.set("user:"+u+":pw",p);const init={notes:[],tasks:[],wallpaper:"aurora",bio:"",joined:Date.now(),settings:{},installedApps:[],folders:[]};
       await db.set("user:"+u+":data",init);setUser(u);setData(init);setIconPos({});setWidgetState(DEFAULT_WIDGET_STATE);setScreen("desktop");
     }else{
       const stored=await db.get("user:"+u+":pw");if(stored===null){setAuthErr("Account not found.");setBusy(false);return;}
       if(stored!==p){setAuthErr("Incorrect password.");setBusy(false);return;}
       const d=await db.get("user:"+u+":data");const savedIconPos=await db.get("user:"+u+":iconpos");
-      setUser(u);setData(d||{notes:[],tasks:[],wallpaper:"nova",bio:"",joined:Date.now(),settings:{},installedApps:[],folders:[]});
+      setUser(u);setData(d||{notes:[],tasks:[],wallpaper:"aurora",bio:"",joined:Date.now(),settings:{},installedApps:[],folders:[]});
       setIconPos(savedIconPos||{});
       if(d?.settings?.widgetState)setWidgetState({...DEFAULT_WIDGET_STATE,...d.settings.widgetState});
       setScreen("desktop");
@@ -599,7 +652,7 @@ export default function NovaOS(){
         </div>
         <div style={{padding:"10px 16px",borderTop:"1px solid rgba(255,255,255,0.07)",display:"flex",alignItems:"center",gap:10}}>
           <div style={{width:32,height:32,borderRadius:"50%",background:fill(AC),border:"1.5px solid "+AC,display:"flex",alignItems:"center",justifyContent:"center",fontSize:15,flexShrink:0}}>👤</div>
-          <div style={{flex:1}}><div style={{fontFamily:FFB,fontWeight:600,fontSize:13,color:"#fff"}}>@{user}</div><div style={{fontFamily:FF,fontSize:10,color:"rgba(255,255,255,0.3)"}}>Nova OS v4.0</div></div>
+          <div style={{flex:1}}><div style={{fontFamily:FFB,fontWeight:600,fontSize:13,color:"#fff"}}>@{user}</div><div style={{fontFamily:FF,fontSize:10,color:"rgba(255,255,255,0.3)"}}>Nova OS v4.1</div></div>
           <button onClick={logout} style={{padding:"6px 12px",background:"rgba(200,40,40,0.12)",border:"1px solid rgba(200,40,40,0.3)",borderRadius:6,cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:11,color:"rgba(255,140,140,0.9)"}}>Logout</button>
         </div>
       </div>)}
@@ -704,7 +757,7 @@ function FilesApp({data,updateData,showToast,AC}){
     if(!newFolderName.trim())return;
     const f={id:"f"+Date.now(),name:newFolderName.trim(),parentId:curId,created:Date.now()};
     updateData(p=>({...p,folders:[...(p.folders||[]),f]}));
-    setNewFolderName("");setShowNewFolder(false);showToast("Folder created \u2713");
+    setNewFolderName("");setShowNewFolder(false);showToast("Folder created ✓");
   }
   function deleteFolder(fid){
     function desc(id){const ch=folders.filter(f=>f.parentId===id);return[id,...ch.flatMap(c=>desc(c.id))];}
@@ -720,24 +773,24 @@ function FilesApp({data,updateData,showToast,AC}){
   function renameFolder(id,name){
     if(!name.trim())return;
     updateData(p=>({...p,folders:p.folders.map(f=>f.id===id?{...f,name:name.trim()}:f)}));
-    setEditingFolder(null);showToast("Renamed \u2713");
+    setEditingFolder(null);showToast("Renamed ✓");
   }
   function createNote(){
     if(!newNoteTitle.trim())return;
     updateData(p=>({...p,notes:[{id:Date.now(),title:newNoteTitle.trim(),body:newNoteBody.trim(),ts:Date.now(),folderId:curId},...(p.notes||[])]}));
-    setNewNoteTitle("");setNewNoteBody("");setShowNewNote(false);showToast("Note created \u2713");
+    setNewNoteTitle("");setNewNoteBody("");setShowNewNote(false);showToast("Note created ✓");
   }
   function deleteNote(id){updateData(p=>({...p,notes:p.notes.filter(n=>n.id!==id)}));if(preview?.id===id)setPreview(null);showToast("Deleted");}
   function deleteTask(id){updateData(p=>({...p,tasks:p.tasks.filter(t=>t.id!==id)}));showToast("Deleted");}
   function toggleTask(id){updateData(p=>({...p,tasks:p.tasks.map(t=>t.id===id?{...t,done:!t.done}:t)}));}
-  function moveNote(noteId,fid){updateData(p=>({...p,notes:p.notes.map(n=>n.id===noteId?{...n,folderId:fid}:n)}));setMovingItem(null);showToast("Moved \u2713");}
-  function moveTask(taskId,fid){updateData(p=>({...p,tasks:p.tasks.map(t=>t.id===taskId?{...t,folderId:fid}:t)}));setMovingItem(null);showToast("Moved \u2713");}
+  function moveNote(noteId,fid){updateData(p=>({...p,notes:p.notes.map(n=>n.id===noteId?{...n,folderId:fid}:n)}));setMovingItem(null);showToast("Moved ✓");}
+  function moveTask(taskId,fid){updateData(p=>({...p,tasks:p.tasks.map(t=>t.id===taskId?{...t,folderId:fid}:t)}));setMovingItem(null);showToast("Moved ✓");}
  
   // All folder options for move dropdown
-  const folderOpts=[{id:null,label:"\ud83c\udfe0 Home (root)"}];
+  const folderOpts=[{id:null,label:"🏠 Home (root)"}];
   function addOpt(fid,depth){
     const f=folders.find(x=>x.id===fid);if(!f)return;
-    folderOpts.push({id:fid,label:"\u00a0".repeat(depth*3)+"\ud83d\udcc1 "+f.name});
+    folderOpts.push({id:fid,label:"\u00a0".repeat(depth*3)+"📁 "+f.name});
     folders.filter(x=>x.parentId===fid).forEach(c=>addOpt(c.id,depth+1));
   }
   folders.filter(f=>!f.parentId).forEach(f=>addOpt(f.id,1));
@@ -750,7 +803,7 @@ function FilesApp({data,updateData,showToast,AC}){
       {/* Breadcrumb + action buttons */}
       <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:12,flexWrap:"wrap"}}>
         <div style={{display:"flex",alignItems:"center",gap:4,flex:1,flexWrap:"wrap",fontFamily:FFB,fontWeight:600,fontSize:12}}>
-          <span style={{cursor:"pointer",color:curId?ac:"rgba(255,255,255,0.6)"}} onClick={()=>setCurId(null)}>\ud83c\udfe0 Home</span>
+          <span style={{cursor:"pointer",color:curId?ac:"rgba(255,255,255,0.6)"}} onClick={()=>setCurId(null)}>🏠 Home</span>
           {breadcrumb.map((f,i)=>(
             <span key={f.id} style={{display:"flex",alignItems:"center",gap:4}}>
               <span style={{color:"rgba(255,255,255,0.2)"}}>{">"}</span>
@@ -758,24 +811,24 @@ function FilesApp({data,updateData,showToast,AC}){
             </span>
           ))}
         </div>
-        <button onClick={()=>{setShowNewFolder(v=>!v);setShowNewNote(false);}} style={btStyle(showNewFolder)}>\ud83d\udcc1 New Folder</button>
-        <button onClick={()=>{setShowNewNote(v=>!v);setShowNewFolder(false);}} style={btStyle(showNewNote)}>\ud83d\udcc4 New Note</button>
+        <button onClick={()=>{setShowNewFolder(v=>!v);setShowNewNote(false);}} style={btStyle(showNewFolder)}>📁 New Folder</button>
+        <button onClick={()=>{setShowNewNote(v=>!v);setShowNewFolder(false);}} style={btStyle(showNewNote)}>📄 New Note</button>
       </div>
  
       {/* New folder input */}
       {showNewFolder&&(
         <div style={{display:"flex",gap:7,marginBottom:10}}>
-          <input autoFocus value={newFolderName} onChange={e=>setNewFolderName(e.target.value)} onKeyDown={e=>e.key==="Enter"&&createFolder()} placeholder="Folder name\u2026" style={{...INP,flex:1}}/>
+          <input autoFocus value={newFolderName} onChange={e=>setNewFolderName(e.target.value)} onKeyDown={e=>e.key==="Enter"&&createFolder()} placeholder="Folder name…" style={{...INP,flex:1}}/>
           <button onClick={createFolder} style={{padding:"7px 14px",background:fill(ac),border:"1px solid "+bdr(ac),borderRadius:7,cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:12,color:ac}}>Create</button>
-          <button onClick={()=>setShowNewFolder(false)} style={{padding:"7px 11px",background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.11)",borderRadius:7,cursor:"pointer",color:"rgba(255,255,255,0.5)",fontFamily:FFB,fontSize:12}}>\u2715</button>
+          <button onClick={()=>setShowNewFolder(false)} style={{padding:"7px 11px",background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.11)",borderRadius:7,cursor:"pointer",color:"rgba(255,255,255,0.5)",fontFamily:FFB,fontSize:12}}>✕</button>
         </div>
       )}
  
       {/* New note input */}
       {showNewNote&&(
         <div style={{padding:12,background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:8,marginBottom:10,display:"flex",flexDirection:"column",gap:7}}>
-          <input autoFocus value={newNoteTitle} onChange={e=>setNewNoteTitle(e.target.value)} onKeyDown={e=>e.key==="Enter"&&createNote()} placeholder="Note title\u2026" style={INP}/>
-          <textarea value={newNoteBody} onChange={e=>setNewNoteBody(e.target.value)} placeholder="Content\u2026 (optional)" style={{...INP,minHeight:55}}/>
+          <input autoFocus value={newNoteTitle} onChange={e=>setNewNoteTitle(e.target.value)} onKeyDown={e=>e.key==="Enter"&&createNote()} placeholder="Note title…" style={INP}/>
+          <textarea value={newNoteBody} onChange={e=>setNewNoteBody(e.target.value)} placeholder="Content… (optional)" style={{...INP,minHeight:55}}/>
           <div style={{display:"flex",gap:7}}>
             <button onClick={createNote} style={{flex:1,padding:"7px",background:fill(ac),border:"1px solid "+bdr(ac),borderRadius:7,cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:12,color:ac}}>Create Note</button>
             <button onClick={()=>setShowNewNote(false)} style={{padding:"7px 12px",background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.11)",borderRadius:7,cursor:"pointer",color:"rgba(255,255,255,0.5)",fontFamily:FFB,fontSize:12}}>Cancel</button>
@@ -806,7 +859,7 @@ function FilesApp({data,updateData,showToast,AC}){
       {subFolders.length>0&&<div style={SEC}>Folders ({subFolders.length})</div>}
       {subFolders.map(f=>(
         <div key={f.id} className="fr" style={{display:"flex",alignItems:"center",gap:9,padding:"9px 12px",marginBottom:4,background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:8,cursor:"pointer",transition:"background 0.12s"}}>
-          <span style={{fontSize:20,pointerEvents:"none"}}>\ud83d\udcc1</span>
+          <span style={{fontSize:20,pointerEvents:"none"}}>📁</span>
           {editingFolder?.id===f.id?(
             <input autoFocus value={editingFolder.name} onChange={e=>setEditingFolder(x=>({...x,name:e.target.value}))} onKeyDown={e=>{if(e.key==="Enter")renameFolder(f.id,editingFolder.name);if(e.key==="Escape")setEditingFolder(null);}} onBlur={()=>renameFolder(f.id,editingFolder.name)} style={{...INP,flex:1,padding:"3px 8px",fontSize:13}}/>
           ):(
@@ -815,8 +868,8 @@ function FilesApp({data,updateData,showToast,AC}){
               <div style={{fontSize:10,color:"rgba(255,255,255,0.28)",marginTop:1}}>{itemCount(f.id)} items</div>
             </div>
           )}
-          <button onClick={e=>{e.stopPropagation();setEditingFolder({id:f.id,name:f.name});}} style={{background:"none",border:"none",cursor:"pointer",color:"rgba(255,255,255,0.28)",fontSize:12,padding:"3px 6px"}} title="Rename">\u270f\ufe0f</button>
-          <button className="dl" onClick={e=>{e.stopPropagation();deleteFolder(f.id);}} style={{background:"none",border:"none",cursor:"pointer",color:"rgba(255,80,80,0.3)",fontSize:13,padding:"3px 6px",transition:"color 0.12s"}} title="Delete">\u2715</button>
+          <button onClick={e=>{e.stopPropagation();setEditingFolder({id:f.id,name:f.name});}} style={{background:"none",border:"none",cursor:"pointer",color:"rgba(255,255,255,0.28)",fontSize:12,padding:"3px 6px"}} title="Rename">✏️</button>
+          <button className="dl" onClick={e=>{e.stopPropagation();deleteFolder(f.id);}} style={{background:"none",border:"none",cursor:"pointer",color:"rgba(255,80,80,0.3)",fontSize:13,padding:"3px 6px",transition:"color 0.12s"}} title="Delete">✕</button>
         </div>
       ))}
  
@@ -825,13 +878,13 @@ function FilesApp({data,updateData,showToast,AC}){
       {curNotes.map(n=>(
         <div key={n.id}>
           <div className="fr" onClick={()=>setPreview(preview?.id===n.id?null:n)} style={{display:"flex",alignItems:"center",gap:9,padding:"9px 12px",marginBottom:3,background:preview?.id===n.id?"rgba(79,158,255,0.1)":"rgba(255,255,255,0.03)",border:"1px solid "+(preview?.id===n.id?"rgba(79,158,255,0.35)":"rgba(255,255,255,0.07)"),borderRadius:7,cursor:"pointer",transition:"background 0.12s"}}>
-            <span style={{fontSize:14}}>\ud83d\udcc4</span>
+            <span style={{fontSize:14}}>📄</span>
             <div style={{flex:1,minWidth:0}}>
               <div style={{fontFamily:FFB,fontWeight:600,fontSize:12,color:"rgba(255,255,255,0.88)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{n.title}</div>
-              <div style={{fontSize:9,color:"rgba(255,255,255,0.28)",fontFamily:FFM}}>{new Date(n.ts).toLocaleDateString()}{n.body?" \u00b7 "+n.body.slice(0,28)+"\u2026":""}</div>
+              <div style={{fontSize:9,color:"rgba(255,255,255,0.28)",fontFamily:FFM}}>{new Date(n.ts).toLocaleDateString()}{n.body?" · "+n.body.slice(0,28)+"…":""}</div>
             </div>
-            <button onClick={e=>{e.stopPropagation();setMovingItem({type:"note",id:n.id,name:n.title,folderId:n.folderId||null});}} style={{background:"none",border:"none",cursor:"pointer",color:"rgba(255,255,255,0.25)",fontSize:11,padding:"3px 5px"}} title="Move to folder">\u21aa</button>
-            <button className="dl" onClick={e=>{e.stopPropagation();deleteNote(n.id);}} style={{background:"none",border:"none",cursor:"pointer",color:"rgba(255,80,80,0.28)",fontSize:12,padding:"3px 5px",transition:"color 0.12s"}}>\u2715</button>
+            <button onClick={e=>{e.stopPropagation();setMovingItem({type:"note",id:n.id,name:n.title,folderId:n.folderId||null});}} style={{background:"none",border:"none",cursor:"pointer",color:"rgba(255,255,255,0.25)",fontSize:11,padding:"3px 5px"}} title="Move to folder">↪</button>
+            <button className="dl" onClick={e=>{e.stopPropagation();deleteNote(n.id);}} style={{background:"none",border:"none",cursor:"pointer",color:"rgba(255,80,80,0.28)",fontSize:12,padding:"3px 5px",transition:"color 0.12s"}}>✕</button>
           </div>
           {preview?.id===n.id&&(
             <div style={{marginBottom:6,padding:"11px 14px",background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:7}}>
@@ -847,11 +900,11 @@ function FilesApp({data,updateData,showToast,AC}){
       {curTasks.map(t=>(
         <div key={t.id} style={{display:"flex",alignItems:"center",gap:9,padding:"8px 12px",marginBottom:4,background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.07)",borderRadius:7,opacity:t.done?0.45:1}}>
           <div onClick={()=>toggleTask(t.id)} style={{width:17,height:17,borderRadius:5,border:"1.5px solid "+(t.done?ac:"rgba(255,255,255,0.22)"),background:t.done?ac:"transparent",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-            {t.done&&<span style={{color:"#000",fontSize:9,fontWeight:900}}>\u2713</span>}
+            {t.done&&<span style={{color:"#000",fontSize:9,fontWeight:900}}>✓</span>}
           </div>
           <span style={{flex:1,fontFamily:FF,fontSize:12,color:"rgba(255,255,255,0.88)",textDecoration:t.done?"line-through":"none",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t.text}</span>
-          <button onClick={()=>setMovingItem({type:"task",id:t.id,name:t.text,folderId:t.folderId||null})} style={{background:"none",border:"none",cursor:"pointer",color:"rgba(255,255,255,0.25)",fontSize:11,padding:"3px 5px"}} title="Move">\u21aa</button>
-          <button className="dl" onClick={()=>deleteTask(t.id)} style={{background:"none",border:"none",cursor:"pointer",color:"rgba(255,80,80,0.28)",fontSize:12,padding:"3px 5px",transition:"color 0.12s"}}>\u2715</button>
+          <button onClick={()=>setMovingItem({type:"task",id:t.id,name:t.text,folderId:t.folderId||null})} style={{background:"none",border:"none",cursor:"pointer",color:"rgba(255,255,255,0.25)",fontSize:11,padding:"3px 5px"}} title="Move">↪</button>
+          <button className="dl" onClick={()=>deleteTask(t.id)} style={{background:"none",border:"none",cursor:"pointer",color:"rgba(255,80,80,0.28)",fontSize:12,padding:"3px 5px",transition:"color 0.12s"}}>✕</button>
         </div>
       ))}
     </div>
@@ -914,6 +967,57 @@ function Game2048App({AC}){
   return(<div style={{width:"100%",fontFamily:FF,display:"flex",flexDirection:"column",gap:12}}><div style={{display:"flex",alignItems:"center",gap:10}}><div style={{fontFamily:FFB,fontWeight:700,fontSize:22,color:AC}}>2048</div><div style={{flex:1}}/>{[["SCORE",score],["BEST",best]].map(([l,v])=>(<div key={l} style={{padding:"5px 12px",background:"rgba(255,255,255,0.08)",borderRadius:6,textAlign:"center"}}><div style={{fontFamily:FFM,fontSize:9,color:"rgba(255,255,255,0.4)",letterSpacing:1}}>{l}</div><div style={{fontFamily:FFB,fontWeight:700,fontSize:15,color:"#fff"}}>{v}</div></div>))}<button onClick={restart} style={{padding:"6px 13px",background:fill(AC),border:"1px solid "+bdr(AC),borderRadius:7,cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:12,color:AC}}>New</button></div><div style={{position:"relative"}}><div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:"1.5%",background:"rgba(255,255,255,0.08)",padding:"1.5%",borderRadius:10}}>{grid.flat().map((v,i)=>(<div key={i} style={{aspectRatio:"1",borderRadius:"8%",background:TC[v]||"#3c3a32",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:FFB,fontWeight:700,fontSize:"clamp(14px,4vw,28px)",color:TT[v]||"#f9f6f2",transition:"background 0.1s"}}>{v>0?v:""}</div>))}</div>{(over||won)&&(<div style={{position:"absolute",inset:0,background:"rgba(7,8,15,0.78)",borderRadius:10,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:12}}><div style={{fontFamily:FFB,fontWeight:700,fontSize:22,color:won?"#edcf72":"#ff7878"}}>{won?"You Win! 🎉":"Game Over"}</div><button onClick={restart} style={{padding:"10px 28px",background:fill(AC),border:"1px solid "+bdr(AC),borderRadius:8,cursor:"pointer",fontFamily:FFB,fontWeight:700,fontSize:14,color:AC}}>Try Again</button></div>)}</div><div style={{fontSize:11,color:"rgba(255,255,255,0.28)",fontFamily:FF,textAlign:"center"}}>Arrow keys or WASD · Combine to reach 2048</div></div>);
 }
  
+// Stars and AppCard are at module scope (not nested inside StoreApp) so React
+// keeps the same component identity across renders. When they were nested, the
+// parent's clock-tick re-render every second created fresh function refs, which
+// React treated as different component types and remounted the whole card —
+// remounting the <img> inside StoreIcon, which flickered.
+function Stars({appId, ratings, rateApp, ac}){
+  const r=ratings[appId]||{avg:0,count:0,mine:0};
+  const display=r.mine>0?r.mine:r.avg;
+  return(
+    <div style={{display:"flex",alignItems:"center",gap:6,marginTop:4}}>
+      {[1,2,3,4,5].map(s=>(
+        <span key={s} onClick={e=>{e.stopPropagation();rateApp(appId,s);}}
+          style={{cursor:"pointer",fontSize:15,color:s<=Math.round(display)?"#ffcc44":"rgba(255,255,255,0.18)",transition:"color 0.1s,transform 0.1s",lineHeight:1}}
+          onMouseEnter={e=>e.target.style.transform="scale(1.25)"}
+          onMouseLeave={e=>e.target.style.transform="scale(1)"}>
+          ★
+        </span>
+      ))}
+      {r.count>0&&<span style={{fontSize:10,fontFamily:FFM,color:"rgba(255,255,255,0.35)"}}>{r.avg.toFixed(1)} ({r.count})</span>}
+      {r.count===0&&<span style={{fontSize:10,fontFamily:FF,color:"rgba(255,255,255,0.2)",fontStyle:"italic"}}>Rate this</span>}
+      {r.mine>0&&<span style={{fontSize:9,fontFamily:FF,color:ac,opacity:0.8}}>your: {r.mine}★</span>}
+    </div>
+  );
+}
+
+function AppCard({app, isIn, ac, ratings, rateApp, toggleInstall}){
+  return(
+    <div className="sc" style={{padding:"14px",background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:10,display:"flex",flexDirection:"column",gap:0,transition:"background 0.12s"}}>
+      <div style={{display:"flex",alignItems:"flex-start",gap:11,marginBottom:8}}>
+        <div style={{width:44,height:44,borderRadius:10,background:"rgba(255,255,255,0.07)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,overflow:"hidden",fontSize:app.domain?undefined:22}}>
+          {app.domain?<StoreIcon domain={app.domain} fallback={app.icon} size={32}/>:app.icon}
+        </div>
+        <div style={{flex:1,minWidth:0}}>
+          <div style={{fontFamily:FFB,fontWeight:600,fontSize:13,color:"rgba(255,255,255,0.92)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{app.name}</div>
+          <div style={{display:"flex",alignItems:"center",gap:5,marginTop:2,flexWrap:"wrap"}}>
+            <span style={{fontSize:9,fontFamily:FFM,padding:"1px 6px",background:app.newTab?"rgba(255,180,0,0.12)":"rgba(79,200,100,0.12)",border:"1px solid "+(app.newTab?"rgba(255,180,0,0.3)":"rgba(79,200,100,0.3)"),borderRadius:4,color:app.newTab?"rgba(255,200,80,0.9)":"rgba(100,220,120,0.9)"}}>{app.badge||"↗ New Tab"}</span>
+            <span style={{fontSize:9,color:"rgba(255,255,255,0.28)"}}>{app.cat}</span>
+            {app.submitter&&<span style={{fontSize:9,color:"rgba(255,255,255,0.22)",fontFamily:FFM}}>by @{app.submitter}</span>}
+          </div>
+          <Stars appId={app.id} ratings={ratings} rateApp={rateApp} ac={ac}/>
+        </div>
+      </div>
+      <div style={{fontSize:12,color:"rgba(255,255,255,0.48)",lineHeight:1.5,marginBottom:10,flex:1}}>{app.desc}</div>
+      <div style={{display:"flex",gap:7}}>
+        <button onClick={()=>toggleInstall(app.id)} style={{flex:1,padding:"6px",background:isIn?"rgba(255,80,80,0.1)":"rgba(255,255,255,0.06)",border:"1px solid "+(isIn?"rgba(255,80,80,0.3)":"rgba(255,255,255,0.12)"),borderRadius:6,cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:11,color:isIn?"rgba(255,130,130,0.9)":"rgba(255,255,255,0.6)"}}>{isIn?"– Remove":"+ Desktop"}</button>
+        <button onClick={()=>window.open(app.url,"_blank")} style={{flex:1,padding:"6px",background:fill(ac),border:"1px solid "+bdr(ac),borderRadius:6,cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:11,color:ac}}>Launch ↗</button>
+      </div>
+    </div>
+  );
+}
+
 function StoreApp({user,data,updateData,showToast,AC}){
   const ac=AC||DEFAULT_AC;
   const [tab,setTab]=useState("official");
@@ -924,7 +1028,7 @@ function StoreApp({user,data,updateData,showToast,AC}){
   const [loadingComm,setLoadingComm]=useState(true);
   const [sName,setSName]=useState(""); const [sUrl,setSUrl]=useState("");
   const [sDesc,setSDesc]=useState(""); const [sCat,setSCat]=useState("Tools");
-  const [sIcon,setSIcon]=useState("\ud83d\ude80"); const [submitting,setSubmitting]=useState(false);
+  const [sIcon,setSIcon]=useState("🚀"); const [submitting,setSubmitting]=useState(false);
   const installed=data?.installedApps||[];
  
   // Real-time ratings from Firestore
@@ -952,7 +1056,7 @@ function StoreApp({user,data,updateData,showToast,AC}){
   },[]);
  
   async function rateApp(appId,rating){
-    try{await setDoc(doc(firestoreDb,"nova_ratings",appId+"_"+user),{appId,user,rating,ts:Date.now()});showToast("Rated "+rating+"\u2605 \u2713");}
+    try{await setDoc(doc(firestoreDb,"nova_ratings",appId+"_"+user),{appId,user,rating,ts:Date.now()});showToast("Rated "+rating+"★ ✓");}
     catch{showToast("Rating failed");}
   }
   async function submitApp(){
@@ -962,62 +1066,20 @@ function StoreApp({user,data,updateData,showToast,AC}){
     if(!url.startsWith("http"))url="https://"+url;
     setSubmitting(true);
     try{
-      await addDoc(collection(firestoreDb,"nova_user_apps"),{name,url,desc,cat:sCat,icon:sIcon,submitter:user,ts:Date.now(),newTab:true,badge:"\u2197 New Tab"});
-      showToast("App submitted! \u2713");setSName("");setSUrl("");setSDesc("");setSIcon("\ud83d\ude80");setTab("community");
+      await addDoc(collection(firestoreDb,"nova_user_apps"),{name,url,desc,cat:sCat,icon:sIcon,submitter:user,ts:Date.now(),newTab:true,badge:"↗ New Tab"});
+      showToast("App submitted! ✓");setSName("");setSUrl("");setSDesc("");setSIcon("🚀");setTab("community");
     }catch{showToast("Submission failed");}
     setSubmitting(false);
   }
   function toggleInstall(appId){
     const isIn=installed.includes(appId);
     updateData(p=>({...p,installedApps:isIn?p.installedApps.filter(id=>id!==appId):[...(p.installedApps||[]),appId]}));
-    showToast(isIn?"App removed":"Added to desktop \u2713");
+    showToast(isIn?"App removed":"Added to desktop ✓");
   }
  
-  function Stars({appId}){
-    const r=ratings[appId]||{avg:0,count:0,mine:0};
-    const display=r.mine>0?r.mine:r.avg;
-    return(
-      <div style={{display:"flex",alignItems:"center",gap:6,marginTop:4}}>
-        {[1,2,3,4,5].map(s=>(
-          <span key={s} onClick={e=>{e.stopPropagation();rateApp(appId,s);}}
-            style={{cursor:"pointer",fontSize:15,color:s<=Math.round(display)?"#ffcc44":"rgba(255,255,255,0.18)",transition:"color 0.1s,transform 0.1s",lineHeight:1}}
-            onMouseEnter={e=>e.target.style.transform="scale(1.25)"}
-            onMouseLeave={e=>e.target.style.transform="scale(1)"}>
-            \u2605
-          </span>
-        ))}
-        {r.count>0&&<span style={{fontSize:10,fontFamily:FFM,color:"rgba(255,255,255,0.35)"}}>{r.avg.toFixed(1)} ({r.count})</span>}
-        {r.count===0&&<span style={{fontSize:10,fontFamily:FF,color:"rgba(255,255,255,0.2)",fontStyle:"italic"}}>Rate this</span>}
-        {r.mine>0&&<span style={{fontSize:9,fontFamily:FF,color:ac,opacity:0.8}}>your: {r.mine}\u2605</span>}
-      </div>
-    );
-  }
+  // Stars hoisted to module scope (above StoreApp).
  
-  function AppCard({app,isIn}){
-    return(
-      <div className="sc" style={{padding:"14px",background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:10,display:"flex",flexDirection:"column",gap:0,transition:"background 0.12s"}}>
-        <div style={{display:"flex",alignItems:"flex-start",gap:11,marginBottom:8}}>
-          <div style={{width:44,height:44,borderRadius:10,background:"rgba(255,255,255,0.07)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,overflow:"hidden",fontSize:app.domain?undefined:22}}>
-            {app.domain?<StoreIcon domain={app.domain} fallback={app.icon} size={32}/>:app.icon}
-          </div>
-          <div style={{flex:1,minWidth:0}}>
-            <div style={{fontFamily:FFB,fontWeight:600,fontSize:13,color:"rgba(255,255,255,0.92)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{app.name}</div>
-            <div style={{display:"flex",alignItems:"center",gap:5,marginTop:2,flexWrap:"wrap"}}>
-              <span style={{fontSize:9,fontFamily:FFM,padding:"1px 6px",background:app.newTab?"rgba(255,180,0,0.12)":"rgba(79,200,100,0.12)",border:"1px solid "+(app.newTab?"rgba(255,180,0,0.3)":"rgba(79,200,100,0.3)"),borderRadius:4,color:app.newTab?"rgba(255,200,80,0.9)":"rgba(100,220,120,0.9)"}}>{app.badge||"\u2197 New Tab"}</span>
-              <span style={{fontSize:9,color:"rgba(255,255,255,0.28)"}}>{app.cat}</span>
-              {app.submitter&&<span style={{fontSize:9,color:"rgba(255,255,255,0.22)",fontFamily:FFM}}>by @{app.submitter}</span>}
-            </div>
-            <Stars appId={app.id}/>
-          </div>
-        </div>
-        <div style={{fontSize:12,color:"rgba(255,255,255,0.48)",lineHeight:1.5,marginBottom:10,flex:1}}>{app.desc}</div>
-        <div style={{display:"flex",gap:7}}>
-          <button onClick={()=>toggleInstall(app.id)} style={{flex:1,padding:"6px",background:isIn?"rgba(255,80,80,0.1)":"rgba(255,255,255,0.06)",border:"1px solid "+(isIn?"rgba(255,80,80,0.3)":"rgba(255,255,255,0.12)"),borderRadius:6,cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:11,color:isIn?"rgba(255,130,130,0.9)":"rgba(255,255,255,0.6)"}}>{isIn?"\u2013 Remove":"+ Desktop"}</button>
-          <button onClick={()=>window.open(app.url,"_blank")} style={{flex:1,padding:"6px",background:fill(ac),border:"1px solid "+bdr(ac),borderRadius:6,cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:11,color:ac}}>Launch \u2197</button>
-        </div>
-      </div>
-    );
-  }
+  // AppCard hoisted to module scope (above StoreApp).
  
   const filtered=STORE_CATALOG.filter(a=>{
     if(cat!=="All"&&a.cat!==cat)return false;
@@ -1030,13 +1092,13 @@ function StoreApp({user,data,updateData,showToast,AC}){
     <div style={{width:"100%",fontFamily:FF}}>
       {/* Header + search */}
       <div style={{marginBottom:12}}>
-        <div style={{fontFamily:FFB,fontWeight:700,fontSize:20,color:"#fff",marginBottom:8}}>\ud83c\udfea Nova Store 4.0</div>
-        <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search all apps\u2026" style={INP}/>
+        <div style={{fontFamily:FFB,fontWeight:700,fontSize:20,color:"#fff",marginBottom:8}}>🏪 Nova Store 4.1</div>
+        <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search all apps…" style={INP}/>
       </div>
  
       {/* Tab bar */}
       <div style={{display:"flex",borderBottom:"1px solid rgba(255,255,255,0.08)",marginBottom:14}}>
-        {[["official","\ud83c\udfc6 Official"],["community","\ud83c\udf0d Community"+(commApps.length>0?" ("+commApps.length+")":"")],["submit","+ Submit App"]].map(([id,lbl])=>(
+        {[["official","🏆 Official"],["community","🌍 Community"+(commApps.length>0?" ("+commApps.length+")":"")],["submit","+ Submit App"]].map(([id,lbl])=>(
           <button key={id} onClick={()=>setTab(id)} style={{padding:"8px 14px",background:"none",border:"none",borderBottom:tab===id?"2px solid "+ac:"2px solid transparent",cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:12,color:tab===id?ac:"rgba(255,255,255,0.38)",transition:"all 0.15s",whiteSpace:"nowrap"}}>{lbl}</button>
         ))}
       </div>
@@ -1047,7 +1109,7 @@ function StoreApp({user,data,updateData,showToast,AC}){
           {STORE_CATS.map(c=><button key={c} onClick={()=>setCat(c)} style={{padding:"4px 11px",background:cat===c?fill(ac):"rgba(255,255,255,0.06)",border:"1px solid "+(cat===c?bdr(ac):"rgba(255,255,255,0.1)"),borderRadius:20,cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:11,color:cat===c?ac:"rgba(255,255,255,0.5)",transition:"all 0.12s"}}>{c}</button>)}
         </div>
         <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(250px,1fr))",gap:9}}>
-          {filtered.map(app=><AppCard key={app.id} app={app} isIn={installed.includes(app.id)}/>)}
+          {filtered.map(app=><AppCard key={app.id} app={app} isIn={installed.includes(app.id)} ac={ac} ratings={ratings} rateApp={rateApp} toggleInstall={toggleInstall}/>)}
           {filtered.length===0&&<div style={{gridColumn:"span 2",color:"rgba(255,255,255,0.2)",fontFamily:FF,fontStyle:"italic",fontSize:13,textAlign:"center",padding:"40px 0"}}>No apps match.</div>}
         </div>
         {installed.length>0&&<div style={{marginTop:14,padding:"8px 12px",background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.07)",borderRadius:8,fontFamily:FF,fontSize:11,color:"rgba(255,255,255,0.35)"}}>{installed.length} app{installed.length!==1?"s":""} on desktop</div>}
@@ -1056,13 +1118,13 @@ function StoreApp({user,data,updateData,showToast,AC}){
       {/* Community tab */}
       {tab==="community"&&(<>
         <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12}}>
-          <span style={{fontSize:11,color:"rgba(255,255,255,0.3)"}}>Apps submitted by Nova users \u00b7 click \u2605 to rate</span>
+          <span style={{fontSize:11,color:"rgba(255,255,255,0.3)"}}>Apps submitted by Nova users · click ★ to rate</span>
           <button onClick={()=>setTab("submit")} style={{padding:"5px 12px",background:fill(ac),border:"1px solid "+bdr(ac),borderRadius:6,cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:11,color:ac}}>+ Submit</button>
         </div>
         {loadingComm&&<div style={{textAlign:"center",padding:"36px 0"}}><div style={{width:24,height:24,border:"3px solid rgba(255,255,255,0.1)",borderTopColor:ac,borderRadius:"50%",animation:"spin 0.8s linear infinite",margin:"0 auto"}}/></div>}
-        {!loadingComm&&filtComm.length===0&&<div style={{color:"rgba(255,255,255,0.18)",fontFamily:FF,fontStyle:"italic",fontSize:13,textAlign:"center",padding:"40px 0"}}>No community apps yet \u2014 be the first! \ud83d\ude80</div>}
+        {!loadingComm&&filtComm.length===0&&<div style={{color:"rgba(255,255,255,0.18)",fontFamily:FF,fontStyle:"italic",fontSize:13,textAlign:"center",padding:"40px 0"}}>No community apps yet — be the first! 🚀</div>}
         <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(250px,1fr))",gap:9}}>
-          {filtComm.map(app=><AppCard key={app.id} app={app} isIn={installed.includes(app.id)}/>)}
+          {filtComm.map(app=><AppCard key={app.id} app={app} isIn={installed.includes(app.id)} ac={ac} ratings={ratings} rateApp={rateApp} toggleInstall={toggleInstall}/>)}
         </div>
       </>)}
  
@@ -1098,7 +1160,7 @@ function StoreApp({user,data,updateData,showToast,AC}){
             </div>
             <button onClick={submitApp} disabled={submitting||!sName.trim()||!sUrl.trim()||!sDesc.trim()}
               style={{padding:"11px",background:fill(ac),border:"1px solid "+bdr(ac),borderRadius:8,cursor:submitting?"default":"pointer",fontFamily:FFB,fontWeight:700,fontSize:13,color:ac,opacity:submitting||!sName.trim()||!sUrl.trim()||!sDesc.trim()?0.4:1}}>
-              {submitting?"Submitting\u2026":"Submit App \u2192"}
+              {submitting?"Submitting…":"Submit App →"}
             </button>
             <div style={{fontSize:10,color:"rgba(255,255,255,0.2)",fontFamily:FF,fontStyle:"italic"}}>Submissions are public and visible to all Nova OS users. Keep it appropriate.</div>
           </div>
@@ -1109,7 +1171,7 @@ function StoreApp({user,data,updateData,showToast,AC}){
 }
  
 function TerminalApp({user,AC}){
-  const [lines,setLines]=useState([{t:"out",v:"NOVA Terminal v4.0.0"},{t:"out",v:"Session: "+user+" — "+new Date().toLocaleString()},{t:"out",v:'Type "help" for commands.'},{t:"gap"}]);
+  const [lines,setLines]=useState([{t:"out",v:"NOVA Terminal v4.1.0"},{t:"out",v:"Session: "+user+" — "+new Date().toLocaleString()},{t:"out",v:'Type "help" for commands.'},{t:"gap"}]);
   const [cmd,setCmd]=useState("");const [hist,setHist]=useState([]);const [hIdx,setHIdx]=useState(-1);const endRef=useRef(null);
   useEffect(()=>{endRef.current?.scrollIntoView({behavior:"smooth"});},[lines]);
   const CMDS={help:()=>["Commands: help, whoami, date, echo <text>, version, sysinfo, ls, neofetch, clear"],whoami:()=>[user],date:()=>[new Date().toLocaleString()],version:()=>["NOVA OS v4.0.0 — Nova Systems Inc."],sysinfo:()=>["CPU: Nova Virtual Core™","RAM: 8.0 GB","Storage: Firebase Firestore","Resolution: "+window.innerWidth+"x"+window.innerHeight,"Uptime: "+Math.floor(performance.now()/1000)+"s"],ls:()=>["notes/ tasks/ files/ paint/ browser/ snake/ 2048/ store/ terminal/ settings/"],neofetch:()=>[" ███╗   ██╗ ██████╗ ██╗   ██╗ █████╗ "," ████╗  ██║██╔═══██╗██║   ██║██╔══██╗"," ██╔██╗ ██║██║   ██║██║   ██║███████║"," ██║╚██╗██║██║   ██║╚██╗ ██╔╝██╔══██║"," ██║ ╚████║╚██████╔╝ ╚████╔╝ ██║  ██║","OS: Nova v3.5  User: "+user,"Widgets: Clock·Weather·Notes·Tasks·Calendar·SysInfo"],echo:args=>[args.join(" ")||"(empty)"],clear:()=>"__clear__"};
@@ -1121,7 +1183,7 @@ function TerminalApp({user,AC}){
 function SettingsApp({user,data,updateSettings,showToast,AC,onCustomWallpaper}){
   const settings=data?.settings||{};const fileRef=useRef(null);
   function handleUpload(e){const file=e.target.files[0];if(!file)return;if(file.size>8*1024*1024){showToast("File too large (max 8MB)");return;}const reader=new FileReader();reader.onload=ev=>{const img=new Image();img.onload=()=>{const canvas=document.createElement("canvas");const MAX=900;const ratio=Math.min(MAX/img.width,MAX/img.height,1);canvas.width=Math.round(img.width*ratio);canvas.height=Math.round(img.height*ratio);canvas.getContext("2d").drawImage(img,0,0,canvas.width,canvas.height);onCustomWallpaper(canvas.toDataURL("image/jpeg",0.72));};img.src=ev.target.result;};reader.readAsDataURL(file);e.target.value="";}
-  const wpId=settings.wallpaper||data?.wallpaper||"nova";
+  const wpId=settings.wallpaper||data?.wallpaper||"aurora";
   const widgets=settings.widgets||{};
   function setWidget(id,val){updateSettings({widgets:{...widgets,[id]:val}});}
   return(
