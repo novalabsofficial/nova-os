@@ -3,7 +3,7 @@
 // Drop this into src/NovaOS.jsx
  
 import { useState, useEffect, useRef, useCallback } from "react";
-import { doc, getDoc, setDoc, collection, addDoc, query, orderBy, limit, onSnapshot, serverTimestamp } from "firebase/firestore";
+import { doc, getDoc, setDoc, deleteDoc, collection, addDoc, query, orderBy, limit, onSnapshot, serverTimestamp } from "firebase/firestore";
 import { firestoreDb } from "./firebase.js";
 import {
   TASKBAR_H, MIN_W, MIN_H,
@@ -1000,7 +1000,10 @@ function Stars({appId, ratings, rateApp, ac}){
   );
 }
 
-function AppCard({app, isIn, ac, ratings, rateApp, toggleInstall}){
+function AppCard({app, isIn, ac, ratings, rateApp, toggleInstall, currentUser, onDeleteApp}){
+  // Only the user who submitted a community app can remove it from the store.
+  // Official (catalog) apps have no `submitter`, so this is always false for them.
+  const canDeleteFromStore = app.submitter && app.submitter === currentUser;
   return(
     <div className="sc" style={{padding:"14px",background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:10,display:"flex",flexDirection:"column",gap:0,transition:"background 0.12s"}}>
       <div style={{display:"flex",alignItems:"flex-start",gap:11,marginBottom:8}}>
@@ -1016,6 +1019,13 @@ function AppCard({app, isIn, ac, ratings, rateApp, toggleInstall}){
           </div>
           <Stars appId={app.id} ratings={ratings} rateApp={rateApp} ac={ac}/>
         </div>
+        {canDeleteFromStore && (
+          <button
+            className="dl"
+            onClick={()=>onDeleteApp(app)}
+            title="Remove your submission from the store"
+            style={{background:"none",border:"none",cursor:"pointer",color:"rgba(255,80,80,0.35)",fontSize:13,padding:"3px 6px",transition:"color 0.12s",flexShrink:0}}>🗑</button>
+        )}
       </div>
       <div style={{fontSize:12,color:"rgba(255,255,255,0.48)",lineHeight:1.5,marginBottom:10,flex:1}}>{app.desc}</div>
       <div style={{display:"flex",gap:7}}>
@@ -1084,6 +1094,17 @@ function StoreApp({user,data,updateData,showToast,AC}){
     updateData(p=>({...p,installedApps:isIn?p.installedApps.filter(id=>id!==appId):[...(p.installedApps||[]),appId]}));
     showToast(isIn?"App removed":"Added to desktop ✓");
   }
+
+  async function deleteApp(app){
+    // Submitter-only delete for community apps. Browser confirm is rough but
+    // adequate; the action is recoverable (you can resubmit) so not catastrophic.
+    if(app.submitter!==user)return;
+    if(!window.confirm("Remove \""+app.name+"\" from the store? This can't be undone."))return;
+    try{
+      await deleteDoc(doc(firestoreDb,"nova_user_apps",app.id));
+      showToast("App removed from store ✓");
+    }catch{showToast("Delete failed");}
+  }
  
   // Stars hoisted to module scope (above StoreApp).
  
@@ -1117,7 +1138,7 @@ function StoreApp({user,data,updateData,showToast,AC}){
           {STORE_CATS.map(c=><button key={c} onClick={()=>setCat(c)} style={{padding:"4px 11px",background:cat===c?fill(ac):"rgba(255,255,255,0.06)",border:"1px solid "+(cat===c?bdr(ac):"rgba(255,255,255,0.1)"),borderRadius:20,cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:11,color:cat===c?ac:"rgba(255,255,255,0.5)",transition:"all 0.12s"}}>{c}</button>)}
         </div>
         <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(250px,1fr))",gap:9}}>
-          {filtered.map(app=><AppCard key={app.id} app={app} isIn={installed.includes(app.id)} ac={ac} ratings={ratings} rateApp={rateApp} toggleInstall={toggleInstall}/>)}
+          {filtered.map(app=><AppCard key={app.id} app={app} isIn={installed.includes(app.id)} ac={ac} ratings={ratings} rateApp={rateApp} toggleInstall={toggleInstall} currentUser={user} onDeleteApp={deleteApp}/>)}
           {filtered.length===0&&<div style={{gridColumn:"span 2",color:"rgba(255,255,255,0.2)",fontFamily:FF,fontStyle:"italic",fontSize:13,textAlign:"center",padding:"40px 0"}}>No apps match.</div>}
         </div>
         {installed.length>0&&<div style={{marginTop:14,padding:"8px 12px",background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.07)",borderRadius:8,fontFamily:FF,fontSize:11,color:"rgba(255,255,255,0.35)"}}>{installed.length} app{installed.length!==1?"s":""} on desktop</div>}
@@ -1132,7 +1153,7 @@ function StoreApp({user,data,updateData,showToast,AC}){
         {loadingComm&&<div style={{textAlign:"center",padding:"36px 0"}}><div style={{width:24,height:24,border:"3px solid rgba(255,255,255,0.1)",borderTopColor:ac,borderRadius:"50%",animation:"spin 0.8s linear infinite",margin:"0 auto"}}/></div>}
         {!loadingComm&&filtComm.length===0&&<div style={{color:"rgba(255,255,255,0.18)",fontFamily:FF,fontStyle:"italic",fontSize:13,textAlign:"center",padding:"40px 0"}}>No community apps yet — be the first! 🚀</div>}
         <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(250px,1fr))",gap:9}}>
-          {filtComm.map(app=><AppCard key={app.id} app={app} isIn={installed.includes(app.id)} ac={ac} ratings={ratings} rateApp={rateApp} toggleInstall={toggleInstall}/>)}
+          {filtComm.map(app=><AppCard key={app.id} app={app} isIn={installed.includes(app.id)} ac={ac} ratings={ratings} rateApp={rateApp} toggleInstall={toggleInstall} currentUser={user} onDeleteApp={deleteApp}/>)}
         </div>
       </>)}
  
@@ -1269,6 +1290,14 @@ function ChatApp({ user, AC }) {
     setLastSent(now);
     setInput("");
     try {
+      // Reset chat when the 120-message buffer is full. Wipes all existing
+      // messages (visible to every user) before adding the new one. The
+      // collection is shared, so any sender hitting the cap resets globally.
+      if (messages.length >= 120) {
+        await Promise.all(
+          messages.map(m => deleteDoc(doc(firestoreDb, "nova_chat", m.id)))
+        );
+      }
       await addDoc(collection(firestoreDb, "nova_chat"), {
         user,
         text,
@@ -1277,6 +1306,12 @@ function ChatApp({ user, AC }) {
     } catch { /* silent */ }
     setSending(false);
     inputRef.current?.focus();
+  }
+
+  async function deleteMessage(id) {
+    try {
+      await deleteDoc(doc(firestoreDb, "nova_chat", id));
+    } catch { /* silent — onSnapshot will refresh either way */ }
   }
  
   function fmtTime(ts) {
@@ -1381,6 +1416,18 @@ function ChatApp({ user, AC }) {
                 }}>
                   {item.text}
                 </div>
+                {/* Delete button — only on your own messages */}
+                {isMe && (
+                  <button
+                    className="dl"
+                    onClick={() => deleteMessage(item.id)}
+                    title="Delete message"
+                    style={{
+                      background: "none", border: "none", cursor: "pointer",
+                      color: "rgba(255,80,80,0.35)", fontSize: 12, padding: "2px 5px",
+                      transition: "color 0.12s", flexShrink: 0, marginBottom: 2,
+                    }}>✕</button>
+                )}
               </div>
               {/* Timestamp */}
               <span style={{ fontSize: 9, fontFamily: FFM, color: "rgba(255,255,255,0.2)", marginTop: 2, marginLeft: isMe ? 0 : 28, marginRight: isMe ? 28 : 0 }}>
