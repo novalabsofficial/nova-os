@@ -5,19 +5,17 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { doc, getDoc, setDoc, collection, addDoc, query, orderBy, limit, onSnapshot, serverTimestamp } from "firebase/firestore";
 import { firestoreDb } from "./firebase.js";
- 
+import {
+  TASKBAR_H, MIN_W, MIN_H,
+  ICON_W, ICON_H, ICON_GAP, ICON_PAD_X, ICON_PAD_Y,
+  WIDGET_SNAP,
+} from "./lib/constants.js";
+import { hexRgb, fill, bdr, isUrl } from "./lib/format.js";
+import { defaultIconPos, snapToFreeGrid, snapW } from "./lib/geometry.js";
+
 // ─── CONSTANTS ────────────────────────────────────────────────────────────────
 const DEFAULT_AC = "#4f9eff";
 const COLL       = "nova_storage";
-const TASKBAR_H  = 52;
-const MIN_W      = 280;
-const MIN_H      = 200;
-const ICON_W     = 76;
-const ICON_H     = 92;
-const ICON_GAP   = 4;
-const ICON_PAD_X = 10;
-const ICON_PAD_Y = 14;
-const WIDGET_SNAP = 20;
  
 const WIDGET_CONFIGS = {
   clock:    { label:"Clock",        emoji:"🕐", minW:180, minH:80  },
@@ -106,44 +104,6 @@ const db = {
   async get(k){try{const s=await getDoc(doc(firestoreDb,COLL,k.replace(/[:/]/g,"_")));return s.exists()?s.data().value:null;}catch{return null;}},
   async set(k,v){try{await setDoc(doc(firestoreDb,COLL,k.replace(/[:/]/g,"_")),{value:v});}catch{}},
 };
- 
-// ─── HELPERS ──────────────────────────────────────────────────────────────────
-function hexRgb(h){const c=h.replace("#","");return parseInt(c.slice(0,2),16)+","+parseInt(c.slice(2,4),16)+","+parseInt(c.slice(4,6),16);}
-function fill(ac){return "rgba("+hexRgb(ac)+",0.16)";}
-function bdr(ac) {return "rgba("+hexRgb(ac)+",0.55)";}
-function isUrl(s){const t=s.trim();return /^https?:\/\//i.test(t)||/^[\w-]+\.[\w]{2,}(\/|$)/.test(t);}
- 
-function defaultIconPos(i){
-  const availH=window.innerHeight-TASKBAR_H-ICON_PAD_Y-10;
-  const rows=Math.max(1,Math.floor(availH/(ICON_H+ICON_GAP)));
-  return {x:ICON_PAD_X+Math.floor(i/rows)*(ICON_W+ICON_GAP), y:ICON_PAD_Y+(i%rows)*(ICON_H+ICON_GAP)};
-}
- 
-function snapToFreeGrid(dragId,rawX,rawY,allPos){
-  const cW=ICON_W+ICON_GAP,cH=ICON_H+ICON_GAP;
-  const maxC=Math.floor((window.innerWidth-ICON_PAD_X)/cW);
-  const maxR=Math.floor((window.innerHeight-TASKBAR_H-ICON_PAD_Y)/cH);
-  const tc=Math.max(0,Math.min(Math.round((rawX-ICON_PAD_X)/cW),maxC-1));
-  const tr=Math.max(0,Math.min(Math.round((rawY-ICON_PAD_Y)/cH),maxR-1));
-  const occ=new Set();
-  Object.entries(allPos).forEach(([id,pos])=>{
-    if(id===dragId)return;
-    occ.add(Math.round((pos.x-ICON_PAD_X)/cW)+","+Math.round((pos.y-ICON_PAD_Y)/cH));
-  });
-  const vis=new Set([tc+","+tr]);const q=[[tc,tr]];
-  while(q.length){
-    const [c,r]=q.shift();
-    if(c>=0&&r>=0&&c<maxC&&r<maxR&&!occ.has(c+","+r))
-      return {x:ICON_PAD_X+c*cW,y:ICON_PAD_Y+r*cH};
-    for(const [dc,dr] of [[0,1],[1,0],[0,-1],[-1,0],[1,1],[1,-1],[-1,1],[-1,-1]]){
-      const nk=(c+dc)+","+(r+dr);
-      if(!vis.has(nk)){vis.add(nk);q.push([c+dc,r+dr]);}
-    }
-  }
-  return {x:ICON_PAD_X+tc*cW,y:ICON_PAD_Y+tr*cH};
-}
- 
-function snapW(x,y){const g=WIDGET_SNAP;return{x:Math.round(x/g)*g,y:Math.round(y/g)*g};}
  
 // ─── FONTS & STYLES ───────────────────────────────────────────────────────────
 const FF ="'DM Sans',sans-serif";
