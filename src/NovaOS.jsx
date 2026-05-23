@@ -1,9 +1,9 @@
 
-// NOVA OS v4.1 — Nova Systems
+// NOVA OS v4.2 — Nova Systems
 // Drop this into src/NovaOS.jsx
  
 import { useState, useEffect, useRef, useCallback } from "react";
-import { doc, getDoc, setDoc, deleteDoc, collection, addDoc, query, orderBy, limit, onSnapshot, serverTimestamp } from "firebase/firestore";
+import { doc, getDoc, setDoc, updateDoc, deleteDoc, collection, addDoc, query, orderBy, limit, onSnapshot, serverTimestamp } from "firebase/firestore";
 import { firestoreDb } from "./firebase.js";
 import {
   TASKBAR_H, MIN_W, MIN_H,
@@ -12,6 +12,7 @@ import {
 } from "./lib/constants.js";
 import { hexRgb, fill, bdr, isUrl } from "./lib/format.js";
 import { defaultIconPos, snapToFreeGrid, snapW } from "./lib/geometry.js";
+import { autoModerate, isAdmin, isPubliclyVisible } from "./lib/moderation.js";
 
 // ─── CONSTANTS ────────────────────────────────────────────────────────────────
 const DEFAULT_AC = "#4f9eff";
@@ -84,7 +85,7 @@ const STORE_CATALOG = [
 ];
  
 const STORE_CATS    = ["All","Games","Media","Tools","Social","News"];
-const BOOT_MSGS     = ["NOVA OS v4.1 — Nova Systems","Initializing kernel... OK","Loading hardware abstraction layer... OK","Mounting filesystems... OK","Starting widget engine... OK","Initializing Nova Store... OK","Loading user environment... OK","System ready."];
+const BOOT_MSGS     = ["NOVA OS v4.2 — Nova Systems","Initializing kernel... OK","Loading hardware abstraction layer... OK","Mounting filesystems... OK","Starting widget engine... OK","Initializing Nova Store... OK","Loading user environment... OK","System ready."];
 const ACCENT_PRESETS= ["#4f9eff","#ff6b6b","#4cef90","#ffcc44","#cc44ff","#ff8c44","#44ddcc","#ff44aa"];
 const BOOKMARKS     = [{label:"Hacker News",url:"https://news.ycombinator.com"},{label:"Wikipedia",url:"https://en.m.wikipedia.org"},{label:"Archive.org",url:"https://archive.org"},{label:"itch.io",url:"https://itch.io"}];
 const PAINT_COLORS  = ["#fff","#000","#ff4444","#ff8800","#ffdd00","#44dd44","#00ccff","#4466ff","#cc44ff","#ff44aa","#8b4513","#888"];
@@ -117,21 +118,31 @@ const CSS=`
   *{box-sizing:border-box;}body{margin:0;background:#07080f;}
   ::-webkit-scrollbar{width:4px;}::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.12);border-radius:2px;}
   input,textarea,button{font-family:inherit;}input::placeholder,textarea::placeholder{color:rgba(255,255,255,0.22);}textarea{resize:vertical;}
-  @keyframes boot-in{from{opacity:0;transform:translateX(-8px);}to{opacity:1;transform:none;}}
-  @keyframes win-in{from{opacity:0;transform:scale(0.95) translateY(6px);}to{opacity:1;transform:none;}}
-  @keyframes menu-up{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:none;}}
-  @keyframes toast-in{from{opacity:0;transform:translateX(14px);}to{opacity:1;transform:none;}}
+  /* Keyframes — slightly larger displacements + later finish for visible smoothness */
+  @keyframes boot-in{from{opacity:0;transform:translateX(-12px);}to{opacity:1;transform:none;}}
+  @keyframes win-in{from{opacity:0;transform:scale(0.92) translateY(10px);}to{opacity:1;transform:none;}}
+  @keyframes menu-up{from{opacity:0;transform:translateY(14px);}to{opacity:1;transform:none;}}
+  @keyframes toast-in{from{opacity:0;transform:translateX(18px) scale(0.97);}to{opacity:1;transform:none;}}
   @keyframes spin{to{transform:rotate(360deg);}}
   @keyframes pulse{0%,100%{opacity:1;}50%{opacity:0.5;}}
-  .di:hover{background:rgba(255,255,255,0.14)!important;}.tb:hover{background:rgba(255,255,255,0.1)!important;}
-  .wx:hover{background:#c42b1c!important;color:#fff!important;}.wm:hover,.wn:hover{background:rgba(255,255,255,0.1)!important;}
-  .ma:hover{background:rgba(255,255,255,0.08)!important;}.ls:hover:not(:disabled){opacity:0.82!important;}
-  .lt:hover{color:rgba(160,210,255,0.9)!important;}.sb:hover{background:rgba(255,255,255,0.1)!important;}
-  .dl:hover{color:rgba(255,80,80,0.9)!important;}.ps:hover{transform:scale(1.2);z-index:2;}
-  .fr:hover{background:rgba(255,255,255,0.07)!important;}.sr:hover{background:rgba(255,255,255,0.06)!important;}
-  .bp:hover{background:rgba(255,255,255,0.1)!important;}.ad:hover{transform:scale(1.15);}
-  .ws:hover{border-color:rgba(255,255,255,0.5)!important;}.sc:hover{background:rgba(255,255,255,0.06)!important;}
-  .wgt{transition:border-color 0.15s;}.wgt:hover{border-color:rgba(255,255,255,0.22)!important;}
+  /* Hover transitions standardized on cubic-bezier(0.4,0,0.2,1) — Material's "standard" curve */
+  .di{transition:background 0.18s cubic-bezier(0.4,0,0.2,1),transform 0.18s cubic-bezier(0.4,0,0.2,1);}.di:hover{background:rgba(255,255,255,0.14)!important;}
+  .tb{transition:background 0.18s cubic-bezier(0.4,0,0.2,1);}.tb:hover{background:rgba(255,255,255,0.1)!important;}
+  .wx{transition:background 0.18s cubic-bezier(0.4,0,0.2,1),color 0.18s cubic-bezier(0.4,0,0.2,1);}.wx:hover{background:#c42b1c!important;color:#fff!important;}
+  .wm,.wn{transition:background 0.18s cubic-bezier(0.4,0,0.2,1);}.wm:hover,.wn:hover{background:rgba(255,255,255,0.1)!important;}
+  .ma{transition:background 0.18s cubic-bezier(0.4,0,0.2,1);}.ma:hover{background:rgba(255,255,255,0.08)!important;}
+  .ls{transition:opacity 0.18s cubic-bezier(0.4,0,0.2,1);}.ls:hover:not(:disabled){opacity:0.82!important;}
+  .lt{transition:color 0.18s cubic-bezier(0.4,0,0.2,1);}.lt:hover{color:rgba(160,210,255,0.9)!important;}
+  .sb{transition:background 0.18s cubic-bezier(0.4,0,0.2,1);}.sb:hover{background:rgba(255,255,255,0.1)!important;}
+  .dl{transition:color 0.18s cubic-bezier(0.4,0,0.2,1);}.dl:hover{color:rgba(255,80,80,0.9)!important;}
+  .ps{transition:transform 0.2s cubic-bezier(0.4,0,0.2,1);}.ps:hover{transform:scale(1.2);z-index:2;}
+  .fr{transition:background 0.18s cubic-bezier(0.4,0,0.2,1);}.fr:hover{background:rgba(255,255,255,0.07)!important;}
+  .sr{transition:background 0.18s cubic-bezier(0.4,0,0.2,1);}.sr:hover{background:rgba(255,255,255,0.06)!important;}
+  .bp{transition:background 0.18s cubic-bezier(0.4,0,0.2,1);}.bp:hover{background:rgba(255,255,255,0.1)!important;}
+  .ad{transition:transform 0.2s cubic-bezier(0.4,0,0.2,1);}.ad:hover{transform:scale(1.15);}
+  .ws{transition:border-color 0.18s cubic-bezier(0.4,0,0.2,1);}.ws:hover{border-color:rgba(255,255,255,0.5)!important;}
+  .sc{transition:background 0.18s cubic-bezier(0.4,0,0.2,1);}.sc:hover{background:rgba(255,255,255,0.06)!important;}
+  .wgt{transition:border-color 0.2s cubic-bezier(0.4,0,0.2,1);}.wgt:hover{border-color:rgba(255,255,255,0.22)!important;}
 `;
  
 // ─── BACKGROUNDS ─────────────────────────────────────────────────────────────
@@ -598,17 +609,17 @@ export default function NovaOS(){
   const dragCursor=drag?(drag.type==="move"?"grabbing":drag.edge+"-resize"):widgetResize?(widgetResize.edge+"-resize"):isAnyDrag?"grabbing":"default";
  
   // ── BOOT ─────────────────────────────────────────────────────────────────
-  if(screen==="boot")return(<div style={{width:"100%",height:"100vh",background:"#07080f",display:"flex",flexDirection:"column",justifyContent:"center",padding:"10vh 12%"}}><style>{CSS}</style><div style={{fontFamily:FFB,fontWeight:700,fontSize:66,letterSpacing:4,color:"#fff",marginBottom:4,lineHeight:1}}>NOVA</div><div style={{fontFamily:FF,fontSize:12,color:"rgba(255,255,255,0.22)",letterSpacing:5,marginBottom:46}}>OPERATING SYSTEM  ·  v4.1</div>{bootLines.map((l,i)=><div key={i} style={{fontFamily:FFM,fontSize:12,color:l.includes("ready")?"#4f9eff":"rgba(255,255,255,0.42)",marginBottom:5,animation:"boot-in 0.13s ease-out"}}>{l.includes("OK")?<>{l.replace("... OK","")}... <span style={{color:"#4cef90"}}>OK</span></>:l}</div>)}</div>);
+  if(screen==="boot")return(<div style={{width:"100%",height:"100vh",background:"#07080f",display:"flex",flexDirection:"column",justifyContent:"center",padding:"10vh 12%"}}><style>{CSS}</style><div style={{fontFamily:FFB,fontWeight:700,fontSize:66,letterSpacing:4,color:"#fff",marginBottom:4,lineHeight:1}}>NOVA</div><div style={{fontFamily:FF,fontSize:12,color:"rgba(255,255,255,0.22)",letterSpacing:5,marginBottom:46}}>OPERATING SYSTEM  ·  v4.2</div>{bootLines.map((l,i)=><div key={i} style={{fontFamily:FFM,fontSize:12,color:l.includes("ready")?"#4f9eff":"rgba(255,255,255,0.42)",marginBottom:5,animation:"boot-in 0.22s cubic-bezier(0.4,0,0.2,1)"}}>{l.includes("OK")?<>{l.replace("... OK","")}... <span style={{color:"#4cef90"}}>OK</span></>:l}</div>)}</div>);
  
   // ── LOGIN ────────────────────────────────────────────────────────────────
-  if(screen==="login")return(<div style={{width:"100%",height:"100vh",position:"relative",overflow:"hidden"}}><style>{CSS}</style><NovaBg/><div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center"}}><div style={{background:"rgba(8,10,22,0.86)",backdropFilter:"blur(24px)",border:"1px solid rgba(255,255,255,0.11)",borderRadius:16,padding:"44px 40px",width:376,boxShadow:"0 40px 100px rgba(0,0,0,0.6)",position:"relative",overflow:"hidden"}}><div style={{position:"absolute",top:0,left:0,right:0,height:2,background:"linear-gradient(90deg,transparent,"+DEFAULT_AC+",transparent)"}}/><div style={{fontFamily:FFB,fontWeight:700,fontSize:38,color:"#fff",textAlign:"center",letterSpacing:4,marginBottom:4}}>NOVA</div><div style={{fontFamily:FF,fontSize:11,color:"rgba(255,255,255,0.22)",textAlign:"center",letterSpacing:4,marginBottom:36}}>OPERATING SYSTEM  ·  v4.1</div><div style={{display:"flex",borderBottom:"1px solid rgba(255,255,255,0.09)",marginBottom:24}}>{["login","register"].map(m=><button key={m} className="lt" onClick={()=>{setMode(m);setAuthErr("");}} style={{flex:1,padding:"10px 0",background:"none",border:"none",borderBottom:mode===m?"2px solid "+DEFAULT_AC:"2px solid transparent",cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:12,letterSpacing:1,color:mode===m?DEFAULT_AC:"rgba(255,255,255,0.28)",transition:"color 0.15s"}}>{m==="login"?"SIGN IN":"REGISTER"}</button>)}</div><input style={{...INP,marginBottom:11}} placeholder="Username" value={uname} onChange={e=>setUname(e.target.value)} onKeyDown={e=>e.key==="Enter"&&handleAuth()} autoFocus/><input style={INP} type="password" placeholder="Password" value={pass} onChange={e=>setPass(e.target.value)} onKeyDown={e=>e.key==="Enter"&&handleAuth()}/><button className="ls" disabled={busy} onClick={handleAuth} style={{width:"100%",padding:"12px",background:fill(DEFAULT_AC),border:"1px solid "+bdr(DEFAULT_AC),borderRadius:8,cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:14,letterSpacing:1,color:"#fff",marginTop:14,transition:"opacity 0.15s"}}>{busy?"AUTHENTICATING…":mode==="login"?"SIGN IN →":"CREATE ACCOUNT →"}</button>{authErr&&<div style={{color:"#ff7878",fontFamily:FF,fontSize:13,textAlign:"center",marginTop:12}}>⚠ {authErr}</div>}<div style={{marginTop:20,fontFamily:FF,fontStyle:"italic",fontSize:11,color:"rgba(255,255,255,0.14)",textAlign:"center"}}>Don't reuse real passwords — demo auth only.</div></div></div></div>);
+  if(screen==="login")return(<div style={{width:"100%",height:"100vh",position:"relative",overflow:"hidden"}}><style>{CSS}</style><NovaBg/><div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center"}}><div style={{background:"rgba(8,10,22,0.86)",backdropFilter:"blur(24px)",border:"1px solid rgba(255,255,255,0.11)",borderRadius:16,padding:"44px 40px",width:376,boxShadow:"0 40px 100px rgba(0,0,0,0.6)",position:"relative",overflow:"hidden"}}><div style={{position:"absolute",top:0,left:0,right:0,height:2,background:"linear-gradient(90deg,transparent,"+DEFAULT_AC+",transparent)"}}/><div style={{fontFamily:FFB,fontWeight:700,fontSize:38,color:"#fff",textAlign:"center",letterSpacing:4,marginBottom:4}}>NOVA</div><div style={{fontFamily:FF,fontSize:11,color:"rgba(255,255,255,0.22)",textAlign:"center",letterSpacing:4,marginBottom:36}}>OPERATING SYSTEM  ·  v4.2</div><div style={{display:"flex",borderBottom:"1px solid rgba(255,255,255,0.09)",marginBottom:24}}>{["login","register"].map(m=><button key={m} className="lt" onClick={()=>{setMode(m);setAuthErr("");}} style={{flex:1,padding:"10px 0",background:"none",border:"none",borderBottom:mode===m?"2px solid "+DEFAULT_AC:"2px solid transparent",cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:12,letterSpacing:1,color:mode===m?DEFAULT_AC:"rgba(255,255,255,0.28)",transition:"color 0.15s"}}>{m==="login"?"SIGN IN":"REGISTER"}</button>)}</div><input style={{...INP,marginBottom:11}} placeholder="Username" value={uname} onChange={e=>setUname(e.target.value)} onKeyDown={e=>e.key==="Enter"&&handleAuth()} autoFocus/><input style={INP} type="password" placeholder="Password" value={pass} onChange={e=>setPass(e.target.value)} onKeyDown={e=>e.key==="Enter"&&handleAuth()}/><button className="ls" disabled={busy} onClick={handleAuth} style={{width:"100%",padding:"12px",background:fill(DEFAULT_AC),border:"1px solid "+bdr(DEFAULT_AC),borderRadius:8,cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:14,letterSpacing:1,color:"#fff",marginTop:14,transition:"opacity 0.15s"}}>{busy?"AUTHENTICATING…":mode==="login"?"SIGN IN →":"CREATE ACCOUNT →"}</button>{authErr&&<div style={{color:"#ff7878",fontFamily:FF,fontSize:13,textAlign:"center",marginTop:12}}>⚠ {authErr}</div>}<div style={{marginTop:20,fontFamily:FF,fontStyle:"italic",fontSize:11,color:"rgba(255,255,255,0.14)",textAlign:"center"}}>Don't reuse real passwords — demo auth only.</div></div></div></div>);
  
   // ── DESKTOP ──────────────────────────────────────────────────────────────
   return(
     <div style={{width:"100%",height:"100vh",position:"relative",overflow:"hidden",cursor:dragCursor,fontSize:largeFnt?15:13}}>
       <style>{CSS}</style>
       <Wallpaper id={wpId} customUrl={customWp}/>
-      {toast&&<div style={{position:"fixed",top:14,right:14,zIndex:99999,padding:"10px 18px",background:"rgba(8,10,22,0.97)",border:"1px solid "+AC,borderRadius:9,fontFamily:FFB,fontWeight:600,fontSize:13,color:"#fff",animation:"toast-in 0.17s ease-out",boxShadow:"0 8px 36px rgba(0,0,0,0.6)"}}>{toast}</div>}
+      {toast&&<div style={{position:"fixed",top:14,right:14,zIndex:99999,padding:"10px 18px",background:"rgba(8,10,22,0.97)",border:"1px solid "+AC,borderRadius:9,fontFamily:FFB,fontWeight:600,fontSize:13,color:"#fff",animation:"toast-in 0.24s cubic-bezier(0.16,1,0.3,1)",boxShadow:"0 8px 36px rgba(0,0,0,0.6)"}}>{toast}</div>}
  
       {/* Desktop widgets */}
       {Object.keys(WIDGET_CONFIGS).map(id=>{
@@ -632,7 +643,7 @@ export default function NovaOS(){
         const isDrg=iconDrag?.id===app.id;
         function launch(){if(app.storeApp){if(app.storeApp.newTab)window.open(app.storeApp.url,"_blank");else openApp("browser");}else openApp(app.id);}
         return(
-          <div key={app.id} style={{position:"absolute",left:pos.x,top:pos.y,width:ICON_W,zIndex:isDrg?500:2,cursor:isDrg?"grabbing":"grab",userSelect:"none",display:"flex",flexDirection:"column",alignItems:"center",gap:4,padding:"8px 4px",borderRadius:9,background:"rgba(0,0,0,0.1)",border:"1px solid transparent",transition:isDrg?"none":"background 0.12s",boxShadow:isDrg?"0 8px 32px rgba(0,0,0,0.6)":"none"}}
+          <div key={app.id} style={{position:"absolute",left:pos.x,top:pos.y,width:ICON_W,zIndex:isDrg?500:2,cursor:isDrg?"grabbing":"grab",userSelect:"none",display:"flex",flexDirection:"column",alignItems:"center",gap:4,padding:"8px 4px",borderRadius:9,background:"rgba(0,0,0,0.1)",border:"1px solid transparent",transition:isDrg?"none":"background 0.18s cubic-bezier(0.4,0,0.2,1), left 0.25s cubic-bezier(0.4,0,0.2,1), top 0.25s cubic-bezier(0.4,0,0.2,1)",boxShadow:isDrg?"0 8px 32px rgba(0,0,0,0.6)":"none"}}
             className={isDrg?"":"di"} title={app.desc} onMouseDown={e=>onIconMouseDown(e,app.id,allDesktopIcons)} onDoubleClick={launch}>
             <div style={{pointerEvents:"none",display:"flex",alignItems:"center",justifyContent:"center",filter:"drop-shadow(0 2px 6px rgba(0,0,0,0.7))"}}>
               <AppIconDisplay app={app} size={28}/>
@@ -643,7 +654,7 @@ export default function NovaOS(){
       })}
  
       {/* Start menu */}
-      {menuOpen&&(<div ref={menuRef} style={{position:"fixed",bottom:TASKBAR_H,left:0,width:360,background:"rgba(9,11,24,0.97)",backdropFilter:"blur(30px)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:"0 14px 0 0",boxShadow:"6px -6px 48px rgba(0,0,0,0.65)",zIndex:9998,display:"flex",flexDirection:"column",animation:"menu-up 0.15s ease-out",overflow:"hidden"}}>
+      {menuOpen&&(<div ref={menuRef} style={{position:"fixed",bottom:TASKBAR_H,left:0,width:360,background:"rgba(9,11,24,0.97)",backdropFilter:"blur(30px)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:"0 14px 0 0",boxShadow:"6px -6px 48px rgba(0,0,0,0.65)",zIndex:9998,display:"flex",flexDirection:"column",animation:"menu-up 0.22s cubic-bezier(0.4,0,0.2,1)",overflow:"hidden"}}>
         <div style={{padding:"16px 16px 10px"}}><div style={{display:"flex",alignItems:"center",gap:9,background:"rgba(255,255,255,0.08)",border:"1px solid rgba(255,255,255,0.12)",borderRadius:9,padding:"9px 14px"}}><span style={{fontSize:13,opacity:0.5}}>🔍</span><input value={menuSrch} onChange={e=>setMenuSrch(e.target.value)} placeholder="Search apps…" autoFocus style={{flex:1,background:"none",border:"none",outline:"none",color:"rgba(255,255,255,0.92)",fontFamily:FF,fontSize:14}}/>{menuSrch&&<button onClick={()=>setMenuSrch("")} style={{background:"none",border:"none",color:"rgba(255,255,255,0.3)",cursor:"pointer",fontSize:13}}>✕</button>}</div></div>
         <div style={{padding:"0 14px 14px",flex:1,overflowY:"auto"}}>
           <div style={SEC}>{menuSrch?`Results for "${menuSrch}"`:"All Apps"}</div>
@@ -660,7 +671,7 @@ export default function NovaOS(){
         </div>
         <div style={{padding:"10px 16px",borderTop:"1px solid rgba(255,255,255,0.07)",display:"flex",alignItems:"center",gap:10}}>
           <div style={{width:32,height:32,borderRadius:"50%",background:fill(AC),border:"1.5px solid "+AC,display:"flex",alignItems:"center",justifyContent:"center",fontSize:15,flexShrink:0}}>👤</div>
-          <div style={{flex:1}}><div style={{fontFamily:FFB,fontWeight:600,fontSize:13,color:"#fff"}}>@{user}</div><div style={{fontFamily:FF,fontSize:10,color:"rgba(255,255,255,0.3)"}}>Nova OS v4.1</div></div>
+          <div style={{flex:1}}><div style={{fontFamily:FFB,fontWeight:600,fontSize:13,color:"#fff"}}>@{user}</div><div style={{fontFamily:FF,fontSize:10,color:"rgba(255,255,255,0.3)"}}>Nova OS v4.2</div></div>
           <button onClick={logout} style={{padding:"6px 12px",background:"rgba(200,40,40,0.12)",border:"1px solid rgba(200,40,40,0.3)",borderRadius:6,cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:11,color:"rgba(255,140,140,0.9)"}}>Logout</button>
         </div>
       </div>)}
@@ -672,7 +683,7 @@ export default function NovaOS(){
         if(isMin)return null;
         const winStyle=isMax?{position:"fixed",top:0,left:0,right:0,bottom:TASKBAR_H+"px",zIndex:win.z,borderRadius:0}:{position:"absolute",left:win.x,top:win.y,width:win.width,height:win.height,zIndex:win.z,borderRadius:12};
         return(
-          <div key={win.id} onClick={()=>focusWin(win.id)} style={{...winStyle,background:"rgba(10,12,26,0.93)",border:"1px solid rgba(255,255,255,0.1)",boxShadow:"0 "+(isDrg?30:15)+"px "+(isDrg?90:50)+"px rgba(0,0,0,"+(isDrg?0.8:0.6)+")",display:"flex",flexDirection:"column",animation:"win-in 0.15s ease-out",backdropFilter:"blur("+winBlur+"px)",transition:"box-shadow 0.12s",overflow:"hidden"}}>
+          <div key={win.id} onClick={()=>focusWin(win.id)} style={{...winStyle,background:"rgba(10,12,26,0.93)",border:"1px solid rgba(255,255,255,0.1)",boxShadow:"0 "+(isDrg?30:15)+"px "+(isDrg?90:50)+"px rgba(0,0,0,"+(isDrg?0.8:0.6)+")",display:"flex",flexDirection:"column",animation:"win-in 0.24s cubic-bezier(0.16,1,0.3,1)",backdropFilter:"blur("+winBlur+"px)",transition:isDrg?"box-shadow 0.18s cubic-bezier(0.4,0,0.2,1)":"box-shadow 0.18s cubic-bezier(0.4,0,0.2,1), left 0.28s cubic-bezier(0.4,0,0.2,1), top 0.28s cubic-bezier(0.4,0,0.2,1), width 0.28s cubic-bezier(0.4,0,0.2,1), height 0.28s cubic-bezier(0.4,0,0.2,1)",overflow:"hidden"}}>
             {!isMax&&<ResizeHandles winId={win.id} onStartResize={startResize}/>}
             <div onMouseDown={e=>!isMax&&startDrag(e,win.id)} style={{height:38,display:"flex",alignItems:"center",padding:"0 8px 0 12px",gap:9,background:"rgba(255,255,255,0.04)",borderBottom:"1px solid rgba(255,255,255,0.07)",borderRadius:isMax?"0":"12px 12px 0 0",cursor:isMax?"default":isDrg?"grabbing":"grab",userSelect:"none",flexShrink:0}}>
               <div style={{display:"flex",alignItems:"center",justifyContent:"center"}}><AppIconDisplay app={{id:win.app,icon:app?.icon||"📦"}} size={16}/></div>
@@ -1089,11 +1100,43 @@ function StoreApp({user,data,updateData,showToast,AC}){
     if(!name||!url||!desc){showToast("All fields required");return;}
     if(!url.startsWith("http"))url="https://"+url;
     setSubmitting(true);
+    // Run auto-filter. Flags don't block — they just decorate the queue entry
+    // so admins can prioritize what to look at first.
+    const autoFlags=autoModerate({name,desc,url});
     try{
-      await addDoc(collection(firestoreDb,"nova_user_apps"),{name,url,desc,cat:sCat,icon:sIcon,submitter:user,ts:Date.now(),newTab:true,badge:"↗ New Tab"});
-      showToast("App submitted! ✓");setSName("");setSUrl("");setSDesc("");setSIcon("🚀");setTab("community");
+      await addDoc(collection(firestoreDb,"nova_user_apps"),{
+        name,url,desc,cat:sCat,icon:sIcon,submitter:user,ts:Date.now(),
+        newTab:true,badge:"↗ New Tab",
+        status:"pending",autoFlags,reviewedBy:null,reviewedAt:null,rejectReason:null,
+      });
+      showToast(autoFlags.length>0
+        ? "Submitted — flagged for review ⚠"
+        : "Submitted — pending admin review ✓");
+      setSName("");setSUrl("");setSDesc("");setSIcon("🚀");setTab("community");
     }catch{showToast("Submission failed");}
     setSubmitting(false);
+  }
+
+  async function approveApp(app){
+    if(!isAdmin(user))return;
+    try{
+      await updateDoc(doc(firestoreDb,"nova_user_apps",app.id),{
+        status:"approved",reviewedBy:user,reviewedAt:Date.now(),
+      });
+      showToast("Approved \""+app.name+"\" ✓");
+    }catch{showToast("Approve failed");}
+  }
+
+  async function rejectApp(app){
+    if(!isAdmin(user))return;
+    const reason=window.prompt("Reject \""+app.name+"\" — optional reason (visible to submitter):","");
+    if(reason===null)return; // user cancelled
+    try{
+      await updateDoc(doc(firestoreDb,"nova_user_apps",app.id),{
+        status:"rejected",rejectReason:reason||null,reviewedBy:user,reviewedAt:Date.now(),
+      });
+      showToast("Rejected \""+app.name+"\"");
+    }catch{showToast("Reject failed");}
   }
   function toggleInstall(appId){
     const isIn=installed.includes(appId);
@@ -1132,19 +1175,31 @@ function StoreApp({user,data,updateData,showToast,AC}){
     if(search&&!a.name.toLowerCase().includes(search.toLowerCase())&&!a.desc.toLowerCase().includes(search.toLowerCase()))return false;
     return true;
   });
-  const filtComm=commApps.filter(a=>!search||a.name.toLowerCase().includes(search.toLowerCase())||a.desc.toLowerCase().includes(search.toLowerCase()));
+  const matchesSearch=a=>!search||a.name.toLowerCase().includes(search.toLowerCase())||a.desc.toLowerCase().includes(search.toLowerCase());
+  // Community feed: only show approved (or legacy unstamped) apps. Pending/rejected are hidden from non-admins.
+  const filtComm=commApps.filter(a=>isPubliclyVisible(a)&&matchesSearch(a));
+  // Moderation queue: every app awaiting review. Only admins see this list.
+  const modQueue=commApps.filter(a=>a.status==="pending");
+  // The current user's own submissions, regardless of status, so they can track what they've sent in.
+  const mySubmissions=commApps.filter(a=>a.submitter===user&&a.status&&a.status!=="approved");
+  const userIsAdmin=isAdmin(user);
  
   return(
     <div style={{width:"100%",fontFamily:FF}}>
       {/* Header + search */}
       <div style={{marginBottom:12}}>
-        <div style={{fontFamily:FFB,fontWeight:700,fontSize:20,color:"#fff",marginBottom:8}}>🏪 Nova Store 4.1</div>
+        <div style={{fontFamily:FFB,fontWeight:700,fontSize:20,color:"#fff",marginBottom:8}}>🏪 Nova Store 4.2</div>
         <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search all apps…" style={INP}/>
       </div>
  
       {/* Tab bar */}
       <div style={{display:"flex",borderBottom:"1px solid rgba(255,255,255,0.08)",marginBottom:14}}>
-        {[["official","🏆 Official"],["community","🌍 Community"+(commApps.length>0?" ("+commApps.length+")":"")],["submit","+ Submit App"]].map(([id,lbl])=>(
+        {[
+          ["official","🏆 Official"],
+          ["community","🌍 Community"+(filtComm.length>0?" ("+filtComm.length+")":"")],
+          ["submit","+ Submit App"],
+          ...(userIsAdmin?[["moderation","🛡 Moderation"+(modQueue.length>0?" ("+modQueue.length+")":"")]]:[]),
+        ].map(([id,lbl])=>(
           <button key={id} onClick={()=>setTab(id)} style={{padding:"8px 14px",background:"none",border:"none",borderBottom:tab===id?"2px solid "+ac:"2px solid transparent",cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:12,color:tab===id?ac:"rgba(255,255,255,0.38)",transition:"all 0.15s",whiteSpace:"nowrap"}}>{lbl}</button>
         ))}
       </div>
@@ -1167,10 +1222,62 @@ function StoreApp({user,data,updateData,showToast,AC}){
           <span style={{fontSize:11,color:"rgba(255,255,255,0.3)"}}>Apps submitted by Nova users · click ★ to rate</span>
           <button onClick={()=>setTab("submit")} style={{padding:"5px 12px",background:fill(ac),border:"1px solid "+bdr(ac),borderRadius:6,cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:11,color:ac}}>+ Submit</button>
         </div>
+        {/* Your submissions in moderation — only renders if you have any */}
+        {mySubmissions.length>0&&(
+          <div style={{marginBottom:14,padding:"10px 12px",background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:8}}>
+            <div style={{fontFamily:FFB,fontWeight:600,fontSize:11,color:"rgba(255,255,255,0.55)",marginBottom:6,letterSpacing:0.5}}>YOUR SUBMISSIONS</div>
+            {mySubmissions.map(a=>{
+              const isPending=a.status==="pending";
+              const badgeColor=isPending?"#ffcc44":"#ff7878";
+              return(
+                <div key={a.id} style={{display:"flex",alignItems:"center",gap:8,padding:"4px 0",fontFamily:FF,fontSize:12,color:"rgba(255,255,255,0.7)"}}>
+                  <span style={{flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{a.name}</span>
+                  <span style={{fontFamily:FFM,fontSize:10,padding:"1px 6px",borderRadius:4,background:"rgba("+hexRgb(badgeColor)+",0.15)",border:"1px solid "+badgeColor,color:badgeColor}}>{isPending?"Pending review":"Rejected"}</span>
+                  {!isPending&&a.rejectReason&&<span style={{fontSize:11,fontStyle:"italic",color:"rgba(255,255,255,0.4)",marginLeft:6}}>"{a.rejectReason}"</span>}
+                </div>
+              );
+            })}
+          </div>
+        )}
         {loadingComm&&<div style={{textAlign:"center",padding:"36px 0"}}><div style={{width:24,height:24,border:"3px solid rgba(255,255,255,0.1)",borderTopColor:ac,borderRadius:"50%",animation:"spin 0.8s linear infinite",margin:"0 auto"}}/></div>}
         {!loadingComm&&filtComm.length===0&&<div style={{color:"rgba(255,255,255,0.18)",fontFamily:FF,fontStyle:"italic",fontSize:13,textAlign:"center",padding:"40px 0"}}>No community apps yet — be the first! 🚀</div>}
         <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(250px,1fr))",gap:9}}>
           {filtComm.map(app=><AppCard key={app.id} app={app} isIn={installed.includes(app.id)} ac={ac} ratings={ratings} rateApp={rateApp} toggleInstall={toggleInstall} currentUser={user} onDeleteApp={deleteApp}/>)}
+        </div>
+      </>)}
+
+      {/* Moderation tab — admins only */}
+      {tab==="moderation"&&userIsAdmin&&(<>
+        <div style={{marginBottom:12}}>
+          <div style={{fontFamily:FFB,fontWeight:700,fontSize:14,color:"#fff"}}>🛡 Moderation Queue</div>
+          <div style={{fontSize:11,color:"rgba(255,255,255,0.35)",marginTop:2}}>{modQueue.length} app{modQueue.length===1?"":"s"} awaiting review · red flags from auto-filter need extra attention</div>
+        </div>
+        {modQueue.length===0&&<div style={{color:"rgba(255,255,255,0.2)",fontFamily:FF,fontStyle:"italic",fontSize:13,textAlign:"center",padding:"40px 0"}}>Queue is empty — nothing to review 🎉</div>}
+        <div style={{display:"flex",flexDirection:"column",gap:10}}>
+          {modQueue.map(app=>(
+            <div key={app.id} style={{padding:"12px 14px",background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:9}}>
+              <div style={{display:"flex",alignItems:"flex-start",gap:10}}>
+                <div style={{fontSize:24,flexShrink:0,lineHeight:1}}>{app.icon||"📦"}</div>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontFamily:FFB,fontWeight:600,fontSize:13,color:"#fff"}}>{app.name}</div>
+                  <div style={{fontSize:11,color:"rgba(255,255,255,0.4)",marginTop:1}}>by @{app.submitter||"unknown"} · {app.cat||"Uncategorized"}</div>
+                  <a href={app.url} target="_blank" rel="noreferrer" style={{fontSize:11,fontFamily:FFM,color:ac,textDecoration:"none",marginTop:3,display:"inline-block",wordBreak:"break-all"}}>{app.url}</a>
+                  <div style={{fontSize:12,color:"rgba(255,255,255,0.6)",marginTop:6,lineHeight:1.5}}>{app.desc}</div>
+                  {app.autoFlags&&app.autoFlags.length>0&&(
+                    <div style={{display:"flex",flexWrap:"wrap",gap:5,marginTop:8}}>
+                      {app.autoFlags.map((f,i)=>(
+                        <span key={i} style={{fontSize:10,fontFamily:FFM,padding:"2px 7px",borderRadius:4,background:"rgba(255,80,80,0.12)",border:"1px solid rgba(255,80,80,0.4)",color:"#ff9898"}}>⚠ {f}</span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+              <div style={{display:"flex",gap:7,marginTop:11,justifyContent:"flex-end"}}>
+                <button onClick={()=>rejectApp(app)} style={{padding:"6px 14px",background:"rgba(255,80,80,0.08)",border:"1px solid rgba(255,80,80,0.35)",borderRadius:6,cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:11,color:"rgba(255,130,130,0.95)"}}>✕ Reject</button>
+                <button onClick={()=>approveApp(app)} style={{padding:"6px 14px",background:"rgba(76,239,144,0.1)",border:"1px solid rgba(76,239,144,0.4)",borderRadius:6,cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:11,color:"#4cef90"}}>✓ Approve</button>
+              </div>
+            </div>
+          ))}
         </div>
       </>)}
  
@@ -1217,10 +1324,10 @@ function StoreApp({user,data,updateData,showToast,AC}){
 }
  
 function TerminalApp({user,AC}){
-  const [lines,setLines]=useState([{t:"out",v:"NOVA Terminal v4.1.0"},{t:"out",v:"Session: "+user+" — "+new Date().toLocaleString()},{t:"out",v:'Type "help" for commands.'},{t:"gap"}]);
+  const [lines,setLines]=useState([{t:"out",v:"NOVA Terminal v4.2.0"},{t:"out",v:"Session: "+user+" — "+new Date().toLocaleString()},{t:"out",v:'Type "help" for commands.'},{t:"gap"}]);
   const [cmd,setCmd]=useState("");const [hist,setHist]=useState([]);const [hIdx,setHIdx]=useState(-1);const endRef=useRef(null);
   useEffect(()=>{endRef.current?.scrollIntoView({behavior:"smooth"});},[lines]);
-  const CMDS={help:()=>["Commands: help, whoami, date, echo <text>, version, sysinfo, ls, neofetch, clear"],whoami:()=>[user],date:()=>[new Date().toLocaleString()],version:()=>["NOVA OS v4.1.0 — Nova Systems Inc."],sysinfo:()=>["CPU: Nova Virtual Core™","RAM: 8.0 GB","Storage: Firebase Firestore","Resolution: "+window.innerWidth+"x"+window.innerHeight,"Uptime: "+Math.floor(performance.now()/1000)+"s"],ls:()=>["notes/ tasks/ files/ paint/ browser/ snake/ 2048/ store/ terminal/ settings/"],neofetch:()=>[" ███╗   ██╗ ██████╗ ██╗   ██╗ █████╗ "," ████╗  ██║██╔═══██╗██║   ██║██╔══██╗"," ██╔██╗ ██║██║   ██║██║   ██║███████║"," ██║╚██╗██║██║   ██║╚██╗ ██╔╝██╔══██║"," ██║ ╚████║╚██████╔╝ ╚████╔╝ ██║  ██║","OS: Nova v4.1  User: "+user,"Widgets: Clock·Weather·Notes·Tasks·Calendar·SysInfo"],echo:args=>[args.join(" ")||"(empty)"],clear:()=>"__clear__"};
+  const CMDS={help:()=>["Commands: help, whoami, date, echo <text>, version, sysinfo, ls, neofetch, clear"],whoami:()=>[user],date:()=>[new Date().toLocaleString()],version:()=>["NOVA OS v4.2.0 — Nova Systems Inc."],sysinfo:()=>["CPU: Nova Virtual Core™","RAM: 8.0 GB","Storage: Firebase Firestore","Resolution: "+window.innerWidth+"x"+window.innerHeight,"Uptime: "+Math.floor(performance.now()/1000)+"s"],ls:()=>["notes/ tasks/ files/ paint/ browser/ snake/ 2048/ store/ terminal/ settings/"],neofetch:()=>[" ███╗   ██╗ ██████╗ ██╗   ██╗ █████╗ "," ████╗  ██║██╔═══██╗██║   ██║██╔══██╗"," ██╔██╗ ██║██║   ██║██║   ██║███████║"," ██║╚██╗██║██║   ██║╚██╗ ██╔╝██╔══██║"," ██║ ╚████║╚██████╔╝ ╚████╔╝ ██║  ██║","OS: Nova v4.2  User: "+user,"Widgets: Clock·Weather·Notes·Tasks·Calendar·SysInfo"],echo:args=>[args.join(" ")||"(empty)"],clear:()=>"__clear__"};
   function run(){const raw=cmd.trim();if(!raw)return;const parts=raw.split(" ");const c=parts[0].toLowerCase();const args=parts.slice(1);setHist(h=>[raw,...h]);setHIdx(-1);setCmd("");const nl=[...lines,{t:"in",v:raw}];const h=CMDS[c];if(!h){nl.push({t:"err",v:c+': not found. Try "help".'});}else{const r=h(args);if(r==="__clear__"){setLines([]);return;}r.forEach(v=>nl.push({t:"out",v}));}nl.push({t:"gap"});setLines(nl);}
   function onKey(e){if(e.key==="Enter"){run();return;}if(e.key==="ArrowUp"){const i=Math.min(hIdx+1,hist.length-1);setHIdx(i);if(hist[i])setCmd(hist[i]);}if(e.key==="ArrowDown"){const i=Math.max(hIdx-1,-1);setHIdx(i);setCmd(i===-1?"":(hist[i]||""));}}
   return(<div style={{width:"100%",fontFamily:FFM}}><div style={{background:"#030407",borderRadius:8,padding:"13px 15px",height:"100%",minHeight:280,overflowY:"auto",border:"1px solid rgba(255,255,255,0.07)"}}>{lines.map((l,i)=><div key={i} style={{color:l.t==="in"?AC:l.t==="err"?"#ff7878":"rgba(180,210,255,0.58)",fontSize:12,marginBottom:l.t==="gap"?5:2,minHeight:l.t==="gap"?4:undefined,whiteSpace:"pre"}}>{l.t==="in"?"$ "+l.v:l.t==="gap"?null:l.v}</div>)}<div style={{display:"flex",alignItems:"center"}}><span style={{color:"#4cef90",marginRight:7,fontSize:12}}>$</span><input value={cmd} onChange={e=>setCmd(e.target.value)} onKeyDown={onKey} autoFocus style={{flex:1,background:"none",border:"none",outline:"none",color:AC,fontFamily:FFM,fontSize:12,caretColor:AC}}/></div><div ref={endRef}/></div></div>);
