@@ -313,11 +313,12 @@ function MeshBg(){
 
 function Wallpaper({id,customUrl}){
   if(id==="custom"&&customUrl)return<div style={{position:"absolute",inset:0,background:'url("'+customUrl+'") center/cover no-repeat'}}/>;
-  if(!id||id==="aurora")return<AuroraBg/>;
-  if(id==="mesh")return<MeshBg/>;
+  // 5.2 made Mesh the new system default. Aurora is still selectable.
+  if(!id||id==="mesh")return<MeshBg/>;
+  if(id==="aurora")return<AuroraBg/>;
   if(id==="nova")return<NovaBg/>;
   if(id==="bliss")return<BlissBg/>;
-  const wp=WALLPAPERS[id];if(wp&&wp.grad)return<div style={{position:"absolute",inset:0,background:wp.grad}}/>;return<AuroraBg/>;
+  const wp=WALLPAPERS[id];if(wp&&wp.grad)return<div style={{position:"absolute",inset:0,background:wp.grad}}/>;return<MeshBg/>;
 }
  
 // ─── ICONS ────────────────────────────────────────────────────────────────────
@@ -786,7 +787,7 @@ export default function NovaOS(){
   const use24h  =settings.clock24h  ||false;
   const winBlur =settings.winBlur   ??18;
   const largeFnt=settings.largeFont ||false;
-  const wpId    =settings.wallpaper ||data?.wallpaper||"aurora";
+  const wpId    =settings.wallpaper ||data?.wallpaper||"mesh";
   const widgets =settings.widgets   ||{};
   // Resolved device mode: user's saved preference overrides detection. "auto"
   // (or any unset/invalid value) defers to the viewport+touch heuristic.
@@ -951,21 +952,35 @@ export default function NovaOS(){
     setBusy(true);setAuthErr("");
     if(mode==="register"){
       const ex=await db.get("user:"+u+":pw");if(ex!==null){setAuthErr("Username taken.");setBusy(false);return;}
-      await db.set("user:"+u+":pw",p);const init={notes:[],tasks:[],wallpaper:"aurora",bio:"",joined:Date.now(),settings:{},installedApps:[],folders:[],migratedTo41:true};
+      await db.set("user:"+u+":pw",p);const init={notes:[],tasks:[],wallpaper:"mesh",bio:"",joined:Date.now(),settings:{},installedApps:[],folders:[],migratedTo41:true,migratedTo52:true};
       await db.set("user:"+u+":data",init);setUser(u);setData(init);setIconPos({});setWidgetState(DEFAULT_WIDGET_STATE);setScreen("desktop");
     }else{
       const stored=await db.get("user:"+u+":pw");if(stored===null){setAuthErr("Account not found.");setBusy(false);return;}
       if(stored!==p){setAuthErr("Incorrect password.");setBusy(false);return;}
       const d=await db.get("user:"+u+":data");const savedIconPos=await db.get("user:"+u+":iconpos");
-      // One-time migration: NOVA OS 4.1 makes Aurora the default wallpaper.
-      // Bump any account still on the old "nova" default exactly once.
+      // One-time migrations layered by release. Each runs at most once per user
+      // (gated by its own migratedToX.Y flag) and only re-points the wallpaper
+      // if the user is on the *previous* default — anyone who deliberately
+      // picked sakura / forest / etc. keeps their choice.
+      let migratedNow = false;
       if(d&&!d.migratedTo41){
+        // 4.1: Nova → Aurora as the default wallpaper.
         if(d.wallpaper==="nova")d.wallpaper="aurora";
         if(d.settings?.wallpaper==="nova")d.settings={...d.settings,wallpaper:"aurora"};
         d.migratedTo41=true;
-        await db.set("user:"+u+":data",d);
+        migratedNow=true;
       }
-      setUser(u);setData(d||{notes:[],tasks:[],wallpaper:"aurora",bio:"",joined:Date.now(),settings:{},installedApps:[],folders:[],migratedTo41:true});
+      if(d&&!d.migratedTo52){
+        // 5.2: Aurora → Mesh as the default wallpaper. This runs *after* the
+        // 4.1 step above, so a user who came from v3.x (wallpaper: "nova")
+        // gets bumped nova → aurora → mesh in a single login.
+        if(d.wallpaper==="aurora")d.wallpaper="mesh";
+        if(d.settings?.wallpaper==="aurora")d.settings={...d.settings,wallpaper:"mesh"};
+        d.migratedTo52=true;
+        migratedNow=true;
+      }
+      if(migratedNow) await db.set("user:"+u+":data",d);
+      setUser(u);setData(d||{notes:[],tasks:[],wallpaper:"mesh",bio:"",joined:Date.now(),settings:{},installedApps:[],folders:[],migratedTo41:true,migratedTo52:true});
       setIconPos(savedIconPos||{});
       if(d?.settings?.widgetState)setWidgetState({...DEFAULT_WIDGET_STATE,...d.settings.widgetState});
       setScreen("desktop");
@@ -987,7 +1002,7 @@ export default function NovaOS(){
   if(screen==="boot")return(<div style={{width:"100%",height:"100vh",background:"#07080f",display:"flex",flexDirection:"column",justifyContent:"center",padding:"10vh max(24px, 12%)"}}><style>{CSS}</style><div style={{fontFamily:FFB,fontWeight:700,fontSize:"clamp(40px, 12vw, 66px)",letterSpacing:4,color:"#fff",marginBottom:4,lineHeight:1}}>NOVA</div><div style={{fontFamily:FF,fontSize:12,color:"rgba(255,255,255,0.22)",letterSpacing:5,marginBottom:46}}>OPERATING SYSTEM  ·  v5.2</div>{bootLines.map((l,i)=><div key={i} style={{fontFamily:FFM,fontSize:12,color:l.includes("ready")?"#4f9eff":"rgba(255,255,255,0.42)",marginBottom:5,animation:"boot-in 0.22s cubic-bezier(0.4,0,0.2,1)"}}>{l.includes("OK")?<>{l.replace("... OK","")}... <span style={{color:"#4cef90"}}>OK</span></>:l}</div>)}{MobileNotice}</div>);
  
   // ── LOGIN ────────────────────────────────────────────────────────────────
-  if(screen==="login")return(<div style={{width:"100%",height:"100vh",position:"relative",overflow:"hidden"}}><style>{CSS}</style><NovaBg/><div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center"}}><div style={{background:"rgba(8,10,22,0.86)",backdropFilter:"blur(24px)",border:"1px solid rgba(255,255,255,0.11)",borderRadius:16,padding:"44px 40px",width:376,maxWidth:"calc(100vw - 24px)",boxShadow:"0 40px 100px rgba(0,0,0,0.6)",position:"relative",overflow:"hidden"}}><div style={{position:"absolute",top:0,left:0,right:0,height:2,background:"linear-gradient(90deg,transparent,"+DEFAULT_AC+",transparent)"}}/><div style={{fontFamily:FFB,fontWeight:700,fontSize:38,color:"#fff",textAlign:"center",letterSpacing:4,marginBottom:4}}>NOVA</div><div style={{fontFamily:FF,fontSize:11,color:"rgba(255,255,255,0.22)",textAlign:"center",letterSpacing:4,marginBottom:36}}>OPERATING SYSTEM  ·  v5.2</div><div style={{display:"flex",borderBottom:"1px solid rgba(255,255,255,0.09)",marginBottom:24}}>{["login","register"].map(m=><button key={m} className="lt" onClick={()=>{setMode(m);setAuthErr("");}} style={{flex:1,padding:"10px 0",background:"none",border:"none",borderBottom:mode===m?"2px solid "+DEFAULT_AC:"2px solid transparent",cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:12,letterSpacing:1,color:mode===m?DEFAULT_AC:"rgba(255,255,255,0.28)",transition:"color 0.15s"}}>{m==="login"?"SIGN IN":"REGISTER"}</button>)}</div><input style={{...INP,marginBottom:11}} placeholder="Username" value={uname} onChange={e=>setUname(e.target.value)} onKeyDown={e=>e.key==="Enter"&&handleAuth()} autoFocus/><input style={INP} type="password" placeholder="Password" value={pass} onChange={e=>setPass(e.target.value)} onKeyDown={e=>e.key==="Enter"&&handleAuth()}/><button className="ls" disabled={busy} onClick={handleAuth} style={{width:"100%",padding:"12px",background:fill(DEFAULT_AC),border:"1px solid "+bdr(DEFAULT_AC),borderRadius:8,cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:14,letterSpacing:1,color:"#fff",marginTop:14,transition:"opacity 0.15s"}}>{busy?"AUTHENTICATING…":mode==="login"?"SIGN IN →":"CREATE ACCOUNT →"}</button>{authErr&&<div style={{color:"#ff7878",fontFamily:FF,fontSize:13,textAlign:"center",marginTop:12}}>⚠ {authErr}</div>}<div style={{marginTop:20,fontFamily:FF,fontStyle:"italic",fontSize:11,color:"rgba(255,255,255,0.14)",textAlign:"center"}}>Don't reuse real passwords — demo auth only.</div></div></div>{MobileNotice}</div>);
+  if(screen==="login")return(<div style={{width:"100%",height:"100vh",position:"relative",overflow:"hidden"}}><style>{CSS}</style><MeshBg/><div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center"}}><div style={{background:"rgba(8,10,22,0.86)",backdropFilter:"blur(24px)",border:"1px solid rgba(255,255,255,0.11)",borderRadius:16,padding:"44px 40px",width:376,maxWidth:"calc(100vw - 24px)",boxShadow:"0 40px 100px rgba(0,0,0,0.6)",position:"relative",overflow:"hidden"}}><div style={{position:"absolute",top:0,left:0,right:0,height:2,background:"linear-gradient(90deg,transparent,"+DEFAULT_AC+",transparent)"}}/><div style={{fontFamily:FFB,fontWeight:700,fontSize:38,color:"#fff",textAlign:"center",letterSpacing:4,marginBottom:4}}>NOVA</div><div style={{fontFamily:FF,fontSize:11,color:"rgba(255,255,255,0.22)",textAlign:"center",letterSpacing:4,marginBottom:36}}>OPERATING SYSTEM  ·  v5.2</div><div style={{display:"flex",borderBottom:"1px solid rgba(255,255,255,0.09)",marginBottom:24}}>{["login","register"].map(m=><button key={m} className="lt" onClick={()=>{setMode(m);setAuthErr("");}} style={{flex:1,padding:"10px 0",background:"none",border:"none",borderBottom:mode===m?"2px solid "+DEFAULT_AC:"2px solid transparent",cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:12,letterSpacing:1,color:mode===m?DEFAULT_AC:"rgba(255,255,255,0.28)",transition:"color 0.15s"}}>{m==="login"?"SIGN IN":"REGISTER"}</button>)}</div><input style={{...INP,marginBottom:11}} placeholder="Username" value={uname} onChange={e=>setUname(e.target.value)} onKeyDown={e=>e.key==="Enter"&&handleAuth()} autoFocus/><input style={INP} type="password" placeholder="Password" value={pass} onChange={e=>setPass(e.target.value)} onKeyDown={e=>e.key==="Enter"&&handleAuth()}/><button className="ls" disabled={busy} onClick={handleAuth} style={{width:"100%",padding:"12px",background:fill(DEFAULT_AC),border:"1px solid "+bdr(DEFAULT_AC),borderRadius:8,cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:14,letterSpacing:1,color:"#fff",marginTop:14,transition:"opacity 0.15s"}}>{busy?"AUTHENTICATING…":mode==="login"?"SIGN IN →":"CREATE ACCOUNT →"}</button>{authErr&&<div style={{color:"#ff7878",fontFamily:FF,fontSize:13,textAlign:"center",marginTop:12}}>⚠ {authErr}</div>}<div style={{marginTop:20,fontFamily:FF,fontStyle:"italic",fontSize:11,color:"rgba(255,255,255,0.14)",textAlign:"center"}}>Don't reuse real passwords — demo auth only.</div></div></div>{MobileNotice}</div>);
  
   // ── DESKTOP ──────────────────────────────────────────────────────────────
   return(
@@ -1861,7 +1876,7 @@ function TerminalApp({user,AC}){
 function SettingsApp({user,data,updateSettings,showToast,AC,onCustomWallpaper}){
   const settings=data?.settings||{};const fileRef=useRef(null);
   function handleUpload(e){const file=e.target.files[0];if(!file)return;if(file.size>8*1024*1024){showToast("File too large (max 8MB)");return;}const reader=new FileReader();reader.onload=ev=>{const img=new Image();img.onload=()=>{const canvas=document.createElement("canvas");const MAX=900;const ratio=Math.min(MAX/img.width,MAX/img.height,1);canvas.width=Math.round(img.width*ratio);canvas.height=Math.round(img.height*ratio);canvas.getContext("2d").drawImage(img,0,0,canvas.width,canvas.height);onCustomWallpaper(canvas.toDataURL("image/jpeg",0.72));};img.src=ev.target.result;};reader.readAsDataURL(file);e.target.value="";}
-  const wpId=settings.wallpaper||data?.wallpaper||"aurora";
+  const wpId=settings.wallpaper||data?.wallpaper||"mesh";
   const widgets=settings.widgets||{};
   function setWidget(id,val){updateSettings({widgets:{...widgets,[id]:val}});}
   return(
