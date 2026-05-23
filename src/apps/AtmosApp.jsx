@@ -22,12 +22,17 @@ export function AtmosApp({AC,showToast,pushNotification,openNovaAi,data,updateSe
   const [forecast,setForecast]=useState(null);
   const [alerts,setAlerts]=useState([]);
   const [loadingForecast,setLoadingForecast]=useState(false);
-  const [units,setUnits]=useState("imperial");        // imperial | metric
+  // v6.4: units preference persists per-account. Defaults to imperial.
+  const [units,setUnits]=useState(()=>data?.settings?.weatherUnits||"imperial");
   const [expandedAlert,setExpandedAlert]=useState(null);
   const debounceRef=useRef(null);
   // v6.4: the user can pin a default location that persists across sessions
   // AND drives the Weather desktop widget. Saved at data.settings.weatherLocation.
   const savedLoc = data?.settings?.weatherLocation || null;
+  // v6.4: last-5 recent searches shown as quick-tap chips below the search bar.
+  // Each entry is the same shape as a pickLocation argument so the chip click
+  // can call pickLocation directly. Deduped by (lat,lon) and capped at 5.
+  const recentLocations = data?.settings?.recentLocations || [];
 
   // Debounced geocode lookup as the user types. 350ms is just slow enough to
   // not hammer Nominatim's 1-req/sec policy, and just fast enough to feel live.
@@ -73,7 +78,12 @@ export function AtmosApp({AC,showToast,pushNotification,openNovaAi,data,updateSe
     if(!skipSave && updateSettings){
       // Only save the fields we actually need — strip any extra props the
       // geocoder may have attached so the Firestore doc stays slim.
-      updateSettings({weatherLocation:{label:s.label, lat:s.lat, lon:s.lon, countryCode:s.countryCode || null}});
+      const slim = {label:s.label, lat:s.lat, lon:s.lon, countryCode:s.countryCode || null};
+      // Update the recent-locations list: move/insert this city to the front,
+      // dedupe by (lat,lon), keep only the last 5.
+      const filtered = (data?.settings?.recentLocations || []).filter(r => !(r.lat===s.lat && r.lon===s.lon));
+      const nextRecent = [slim, ...filtered].slice(0, 5);
+      updateSettings({weatherLocation: slim, recentLocations: nextRecent});
     }
     try{
       const fres=await fetch(forecastUrl(s.lat,s.lon,units));
@@ -169,8 +179,32 @@ export function AtmosApp({AC,showToast,pushNotification,openNovaAi,data,updateSe
             </div>
           )}
         </div>
-        <button onClick={()=>setUnits(u=>u==="imperial"?"metric":"imperial")} style={{padding:"8px 12px",background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:8,cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:11,color:"rgba(255,255,255,0.7)"}}>{units==="imperial"?"°F":"°C"}</button>
+        <button onClick={()=>setUnits(u=>{
+          const next = u==="imperial"?"metric":"imperial";
+          // v6.4: persist so the toggle survives reloads and syncs across devices
+          if(updateSettings) updateSettings({weatherUnits:next});
+          return next;
+        })} style={{padding:"8px 12px",background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:8,cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:11,color:"rgba(255,255,255,0.7)"}}>{units==="imperial"?"°F":"°C"}</button>
       </div>
+
+      {/* v6.4: recent-locations chips. Only render when we have any, so the
+          empty state isn't cluttered. The chip for the currently-loaded
+          location is highlighted; clicking any chip re-loads (and re-pins). */}
+      {recentLocations.length > 0 && (
+        <div style={{display:"flex",gap:6,flexWrap:"wrap",flexShrink:0,marginTop:-6}}>
+          <span style={{fontSize:10,fontFamily:FFM,color:"rgba(255,255,255,0.32)",letterSpacing:1,alignSelf:"center",marginRight:2}}>RECENT</span>
+          {recentLocations.map((r, i) => {
+            const isActive = loc && loc.lat===r.lat && loc.lon===r.lon;
+            const shortLabel = (r.label || "").split(",")[0].trim();
+            return (
+              <button key={r.lat+","+r.lon+","+i} onClick={()=>pickLocation(r)} title={r.label}
+                style={{padding:"4px 10px",background:isActive?fill(AC):"rgba(255,255,255,0.05)",border:"1px solid "+(isActive?bdr(AC):"rgba(255,255,255,0.1)"),borderRadius:14,cursor:"pointer",fontFamily:FF,fontSize:11,color:isActive?AC:"rgba(255,255,255,0.7)",whiteSpace:"nowrap",maxWidth:140,overflow:"hidden",textOverflow:"ellipsis"}}>
+                📍 {shortLabel}
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       {/* Body */}
       <div style={{flex:1,overflowY:"auto",minHeight:0,display:"flex",flexDirection:"column",gap:12}}>

@@ -164,6 +164,20 @@ export default function NovaOS(){
   // change. Safe to call before audio actually plays — it just writes to
   // localStorage.
   useEffect(()=>{ setSoundWallpaper(wpId); },[wpId]);
+  // v6.4: when "Restore open apps on sign-in" is enabled, save the current
+  // window list (debounced ~1.2s) to a separate Firestore doc so we don't
+  // round-trip the whole user-data doc on every drag/resize. Saved under
+  // user:<uname>:savedWindows. Restored at login (see handleAuth below).
+  useEffect(()=>{
+    if(!user) return;
+    if(!data?.settings?.restoreOnSignin) return;
+    const t = setTimeout(()=>{
+      // Strip nothing — windows are already plain JSON-friendly objects.
+      const toSave = (winsRef.current || []).map(w => ({...w}));
+      db.set("user:"+user+":savedWindows", toSave);
+    }, 1200);
+    return ()=>clearTimeout(t);
+  },[wins, user, data?.settings?.restoreOnSignin]);
   // Outside-click closes menu. pointerdown covers both mouse and touch in one go.
   useEffect(()=>{if(!menuOpen)return;function h(e){if(menuRef.current&&!menuRef.current.contains(e.target))setMenuOpen(false);}setTimeout(()=>document.addEventListener("pointerdown",h),0);return()=>document.removeEventListener("pointerdown",h);},[menuOpen]);
 
@@ -334,6 +348,71 @@ export default function NovaOS(){
   function closeWin(id){playSound("windowClose");setWins(ws=>ws.filter(w=>w.id!==id));}
   function minimizeWin(id){setWins(ws=>ws.map(w=>w.id===id?{...w,state:w.state==="minimized"?"normal":"minimized"}:w));}
   function maximizeWin(id){setWins(ws=>ws.map(w=>{if(w.id!==id)return w;if(w.state==="maximized")return{...w,state:"normal",...(w.prevBounds||{}),prevBounds:null};return{...w,state:"maximized",prevBounds:{x:w.x,y:w.y,width:w.width,height:w.height}};}));}
+
+  // v6.4: Global keyboard shortcuts.
+  //   Cmd/Ctrl + K    → toggle start menu (search auto-focused)
+  //   Cmd/Ctrl + ,    → open Settings
+  //   Esc             → close start menu (apps handle Esc themselves)
+  //   Alt + W         → close the active window
+  //   Alt + M         → minimize the active window
+  //
+  // Why Alt instead of Cmd for window controls: browsers reserve Cmd+W
+  // (close tab) and Cmd+M (minimize browser) at the OS level — web pages
+  // can't preventDefault them. Alt-based combos are the cleanest dodge.
+  //
+  // We avoid firing shortcuts while typing into <input>/<textarea> so
+  // Cmd+K inside a search box doesn't surprise-open the start menu.
+  // (Esc is allowed everywhere — it's expected to "cancel" universally.)
+  //
+  // Handler ref pattern: keeps the listener stable across renders while
+  // still reading the latest handler functions. Re-binding the listener
+  // on every render would work too, just slightly noisier.
+  const kbHandlersRef = useRef(null);
+  kbHandlersRef.current = { openApp, closeWin, minimizeWin, setMenuOpen, screen };
+  useEffect(()=>{
+    function onKey(e){
+      const h = kbHandlersRef.current;
+      if(!h || h.screen !== "desktop") return;  // shortcuts only matter once signed in
+      const mod = e.ctrlKey || e.metaKey;
+      const target = e.target;
+      const isTyping = target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable);
+
+      // Esc — close menus. Apps handle their own modal closes.
+      if(e.key === "Escape"){
+        h.setMenuOpen(false);
+        return;
+      }
+      // Cmd/Ctrl + K — start menu
+      if(mod && (e.key === "k" || e.key === "K") && !isTyping){
+        e.preventDefault();
+        h.setMenuOpen(o => !o);
+        return;
+      }
+      // Cmd/Ctrl + , — Settings
+      if(mod && e.key === "," && !isTyping){
+        e.preventDefault();
+        h.openApp("settings");
+        return;
+      }
+      // Alt + W — close active window. Excludes minimized so Alt+W when
+      // everything is hidden in the taskbar doesn't surprise-close the wrong thing.
+      if(e.altKey && (e.key === "w" || e.key === "W") && !isTyping){
+        e.preventDefault();
+        const top = [...(winsRef.current || [])].filter(w => w.state !== "minimized").sort((a,b) => (b.z||0) - (a.z||0))[0];
+        if(top) h.closeWin(top.id);
+        return;
+      }
+      // Alt + M — minimize active window
+      if(e.altKey && (e.key === "m" || e.key === "M") && !isTyping){
+        e.preventDefault();
+        const top = [...(winsRef.current || [])].filter(w => w.state !== "minimized").sort((a,b) => (b.z||0) - (a.z||0))[0];
+        if(top) h.minimizeWin(top.id);
+        return;
+      }
+    }
+    document.addEventListener("keydown", onKey);
+    return ()=>document.removeEventListener("keydown", onKey);
+  },[]);
   function onIconMouseDown(e,appId,allIcons){if(e.button!==0)return;e.stopPropagation();e.preventDefault();const idx=allIcons.findIndex(a=>a.id===appId);const pos=iconPos[appId]||defaultIconPos(idx);setIconDrag({id:appId,ox:e.clientX-pos.x,oy:e.clientY-pos.y,user,allIcons:[...allIcons]});}
   function onWidgetDragStart(e,id){if(e.button!==0)return;e.stopPropagation();e.preventDefault();const s=widgetState[id]||DEFAULT_WIDGET_STATE[id];setWidgetDrag({id,ox:e.clientX-s.x,oy:e.clientY-s.y});}
   function onWidgetResizeStart(e,id,edge){if(e.button!==0)return;e.stopPropagation();e.preventDefault();const s=widgetState[id]||DEFAULT_WIDGET_STATE[id];setWidgetResize({id,edge,sx:e.clientX,sy:e.clientY,x0:s.x,y0:s.y,w0:s.w,h0:s.h});}
@@ -429,6 +508,20 @@ export default function NovaOS(){
       setUser(u);setUid(newUid);setData(d||initData);
       setIconPos(savedIconPos||{});
       if(d?.settings?.widgetState)setWidgetState({...DEFAULT_WIDGET_STATE,...d.settings.widgetState});
+      // v6.4: restore previously-open windows if the user opted in. We filter
+      // out windows whose app no longer exists (e.g. removed in an OS update)
+      // so we don't render empty/broken windows. maxZ is bumped above the
+      // highest restored z so newly-opened apps stack on top.
+      if(d?.settings?.restoreOnSignin){
+        const savedWindows = await db.get("user:"+u+":savedWindows");
+        if(Array.isArray(savedWindows) && savedWindows.length > 0){
+          const validIds = new Set(APPS.map(a => a.id));
+          const valid = savedWindows.filter(w => validIds.has(w.app));
+          setWins(valid);
+          const topZ = valid.reduce((max,w) => Math.max(max, w.z||100), 100);
+          setMaxZ(topZ + 1);
+        }
+      }
       setScreen("desktop");playSound("login");
       // Let the user know if this was a silent 6.3 migration. Toast fires
       // after the desktop renders so it's noticeable but unobtrusive.
@@ -591,7 +684,7 @@ export default function NovaOS(){
                 {win.app==="settings" &&<SettingsApp user={user} data={data} updateSettings={updateSettings} showToast={showToast} AC={AC} onCustomWallpaper={handleCustomWallpaper} onLogout={logout}/>}
                 {win.app==="profile"  &&<ProfileApp  user={user} data={data} updateData={updateData} showToast={showToast} AC={AC}/>}
                 {win.app==="calculator" &&<CalculatorApp AC={AC}/>}
-                {win.app==="clock"      &&<ClockApp AC={AC}/>}
+                {win.app==="clock"      &&<ClockApp AC={AC} data={data} updateSettings={updateSettings}/>}
                 {win.app==="calendar"   &&<CalendarApp data={data} updateData={updateData} showToast={showToast} AC={AC}/>}
                 {win.app==="music"      &&<MusicApp AC={AC} showToast={showToast}/>}
                 {win.app==="pdf"        &&<PdfApp AC={AC} showToast={showToast}/>}

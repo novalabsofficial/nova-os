@@ -42,6 +42,11 @@ export function SettingsApp({user,data,updateSettings,showToast,AC,onCustomWallp
       <div style={SEC}>Display</div>
       <Toggle label="24-Hour Clock" value={!!settings.clock24h}  onChange={v=>updateSettings({clock24h:v})}  ac={AC}/>
       <Toggle label="Large Text"    value={!!settings.largeFont} onChange={v=>updateSettings({largeFont:v})} ac={AC}/>
+      {/* v6.4: when on, the OS saves which apps are open + their positions
+          on every change (debounced) and restores them next sign-in. Useful
+          if you typically work with the same set of windows; turn off if
+          you'd rather start clean each session. */}
+      <Toggle label="Restore open apps on sign-in" value={!!settings.restoreOnSignin} onChange={v=>updateSettings({restoreOnSignin:v})} ac={AC}/>
       <div style={{...SEC,marginTop:22}}>Display Mode</div>
       <div style={{fontSize:11,color:"rgba(255,255,255,0.3)",marginBottom:9,lineHeight:1.55}}>How Nova OS sizes for your device. "Auto" picks based on screen size + touch capability — override here if you want a specific look.</div>
       <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:7,marginBottom:6}}>
@@ -73,6 +78,24 @@ export function SettingsApp({user,data,updateSettings,showToast,AC,onCustomWallp
       <div style={{display:"flex",flexWrap:"wrap",gap:5,marginBottom:22,opacity:soundCfg.enabled?1:0.4}}>
         {["startup","login","logout","notification","appLaunch","windowOpen","windowClose","toast","error"].map(s=>(
           <button key={s} onClick={()=>playSound(s)} style={{padding:"4px 10px",background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:6,cursor:"pointer",fontFamily:FFM,fontWeight:500,fontSize:10,color:"rgba(255,255,255,0.55)"}}>▶ {s}</button>
+        ))}
+      </div>
+
+      {/* v6.4: Discoverable shortcut list. Browsers won't let us intercept
+          Cmd+W / Cmd+M, hence the Alt-based bindings. */}
+      <div style={SEC}>Keyboard Shortcuts</div>
+      <div style={{display:"flex",flexDirection:"column",gap:5,marginBottom:22,padding:"10px 12px",background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.06)",borderRadius:8}}>
+        {[
+          ["⌘/Ctrl + K",       "Open start menu"],
+          ["⌘/Ctrl + ,",       "Open Settings"],
+          ["Esc",              "Close start menu / dialogs"],
+          ["Alt + W",          "Close active window"],
+          ["Alt + M",          "Minimize active window"],
+        ].map(([combo, action])=>(
+          <div key={combo} style={{display:"flex",alignItems:"center",gap:10,fontSize:12,color:"rgba(255,255,255,0.78)"}}>
+            <span style={{fontFamily:FFM,fontSize:11,padding:"2px 7px",background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.12)",borderRadius:4,color:"rgba(255,255,255,0.88)",minWidth:120,textAlign:"center"}}>{combo}</span>
+            <span style={{fontFamily:FF,opacity:0.85}}>{action}</span>
+          </div>
         ))}
       </div>
 
