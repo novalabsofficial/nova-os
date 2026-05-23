@@ -120,6 +120,10 @@ const SOUND_WALLPAPER_LS_KEY = "nova-sound-wallpaper";
 // this module stays a pure leaf with no circular import risk.
 const WALLPAPER_SEMITONES = {
   mesh:   0,
+  // v7.0 additions
+  lumen: -1,
+  drift:  8,
+  halo:   2,
   aurora: 5,
   nova:  -2,
   ocean: -4,
@@ -200,69 +204,103 @@ function _scheduleNote(ctx, freq, startTime, durationMs, peakGain, type = "sine"
   osc.stop(startTime + dur);
 }
 
-// Each entry is (ctx, now, vol, r) => schedule notes. Frequencies are tuned
-// to musical pitches so layered notes harmonize. `r` is the per-wallpaper
-// pitch ratio (1.0 = no transpose) — see getActivePitchRatio() above.
+// v7.0 helper: a "modern bell" — fundamental + slightly-inharmonic upper
+// partials. Real bells have non-integer overtones (2.01x, 3.03x rather than
+// pure 2x and 3x), which is why they sound rich and "alive" instead of
+// cold and pure-toned. Triangle base softens the attack vs sine.
+function _bell(ctx, t, freq, durationMs, peakGain) {
+  _scheduleNote(ctx, freq,         t, durationMs,        peakGain,         "triangle");
+  _scheduleNote(ctx, freq * 2.01,  t, durationMs * 0.70, peakGain * 0.40,  "sine");
+  _scheduleNote(ctx, freq * 3.03,  t, durationMs * 0.50, peakGain * 0.18,  "sine");
+}
+
+// v7.0 helper: a soft "shimmer" — fundamental + octave + perfect fifth,
+// faster decay. Used for short positive feedback (windowOpen, appLaunch).
+// More compact than _bell, more luminous than a single sine.
+function _shimmer(ctx, t, freq, durationMs, peakGain) {
+  _scheduleNote(ctx, freq,        t, durationMs,        peakGain,        "triangle");
+  _scheduleNote(ctx, freq * 1.5,  t, durationMs * 0.60, peakGain * 0.25, "sine");
+  _scheduleNote(ctx, freq * 2,    t, durationMs * 0.50, peakGain * 0.20, "sine");
+}
+
+// v7.0 sound design: modern, organic, less "ping" more "chime." Every
+// recipe routes through _bell or _shimmer (defined above) which add slightly-
+// inharmonic upper partials for richness — the difference between a pure
+// sine and a struck bell. Pitches still resolve to musical chords so layered
+// notes harmonize.
+//
+// `r` is the per-wallpaper pitch ratio (1.0 = no transpose). See
+// getActivePitchRatio() above.
 //
 // Note name → Hz reference (at r=1):
-//   A4=440  C5=523.25  D5=587.33  E5=659.25  G5=783.99  A5=880
-//   C4=261.63  E4=329.63  G4=392  E6=1318.51
+//   C4=261.63  E4=329.63  G4=392.00  C5=523.25  E5=659.25  G5=783.99
+//   A4=440.00  D5=587.33  A5=880.00  C6=1046.50  E6=1318.51  G6=1568
 const SOUND_RECIPES = {
-  // Two ascending notes — D5 then A5 — fast and friendly, the bell-like default
+  // Soft two-note bell chime — fifth interval (D5 → A5) feels open + friendly
   notification: (ctx, t, v, r) => {
-    _scheduleNote(ctx, 587.33 * r, t + 0.00, 240, 0.28 * v);
-    _scheduleNote(ctx, 880.00 * r, t + 0.07, 320, 0.28 * v);
+    _bell(ctx, t + 0.00, 587.33 * r, 420, 0.20 * v);
+    _bell(ctx, t + 0.09, 880.00 * r, 540, 0.22 * v);
   },
-  // C-major arpeggio cascading in. Warm welcome.
+
+  // Cinematic startup — low octave drone provides body, mid-bells stack up
+  // to a C major triad. Slower, more spacious than the old arpeggio.
   startup: (ctx, t, v, r) => {
-    _scheduleNote(ctx, 261.63 * r, t + 0.00, 520, 0.22 * v);
-    _scheduleNote(ctx, 329.63 * r, t + 0.11, 520, 0.22 * v);
-    _scheduleNote(ctx, 392.00 * r, t + 0.22, 520, 0.22 * v);
-    _scheduleNote(ctx, 523.25 * r, t + 0.33, 540, 0.24 * v);
+    // Low body — long, soft, sets the mood
+    _scheduleNote(ctx, 130.81 * r, t + 0.00, 1300, 0.09 * v, "triangle");
+    // Bells climb a major triad
+    _bell(ctx, t + 0.00, 261.63 * r, 760,  0.13 * v);  // C4
+    _bell(ctx, t + 0.22, 392.00 * r, 800,  0.14 * v);  // G4
+    _bell(ctx, t + 0.44, 523.25 * r, 900,  0.16 * v);  // C5
+    _bell(ctx, t + 0.66, 783.99 * r, 1100, 0.14 * v);  // G5 — sparkle on top
   },
-  // Bright ascending chime — A4, E5, A5
+
+  // Bright welcome chime — C major arpeggio with bell richness
   login: (ctx, t, v, r) => {
-    _scheduleNote(ctx, 440.00 * r, t + 0.00, 200, 0.22 * v);
-    _scheduleNote(ctx, 659.25 * r, t + 0.08, 250, 0.22 * v);
-    _scheduleNote(ctx, 880.00 * r, t + 0.16, 380, 0.24 * v);
+    _bell(ctx, t + 0.00, 523.25 * r, 380, 0.18 * v);  // C5
+    _bell(ctx, t + 0.08, 659.25 * r, 380, 0.18 * v);  // E5
+    _bell(ctx, t + 0.16, 783.99 * r, 480, 0.20 * v);  // G5
   },
-  // Descending — A4 to D4 — gentle goodbye
+
+  // Gentle descending farewell — three soft bells walking down
   logout: (ctx, t, v, r) => {
-    _scheduleNote(ctx, 440.00 * r, t + 0.00, 220, 0.22 * v);
-    _scheduleNote(ctx, 293.66 * r, t + 0.18, 360, 0.22 * v);
+    _bell(ctx, t + 0.00, 523.25 * r, 360, 0.16 * v);  // C5
+    _bell(ctx, t + 0.13, 392.00 * r, 460, 0.16 * v);  // G4
+    _bell(ctx, t + 0.26, 261.63 * r, 620, 0.14 * v);  // C4
   },
-  // Low sawtooth buzz for errors. Sawtooth is harsher than sine, intentionally.
-  // Errors stay at their root pitch — transposing them too high makes them
-  // sound cheerful, which defeats the point.
+
+  // Soft low "bonk" instead of the old sawtooth buzz. Serious but not harsh.
+  // Errors cap their transpose at 1.0 so they never get cheerfully bright.
   error: (ctx, t, v, r) => {
-    // Cap transpose for errors so they always sound serious — never higher
-    // than the original (still allow darker keys to pull them lower).
     const er = Math.min(1, r);
-    _scheduleNote(ctx, 220 * er, t + 0.00, 220, 0.30 * v, "sawtooth");
-    _scheduleNote(ctx, 196 * er, t + 0.10, 200, 0.20 * v, "sawtooth");
+    _scheduleNote(ctx, 174.61 * er, t + 0.00, 280, 0.26 * v, "triangle");  // F3
+    _scheduleNote(ctx, 116.54 * er, t + 0.00, 340, 0.18 * v, "triangle");  // Bb2 octave-down body
   },
-  // Short high blip — UI feedback for opening
+
+  // Crisp "pop" with a touch of sparkle on top
   windowOpen: (ctx, t, v, r) => {
-    _scheduleNote(ctx, 880.00 * r, t + 0.00, 70, 0.14 * v);
-    _scheduleNote(ctx, 1318.51 * r, t + 0.03, 80, 0.12 * v);
+    _shimmer(ctx, t, 880 * r, 90, 0.10 * v);
   },
-  // Brief descending whoosh for closing
+
+  // Soft descending close — two falling notes
   windowClose: (ctx, t, v, r) => {
-    _scheduleNote(ctx, 880.00 * r, t + 0.00, 90, 0.14 * v);
-    _scheduleNote(ctx, 440.00 * r, t + 0.06, 110, 0.12 * v);
+    _scheduleNote(ctx, 880 * r, t + 0.00, 80, 0.09 * v, "triangle");
+    _scheduleNote(ctx, 587 * r, t + 0.05, 110, 0.08 * v, "triangle");
   },
-  // Soft launch ping
+
+  // Bright launch sparkle — like windowOpen but airier
   appLaunch: (ctx, t, v, r) => {
-    _scheduleNote(ctx, 783.99 * r, t + 0.00, 70, 0.14 * v);
-    _scheduleNote(ctx, 1175.00 * r, t + 0.04, 90, 0.10 * v);
+    _shimmer(ctx, t, 1046.50 * r, 100, 0.10 * v);
   },
-  // Toast — the most subtle, plays often
+
+  // Subtle chime with a hint of high sparkle — plays often, stays light
   toast: (ctx, t, v, r) => {
-    _scheduleNote(ctx, 1318.51 * r, t + 0.00, 100, 0.10 * v);
+    _scheduleNote(ctx, 1046.50 * r, t + 0.00, 140, 0.10 * v, "triangle");  // C6
+    _scheduleNote(ctx, 2093.00 * r, t + 0.00, 90,  0.04 * v, "sine");      // C7 air
   },
-  // Click for buttons/menus — very short, very quiet
+
+  // Tiny click for buttons/menus — very short, very quiet
   click: (ctx, t, v, r) => {
-    _scheduleNote(ctx, 1567.98 * r, t + 0.00, 35, 0.08 * v);
+    _scheduleNote(ctx, 1567.98 * r, t + 0.00, 30, 0.06 * v, "triangle");
   },
 };
 

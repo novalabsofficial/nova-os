@@ -1,5 +1,5 @@
 
-// NOVA OS v6.4 — Nova Systems
+// NOVA OS v7.0 — Nova Systems
 // Drop this into src/NovaOS.jsx
  
 import { useState, useEffect, useRef, useCallback, lazy, Suspense } from "react";
@@ -550,10 +550,98 @@ export default function NovaOS(){
   const dragCursor=drag?(drag.type==="move"?"grabbing":drag.edge+"-resize"):widgetResize?(widgetResize.edge+"-resize"):isAnyDrag?"grabbing":"default";
  
   // ── BOOT ─────────────────────────────────────────────────────────────────
-  if(screen==="boot")return(<div style={{width:"100%",height:"100vh",background:"#07080f",display:"flex",flexDirection:"column",justifyContent:"center",padding:"10vh max(24px, 12%)"}}><style>{CSS}</style><div style={{fontFamily:FFB,fontWeight:700,fontSize:"clamp(40px, 12vw, 66px)",letterSpacing:4,color:"#fff",marginBottom:4,lineHeight:1}}>NOVA</div><div style={{fontFamily:FF,fontSize:12,color:"rgba(255,255,255,0.22)",letterSpacing:5,marginBottom:46}}>OPERATING SYSTEM  ·  v6.4</div>{bootLines.map((l,i)=><div key={i} style={{fontFamily:FFM,fontSize:12,color:l.includes("ready")?"#4f9eff":"rgba(255,255,255,0.42)",marginBottom:5,animation:"boot-in 0.22s cubic-bezier(0.4,0,0.2,1)"}}>{l.includes("OK")?<>{l.replace("... OK","")}... <span style={{color:"#4cef90"}}>OK</span></>:l}</div>)}{MobileNotice}</div>);
+  // v7.0: refreshed with ambient backdrop glow, breathing-logo animation,
+  // and a subtle accent rule under the version line. Same boot sequence,
+  // more cinematic feel.
+  if(screen==="boot")return(
+    <div style={{width:"100%",height:"100vh",background:"#07080f",display:"flex",flexDirection:"column",justifyContent:"center",padding:"10vh max(24px, 12%)",position:"relative",overflow:"hidden"}}>
+      <style>{CSS}</style>
+      {/* Ambient backdrop — soft purple/blue glow behind everything */}
+      <div style={{position:"absolute",top:"30%",left:"50%",transform:"translateX(-50%)",width:680,height:680,borderRadius:"50%",background:"radial-gradient(circle,rgba(99,102,241,0.18) 0%,rgba(99,102,241,0.08) 30%,transparent 65%)",filter:"blur(40px)",pointerEvents:"none"}}/>
+      <div style={{position:"absolute",top:"60%",left:"35%",width:520,height:520,borderRadius:"50%",background:"radial-gradient(circle,rgba(6,182,212,0.10) 0%,transparent 60%)",filter:"blur(50px)",pointerEvents:"none"}}/>
+      <div style={{position:"relative",zIndex:1}}>
+        <div style={{fontFamily:FFB,fontWeight:700,fontSize:"clamp(40px, 12vw, 72px)",letterSpacing:6,color:"#fff",marginBottom:6,lineHeight:1,animation:"nova-breathe 3.6s ease-in-out infinite"}}>NOVA</div>
+        <div style={{fontFamily:FF,fontSize:11,color:"rgba(255,255,255,0.32)",letterSpacing:6,marginBottom:8,fontWeight:500}}>OPERATING SYSTEM  ·  v7.0</div>
+        {/* Hairline accent — fades in from the version line */}
+        <div style={{height:1,width:160,background:"linear-gradient(90deg,rgba(99,102,241,0.6),transparent)",marginBottom:46}}/>
+        {bootLines.map((l,i) => (
+          <div key={i} style={{fontFamily:FFM,fontSize:12,color:l.includes("ready")?"#a8c5ff":"rgba(255,255,255,0.5)",marginBottom:5,animation:"boot-in 0.28s cubic-bezier(0.16,1,0.3,1)",letterSpacing:0.3}}>
+            {l.includes("OK") ? <>{l.replace("... OK","")}... <span style={{color:"#4cef90"}}>OK</span></> : l}
+          </div>
+        ))}
+      </div>
+      {MobileNotice}
+    </div>
+  );
  
   // ── LOGIN ────────────────────────────────────────────────────────────────
-  if(screen==="login")return(<div style={{width:"100%",height:"100vh",position:"relative",overflow:"hidden"}}><style>{CSS}</style><MeshBg/><div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center"}}><div style={{background:"rgba(8,10,22,0.86)",backdropFilter:"blur(24px)",border:"1px solid rgba(255,255,255,0.11)",borderRadius:16,padding:"44px 40px",width:376,maxWidth:"calc(100vw - 24px)",boxShadow:"0 40px 100px rgba(0,0,0,0.6)",position:"relative",overflow:"hidden"}}><div style={{position:"absolute",top:0,left:0,right:0,height:2,background:"linear-gradient(90deg,transparent,"+DEFAULT_AC+",transparent)"}}/><div style={{fontFamily:FFB,fontWeight:700,fontSize:38,color:"#fff",textAlign:"center",letterSpacing:4,marginBottom:4}}>NOVA</div><div style={{fontFamily:FF,fontSize:11,color:"rgba(255,255,255,0.22)",textAlign:"center",letterSpacing:4,marginBottom:36}}>OPERATING SYSTEM  ·  v6.4</div><div style={{display:"flex",borderBottom:"1px solid rgba(255,255,255,0.09)",marginBottom:24}}>{["login","register"].map(m=><button key={m} className="lt" onClick={()=>{setMode(m);setAuthErr("");}} style={{flex:1,padding:"10px 0",background:"none",border:"none",borderBottom:mode===m?"2px solid "+DEFAULT_AC:"2px solid transparent",cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:12,letterSpacing:1,color:mode===m?DEFAULT_AC:"rgba(255,255,255,0.28)",transition:"color 0.15s"}}>{m==="login"?"SIGN IN":"REGISTER"}</button>)}</div><input style={{...INP,marginBottom:11}} placeholder="Username" value={uname} onChange={e=>setUname(e.target.value)} onKeyDown={e=>e.key==="Enter"&&handleAuth()} autoFocus/><input style={INP} type="password" placeholder="Password" value={pass} onChange={e=>setPass(e.target.value)} onKeyDown={e=>e.key==="Enter"&&handleAuth()}/><button className="ls" disabled={busy} onClick={handleAuth} style={{width:"100%",padding:"12px",background:fill(DEFAULT_AC),border:"1px solid "+bdr(DEFAULT_AC),borderRadius:8,cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:14,letterSpacing:1,color:"#fff",marginTop:14,transition:"opacity 0.15s"}}>{busy?"AUTHENTICATING…":mode==="login"?"SIGN IN →":"CREATE ACCOUNT →"}</button>{authErr&&<div style={{color:"#ff7878",fontFamily:FF,fontSize:13,textAlign:"center",marginTop:12}}>⚠ {authErr}</div>}<div style={{marginTop:20,fontFamily:FF,fontStyle:"italic",fontSize:11,color:"rgba(255,255,255,0.14)",textAlign:"center"}}>Don't reuse real passwords — demo auth only.</div></div></div>{MobileNotice}</div>);
+  // v7.0: refreshed card with multi-layer shadow, shimmering accent rule,
+  // floating ambient orbs behind the mesh backdrop. More confident typography
+  // and inner highlight border to lift the card off the background.
+  if(screen==="login")return(
+    <div style={{width:"100%",height:"100vh",position:"relative",overflow:"hidden"}}>
+      <style>{CSS}</style>
+      <MeshBg/>
+      {/* Floating ambient orbs behind the card — subtle motion that catches the eye */}
+      <div style={{position:"absolute",top:"15%",left:"12%",width:240,height:240,borderRadius:"50%",background:"radial-gradient(circle,rgba(167,139,250,0.32) 0%,transparent 70%)",filter:"blur(40px)",animation:"float 8s ease-in-out infinite",pointerEvents:"none"}}/>
+      <div style={{position:"absolute",bottom:"18%",right:"14%",width:280,height:280,borderRadius:"50%",background:"radial-gradient(circle,rgba(6,182,212,0.28) 0%,transparent 70%)",filter:"blur(50px)",animation:"float 10s ease-in-out infinite reverse",pointerEvents:"none"}}/>
+      <div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
+        <div style={{
+          background:"linear-gradient(180deg, rgba(12,14,28,0.92), rgba(8,10,22,0.92))",
+          backdropFilter:"blur(28px)",
+          border:"1px solid rgba(255,255,255,0.12)",
+          borderRadius:20,
+          padding:"48px 42px",
+          width:400,
+          maxWidth:"calc(100vw - 24px)",
+          // Layered shadow: deep ambient + close-in directional + inner highlight
+          boxShadow:"0 50px 120px rgba(0,0,0,0.7), 0 0 0 1px rgba(255,255,255,0.04) inset, 0 1px 0 rgba(255,255,255,0.08) inset",
+          position:"relative",
+          overflow:"hidden",
+          animation:"win-in 0.5s cubic-bezier(0.16,1,0.3,1)",
+        }}>
+          {/* Shimmering accent rule at the top of the card */}
+          <div style={{
+            position:"absolute",top:0,left:0,right:0,height:2,
+            background:"linear-gradient(90deg, transparent, rgba(167,139,250,0.8), rgba(99,102,241,1), rgba(6,182,212,0.8), transparent)",
+            backgroundSize:"200% 100%",
+            animation:"shimmer 4s ease-in-out infinite",
+          }}/>
+          <div style={{fontFamily:FFB,fontWeight:700,fontSize:42,color:"#fff",textAlign:"center",letterSpacing:6,marginBottom:6,lineHeight:1}}>NOVA</div>
+          <div style={{fontFamily:FF,fontSize:10,color:"rgba(255,255,255,0.28)",textAlign:"center",letterSpacing:5,marginBottom:34,fontWeight:500}}>OPERATING SYSTEM  ·  v7.0</div>
+          <div style={{display:"flex",borderBottom:"1px solid rgba(255,255,255,0.09)",marginBottom:24}}>
+            {["login","register"].map(m => (
+              <button key={m} className="lt" onClick={()=>{setMode(m);setAuthErr("");}} style={{flex:1,padding:"10px 0",background:"none",border:"none",borderBottom:mode===m?"2px solid "+DEFAULT_AC:"2px solid transparent",cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:12,letterSpacing:1,color:mode===m?DEFAULT_AC:"rgba(255,255,255,0.32)",transition:"color 0.18s, border-bottom 0.18s"}}>
+                {m==="login" ? "SIGN IN" : "REGISTER"}
+              </button>
+            ))}
+          </div>
+          <input style={{...INP,marginBottom:11,padding:"11px 14px",borderRadius:9}} placeholder="Username" value={uname} onChange={e=>setUname(e.target.value)} onKeyDown={e=>e.key==="Enter"&&handleAuth()} autoFocus/>
+          <input style={{...INP,padding:"11px 14px",borderRadius:9}} type="password" placeholder="Password" value={pass} onChange={e=>setPass(e.target.value)} onKeyDown={e=>e.key==="Enter"&&handleAuth()}/>
+          <button className="ls" disabled={busy} onClick={handleAuth} style={{
+            width:"100%",
+            padding:"13px",
+            // Gradient button — feels more modern than flat fill
+            background:"linear-gradient(135deg, "+DEFAULT_AC+", #6366f1)",
+            border:"1px solid "+bdr(DEFAULT_AC),
+            borderRadius:10,
+            cursor:"pointer",
+            fontFamily:FFB,
+            fontWeight:600,
+            fontSize:14,
+            letterSpacing:1.2,
+            color:"#fff",
+            marginTop:18,
+            transition:"opacity 0.18s, transform 0.18s",
+            boxShadow:"0 8px 24px rgba(99,102,241,0.28)",
+          }}>{busy?"AUTHENTICATING…":mode==="login"?"SIGN IN →":"CREATE ACCOUNT →"}</button>
+          {authErr && <div style={{color:"#ff8b8b",fontFamily:FF,fontSize:13,textAlign:"center",marginTop:14,padding:"8px 12px",background:"rgba(255,80,80,0.08)",border:"1px solid rgba(255,80,80,0.2)",borderRadius:8}}>⚠ {authErr}</div>}
+          <div style={{marginTop:22,fontFamily:FF,fontStyle:"italic",fontSize:11,color:"rgba(255,255,255,0.2)",textAlign:"center"}}>Demo auth — your account syncs across devices.</div>
+        </div>
+      </div>
+      {MobileNotice}
+    </div>
+  );
  
   // ── DESKTOP ──────────────────────────────────────────────────────────────
   return(
@@ -572,7 +660,57 @@ export default function NovaOS(){
       }}>
       <style>{CSS}</style>
       <Wallpaper id={wpId} customUrl={customWp}/>
-      {toast&&<div style={{position:"fixed",top:14,right:14,zIndex:99999,padding:"10px 18px",background:"rgba(8,10,22,0.97)",border:"1px solid "+AC,borderRadius:9,fontFamily:FFB,fontWeight:600,fontSize:13,color:"#fff",animation:"toast-in 0.24s cubic-bezier(0.16,1,0.3,1)",boxShadow:"0 8px 36px rgba(0,0,0,0.6)"}}>{toast}</div>}
+      {/* v7.0 toast refresh: glass surface, leading accent bar, status icon
+          inferred from message text. Floats top-center (more visible than
+          the old top-right corner). Animates in from above with a soft scale. */}
+      {toast && (()=>{
+        // Infer a kind from message keywords — keeps the showToast API a plain
+        // string so existing 100+ call sites don't need to change.
+        const tStr = String(toast);
+        const kind =
+          tStr.includes("✓") || tStr.includes("saved") || tStr.includes("secured") ? "success" :
+          tStr.includes("⚠") || tStr.includes("⚠️") || tStr.includes("failed") || tStr.includes("Couldn't") ? "warn" :
+          "info";
+        const accent = kind==="success" ? "#4cef90" : kind==="warn" ? "#ffaa44" : AC;
+        const icon = kind==="success" ? "✓" : kind==="warn" ? "⚠" : "•";
+        // Strip the leading ✓/⚠ from the text if present, since we have an icon now
+        const cleanText = tStr.replace(/^[✓⚠]\s*/, "").replace(/\s*[✓⚠]$/, "");
+        return (
+          <div style={{
+            position:"fixed",
+            top:18,
+            left:"50%",
+            transform:"translateX(-50%)",
+            zIndex:99999,
+            display:"flex",
+            alignItems:"center",
+            gap:11,
+            padding:"11px 18px 11px 14px",
+            background:"linear-gradient(180deg, rgba(14,16,30,0.96), rgba(10,12,24,0.96))",
+            backdropFilter:"blur(20px)",
+            border:"1px solid rgba(255,255,255,0.1)",
+            borderLeft:"3px solid "+accent,
+            borderRadius:11,
+            fontFamily:FF,
+            fontWeight:500,
+            fontSize:13,
+            color:"rgba(255,255,255,0.94)",
+            animation:"toast-in 0.32s cubic-bezier(0.16,1,0.3,1)",
+            boxShadow:"0 16px 48px rgba(0,0,0,0.55), 0 0 0 1px rgba(255,255,255,0.04) inset",
+            maxWidth:"calc(100vw - 36px)",
+          }}>
+            <span style={{
+              display:"flex",alignItems:"center",justifyContent:"center",
+              width:20,height:20,borderRadius:"50%",
+              background:"rgba("+hexRgb(accent)+",0.18)",
+              color:accent,
+              fontFamily:FFB,fontWeight:700,fontSize:12,
+              flexShrink:0,
+            }}>{icon}</span>
+            <span>{cleanText}</span>
+          </div>
+        );
+      })()}
  
       {/* Desktop widgets */}
       {Object.keys(WIDGET_CONFIGS).map(id=>{
@@ -639,7 +777,7 @@ export default function NovaOS(){
         </div>
         <div style={{padding:"10px 16px",borderTop:"1px solid rgba(255,255,255,0.07)",display:"flex",alignItems:"center",gap:10}}>
           <div style={{width:32,height:32,borderRadius:"50%",background:fill(AC),border:"1.5px solid "+AC,display:"flex",alignItems:"center",justifyContent:"center",fontSize:15,flexShrink:0}}>👤</div>
-          <div style={{flex:1}}><div style={{fontFamily:FFB,fontWeight:600,fontSize:13,color:"#fff"}}>@{user}</div><div style={{fontFamily:FF,fontSize:10,color:"rgba(255,255,255,0.3)"}}>Nova OS v6.4</div></div>
+          <div style={{flex:1}}><div style={{fontFamily:FFB,fontWeight:600,fontSize:13,color:"#fff"}}>@{user}</div><div style={{fontFamily:FF,fontSize:10,color:"rgba(255,255,255,0.3)"}}>Nova OS v7.0</div></div>
           <button onClick={logout} style={{padding:"6px 12px",background:"rgba(200,40,40,0.12)",border:"1px solid rgba(200,40,40,0.3)",borderRadius:6,cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:11,color:"rgba(255,140,140,0.9)"}}>Logout</button>
         </div>
       </div>)}

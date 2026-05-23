@@ -325,8 +325,10 @@ describe('playSound', () => {
   it('schedules multiple oscillators for layered sounds (startup arpeggio)', () => {
     const { oscNodes } = installMockAC();
     playSound('startup');
-    // startup has 4 notes
-    expect(oscNodes.length).toBe(4);
+    // v7.0 — startup uses bell helpers (each = 3 stacked partials for
+    // bell-like inharmonicity) + a low-octave body drone. Concrete count
+    // is an implementation detail; just assert "layered, not a single tone."
+    expect(oscNodes.length).toBeGreaterThan(4);
   });
 
   it('does nothing when sounds are disabled in config', () => {
