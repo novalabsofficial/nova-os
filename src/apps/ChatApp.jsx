@@ -62,7 +62,22 @@ export function ChatApp({ user, AC }) {
     inputRef.current?.focus();
   }
 
-  async function deleteMessage(id) {
+  // v6.2: moderators (anyone whose username is in lib/moderation.js ADMINS)
+  // can delete any message, not just their own. Regular users still see the
+  // delete button only on their own bubbles.
+  const isMod = isAdmin(user);
+
+  async function deleteMessage(id, authorName) {
+    // Confirm before nuking someone else's message — gives mods a brief
+    // moment to double-check the target before it's gone for everyone.
+    if (authorName && authorName !== user) {
+      const ok = window.confirm(
+        `Delete this message from @${authorName}?\n\n` +
+        `Use this only for content that breaks the TOS. ` +
+        `The author will see it disappear in real time; the deletion is irreversible.`
+      );
+      if (!ok) return;
+    }
     try {
       await deleteDoc(doc(firestoreDb, "nova_chat", id));
     } catch { /* silent — onSnapshot will refresh either way */ }
@@ -104,6 +119,9 @@ export function ChatApp({ user, AC }) {
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <div style={{ width: 8, height: 8, borderRadius: "50%", background: loading ? "#888" : "#4cef90", flexShrink: 0, boxShadow: loading ? "none" : "0 0 6px #4cef90" }} />
           <span style={{ fontFamily: FFB, fontWeight: 700, fontSize: 15, color: "#fff" }}>Nova Global Chat</span>
+          {isMod && (
+            <span title="You're a moderator — you can delete any message" style={{ fontFamily: FFB, fontWeight: 700, fontSize: 9, letterSpacing: 1, padding: "2px 7px", borderRadius: 4, background: "rgba(255,200,80,0.16)", border: "1px solid rgba(255,200,80,0.5)", color: "#ffd060" }}>MOD</span>
+          )}
           <span style={{ fontSize: 11, color: "rgba(255,255,255,0.3)", marginLeft: "auto" }}>
             {loading ? "Connecting…" : messages.length + " messages"}
           </span>
@@ -170,17 +188,18 @@ export function ChatApp({ user, AC }) {
                 }}>
                   {item.text}
                 </div>
-                {/* Delete button — only on your own messages */}
-                {isMe && (
+                {/* Delete button — own messages always; mods can delete any */}
+                {(isMe || isMod) && (
                   <button
                     className="dl"
-                    onClick={() => deleteMessage(item.id)}
-                    title="Delete message"
+                    onClick={() => deleteMessage(item.id, item.user)}
+                    title={isMe ? "Delete message" : "Mod delete — TOS violation"}
                     style={{
                       background: "none", border: "none", cursor: "pointer",
-                      color: "rgba(255,80,80,0.35)", fontSize: 12, padding: "2px 5px",
+                      color: isMe ? "rgba(255,80,80,0.35)" : "rgba(255,200,80,0.6)",
+                      fontSize: 12, padding: "2px 5px",
                       transition: "color 0.12s", flexShrink: 0, marginBottom: 2,
-                    }}>✕</button>
+                    }}>{isMe ? "✕" : "🛡"}</button>
                 )}
               </div>
               {/* Timestamp */}

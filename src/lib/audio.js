@@ -108,6 +108,54 @@ export function cancelSpeech() {
 const SOUND_LS_KEY = "nova-sounds";
 const SOUND_DEFAULTS = { enabled: true, volume: 0.6 };
 
+// v6.2: per-wallpaper transpose. Each wallpaper has a `semitones` value in
+// src/ui/constants.js — we mirror the active wallpaper id here and translate
+// it to a frequency ratio at sound-play time. Lives separately from the
+// {enabled,volume} sound config so picking a new wallpaper doesn't accidentally
+// clobber the user's mute or volume.
+const SOUND_WALLPAPER_LS_KEY = "nova-sound-wallpaper";
+
+// Semitones offset per wallpaper id. Must mirror WALLPAPERS in
+// src/ui/constants.js. Kept here as a duplicate (rather than imported) so
+// this module stays a pure leaf with no circular import risk.
+const WALLPAPER_SEMITONES = {
+  mesh:   0,
+  aurora: 5,
+  nova:  -2,
+  ocean: -4,
+  sunset: 4,
+  cyber:  3,
+  zen:   -7,
+  bliss:  7,
+  night: -5,
+  sakura: 9,
+  forest:-3,
+  slate:  1,
+  custom: 0,
+};
+
+/**
+ * Tell the sound system which wallpaper is currently active. Call this when
+ * the user picks a new wallpaper in Settings, and again at app boot once the
+ * saved wallpaper preference loads from Firestore. The id is persisted to
+ * localStorage so the transpose survives a full reload.
+ */
+export function setSoundWallpaper(id) {
+  if (typeof localStorage === "undefined") return;
+  try { localStorage.setItem(SOUND_WALLPAPER_LS_KEY, id || "mesh"); } catch {}
+}
+
+// Internal — read the saved wallpaper id, translate to a frequency ratio.
+// 2^(semitones/12) is the equal-temperament ratio; 0 semitones → 1.0.
+function getActivePitchRatio() {
+  if (typeof localStorage === "undefined") return 1;
+  try {
+    const id = localStorage.getItem(SOUND_WALLPAPER_LS_KEY) || "mesh";
+    const semis = WALLPAPER_SEMITONES[id] ?? 0;
+    return Math.pow(2, semis / 12);
+  } catch { return 1; }
+}
+
 /** Read the user's sound preferences. Safe outside the browser. */
 export function getSoundConfig() {
   if (typeof localStorage === "undefined") return { ...SOUND_DEFAULTS };
@@ -152,63 +200,69 @@ function _scheduleNote(ctx, freq, startTime, durationMs, peakGain, type = "sine"
   osc.stop(startTime + dur);
 }
 
-// Each entry is (ctx, now, vol) => schedule notes. Frequencies are tuned to
-// musical pitches so layered notes harmonize.
+// Each entry is (ctx, now, vol, r) => schedule notes. Frequencies are tuned
+// to musical pitches so layered notes harmonize. `r` is the per-wallpaper
+// pitch ratio (1.0 = no transpose) — see getActivePitchRatio() above.
 //
-// Note name → Hz reference:
+// Note name → Hz reference (at r=1):
 //   A4=440  C5=523.25  D5=587.33  E5=659.25  G5=783.99  A5=880
 //   C4=261.63  E4=329.63  G4=392  E6=1318.51
 const SOUND_RECIPES = {
   // Two ascending notes — D5 then A5 — fast and friendly, the bell-like default
-  notification: (ctx, t, v) => {
-    _scheduleNote(ctx, 587.33, t + 0.00, 240, 0.28 * v);
-    _scheduleNote(ctx, 880.00, t + 0.07, 320, 0.28 * v);
+  notification: (ctx, t, v, r) => {
+    _scheduleNote(ctx, 587.33 * r, t + 0.00, 240, 0.28 * v);
+    _scheduleNote(ctx, 880.00 * r, t + 0.07, 320, 0.28 * v);
   },
   // C-major arpeggio cascading in. Warm welcome.
-  startup: (ctx, t, v) => {
-    _scheduleNote(ctx, 261.63, t + 0.00, 520, 0.22 * v);
-    _scheduleNote(ctx, 329.63, t + 0.11, 520, 0.22 * v);
-    _scheduleNote(ctx, 392.00, t + 0.22, 520, 0.22 * v);
-    _scheduleNote(ctx, 523.25, t + 0.33, 540, 0.24 * v);
+  startup: (ctx, t, v, r) => {
+    _scheduleNote(ctx, 261.63 * r, t + 0.00, 520, 0.22 * v);
+    _scheduleNote(ctx, 329.63 * r, t + 0.11, 520, 0.22 * v);
+    _scheduleNote(ctx, 392.00 * r, t + 0.22, 520, 0.22 * v);
+    _scheduleNote(ctx, 523.25 * r, t + 0.33, 540, 0.24 * v);
   },
   // Bright ascending chime — A4, E5, A5
-  login: (ctx, t, v) => {
-    _scheduleNote(ctx, 440.00, t + 0.00, 200, 0.22 * v);
-    _scheduleNote(ctx, 659.25, t + 0.08, 250, 0.22 * v);
-    _scheduleNote(ctx, 880.00, t + 0.16, 380, 0.24 * v);
+  login: (ctx, t, v, r) => {
+    _scheduleNote(ctx, 440.00 * r, t + 0.00, 200, 0.22 * v);
+    _scheduleNote(ctx, 659.25 * r, t + 0.08, 250, 0.22 * v);
+    _scheduleNote(ctx, 880.00 * r, t + 0.16, 380, 0.24 * v);
   },
   // Descending — A4 to D4 — gentle goodbye
-  logout: (ctx, t, v) => {
-    _scheduleNote(ctx, 440.00, t + 0.00, 220, 0.22 * v);
-    _scheduleNote(ctx, 293.66, t + 0.18, 360, 0.22 * v);
+  logout: (ctx, t, v, r) => {
+    _scheduleNote(ctx, 440.00 * r, t + 0.00, 220, 0.22 * v);
+    _scheduleNote(ctx, 293.66 * r, t + 0.18, 360, 0.22 * v);
   },
   // Low sawtooth buzz for errors. Sawtooth is harsher than sine, intentionally.
-  error: (ctx, t, v) => {
-    _scheduleNote(ctx, 220, t + 0.00, 220, 0.30 * v, "sawtooth");
-    _scheduleNote(ctx, 196, t + 0.10, 200, 0.20 * v, "sawtooth");
+  // Errors stay at their root pitch — transposing them too high makes them
+  // sound cheerful, which defeats the point.
+  error: (ctx, t, v, r) => {
+    // Cap transpose for errors so they always sound serious — never higher
+    // than the original (still allow darker keys to pull them lower).
+    const er = Math.min(1, r);
+    _scheduleNote(ctx, 220 * er, t + 0.00, 220, 0.30 * v, "sawtooth");
+    _scheduleNote(ctx, 196 * er, t + 0.10, 200, 0.20 * v, "sawtooth");
   },
   // Short high blip — UI feedback for opening
-  windowOpen: (ctx, t, v) => {
-    _scheduleNote(ctx, 880.00, t + 0.00, 70, 0.14 * v);
-    _scheduleNote(ctx, 1318.51, t + 0.03, 80, 0.12 * v);
+  windowOpen: (ctx, t, v, r) => {
+    _scheduleNote(ctx, 880.00 * r, t + 0.00, 70, 0.14 * v);
+    _scheduleNote(ctx, 1318.51 * r, t + 0.03, 80, 0.12 * v);
   },
   // Brief descending whoosh for closing
-  windowClose: (ctx, t, v) => {
-    _scheduleNote(ctx, 880.00, t + 0.00, 90, 0.14 * v);
-    _scheduleNote(ctx, 440.00, t + 0.06, 110, 0.12 * v);
+  windowClose: (ctx, t, v, r) => {
+    _scheduleNote(ctx, 880.00 * r, t + 0.00, 90, 0.14 * v);
+    _scheduleNote(ctx, 440.00 * r, t + 0.06, 110, 0.12 * v);
   },
   // Soft launch ping
-  appLaunch: (ctx, t, v) => {
-    _scheduleNote(ctx, 783.99, t + 0.00, 70, 0.14 * v);
-    _scheduleNote(ctx, 1175.00, t + 0.04, 90, 0.10 * v);
+  appLaunch: (ctx, t, v, r) => {
+    _scheduleNote(ctx, 783.99 * r, t + 0.00, 70, 0.14 * v);
+    _scheduleNote(ctx, 1175.00 * r, t + 0.04, 90, 0.10 * v);
   },
   // Toast — the most subtle, plays often
-  toast: (ctx, t, v) => {
-    _scheduleNote(ctx, 1318.51, t + 0.00, 100, 0.10 * v);
+  toast: (ctx, t, v, r) => {
+    _scheduleNote(ctx, 1318.51 * r, t + 0.00, 100, 0.10 * v);
   },
   // Click for buttons/menus — very short, very quiet
-  click: (ctx, t, v) => {
-    _scheduleNote(ctx, 1567.98, t + 0.00, 35, 0.08 * v);
+  click: (ctx, t, v, r) => {
+    _scheduleNote(ctx, 1567.98 * r, t + 0.00, 35, 0.08 * v);
   },
 };
 
@@ -235,8 +289,9 @@ export function playSound(name) {
   if (typeof ctx.resume === "function" && ctx.state === "suspended") {
     try { ctx.resume(); } catch {}
   }
+  const pitchRatio = getActivePitchRatio();
   try {
-    recipe(ctx, ctx.currentTime, cfg.volume);
+    recipe(ctx, ctx.currentTime, cfg.volume, pitchRatio);
   } catch {}
   // Tear the context down a bit after the longest possible sound finishes.
   // Startup is ~870ms; everything else is shorter. 1500ms is comfortable.

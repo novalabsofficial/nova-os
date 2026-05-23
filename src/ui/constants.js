@@ -96,7 +96,7 @@ export const STORE_CATALOG = [
 export const STORE_CATS = ["All","Games","Media","Tools","Social","News"];
 
 export const BOOT_MSGS = [
-  "NOVA OS v6.1 — Nova Systems",
+  "NOVA OS v6.2 — Nova Systems",
   "Initializing kernel... OK",
   "Loading hardware abstraction layer... OK",
   "Mounting filesystems... OK",
@@ -118,19 +118,30 @@ export const BOOKMARKS = [
 export const PAINT_COLORS = ["#fff","#000","#ff4444","#ff8800","#ffdd00","#44dd44","#00ccff","#4466ff","#cc44ff","#ff44aa","#8b4513","#888"];
 
 // Available wallpapers + their preview gradients for the Settings picker.
-// SVG-based wallpapers (aurora, mesh, nova, bliss) have their own components
-// in src/ui/wallpapers.jsx; gradient-only ones (night/sakura/forest/slate)
-// render directly via the wp.grad style.
+// SVG-based wallpapers (mesh, aurora, nova, bliss) have their own components
+// in src/ui/wallpapers.jsx; gradient-only ones (everything else) render
+// directly via the wp.grad style.
+//
+// Mesh is first — it's the system default. v6.2 added Ocean, Sunset,
+// Cyberpunk, and Zen to the lineup.
+//
+// Each wallpaper also carries a `semitones` value that shifts the system
+// sound palette up or down. The default (mesh) is 0; positive values brighten
+// the chime tones, negative values darken them. See src/lib/audio.js.
 export const WALLPAPERS = {
-  aurora:{name:"Aurora",preview:"linear-gradient(180deg,#0a0218 0%,#3b1d6a 35%,#10b981 60%,#0a0218 100%),radial-gradient(ellipse at 50% 90%,#a855f7 0%,transparent 50%)"},
-  mesh:  {name:"Mesh",  preview:"radial-gradient(ellipse at 18% 22%,#6366f1 0%,transparent 45%),radial-gradient(ellipse at 82% 18%,#ec4899 0%,transparent 40%),radial-gradient(ellipse at 60% 85%,#06b6d4 0%,transparent 45%),linear-gradient(135deg,#0a0a14,#050510)"},
-  nova:  {name:"Nova",  preview:"radial-gradient(ellipse at 25% 20%,#0ea5e9 0%,transparent 55%),radial-gradient(ellipse at 80% 85%,#7c3aed 0%,transparent 50%),linear-gradient(135deg,#07080f,#0d0a1a)"},
-  bliss: {name:"Bliss", preview:"linear-gradient(180deg,#4a9fd1 44%,#6ec82e 44%)"},
-  night: {name:"Night", preview:"radial-gradient(#1a0f40,#03020d)",  grad:"radial-gradient(ellipse at 50% 0%,#1a0f40,#03020d)"},
-  sakura:{name:"Sakura",preview:"linear-gradient(155deg,#ffd6e7,#ff8fa3)", grad:"linear-gradient(155deg,#ffd6e7,#ffb3c6,#ff8fa3)"},
-  forest:{name:"Forest",preview:"radial-gradient(#1a5010,#051204)",  grad:"radial-gradient(ellipse at 50% 100%,#1a5010,#051204)"},
-  slate: {name:"Slate", preview:"linear-gradient(135deg,#1e2235,#0f1219)", grad:"linear-gradient(135deg,#1e2235,#0f1219)"},
-  custom:{name:"Custom",preview:"conic-gradient(#888,#555)"},
+  mesh:     {name:"Mesh",      semitones: 0,  preview:"radial-gradient(ellipse at 18% 22%,#6366f1 0%,transparent 45%),radial-gradient(ellipse at 82% 18%,#ec4899 0%,transparent 40%),radial-gradient(ellipse at 60% 85%,#06b6d4 0%,transparent 45%),linear-gradient(135deg,#0a0a14,#050510)"},
+  aurora:   {name:"Aurora",    semitones: 5,  preview:"linear-gradient(180deg,#0a0218 0%,#3b1d6a 35%,#10b981 60%,#0a0218 100%),radial-gradient(ellipse at 50% 90%,#a855f7 0%,transparent 50%)"},
+  nova:     {name:"Nova",      semitones:-2,  preview:"radial-gradient(ellipse at 25% 20%,#0ea5e9 0%,transparent 55%),radial-gradient(ellipse at 80% 85%,#7c3aed 0%,transparent 50%),linear-gradient(135deg,#07080f,#0d0a1a)"},
+  ocean:    {name:"Ocean",     semitones:-4,  preview:"radial-gradient(ellipse at 50% 20%,#42a5f5 0%,transparent 55%),linear-gradient(180deg,#031a2e 0%,#0a3a66 40%,#1565c0 100%)", grad:"radial-gradient(ellipse at 50% 25%,#42a5f5 0%,transparent 60%),radial-gradient(ellipse at 20% 90%,#00acc1 0%,transparent 45%),linear-gradient(180deg,#02101f 0%,#072b4d 35%,#0d3b66 65%,#1565c0 100%)"},
+  sunset:   {name:"Sunset",    semitones: 4,  preview:"linear-gradient(180deg,#1a0033 0%,#4a148c 20%,#d84315 55%,#ff6f00 80%,#ffab40 100%)", grad:"radial-gradient(ellipse at 50% 95%,#ffab40 0%,transparent 50%),radial-gradient(ellipse at 80% 75%,#ff6f00 0%,transparent 45%),linear-gradient(180deg,#0d001f 0%,#3a0a5c 25%,#7b1fa2 50%,#d84315 75%,#ff7043 100%)"},
+  cyber:    {name:"Cyberpunk", semitones: 3,  preview:"radial-gradient(ellipse at 85% 15%,#ec4899 0%,transparent 45%),radial-gradient(ellipse at 15% 85%,#06b6d4 0%,transparent 40%),linear-gradient(135deg,#0d0221 0%,#3b0764 50%,#1a0033 100%)", grad:"radial-gradient(ellipse at 80% 20%,#ec4899 0%,transparent 50%),radial-gradient(ellipse at 15% 80%,#06b6d4 0%,transparent 50%),radial-gradient(ellipse at 50% 50%,#7c1fa0 0%,transparent 60%),linear-gradient(135deg,#0d0221 0%,#1f0540 50%,#0a0118 100%)"},
+  zen:      {name:"Zen",       semitones:-7,  preview:"linear-gradient(160deg,#fef9e7 0%,#f5e6d3 50%,#d4a574 100%)", grad:"radial-gradient(ellipse at 30% 30%,#fffef5 0%,transparent 55%),linear-gradient(160deg,#fef9e7 0%,#f5e6d3 45%,#e0c8a0 80%,#c8a060 100%)"},
+  bliss:    {name:"Bliss",     semitones: 7,  preview:"linear-gradient(180deg,#4a9fd1 44%,#6ec82e 44%)"},
+  night:    {name:"Night",     semitones:-5,  preview:"radial-gradient(#1a0f40,#03020d)",  grad:"radial-gradient(ellipse at 50% 0%,#1a0f40,#03020d)"},
+  sakura:   {name:"Sakura",    semitones: 9,  preview:"linear-gradient(155deg,#ffd6e7,#ff8fa3)", grad:"linear-gradient(155deg,#ffd6e7,#ffb3c6,#ff8fa3)"},
+  forest:   {name:"Forest",    semitones:-3,  preview:"radial-gradient(#1a5010,#051204)",  grad:"radial-gradient(ellipse at 50% 100%,#1a5010,#051204)"},
+  slate:    {name:"Slate",     semitones: 1,  preview:"linear-gradient(135deg,#1e2235,#0f1219)", grad:"linear-gradient(135deg,#1e2235,#0f1219)"},
+  custom:   {name:"Custom",    semitones: 0,  preview:"conic-gradient(#888,#555)"},
 };
 
 // WMO weather codes (used by Open-Meteo) → emoji glyphs for the weather widget.

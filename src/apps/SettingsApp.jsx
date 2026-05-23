@@ -3,7 +3,7 @@ import { FF, FFB, FFM, INP, SEC } from "../ui/styles.js";
 import { fill, bdr } from "../lib/format.js";
 import { WALLPAPERS, ACCENT_PRESETS, WIDGET_CONFIGS } from "../ui/constants.js";
 import { Toggle } from "../ui/Toggle.jsx";
-import { getSoundConfig, setSoundConfig, playSound } from "../lib/audio.js";
+import { getSoundConfig, setSoundConfig, playSound, setSoundWallpaper } from "../lib/audio.js";
 import { db } from "../lib/db.js";
 
 export function SettingsApp({user,data,updateSettings,showToast,AC,onCustomWallpaper,onLogout}){
@@ -27,7 +27,8 @@ export function SettingsApp({user,data,updateSettings,showToast,AC,onCustomWallp
       <div style={{display:"flex",gap:7,marginBottom:6,flexWrap:"wrap"}}>{ACCENT_PRESETS.map(c=><div key={c} className="ad" onClick={()=>{updateSettings({accent:c});showToast("Accent updated ✓");}} style={{width:28,height:28,borderRadius:7,background:c,cursor:"pointer",border:AC===c?"2.5px solid #fff":"2.5px solid transparent",transition:"transform 0.12s,border 0.12s",boxSizing:"border-box"}}/>)}<input type="color" value={AC} onChange={e=>updateSettings({accent:e.target.value})} style={{width:28,height:28,borderRadius:7,border:"1px solid rgba(255,255,255,0.15)",cursor:"pointer",background:"none"}} title="Custom color"/></div>
       <div style={{fontSize:10,color:"rgba(255,255,255,0.22)",marginBottom:20,fontFamily:FFM}}>Current: {AC}</div>
       <div style={SEC}>Wallpaper</div>
-      <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8,marginBottom:10}}>{Object.entries(WALLPAPERS).filter(([k])=>k!=="custom").map(([k,w])=>(<div key={k} className="ws" onClick={()=>{updateSettings({wallpaper:k});showToast("Wallpaper: "+w.name+" ✓");}} style={{height:52,borderRadius:8,background:w.preview,cursor:"pointer",border:wpId===k?"2.5px solid #fff":"2px solid transparent",transition:"border 0.14s",boxSizing:"border-box",display:"flex",alignItems:"flex-end",padding:"5px 7px"}}><span style={{fontSize:9,fontFamily:FFB,fontWeight:600,color:"rgba(255,255,255,0.85)",textShadow:"0 1px 4px rgba(0,0,0,0.9)"}}>{w.name}</span></div>))}</div>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8,marginBottom:10}}>{Object.entries(WALLPAPERS).filter(([k])=>k!=="custom").map(([k,w])=>(<div key={k} className="ws" onClick={()=>{updateSettings({wallpaper:k});setSoundWallpaper(k);playSound("notification");showToast("Wallpaper: "+w.name+" ✓");}} style={{height:52,borderRadius:8,background:w.preview,cursor:"pointer",border:wpId===k?"2.5px solid #fff":"2px solid transparent",transition:"border 0.14s",boxSizing:"border-box",display:"flex",alignItems:"flex-end",padding:"5px 7px"}}><span style={{fontSize:9,fontFamily:FFB,fontWeight:600,color:"rgba(255,255,255,0.85)",textShadow:"0 1px 4px rgba(0,0,0,0.9)"}}>{w.name}</span></div>))}</div>
+      <div style={{fontSize:10,color:"rgba(255,255,255,0.32)",fontStyle:"italic",marginBottom:10,fontFamily:FF}}>✨ v6.2: each wallpaper tunes the system sounds to a matching musical key. Pick one and listen to the chime.</div>
       <input ref={fileRef} type="file" accept="image/*" onChange={handleUpload} style={{display:"none"}}/>
       <button onClick={()=>fileRef.current.click()} style={{width:"100%",padding:"10px",background:wpId==="custom"?fill(AC):"rgba(255,255,255,0.06)",border:"1px solid "+(wpId==="custom"?bdr(AC):"rgba(255,255,255,0.12)"),borderRadius:8,cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:12,color:wpId==="custom"?AC:"rgba(255,255,255,0.6)",marginBottom:22}}>{wpId==="custom"?"✓ Custom Wallpaper Active — Click to Change":"📁 Upload Custom Wallpaper"}</button>
       <div style={SEC}>Desktop Widgets</div>
