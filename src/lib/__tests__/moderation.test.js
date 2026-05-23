@@ -20,10 +20,12 @@ describe('isAdmin', () => {
     expect(isAdmin({})).toBe(false);
   });
 
-  it('is case-sensitive (admins must be matched exactly)', () => {
-    // Pre-existing behavior — if you want case-insensitive admin matching,
-    // update both isAdmin AND this test together.
-    expect(isAdmin('novamod')).toBe(false);
+  it('matches admins case-insensitively', () => {
+    // The auth flow lowercases usernames at registration ("NovaMod" -> "novamod"),
+    // so the check has to be case-insensitive or the admin would never match.
+    expect(isAdmin('novamod')).toBe(true);
+    expect(isAdmin('NOVAMOD')).toBe(true);
+    expect(isAdmin('NovaMod')).toBe(true);
   });
 });
 

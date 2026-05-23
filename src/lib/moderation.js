@@ -10,8 +10,14 @@
 
 export const ADMINS = ["NovaMod"];
 
+// Case-insensitive match. The app's auth lowercases usernames during
+// registration/login (see handleAuth), so a user typing "NovaMod" is stored
+// as "novamod". Comparing both sides lowercased keeps ADMINS readable AND
+// the check correct regardless of how the username was typed.
 export function isAdmin(username) {
-  return typeof username === "string" && ADMINS.includes(username);
+  if (typeof username !== "string") return false;
+  const u = username.toLowerCase();
+  return ADMINS.some(a => a.toLowerCase() === u);
 }
 
 // Substring patterns. Comparison is case-insensitive (we lowercase the URL).
