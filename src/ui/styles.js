@@ -40,13 +40,21 @@ export const CSS = `
   *{box-sizing:border-box;}body{margin:0;background:#07080f;}
   ::-webkit-scrollbar{width:4px;}::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.12);border-radius:2px;}
   input,textarea,button{font-family:inherit;}input::placeholder,textarea::placeholder{color:rgba(255,255,255,0.22);}textarea{resize:vertical;}
-  /* Keyframes — slightly larger displacements + later finish for visible smoothness */
+  /* v7.0 keyframes — refined easing + slight overshoot for premium feel */
   @keyframes boot-in{from{opacity:0;transform:translateX(-12px);}to{opacity:1;transform:none;}}
-  @keyframes win-in{from{opacity:0;transform:scale(0.92) translateY(10px);}to{opacity:1;transform:none;}}
-  @keyframes menu-up{from{opacity:0;transform:translateY(14px);}to{opacity:1;transform:none;}}
-  @keyframes toast-in{from{opacity:0;transform:translateX(18px) scale(0.97);}to{opacity:1;transform:none;}}
+  /* Windows: subtle scale-up + soft slide. cubic-bezier on the call site
+     does the easing; this just defines start/end states. */
+  @keyframes win-in{from{opacity:0;transform:scale(0.94) translateY(12px);}to{opacity:1;transform:none;}}
+  @keyframes menu-up{from{opacity:0;transform:translateY(14px) scale(0.98);}to{opacity:1;transform:none;}}
+  @keyframes toast-in{from{opacity:0;transform:translateY(-10px) scale(0.96);}to{opacity:1;transform:none;}}
   @keyframes spin{to{transform:rotate(360deg);}}
   @keyframes pulse{0%,100%{opacity:1;}50%{opacity:0.5;}}
+  /* v7.0: gentle breathing pulse for the boot logo */
+  @keyframes nova-breathe{0%,100%{opacity:0.92;filter:drop-shadow(0 0 24px rgba(99,102,241,0.25));}50%{opacity:1;filter:drop-shadow(0 0 48px rgba(99,102,241,0.55));}}
+  /* v7.0: shimmer for the login screen accent line */
+  @keyframes shimmer{0%{background-position:-200% 0;}100%{background-position:200% 0;}}
+  /* v7.0: soft float for ambient login-screen orbs */
+  @keyframes float{0%,100%{transform:translateY(0) translateX(0);}50%{transform:translateY(-12px) translateX(6px);}}
   /* Hover transitions standardized on cubic-bezier(0.4,0,0.2,1) — Material's "standard" curve */
   .di{transition:background 0.18s cubic-bezier(0.4,0,0.2,1),transform 0.18s cubic-bezier(0.4,0,0.2,1);}.di:hover{background:rgba(255,255,255,0.14)!important;}
   .tb{transition:background 0.18s cubic-bezier(0.4,0,0.2,1);}.tb:hover{background:rgba(255,255,255,0.1)!important;}

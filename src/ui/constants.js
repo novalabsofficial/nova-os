@@ -96,7 +96,7 @@ export const STORE_CATALOG = [
 export const STORE_CATS = ["All","Games","Media","Tools","Social","News"];
 
 export const BOOT_MSGS = [
-  "NOVA OS v6.4 — Nova Systems",
+  "NOVA OS v7.0 — Nova Systems",
   "Initializing kernel... OK",
   "Loading hardware abstraction layer... OK",
   "Mounting filesystems... OK",
@@ -130,6 +130,10 @@ export const PAINT_COLORS = ["#fff","#000","#ff4444","#ff8800","#ffdd00","#44dd4
 // the chime tones, negative values darken them. See src/lib/audio.js.
 export const WALLPAPERS = {
   mesh:     {name:"Mesh",      semitones: 0,  preview:"radial-gradient(ellipse at 18% 22%,#6366f1 0%,transparent 45%),radial-gradient(ellipse at 82% 18%,#ec4899 0%,transparent 40%),radial-gradient(ellipse at 60% 85%,#06b6d4 0%,transparent 45%),linear-gradient(135deg,#0a0a14,#050510)"},
+  // v7.0 additions
+  lumen:    {name:"Lumen",     semitones:-1,  preview:"radial-gradient(circle at 50% 60%,#ffd89e 0%,#c97a3f 18%,#3a1a4a 50%,#0a0418 80%)", grad:"radial-gradient(circle at 50% 60%,#fff2d4 0%,#ffd89e 12%,#e0905a 25%,#7a2e5c 50%,#1a0830 75%,#050211 100%)"},
+  drift:    {name:"Drift",     semitones: 8,  preview:"radial-gradient(ellipse at 20% 30%,#fbcfe8 0%,transparent 50%),radial-gradient(ellipse at 75% 70%,#c4b5fd 0%,transparent 55%),radial-gradient(ellipse at 50% 50%,#a7f3d0 0%,transparent 60%),linear-gradient(135deg,#fdf2f8,#ede9fe,#ecfdf5)", grad:"radial-gradient(ellipse at 18% 28%,#fbcfe8 0%,transparent 55%),radial-gradient(ellipse at 78% 70%,#c4b5fd 0%,transparent 60%),radial-gradient(ellipse at 50% 50%,#a7f3d0 0%,transparent 65%),radial-gradient(ellipse at 90% 15%,#fed7aa 0%,transparent 45%),linear-gradient(135deg,#fdf2f8 0%,#ede9fe 50%,#ecfdf5 100%)"},
+  halo:     {name:"Halo",      semitones: 2,  preview:"radial-gradient(circle at 50% 50%,#7c3aed 0%,#3730a3 22%,#1e1b4b 45%,#0a0a1f 75%)", grad:"radial-gradient(circle at 50% 50%,#a78bfa 0%,#7c3aed 12%,#4c1d95 28%,#1e1b4b 48%,#0a0a1f 75%,#020010 100%),radial-gradient(circle at 50% 50%,transparent 30%,rgba(167,139,250,0.08) 40%,transparent 50%,rgba(167,139,250,0.06) 65%,transparent 75%)"},
   aurora:   {name:"Aurora",    semitones: 5,  preview:"linear-gradient(180deg,#0a0218 0%,#3b1d6a 35%,#10b981 60%,#0a0218 100%),radial-gradient(ellipse at 50% 90%,#a855f7 0%,transparent 50%)"},
   nova:     {name:"Nova",      semitones:-2,  preview:"radial-gradient(ellipse at 25% 20%,#0ea5e9 0%,transparent 55%),radial-gradient(ellipse at 80% 85%,#7c3aed 0%,transparent 50%),linear-gradient(135deg,#07080f,#0d0a1a)"},
   ocean:    {name:"Ocean",     semitones:-4,  preview:"radial-gradient(ellipse at 50% 20%,#42a5f5 0%,transparent 55%),linear-gradient(180deg,#031a2e 0%,#0a3a66 40%,#1565c0 100%)", grad:"radial-gradient(ellipse at 50% 25%,#42a5f5 0%,transparent 60%),radial-gradient(ellipse at 20% 90%,#00acc1 0%,transparent 45%),linear-gradient(180deg,#02101f 0%,#072b4d 35%,#0d3b66 65%,#1565c0 100%)"},
