@@ -1,5 +1,5 @@
 
-// NOVA OS v5.3 — Nova Systems
+// NOVA OS v6.0 — Nova Systems
 // Drop this into src/NovaOS.jsx
  
 import { useState, useEffect, useRef, useCallback } from "react";
@@ -21,7 +21,7 @@ import { dailyWord, scoreGuess, normalizeGuess } from "./lib/wordle.js";
 import { emptyGrid as tetrisEmpty, randomPiece as tetrisRandom, shapeOf, fits as tetrisFits, lockPiece as tetrisLock, clearLines as tetrisClearLines, scoreForLines, tickInterval, PIECE_COLORS, BOARD_W as TETRIS_W, BOARD_H as TETRIS_H } from "./lib/tetris.js";
 import { wmoIcon, wmoLabel, geocodeUrl, parseGeocode, forecastUrl, parseForecast, alertsUrl, parseAlerts, isLikelyUS } from "./lib/weather.js";
 import { PROVIDERS as AI_PROVIDERS, streamResponse as aiStream, deriveTitle as aiDeriveTitle } from "./lib/ai.js";
-import { playTone, speak, cancelSpeech } from "./lib/audio.js";
+import { playTone, speak, cancelSpeech, playSound, getSoundConfig, setSoundConfig } from "./lib/audio.js";
 
 // ─── CONSTANTS ────────────────────────────────────────────────────────────────
 const DEFAULT_AC = "#4f9eff";
@@ -113,7 +113,7 @@ const STORE_CATALOG = [
 ];
  
 const STORE_CATS    = ["All","Games","Media","Tools","Social","News"];
-const BOOT_MSGS     = ["NOVA OS v5.3 — Nova Systems","Initializing kernel... OK","Loading hardware abstraction layer... OK","Mounting filesystems... OK","Starting widget engine... OK","Initializing Nova Store... OK","Loading user environment... OK","System ready."];
+const BOOT_MSGS     = ["NOVA OS v6.0 — Nova Systems","Initializing kernel... OK","Loading hardware abstraction layer... OK","Mounting filesystems... OK","Starting widget engine... OK","Initializing Nova Store... OK","Loading user environment... OK","System ready."];
 const ACCENT_PRESETS= ["#4f9eff","#ff6b6b","#4cef90","#ffcc44","#cc44ff","#ff8c44","#44ddcc","#ff44aa"];
 const BOOKMARKS     = [{label:"Hacker News",url:"https://news.ycombinator.com"},{label:"Wikipedia",url:"https://en.m.wikipedia.org"},{label:"Archive.org",url:"https://archive.org"},{label:"itch.io",url:"https://itch.io"}];
 const PAINT_COLORS  = ["#fff","#000","#ff4444","#ff8800","#ffdd00","#44dd44","#00ccff","#4466ff","#cc44ff","#ff44aa","#8b4513","#888"];
@@ -737,6 +737,197 @@ const HANDLE_DEFS_TOUCH=[
   {id:"nw",s:{top:0,left:0,width:22,height:22,cursor:"nw-resize"}},{id:"ne",s:{top:0,right:0,width:22,height:22,cursor:"ne-resize"}},
   {id:"sw",s:{bottom:0,left:0,width:22,height:22,cursor:"sw-resize"}},{id:"se",s:{bottom:0,right:0,width:22,height:22,cursor:"se-resize"}},
 ];
+// AiAssist — a ✨ button that shows a popover of canned actions and streams
+// the result back from whichever provider the user configured in Nova AI.
+// Reads the API key + model straight from localStorage so every app gets the
+// BYOK plumbing for free. If the user hasn't configured Nova AI yet, the
+// popover gracefully redirects them to set it up.
+//
+// Each app passes:
+//   - actions: [{label, icon?, prompt}]  — clicked label, optional emoji, prompt template
+//   - getContext: () => string   — text appended to the prompt; the actual user
+//                                   content (note body, task list, weather data, etc.)
+function AiAssist({actions, getContext, AC, openNovaAi}){
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [output, setOutput] = useState("");
+  const [error, setError] = useState(null);
+  const [activeAction, setActiveAction] = useState(null);
+  // Read BYOK config synchronously from localStorage. Re-read on each open so
+  // changes the user makes in Nova AI's settings show up here without a
+  // remount. (The state init runs every open — we deliberately don't memoize.)
+  const keys = aiLoad(AI_LS_KEYS, {claude:"",openai:""});
+  const config = aiLoad(AI_LS_CONFIG, {provider:"claude", model:{claude:AI_PROVIDERS.claude.defaultModel, openai:AI_PROVIDERS.openai.defaultModel}});
+  const provider = config.provider;
+  const model = config.model[provider] || AI_PROVIDERS[provider].defaultModel;
+  const apiKey = keys[provider] || "";
+  const hasKey = !!apiKey.trim();
+
+  async function runAction(action){
+    if(!hasKey){setError("Set up Nova AI first.");return;}
+    setActiveAction(action.label);
+    setBusy(true);setOutput("");setError(null);
+    const context = (getContext?.() || "").toString();
+    const userContent = action.prompt + (context ? "\n\n" + context : "");
+    let acc = "";
+    try{
+      for await (const chunk of aiStream(provider, model, apiKey, [{role:"user",content:userContent}], {})){
+        acc += chunk;
+        setOutput(acc);
+      }
+    }catch(e){setError(e?.message || "Request failed");}
+    setBusy(false);
+  }
+  function closeAll(){setOpen(false);setBusy(false);setOutput("");setError(null);setActiveAction(null);}
+
+  return(<>
+    <button onClick={()=>setOpen(o=>!o)} title="Ask Nova AI" style={{
+      padding:"5px 10px",borderRadius:7,cursor:"pointer",
+      background:open?fill(AC):"linear-gradient(135deg, rgba(168,85,247,0.18), rgba(6,182,212,0.18))",
+      border:"1px solid "+(open?bdr(AC):"rgba(168,85,247,0.4)"),
+      fontFamily:FFB,fontWeight:600,fontSize:11,color:open?AC:"rgba(255,255,255,0.85)",
+      display:"flex",alignItems:"center",gap:5,
+    }}>✨ AI</button>
+
+    {open && (
+      <>
+        <div onClick={closeAll} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",zIndex:99998}}/>
+        <div style={{
+          position:"fixed", top:"50%", left:"50%", transform:"translate(-50%, -50%)",
+          width:"min(540px, calc(100vw - 32px))", maxHeight:"min(80vh, 640px)",
+          background:"rgba(11,13,28,0.98)", backdropFilter:"blur(28px)",
+          border:"1px solid rgba(255,255,255,0.1)", borderRadius:12,
+          boxShadow:"0 30px 80px rgba(0,0,0,0.6)",
+          zIndex:99999, display:"flex", flexDirection:"column", fontFamily:FF,
+          animation:"win-in 0.24s cubic-bezier(0.16,1,0.3,1)",
+        }}>
+          {/* Header */}
+          <div style={{padding:"12px 16px",borderBottom:"1px solid rgba(255,255,255,0.07)",display:"flex",alignItems:"center",gap:9,flexShrink:0}}>
+            <span style={{fontSize:18}}>✨</span>
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{fontFamily:FFB,fontWeight:700,fontSize:13,color:"#fff"}}>Nova AI</div>
+              {hasKey ? (
+                <div style={{fontSize:10,fontFamily:FFM,color:"rgba(255,255,255,0.4)"}}>{AI_PROVIDERS[provider].label} · {model}</div>
+              ) : (
+                <div style={{fontSize:10,fontFamily:FF,color:"#ffaa44"}}>No API key set up yet</div>
+              )}
+            </div>
+            <button onClick={closeAll} style={{width:24,height:24,borderRadius:6,background:"none",border:"none",cursor:"pointer",color:"rgba(255,255,255,0.5)",fontSize:14}}>✕</button>
+          </div>
+
+          {/* Body */}
+          <div style={{flex:1,overflowY:"auto",padding:"14px 16px",minHeight:0}}>
+            {!hasKey ? (
+              <div style={{textAlign:"center",padding:"20px 10px"}}>
+                <div style={{fontSize:13,color:"rgba(255,255,255,0.7)",lineHeight:1.6,marginBottom:14}}>
+                  This app uses your <strong>Nova AI</strong> setup. Add your Claude or ChatGPT API key once and it works everywhere.
+                </div>
+                <button onClick={()=>{closeAll(); openNovaAi?.();}} style={{padding:"9px 18px",background:fill(AC),border:"1px solid "+bdr(AC),borderRadius:8,cursor:"pointer",fontFamily:FFB,fontWeight:700,fontSize:12,color:AC}}>Open Nova AI Settings →</button>
+              </div>
+            ) : (
+              <>
+                {!output && !busy && !error && (
+                  <div style={{display:"flex",flexDirection:"column",gap:6}}>
+                    {actions.map((a,i)=>(
+                      <button key={i} onClick={()=>runAction(a)} style={{textAlign:"left",padding:"10px 12px",background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:8,cursor:"pointer",fontFamily:FF,fontSize:13,color:"rgba(255,255,255,0.88)",display:"flex",alignItems:"center",gap:9}}>
+                        <span style={{fontSize:16}}>{a.icon||"✨"}</span>
+                        <span style={{flex:1}}>{a.label}</span>
+                        <span style={{color:"rgba(255,255,255,0.3)",fontSize:11}}>→</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {(busy || output) && (
+                  <>
+                    <div style={{fontSize:10,fontFamily:FFM,color:"rgba(255,255,255,0.4)",letterSpacing:1,marginBottom:8}}>{(activeAction||"").toUpperCase()}</div>
+                    <div style={{fontSize:13,color:"rgba(255,255,255,0.9)",lineHeight:1.7,whiteSpace:"pre-wrap",wordBreak:"break-word"}}>
+                      {output || <span style={{opacity:0.4,fontStyle:"italic"}}>Thinking…</span>}
+                      {busy && output && <span style={{opacity:0.5,animation:"pulse 1s ease-in-out infinite"}}>▍</span>}
+                    </div>
+                  </>
+                )}
+                {error && (
+                  <div style={{padding:"10px 12px",background:"rgba(255,80,80,0.1)",border:"1px solid rgba(255,80,80,0.3)",borderRadius:7,fontSize:12,color:"#ff8b8b"}}>⚠ {error}</div>
+                )}
+              </>
+            )}
+          </div>
+
+          {/* Footer (only when there's output to act on) */}
+          {output && !busy && (
+            <div style={{padding:"10px 16px",borderTop:"1px solid rgba(255,255,255,0.07)",display:"flex",gap:7,flexShrink:0}}>
+              <button onClick={()=>{try{navigator.clipboard?.writeText(output);}catch{}}} style={{padding:"7px 14px",background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.12)",borderRadius:7,cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:11,color:"rgba(255,255,255,0.75)"}}>📋 Copy</button>
+              <button onClick={()=>{setOutput("");setError(null);setActiveAction(null);}} style={{padding:"7px 14px",background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.12)",borderRadius:7,cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:11,color:"rgba(255,255,255,0.75)"}}>← New action</button>
+              <div style={{flex:1}}/>
+              <button onClick={closeAll} style={{padding:"7px 14px",background:fill(AC),border:"1px solid "+bdr(AC),borderRadius:7,cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:11,color:AC}}>Done</button>
+            </div>
+          )}
+        </div>
+      </>
+    )}
+  </>);
+}
+
+// Reusable right-click / long-press context menu. Floats at (x, y) screen
+// coords with auto-edge-clamping so it never overflows the viewport. Closes
+// on outside click or Escape. Touch users get this for free via the browser's
+// onContextMenu translation of long-press.
+function ContextMenu({x, y, items, onClose, AC}){
+  const ref = useRef(null);
+  useEffect(()=>{
+    function onDown(e){if(ref.current && !ref.current.contains(e.target)) onClose();}
+    function onEsc(e){if(e.key==="Escape") onClose();}
+    // Delay so the click that opened the menu doesn't immediately close it
+    const t = setTimeout(()=>document.addEventListener("pointerdown", onDown), 0);
+    document.addEventListener("keydown", onEsc);
+    return ()=>{
+      clearTimeout(t);
+      document.removeEventListener("pointerdown", onDown);
+      document.removeEventListener("keydown", onEsc);
+    };
+  }, [onClose]);
+
+  const W = 200;
+  // Each item is ~36px tall + dividers/padding. Conservative height estimate.
+  const H = items.reduce((acc,i)=>acc + (i.type==="divider"?9:36), 12);
+  const ax = Math.max(8, Math.min(x, window.innerWidth - W - 8));
+  const ay = Math.max(8, Math.min(y, window.innerHeight - H - 8));
+
+  return(
+    <div ref={ref} style={{
+      position:"fixed", left:ax, top:ay, width:W, zIndex:99999,
+      background:"rgba(9,11,24,0.97)", backdropFilter:"blur(24px)",
+      border:"1px solid rgba(255,255,255,0.1)", borderRadius:9,
+      boxShadow:"0 18px 50px rgba(0,0,0,0.5)",
+      padding:"5px 4px",
+      animation:"menu-up 0.18s cubic-bezier(0.4,0,0.2,1)",
+      fontFamily:FF,
+    }}>
+      {items.map((it, i)=>{
+        if(it.type==="divider") return <div key={i} style={{height:1,background:"rgba(255,255,255,0.07)",margin:"4px 6px"}}/>;
+        const danger = !!it.danger;
+        const disabled = !!it.disabled;
+        return(
+          <div key={i}
+            onClick={disabled?undefined:()=>{ try { it.onClick(); } catch {} onClose(); }}
+            style={{
+              padding:"7px 11px", borderRadius:6, cursor:disabled?"default":"pointer",
+              fontSize:12, color: disabled ? "rgba(255,255,255,0.3)" : danger ? "rgba(255,130,130,0.9)" : "rgba(255,255,255,0.85)",
+              display:"flex", alignItems:"center", gap:9, opacity:disabled?0.5:1,
+              transition:"background 0.12s",
+            }}
+            onPointerEnter={e=>{if(!disabled)e.currentTarget.style.background = danger?"rgba(255,80,80,0.12)":"rgba(255,255,255,0.07)";}}
+            onPointerLeave={e=>{e.currentTarget.style.background = "transparent";}}>
+            {it.icon && <span style={{width:16,textAlign:"center",fontSize:13,opacity:0.85}}>{it.icon}</span>}
+            <span style={{flex:1}}>{it.label}</span>
+            {it.shortcut && <span style={{fontSize:10,fontFamily:FFM,color:"rgba(255,255,255,0.3)"}}>{it.shortcut}</span>}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function ResizeHandles({winId,onStartResize,touchy}){
   const defs=touchy?HANDLE_DEFS_TOUCH:HANDLE_DEFS_MOUSE;
   return defs.map(h=><div key={h.id} onPointerDown={e=>{e.stopPropagation();onStartResize(e,winId,h.id);}} style={{position:"absolute",...h.s,zIndex:20,touchAction:"none"}}/>);
@@ -795,7 +986,11 @@ export default function NovaOS(){
   const deviceMode = effectiveDeviceMode(settings.displayMode, detectedMode);
   const touchy = isTouchMode(deviceMode);
  
-  useEffect(()=>{let i=0,dead=false;function nxt(){if(dead)return;if(i>=BOOT_MSGS.length){setTimeout(()=>{if(!dead)setScreen("login");},700);return;}setBootLines(p=>[...p,BOOT_MSGS[i++]]);setTimeout(nxt,i<2?90:230);}setTimeout(nxt,380);return()=>{dead=true;};},[]);
+  // Boot sequence — when the last "System ready" message lands, queue the
+  // startup sound + transition to login. Most browsers block audio before a
+  // user gesture, so the startup chime may silently fail on first cold load
+  // — that's OK, the login sound after the user clicks Sign In will play.
+  useEffect(()=>{let i=0,dead=false;function nxt(){if(dead)return;if(i>=BOOT_MSGS.length){playSound("startup");setTimeout(()=>{if(!dead)setScreen("login");},700);return;}setBootLines(p=>[...p,BOOT_MSGS[i++]]);setTimeout(nxt,i<2?90:230);}setTimeout(nxt,380);return()=>{dead=true;};},[]);
   useEffect(()=>{const t=setInterval(()=>setTick(new Date()),1000);return()=>clearInterval(t);},[]);
   // Watch viewport size so the detected device mode stays current (e.g. on
   // rotation or window resize). Throttled-by-debounce isn't needed — resize
@@ -872,7 +1067,79 @@ export default function NovaOS(){
     window.addEventListener("pointermove",onMove);window.addEventListener("pointerup",onUp);window.addEventListener("pointercancel",onUp);return()=>{window.removeEventListener("pointermove",onMove);window.removeEventListener("pointerup",onUp);window.removeEventListener("pointercancel",onUp);};
   },[widgetResize]);
  
-  const showToast     =useCallback((msg)=>{setToast(msg);setTimeout(()=>setToast(null),2500);},[]);
+  const showToast     =useCallback((msg)=>{setToast(msg);playSound("toast");setTimeout(()=>setToast(null),2500);},[]);
+
+  // ── Context Menu ─────────────────────────────────────────────────────
+  // A single global menu — only one can be open at a time. Each handler
+  // builds its own item list and calls openContextMenu({x, y, items}).
+  const [ctxMenu, setCtxMenu] = useState(null);
+  const openContextMenu = useCallback((e, items)=>{
+    if(!items || items.length===0) return;
+    e.preventDefault();
+    e.stopPropagation();
+    setCtxMenu({x: e.clientX, y: e.clientY, items});
+  }, []);
+  const closeContextMenu = useCallback(()=>setCtxMenu(null), []);
+
+  // ── Notification Center ──────────────────────────────────────────────
+  // Persistent notifications live in data.notifications (a capped array,
+  // newest first). Different from toasts: toasts are ephemeral action
+  // confirmations, notifications are events the user might want to revisit.
+  const [notifsOpen, setNotifsOpen] = useState(false);
+  const pushNotification = useCallback((n)=>{
+    if(!n || !n.title) return;
+    const notif = {
+      id: Date.now() + "-" + Math.random().toString(36).slice(2,7),
+      ts: Date.now(),
+      read: false,
+      kind: n.kind || "info",  // info | success | warning | alert
+      title: n.title,
+      body: n.body || "",
+      appId: n.appId || null,
+    };
+    setData(prev=>{
+      if(!prev) return prev;
+      // Cap at 50 to avoid unbounded growth in Firestore documents
+      const next = {...prev, notifications: [notif, ...(prev.notifications||[]).slice(0,49)]};
+      saveData(next);
+      return next;
+    });
+    playSound("notification");
+  },[saveData]);
+  const dismissNotification = useCallback((id)=>{
+    setData(prev=>{
+      if(!prev) return prev;
+      const next = {...prev, notifications: (prev.notifications||[]).filter(n=>n.id!==id)};
+      saveData(next);
+      return next;
+    });
+  },[saveData]);
+  const clearAllNotifications = useCallback(()=>{
+    setData(prev=>{
+      if(!prev) return prev;
+      const next = {...prev, notifications: []};
+      saveData(next);
+      return next;
+    });
+  },[saveData]);
+  const markAllNotificationsRead = useCallback(()=>{
+    setData(prev=>{
+      if(!prev) return prev;
+      const cur=prev.notifications||[];
+      if(cur.every(n=>n.read)) return prev; // nothing to do
+      const next={...prev, notifications: cur.map(n=>({...n, read:true}))};
+      saveData(next);
+      return next;
+    });
+  },[saveData]);
+  const notifications = data?.notifications || [];
+  const unreadCount = notifications.filter(n=>!n.read).length;
+  // When the panel opens, mark everything read after a tick — avoids visual flash
+  useEffect(()=>{
+    if(!notifsOpen) return;
+    const id = setTimeout(()=>markAllNotificationsRead(), 250);
+    return ()=>clearTimeout(id);
+  },[notifsOpen, markAllNotificationsRead]);
   const saveData      =useCallback(async(d)=>{if(user)await db.set("user:"+user+":data",d);},[user]);
   const updateData    =useCallback((patch)=>{setData(prev=>{const next=typeof patch==="function"?patch(prev):{...prev,...patch};saveData(next);return next;});},[saveData]);
   const updateSettings=useCallback((patch)=>{updateData(prev=>({...prev,settings:{...(prev.settings||{}),...patch}}));},[updateData]);
@@ -889,6 +1156,9 @@ export default function NovaOS(){
       setWins(ws=>{
         const ex=ws.find(w=>w.app===appId);
         if(ex) return ws.map(w=>w.id===ex.id?{...w,z:nz,state:w.state==="minimized"?(deviceMode==="mobile"?"maximized":"normal"):w.state}:w);
+        // Fresh open — play the app-launch chime. (Restoring from minimized
+        // doesn't play it; that's existing window, not a new app launch.)
+        playSound("appLaunch");
         const n=ws.length%6;
         const sz=DEFAULT_SIZES[appId]||{w:520,h:480};
         const baseX=120+n*28, baseY=36+n*22;
@@ -905,7 +1175,7 @@ export default function NovaOS(){
   },[deviceMode]);
   function startDrag(e,winId){if(e.button!==0)return;e.preventDefault();const w=winsRef.current.find(w=>w.id===winId);if(w){setDrag({type:"move",winId,ox:e.clientX-w.x,oy:e.clientY-w.y});focusWin(winId);}}
   function startResize(e,winId,edge){if(e.button!==0)return;e.preventDefault();const w=winsRef.current.find(w=>w.id===winId);if(w){setDrag({type:"resize",winId,edge,sx:e.clientX,sy:e.clientY,wx:w.x,wy:w.y,ww:w.width,wh:w.height});focusWin(winId);}}
-  function closeWin(id){setWins(ws=>ws.filter(w=>w.id!==id));}
+  function closeWin(id){playSound("windowClose");setWins(ws=>ws.filter(w=>w.id!==id));}
   function minimizeWin(id){setWins(ws=>ws.map(w=>w.id===id?{...w,state:w.state==="minimized"?"normal":"minimized"}:w));}
   function maximizeWin(id){setWins(ws=>ws.map(w=>{if(w.id!==id)return w;if(w.state==="maximized")return{...w,state:"normal",...(w.prevBounds||{}),prevBounds:null};return{...w,state:"maximized",prevBounds:{x:w.x,y:w.y,width:w.width,height:w.height}};}));}
   function onIconMouseDown(e,appId,allIcons){if(e.button!==0)return;e.stopPropagation();e.preventDefault();const idx=allIcons.findIndex(a=>a.id===appId);const pos=iconPos[appId]||defaultIconPos(idx);setIconDrag({id:appId,ox:e.clientX-pos.x,oy:e.clientY-pos.y,user,allIcons:[...allIcons]});}
@@ -948,16 +1218,20 @@ export default function NovaOS(){
   );
 
   async function handleAuth(){
+    // Tiny wrapper so every "show user-facing auth error" path also plays the
+    // error chime. setAuthErr("") (the success-path clear) intentionally skips
+    // the sound.
+    const authErr=(msg)=>{setAuthErr(msg);playSound("error");};
     const u=uname.trim().toLowerCase().replace(/[^a-z0-9_]/g,"");const p=pass.trim();
-    if(!u||!p){setAuthErr("All fields required.");return;}if(u.length<3){setAuthErr("Username needs 3+ characters.");return;}
+    if(!u||!p){authErr("All fields required.");return;}if(u.length<3){authErr("Username needs 3+ characters.");return;}
     setBusy(true);setAuthErr("");
     if(mode==="register"){
-      const ex=await db.get("user:"+u+":pw");if(ex!==null){setAuthErr("Username taken.");setBusy(false);return;}
+      const ex=await db.get("user:"+u+":pw");if(ex!==null){authErr("Username taken.");setBusy(false);return;}
       await db.set("user:"+u+":pw",p);const init={notes:[],tasks:[],wallpaper:"mesh",bio:"",joined:Date.now(),settings:{},installedApps:[],folders:[],migratedTo41:true,migratedTo52:true};
-      await db.set("user:"+u+":data",init);setUser(u);setData(init);setIconPos({});setWidgetState(DEFAULT_WIDGET_STATE);setScreen("desktop");
+      await db.set("user:"+u+":data",init);setUser(u);setData(init);setIconPos({});setWidgetState(DEFAULT_WIDGET_STATE);setScreen("desktop");playSound("login");
     }else{
-      const stored=await db.get("user:"+u+":pw");if(stored===null){setAuthErr("Account not found.");setBusy(false);return;}
-      if(stored!==p){setAuthErr("Incorrect password.");setBusy(false);return;}
+      const stored=await db.get("user:"+u+":pw");if(stored===null){authErr("Account not found.");setBusy(false);return;}
+      if(stored!==p){authErr("Incorrect password.");setBusy(false);return;}
       const d=await db.get("user:"+u+":data");const savedIconPos=await db.get("user:"+u+":iconpos");
       // One-time migrations layered by release. Each runs at most once per user
       // (gated by its own migratedToX.Y flag) and only re-points the wallpaper
@@ -984,11 +1258,11 @@ export default function NovaOS(){
       setUser(u);setData(d||{notes:[],tasks:[],wallpaper:"mesh",bio:"",joined:Date.now(),settings:{},installedApps:[],folders:[],migratedTo41:true,migratedTo52:true});
       setIconPos(savedIconPos||{});
       if(d?.settings?.widgetState)setWidgetState({...DEFAULT_WIDGET_STATE,...d.settings.widgetState});
-      setScreen("desktop");
+      setScreen("desktop");playSound("login");
     }
     setBusy(false);
   }
-  function logout(){setUser(null);setData(null);setCustomWp(null);setWins([]);setMaxZ(100);setMenuOpen(false);setIconPos({});setIconDrag(null);setWidgetState(DEFAULT_WIDGET_STATE);setWidgetDrag(null);setWidgetResize(null);setUname("");setPass("");setAuthErr("");setMode("login");setScreen("login");}
+  function logout(){playSound("logout");setUser(null);setData(null);setCustomWp(null);setWins([]);setMaxZ(100);setMenuOpen(false);setIconPos({});setIconDrag(null);setWidgetState(DEFAULT_WIDGET_STATE);setWidgetDrag(null);setWidgetResize(null);setUname("");setPass("");setAuthErr("");setMode("login");setScreen("login");}
  
   const fmtTime=d=>use24h?d.toLocaleTimeString([],{hour:"2-digit",minute:"2-digit",hour12:false}):d.toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"});
   const fmtDate=d=>d.toLocaleDateString([],{weekday:"short",month:"short",day:"numeric"});
@@ -1000,14 +1274,26 @@ export default function NovaOS(){
   const dragCursor=drag?(drag.type==="move"?"grabbing":drag.edge+"-resize"):widgetResize?(widgetResize.edge+"-resize"):isAnyDrag?"grabbing":"default";
  
   // ── BOOT ─────────────────────────────────────────────────────────────────
-  if(screen==="boot")return(<div style={{width:"100%",height:"100vh",background:"#07080f",display:"flex",flexDirection:"column",justifyContent:"center",padding:"10vh max(24px, 12%)"}}><style>{CSS}</style><div style={{fontFamily:FFB,fontWeight:700,fontSize:"clamp(40px, 12vw, 66px)",letterSpacing:4,color:"#fff",marginBottom:4,lineHeight:1}}>NOVA</div><div style={{fontFamily:FF,fontSize:12,color:"rgba(255,255,255,0.22)",letterSpacing:5,marginBottom:46}}>OPERATING SYSTEM  ·  v5.3</div>{bootLines.map((l,i)=><div key={i} style={{fontFamily:FFM,fontSize:12,color:l.includes("ready")?"#4f9eff":"rgba(255,255,255,0.42)",marginBottom:5,animation:"boot-in 0.22s cubic-bezier(0.4,0,0.2,1)"}}>{l.includes("OK")?<>{l.replace("... OK","")}... <span style={{color:"#4cef90"}}>OK</span></>:l}</div>)}{MobileNotice}</div>);
+  if(screen==="boot")return(<div style={{width:"100%",height:"100vh",background:"#07080f",display:"flex",flexDirection:"column",justifyContent:"center",padding:"10vh max(24px, 12%)"}}><style>{CSS}</style><div style={{fontFamily:FFB,fontWeight:700,fontSize:"clamp(40px, 12vw, 66px)",letterSpacing:4,color:"#fff",marginBottom:4,lineHeight:1}}>NOVA</div><div style={{fontFamily:FF,fontSize:12,color:"rgba(255,255,255,0.22)",letterSpacing:5,marginBottom:46}}>OPERATING SYSTEM  ·  v6.0</div>{bootLines.map((l,i)=><div key={i} style={{fontFamily:FFM,fontSize:12,color:l.includes("ready")?"#4f9eff":"rgba(255,255,255,0.42)",marginBottom:5,animation:"boot-in 0.22s cubic-bezier(0.4,0,0.2,1)"}}>{l.includes("OK")?<>{l.replace("... OK","")}... <span style={{color:"#4cef90"}}>OK</span></>:l}</div>)}{MobileNotice}</div>);
  
   // ── LOGIN ────────────────────────────────────────────────────────────────
-  if(screen==="login")return(<div style={{width:"100%",height:"100vh",position:"relative",overflow:"hidden"}}><style>{CSS}</style><MeshBg/><div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center"}}><div style={{background:"rgba(8,10,22,0.86)",backdropFilter:"blur(24px)",border:"1px solid rgba(255,255,255,0.11)",borderRadius:16,padding:"44px 40px",width:376,maxWidth:"calc(100vw - 24px)",boxShadow:"0 40px 100px rgba(0,0,0,0.6)",position:"relative",overflow:"hidden"}}><div style={{position:"absolute",top:0,left:0,right:0,height:2,background:"linear-gradient(90deg,transparent,"+DEFAULT_AC+",transparent)"}}/><div style={{fontFamily:FFB,fontWeight:700,fontSize:38,color:"#fff",textAlign:"center",letterSpacing:4,marginBottom:4}}>NOVA</div><div style={{fontFamily:FF,fontSize:11,color:"rgba(255,255,255,0.22)",textAlign:"center",letterSpacing:4,marginBottom:36}}>OPERATING SYSTEM  ·  v5.3</div><div style={{display:"flex",borderBottom:"1px solid rgba(255,255,255,0.09)",marginBottom:24}}>{["login","register"].map(m=><button key={m} className="lt" onClick={()=>{setMode(m);setAuthErr("");}} style={{flex:1,padding:"10px 0",background:"none",border:"none",borderBottom:mode===m?"2px solid "+DEFAULT_AC:"2px solid transparent",cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:12,letterSpacing:1,color:mode===m?DEFAULT_AC:"rgba(255,255,255,0.28)",transition:"color 0.15s"}}>{m==="login"?"SIGN IN":"REGISTER"}</button>)}</div><input style={{...INP,marginBottom:11}} placeholder="Username" value={uname} onChange={e=>setUname(e.target.value)} onKeyDown={e=>e.key==="Enter"&&handleAuth()} autoFocus/><input style={INP} type="password" placeholder="Password" value={pass} onChange={e=>setPass(e.target.value)} onKeyDown={e=>e.key==="Enter"&&handleAuth()}/><button className="ls" disabled={busy} onClick={handleAuth} style={{width:"100%",padding:"12px",background:fill(DEFAULT_AC),border:"1px solid "+bdr(DEFAULT_AC),borderRadius:8,cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:14,letterSpacing:1,color:"#fff",marginTop:14,transition:"opacity 0.15s"}}>{busy?"AUTHENTICATING…":mode==="login"?"SIGN IN →":"CREATE ACCOUNT →"}</button>{authErr&&<div style={{color:"#ff7878",fontFamily:FF,fontSize:13,textAlign:"center",marginTop:12}}>⚠ {authErr}</div>}<div style={{marginTop:20,fontFamily:FF,fontStyle:"italic",fontSize:11,color:"rgba(255,255,255,0.14)",textAlign:"center"}}>Don't reuse real passwords — demo auth only.</div></div></div>{MobileNotice}</div>);
+  if(screen==="login")return(<div style={{width:"100%",height:"100vh",position:"relative",overflow:"hidden"}}><style>{CSS}</style><MeshBg/><div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center"}}><div style={{background:"rgba(8,10,22,0.86)",backdropFilter:"blur(24px)",border:"1px solid rgba(255,255,255,0.11)",borderRadius:16,padding:"44px 40px",width:376,maxWidth:"calc(100vw - 24px)",boxShadow:"0 40px 100px rgba(0,0,0,0.6)",position:"relative",overflow:"hidden"}}><div style={{position:"absolute",top:0,left:0,right:0,height:2,background:"linear-gradient(90deg,transparent,"+DEFAULT_AC+",transparent)"}}/><div style={{fontFamily:FFB,fontWeight:700,fontSize:38,color:"#fff",textAlign:"center",letterSpacing:4,marginBottom:4}}>NOVA</div><div style={{fontFamily:FF,fontSize:11,color:"rgba(255,255,255,0.22)",textAlign:"center",letterSpacing:4,marginBottom:36}}>OPERATING SYSTEM  ·  v6.0</div><div style={{display:"flex",borderBottom:"1px solid rgba(255,255,255,0.09)",marginBottom:24}}>{["login","register"].map(m=><button key={m} className="lt" onClick={()=>{setMode(m);setAuthErr("");}} style={{flex:1,padding:"10px 0",background:"none",border:"none",borderBottom:mode===m?"2px solid "+DEFAULT_AC:"2px solid transparent",cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:12,letterSpacing:1,color:mode===m?DEFAULT_AC:"rgba(255,255,255,0.28)",transition:"color 0.15s"}}>{m==="login"?"SIGN IN":"REGISTER"}</button>)}</div><input style={{...INP,marginBottom:11}} placeholder="Username" value={uname} onChange={e=>setUname(e.target.value)} onKeyDown={e=>e.key==="Enter"&&handleAuth()} autoFocus/><input style={INP} type="password" placeholder="Password" value={pass} onChange={e=>setPass(e.target.value)} onKeyDown={e=>e.key==="Enter"&&handleAuth()}/><button className="ls" disabled={busy} onClick={handleAuth} style={{width:"100%",padding:"12px",background:fill(DEFAULT_AC),border:"1px solid "+bdr(DEFAULT_AC),borderRadius:8,cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:14,letterSpacing:1,color:"#fff",marginTop:14,transition:"opacity 0.15s"}}>{busy?"AUTHENTICATING…":mode==="login"?"SIGN IN →":"CREATE ACCOUNT →"}</button>{authErr&&<div style={{color:"#ff7878",fontFamily:FF,fontSize:13,textAlign:"center",marginTop:12}}>⚠ {authErr}</div>}<div style={{marginTop:20,fontFamily:FF,fontStyle:"italic",fontSize:11,color:"rgba(255,255,255,0.14)",textAlign:"center"}}>Don't reuse real passwords — demo auth only.</div></div></div>{MobileNotice}</div>);
  
   // ── DESKTOP ──────────────────────────────────────────────────────────────
   return(
-    <div style={{width:"100%",height:"100vh",position:"relative",overflow:"hidden",cursor:dragCursor,fontSize:largeFnt?15:13}}>
+    <div style={{width:"100%",height:"100vh",position:"relative",overflow:"hidden",cursor:dragCursor,fontSize:largeFnt?15:13}}
+      onContextMenu={e=>{
+        // Only fire if the click is on the desktop itself, not on a child
+        // (icons + windows have their own onContextMenu that stopPropagation).
+        if(e.target !== e.currentTarget && !e.target.classList?.contains("di-empty-space")) return;
+        openContextMenu(e, [
+          {icon:"⚙", label:"Open Settings", onClick:()=>openApp("settings")},
+          {icon:"🎨", label:"Change wallpaper", onClick:()=>{openApp("settings");}},
+          {type:"divider"},
+          {icon:"🔔", label:"Notifications"+(unreadCount>0?" ("+unreadCount+" unread)":""), onClick:()=>setNotifsOpen(true)},
+          {icon:"➕", label:"Open app menu", onClick:()=>{setMenuOpen(true);setMenuSrch("");}},
+        ]);
+      }}>
       <style>{CSS}</style>
       <Wallpaper id={wpId} customUrl={customWp}/>
       {toast&&<div style={{position:"fixed",top:14,right:14,zIndex:99999,padding:"10px 18px",background:"rgba(8,10,22,0.97)",border:"1px solid "+AC,borderRadius:9,fontFamily:FFB,fontWeight:600,fontSize:13,color:"#fff",animation:"toast-in 0.24s cubic-bezier(0.16,1,0.3,1)",boxShadow:"0 8px 36px rgba(0,0,0,0.6)"}}>{toast}</div>}
@@ -1035,7 +1321,22 @@ export default function NovaOS(){
         function launch(){if(app.storeApp){if(app.storeApp.newTab)window.open(app.storeApp.url,"_blank");else openApp("browser");}else openApp(app.id);}
         return(
           <div key={app.id} style={{position:"absolute",left:pos.x,top:pos.y,width:ICON_W,zIndex:isDrg?500:2,cursor:isDrg?"grabbing":"grab",userSelect:"none",display:"flex",flexDirection:"column",alignItems:"center",gap:4,padding:"8px 4px",borderRadius:9,background:"rgba(0,0,0,0.1)",border:"1px solid transparent",transition:isDrg?"none":"background 0.18s cubic-bezier(0.4,0,0.2,1), left 0.25s cubic-bezier(0.4,0,0.2,1), top 0.25s cubic-bezier(0.4,0,0.2,1)",boxShadow:isDrg?"0 8px 32px rgba(0,0,0,0.6)":"none"}}
-            className={isDrg?"":"di"} title={app.desc} onPointerDown={e=>onIconMouseDown(e,app.id,allDesktopIcons)} onDoubleClick={launch}>
+            className={isDrg?"":"di"} title={app.desc}
+            onPointerDown={e=>onIconMouseDown(e,app.id,allDesktopIcons)}
+            onDoubleClick={launch}
+            onContextMenu={e=>openContextMenu(e, [
+              {icon:"▶", label:"Open", onClick:launch},
+              ...(app.storeApp ? [{
+                icon:"–", label:"Remove from desktop", danger:true,
+                onClick:()=>{
+                  const cur=data?.installedApps||[];
+                  updateData(p=>({...p,installedApps:cur.filter(id=>id!==app.id)}));
+                  showToast("Removed from desktop");
+                },
+              }] : []),
+              {type:"divider"},
+              {icon:"📋", label:"Copy app name", onClick:()=>{try{navigator.clipboard?.writeText(app.label);showToast("Copied");}catch{}}},
+            ])}>
             <div style={{pointerEvents:"none",display:"flex",alignItems:"center",justifyContent:"center",filter:"drop-shadow(0 2px 6px rgba(0,0,0,0.7))"}}>
               <AppIconDisplay app={app} size={28}/>
             </div>
@@ -1062,7 +1363,7 @@ export default function NovaOS(){
         </div>
         <div style={{padding:"10px 16px",borderTop:"1px solid rgba(255,255,255,0.07)",display:"flex",alignItems:"center",gap:10}}>
           <div style={{width:32,height:32,borderRadius:"50%",background:fill(AC),border:"1.5px solid "+AC,display:"flex",alignItems:"center",justifyContent:"center",fontSize:15,flexShrink:0}}>👤</div>
-          <div style={{flex:1}}><div style={{fontFamily:FFB,fontWeight:600,fontSize:13,color:"#fff"}}>@{user}</div><div style={{fontFamily:FF,fontSize:10,color:"rgba(255,255,255,0.3)"}}>Nova OS v5.3</div></div>
+          <div style={{flex:1}}><div style={{fontFamily:FFB,fontWeight:600,fontSize:13,color:"#fff"}}>@{user}</div><div style={{fontFamily:FF,fontSize:10,color:"rgba(255,255,255,0.3)"}}>Nova OS v6.0</div></div>
           <button onClick={logout} style={{padding:"6px 12px",background:"rgba(200,40,40,0.12)",border:"1px solid rgba(200,40,40,0.3)",borderRadius:6,cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:11,color:"rgba(255,140,140,0.9)"}}>Logout</button>
         </div>
       </div>)}
@@ -1084,8 +1385,8 @@ export default function NovaOS(){
               <button className="wx" onPointerDown={e=>e.stopPropagation()} onClick={e=>{e.stopPropagation();closeWin(win.id);}} style={{width:26,height:26,borderRadius:6,background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.09)",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,color:"rgba(255,255,255,0.5)",transition:"background 0.12s, color 0.12s",flexShrink:0}}>✕</button>
             </div>
             <div style={{flex:1,overflowY:"auto",overflowX:"hidden",padding:18,minWidth:0}}>
-              {win.app==="notes"    &&<NotesApp    data={data} updateData={updateData} showToast={showToast} AC={AC}/>}
-              {win.app==="tasks"    &&<TasksApp    data={data} updateData={updateData} showToast={showToast} AC={AC}/>}
+              {win.app==="notes"    &&<NotesApp    data={data} updateData={updateData} showToast={showToast} AC={AC} openNovaAi={()=>openApp("novaai")}/>}
+              {win.app==="tasks"    &&<TasksApp    data={data} updateData={updateData} showToast={showToast} AC={AC} openNovaAi={()=>openApp("novaai")}/>}
               {win.app==="files"    &&<FilesApp    data={data} updateData={updateData} showToast={showToast}/>}
               {win.app==="paint"    &&<PaintApp    showToast={showToast} AC={AC}/>}
               {win.app==="browser"  &&<BrowserApp  AC={AC}/>}
@@ -1094,14 +1395,14 @@ export default function NovaOS(){
               {win.app==="store"    &&<StoreApp    user={user} data={data} updateData={updateData} showToast={showToast} AC={AC}/>}
               {win.app==="terminal" &&<TerminalApp user={user} AC={AC}/>}
               {win.app==="chat"     &&<ChatApp     user={user} AC={AC}/>}
-              {win.app==="settings" &&<SettingsApp user={user} data={data} updateSettings={updateSettings} showToast={showToast} AC={AC} onCustomWallpaper={handleCustomWallpaper}/>}
+              {win.app==="settings" &&<SettingsApp user={user} data={data} updateSettings={updateSettings} showToast={showToast} AC={AC} onCustomWallpaper={handleCustomWallpaper} onLogout={logout}/>}
               {win.app==="profile"  &&<ProfileApp  user={user} data={data} updateData={updateData} showToast={showToast} AC={AC}/>}
               {win.app==="calculator" &&<CalculatorApp AC={AC}/>}
               {win.app==="clock"      &&<ClockApp AC={AC}/>}
               {win.app==="calendar"   &&<CalendarApp data={data} updateData={updateData} showToast={showToast} AC={AC}/>}
               {win.app==="music"      &&<MusicApp AC={AC} showToast={showToast}/>}
               {win.app==="pdf"        &&<PdfApp AC={AC} showToast={showToast}/>}
-              {win.app==="atmos"      &&<AtmosApp AC={AC} showToast={showToast}/>}
+              {win.app==="atmos"      &&<AtmosApp AC={AC} showToast={showToast} pushNotification={pushNotification} openNovaAi={()=>openApp("novaai")}/>}
               {win.app==="minesweeper"&&<MinesweeperApp AC={AC}/>}
               {win.app==="wordle"     &&<WordleApp AC={AC} showToast={showToast}/>}
               {win.app==="tetris"     &&<TetrisApp AC={AC}/>}
@@ -1115,39 +1416,138 @@ export default function NovaOS(){
       <div style={{position:"fixed",bottom:0,left:0,right:0,height:TASKBAR_H,background:"rgba(9,11,24,0.92)",backdropFilter:"blur(20px)",borderTop:"1px solid rgba(255,255,255,0.07)",display:"flex",alignItems:"center",padding:"0 10px",gap:5,zIndex:9999}}>
         <button className="sb" onClick={()=>{setMenuOpen(o=>!o);setMenuSrch("");}} style={{width:38,height:38,borderRadius:10,background:menuOpen?fill(AC):"rgba(255,255,255,0.07)",border:menuOpen?"1px solid "+bdr(AC):"1px solid rgba(255,255,255,0.09)",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,transition:"all 0.15s",fontSize:17,color:menuOpen?AC:"rgba(255,255,255,0.7)"}}>◈</button>
         <div style={{width:1,height:24,background:"rgba(255,255,255,0.09)",margin:"0 3px"}}/>
-        {wins.map(win=>{const app=APPS.find(a=>a.id===win.app);const isMin=win.state==="minimized";const isTop=wins.length>0&&win.z===Math.max(...wins.map(w=>w.z));return(<button key={win.id} className="tb" onClick={()=>{if(isMin){setWins(ws=>ws.map(w=>w.id===win.id?{...w,state:"normal"}:w));focusWin(win.id);}else if(isTop){setWins(ws=>ws.map(w=>w.id===win.id?{...w,state:"minimized"}:w));}else focusWin(win.id);}} style={{height:36,padding:"0 10px",background:isTop&&!isMin?"rgba(255,255,255,0.12)":"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.09)",borderRadius:7,cursor:"pointer",fontFamily:FF,fontSize:12,fontWeight:600,color:isMin?"rgba(255,255,255,0.45)":"rgba(255,255,255,0.82)",whiteSpace:"nowrap",transition:"all 0.12s",display:"flex",alignItems:"center",gap:6,position:"relative"}}><div style={{pointerEvents:"none",display:"flex",alignItems:"center"}}><AppIconDisplay app={{id:win.app,icon:app?.icon||"📦"}} size={14}/></div>{deviceMode!=="mobile"&&<span>{app?.label}</span>}{!isMin&&<div style={{position:"absolute",bottom:1,left:"50%",transform:"translateX(-50%)",width:isTop?18:6,height:2,borderRadius:2,background:AC,transition:"width 0.2s"}}/>}</button>);})}
+        {wins.map(win=>{const app=APPS.find(a=>a.id===win.app);const isMin=win.state==="minimized";const isTop=wins.length>0&&win.z===Math.max(...wins.map(w=>w.z));return(<button key={win.id} className="tb" onClick={()=>{if(isMin){setWins(ws=>ws.map(w=>w.id===win.id?{...w,state:"normal"}:w));focusWin(win.id);}else if(isTop){setWins(ws=>ws.map(w=>w.id===win.id?{...w,state:"minimized"}:w));}else focusWin(win.id);}} onContextMenu={e=>openContextMenu(e,[{icon:"▶",label:isMin?"Restore":"Focus",onClick:()=>{setWins(ws=>ws.map(w=>w.id===win.id?{...w,state:"normal"}:w));focusWin(win.id);}},{icon:"—",label:"Minimize",onClick:()=>setWins(ws=>ws.map(w=>w.id===win.id?{...w,state:"minimized"}:w)),disabled:isMin},{icon:"⬜",label:win.state==="maximized"?"Restore size":"Maximize",onClick:()=>maximizeWin(win.id)},{type:"divider"},{icon:"✕",label:"Close",danger:true,onClick:()=>closeWin(win.id)}])} style={{height:36,padding:"0 10px",background:isTop&&!isMin?"rgba(255,255,255,0.12)":"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.09)",borderRadius:7,cursor:"pointer",fontFamily:FF,fontSize:12,fontWeight:600,color:isMin?"rgba(255,255,255,0.45)":"rgba(255,255,255,0.82)",whiteSpace:"nowrap",transition:"all 0.12s",display:"flex",alignItems:"center",gap:6,position:"relative"}}><div style={{pointerEvents:"none",display:"flex",alignItems:"center"}}><AppIconDisplay app={{id:win.app,icon:app?.icon||"📦"}} size={14}/></div>{deviceMode!=="mobile"&&<span>{app?.label}</span>}{!isMin&&<div style={{position:"absolute",bottom:1,left:"50%",transform:"translateX(-50%)",width:isTop?18:6,height:2,borderRadius:2,background:AC,transition:"width 0.2s"}}/>}</button>);})}
         <div style={{flex:1}}/>
         {/* Username chip + divider hidden on mobile to save horizontal space — */}
         {/* profile is still reachable via the menu, so this only loses a shortcut. */}
         {deviceMode!=="mobile"&&<div style={{fontFamily:FFB,fontWeight:600,fontSize:12,color:AC,cursor:"pointer"}} onClick={()=>openApp("profile")}>@{user}</div>}
         {deviceMode!=="mobile"&&<div style={{width:1,height:20,background:"rgba(255,255,255,0.09)"}}/>}
+        {/* Notification bell — badge shows unread count, click toggles the panel */}
+        <button className="sb" onClick={()=>setNotifsOpen(o=>!o)} title={unreadCount>0?unreadCount+" unread":"Notifications"} style={{position:"relative",width:30,height:30,borderRadius:7,background:notifsOpen?fill(AC):"none",border:notifsOpen?"1px solid "+bdr(AC):"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,color:notifsOpen?AC:"rgba(255,255,255,0.5)"}}>
+          🔔
+          {unreadCount>0 && <span style={{position:"absolute",top:1,right:1,minWidth:14,height:14,padding:"0 3px",borderRadius:7,background:"#ff5555",color:"#fff",fontFamily:FFB,fontWeight:700,fontSize:9,display:"flex",alignItems:"center",justifyContent:"center",lineHeight:1}}>{unreadCount>9?"9+":unreadCount}</span>}
+        </button>
         <button className="sb" onClick={()=>openApp("settings")} style={{width:30,height:30,borderRadius:7,background:"none",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,color:"rgba(255,255,255,0.45)",transition:"background 0.12s"}}>⚙️</button>
         <div style={{textAlign:"right",cursor:"default"}}>
           <div style={{fontFamily:FFM,fontWeight:500,fontSize:12,color:"rgba(255,255,255,0.78)"}}>{fmtTime(tick)}</div>
           {deviceMode!=="mobile"&&<div style={{fontFamily:FF,fontSize:9,color:"rgba(255,255,255,0.35)"}}>{fmtDate(tick)}</div>}
         </div>
       </div>
+      {/* Notification Center side panel */}
+      {notifsOpen && (
+        <>
+          {/* Click-outside scrim */}
+          <div onClick={()=>setNotifsOpen(false)} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.25)",zIndex:9997}}/>
+          <div style={{position:"fixed",top:0,right:0,bottom:TASKBAR_H,width:"min(340px, 92vw)",background:"rgba(9,11,24,0.97)",backdropFilter:"blur(28px)",borderLeft:"1px solid rgba(255,255,255,0.08)",boxShadow:"-12px 0 40px rgba(0,0,0,0.45)",zIndex:9998,display:"flex",flexDirection:"column",animation:"menu-up 0.22s cubic-bezier(0.4,0,0.2,1)"}}>
+            <div style={{padding:"14px 16px",borderBottom:"1px solid rgba(255,255,255,0.07)",display:"flex",alignItems:"center",gap:8,flexShrink:0}}>
+              <div style={{flex:1,fontFamily:FFB,fontWeight:700,fontSize:14,color:"#fff"}}>🔔 Notifications</div>
+              {notifications.length>0 && <button onClick={clearAllNotifications} style={{padding:"4px 10px",background:"rgba(255,80,80,0.08)",border:"1px solid rgba(255,80,80,0.25)",borderRadius:6,cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:10,color:"rgba(255,130,130,0.85)"}}>Clear all</button>}
+              <button onClick={()=>setNotifsOpen(false)} style={{width:24,height:24,borderRadius:6,background:"none",border:"none",cursor:"pointer",color:"rgba(255,255,255,0.4)",fontSize:14}}>✕</button>
+            </div>
+            <div style={{flex:1,overflowY:"auto",minHeight:0,padding:"8px"}}>
+              {notifications.length===0 ? (
+                <div style={{textAlign:"center",padding:"40px 20px",color:"rgba(255,255,255,0.3)",fontStyle:"italic",fontSize:12,fontFamily:FF}}>
+                  No notifications yet.<br/><span style={{fontSize:10,opacity:0.65}}>NWS alerts and other important events will appear here.</span>
+                </div>
+              ) : notifications.map(n=>{
+                const kindColor = n.kind==="alert"?"#ff8b8b":n.kind==="warning"?"#ffcc66":n.kind==="success"?"#4cef90":AC;
+                const kindIcon  = n.kind==="alert"?"⚠":n.kind==="warning"?"⚠":n.kind==="success"?"✓":"●";
+                const age = Date.now()-n.ts;
+                const ageStr = age<60000?"just now":age<3600000?Math.floor(age/60000)+"m ago":age<86400000?Math.floor(age/3600000)+"h ago":new Date(n.ts).toLocaleDateString();
+                return(
+                  <div key={n.id} style={{padding:"11px 13px",marginBottom:5,background:n.read?"rgba(255,255,255,0.025)":"rgba(255,255,255,0.06)",border:"1px solid "+(n.read?"rgba(255,255,255,0.05)":"rgba(255,255,255,0.1)"),borderRadius:8,position:"relative"}}>
+                    <div style={{display:"flex",alignItems:"flex-start",gap:8}}>
+                      <span style={{color:kindColor,fontSize:13,lineHeight:1.4,flexShrink:0}}>{kindIcon}</span>
+                      <div style={{flex:1,minWidth:0}}>
+                        <div style={{fontFamily:FFB,fontWeight:600,fontSize:12,color:n.read?"rgba(255,255,255,0.78)":"#fff",lineHeight:1.4}}>{n.title}</div>
+                        {n.body && <div style={{fontSize:11,color:"rgba(255,255,255,0.55)",marginTop:3,lineHeight:1.5,wordBreak:"break-word"}}>{n.body}</div>}
+                        <div style={{fontSize:10,fontFamily:FFM,color:"rgba(255,255,255,0.3)",marginTop:5}}>{ageStr}</div>
+                      </div>
+                      <button onClick={()=>dismissNotification(n.id)} style={{background:"none",border:"none",cursor:"pointer",color:"rgba(255,255,255,0.3)",fontSize:11,padding:"2px 5px",lineHeight:1,flexShrink:0}}>✕</button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </>
+      )}
+      {ctxMenu && <ContextMenu x={ctxMenu.x} y={ctxMenu.y} items={ctxMenu.items} onClose={closeContextMenu} AC={AC}/>}
       {MobileNotice}
     </div>
   );
 }
  
 // ─── APP COMPONENTS ───────────────────────────────────────────────────────────
-function NotesApp({data,updateData,showToast,AC}){
+function NotesApp({data,updateData,showToast,AC,openNovaAi}){
   const [title,setTitle]=useState("");const [body,setBody]=useState("");
   function add(){if(!title.trim())return;updateData(p=>({...p,notes:[{id:Date.now(),title:title.trim(),body:body.trim(),ts:Date.now()},...(p.notes||[])]}));setTitle("");setBody("");showToast("Note saved ✓");}
   function del(id){updateData(p=>({...p,notes:p.notes.filter(n=>n.id!==id)}));}
   const notes=data?.notes||[];
-  return(<div style={{width:"100%",fontFamily:FF}}><div style={SEC}>Notes</div><div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:16}}><input value={title} onChange={e=>setTitle(e.target.value)} placeholder="Title…" style={INP} onKeyDown={e=>e.key==="Enter"&&add()}/><textarea value={body} onChange={e=>setBody(e.target.value)} placeholder="Write something…" style={{...INP,minHeight:80}}/><button onClick={add} style={{padding:"9px",background:fill(AC),border:"1px solid "+bdr(AC),borderRadius:7,cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:12,color:AC}}>+ Add Note</button></div>{notes.length===0&&<div style={{color:"rgba(255,255,255,0.2)",fontSize:12,textAlign:"center",padding:"22px 0",fontStyle:"italic"}}>No notes yet</div>}{notes.map(n=>(<div key={n.id} style={{padding:"11px 13px",marginBottom:7,background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:8,position:"relative"}}><div style={{fontWeight:600,fontSize:14,color:"rgba(255,255,255,0.92)",paddingRight:26,marginBottom:n.body?3:0}}>{n.title}</div>{n.body&&<div style={{fontSize:12,color:"rgba(255,255,255,0.5)",lineHeight:1.6,whiteSpace:"pre-wrap"}}>{n.body}</div>}<div style={{fontFamily:FFM,fontSize:9,color:"rgba(255,255,255,0.18)",marginTop:5}}>{new Date(n.ts).toLocaleDateString()}</div><button className="dl" onClick={()=>del(n.id)} style={{position:"absolute",top:10,right:10,background:"none",border:"none",cursor:"pointer",color:"rgba(255,80,80,0.3)",fontSize:13,transition:"color 0.12s"}}>✕</button></div>))}</div>);
+  // AI actions operate on the current draft (title + body). Insert the AI
+  // button row above the form so it's discoverable but doesn't crowd the input.
+  return(
+    <div style={{width:"100%",fontFamily:FF}}>
+      <div style={{display:"flex",alignItems:"center",gap:9,marginBottom:12}}>
+        <div style={{...SEC,marginBottom:0,flex:1}}>Notes</div>
+        <AiAssist AC={AC} openNovaAi={openNovaAi} actions={[
+          {icon:"✍",label:"Improve writing",prompt:"Improve the writing of the following text without changing its meaning. Output ONLY the rewritten text, no commentary:"},
+          {icon:"📝",label:"Summarize in 2–3 sentences",prompt:"Summarize the following text in 2–3 concise sentences:"},
+          {icon:"➕",label:"Continue writing",prompt:"Continue this text seamlessly from where it leaves off, matching the tone and style. Output only the continuation:"},
+          {icon:"💡",label:"Suggest ideas",prompt:"Read the following text and suggest 3–5 specific ideas or directions the author could expand on:"},
+        ]} getContext={()=>{
+          const t=title.trim(); const b=body.trim();
+          if(!t && !b) return "(The user has not written anything yet — say so and ask what they want to write about.)";
+          return (t?"Title: "+t+"\n\n":"")+(b||"(empty body)");
+        }}/>
+      </div>
+      <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:16}}>
+        <input value={title} onChange={e=>setTitle(e.target.value)} placeholder="Title…" style={INP} onKeyDown={e=>e.key==="Enter"&&add()}/>
+        <textarea value={body} onChange={e=>setBody(e.target.value)} placeholder="Write something…" style={{...INP,minHeight:80}}/>
+        <button onClick={add} style={{padding:"9px",background:fill(AC),border:"1px solid "+bdr(AC),borderRadius:7,cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:12,color:AC}}>+ Add Note</button>
+      </div>
+      {notes.length===0&&<div style={{color:"rgba(255,255,255,0.2)",fontSize:12,textAlign:"center",padding:"22px 0",fontStyle:"italic"}}>No notes yet</div>}
+      {notes.map(n=>(
+        <div key={n.id} style={{padding:"11px 13px",marginBottom:7,background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:8,position:"relative"}}>
+          <div style={{fontWeight:600,fontSize:14,color:"rgba(255,255,255,0.92)",paddingRight:26,marginBottom:n.body?3:0}}>{n.title}</div>
+          {n.body&&<div style={{fontSize:12,color:"rgba(255,255,255,0.5)",lineHeight:1.6,whiteSpace:"pre-wrap"}}>{n.body}</div>}
+          <div style={{fontFamily:FFM,fontSize:9,color:"rgba(255,255,255,0.18)",marginTop:5}}>{new Date(n.ts).toLocaleDateString()}</div>
+          <button className="dl" onClick={()=>del(n.id)} style={{position:"absolute",top:10,right:10,background:"none",border:"none",cursor:"pointer",color:"rgba(255,80,80,0.3)",fontSize:13,transition:"color 0.12s"}}>✕</button>
+        </div>
+      ))}
+    </div>
+  );
 }
  
-function TasksApp({data,updateData,showToast,AC}){
+function TasksApp({data,updateData,showToast,AC,openNovaAi}){
   const [input,setInput]=useState("");
   function add(){if(!input.trim())return;updateData(p=>({...p,tasks:[...(p.tasks||[]),{id:Date.now(),text:input.trim(),done:false}]}));setInput("");showToast("Task added ✓");}
   function toggle(id){updateData(p=>({...p,tasks:p.tasks.map(t=>t.id===id?{...t,done:!t.done}:t)}));}
   function del(id){updateData(p=>({...p,tasks:p.tasks.filter(t=>t.id!==id)}));}
   const tasks=data?.tasks||[];const pending=tasks.filter(t=>!t.done);const done=tasks.filter(t=>t.done);
-  return(<div style={{width:"100%",fontFamily:FF}}><div style={SEC}>Tasks</div><div style={{display:"flex",gap:7,marginBottom:16}}><input value={input} onChange={e=>setInput(e.target.value)} placeholder="Add a task…" style={{...INP,flex:1}} onKeyDown={e=>e.key==="Enter"&&add()}/><button onClick={add} style={{width:40,background:fill(AC),border:"1px solid "+bdr(AC),borderRadius:7,cursor:"pointer",fontFamily:FFB,fontWeight:700,fontSize:18,color:AC}}>+</button></div>{tasks.length===0&&<div style={{color:"rgba(255,255,255,0.2)",fontSize:12,textAlign:"center",padding:"22px 0",fontStyle:"italic"}}>All clear!</div>}{pending.map(t=><TRow key={t.id} t={t} onToggle={toggle} onDel={del} AC={AC}/>)}{done.length>0&&<><div style={{...SEC,marginTop:14}}>Done ({done.length})</div>{done.map(t=><TRow key={t.id} t={t} onToggle={toggle} onDel={del} AC={AC}/>)}</>}</div>);
+  return(
+    <div style={{width:"100%",fontFamily:FF}}>
+      <div style={{display:"flex",alignItems:"center",gap:9,marginBottom:12}}>
+        <div style={{...SEC,marginBottom:0,flex:1}}>Tasks</div>
+        <AiAssist AC={AC} openNovaAi={openNovaAi} actions={[
+          {icon:"🎯",label:"Prioritize my tasks",prompt:"Rank these tasks from most to least important for someone trying to make progress. For each, give a one-line reason. Output as a numbered list:"},
+          {icon:"🧩",label:"Break down a complex task",prompt:"Look at this task list and find the one that's vaguest or biggest. Break it into 3-5 concrete sub-tasks I could add. Format as a bulleted list:"},
+          {icon:"📅",label:"Suggest a day plan",prompt:"Based on these tasks, propose a realistic day plan (morning / afternoon / evening blocks) for working through them. Keep it brief:"},
+        ]} getContext={()=>{
+          if(tasks.length===0) return "(No tasks yet — say so and ask the user what they're working on.)";
+          return "Pending:\n" + (pending.map((t,i)=>(i+1)+". "+t.text).join("\n") || "(none)")
+               + (done.length ? "\n\nAlready done:\n" + done.map((t,i)=>"- "+t.text).join("\n") : "");
+        }}/>
+      </div>
+      <div style={{display:"flex",gap:7,marginBottom:16}}>
+        <input value={input} onChange={e=>setInput(e.target.value)} placeholder="Add a task…" style={{...INP,flex:1}} onKeyDown={e=>e.key==="Enter"&&add()}/>
+        <button onClick={add} style={{width:40,background:fill(AC),border:"1px solid "+bdr(AC),borderRadius:7,cursor:"pointer",fontFamily:FFB,fontWeight:700,fontSize:18,color:AC}}>+</button>
+      </div>
+      {tasks.length===0&&<div style={{color:"rgba(255,255,255,0.2)",fontSize:12,textAlign:"center",padding:"22px 0",fontStyle:"italic"}}>All clear!</div>}
+      {pending.map(t=><TRow key={t.id} t={t} onToggle={toggle} onDel={del} AC={AC}/>)}
+      {done.length>0&&<><div style={{...SEC,marginTop:14}}>Done ({done.length})</div>{done.map(t=><TRow key={t.id} t={t} onToggle={toggle} onDel={del} AC={AC}/>)}</>}
+    </div>
+  );
 }
 function TRow({t,onToggle,onDel,AC}){return(<div style={{display:"flex",alignItems:"center",gap:9,padding:"8px 11px",marginBottom:4,background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.07)",borderRadius:7,opacity:t.done?0.4:1,transition:"opacity 0.2s"}}><div onClick={()=>onToggle(t.id)} style={{width:17,height:17,borderRadius:5,border:"1.5px solid "+(t.done?AC:"rgba(255,255,255,0.22)"),background:t.done?AC:"transparent",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,transition:"all 0.14s"}}>{t.done&&<span style={{color:"#000",fontSize:9,fontWeight:900}}>✓</span>}</div><span style={{flex:1,fontFamily:FF,fontSize:13,color:"rgba(255,255,255,0.88)",textDecoration:t.done?"line-through":"none"}}>{t.text}</span><button className="dl" onClick={()=>onDel(t.id)} style={{background:"none",border:"none",cursor:"pointer",color:"rgba(255,80,80,0.28)",fontSize:12,padding:0,transition:"color 0.12s"}}>✕</button></div>);}
  
@@ -1724,7 +2124,7 @@ function StoreApp({user,data,updateData,showToast,AC}){
     <div style={{width:"100%",fontFamily:FF}}>
       {/* Header + search */}
       <div style={{marginBottom:12}}>
-        <div style={{fontFamily:FFB,fontWeight:700,fontSize:20,color:"#fff",marginBottom:8}}>🏪 Nova Store 5.3</div>
+        <div style={{fontFamily:FFB,fontWeight:700,fontSize:20,color:"#fff",marginBottom:8}}>🏪 Nova Store 6.0</div>
         <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search all apps…" style={INP}/>
       </div>
  
@@ -1865,16 +2265,25 @@ function StoreApp({user,data,updateData,showToast,AC}){
 }
  
 function TerminalApp({user,AC}){
-  const [lines,setLines]=useState([{t:"out",v:"NOVA Terminal v5.3.0"},{t:"out",v:"Session: "+user+" — "+new Date().toLocaleString()},{t:"out",v:'Type "help" for commands.'},{t:"gap"}]);
+  const [lines,setLines]=useState([{t:"out",v:"NOVA Terminal v6.0.0"},{t:"out",v:"Session: "+user+" — "+new Date().toLocaleString()},{t:"out",v:'Type "help" for commands.'},{t:"gap"}]);
   const [cmd,setCmd]=useState("");const [hist,setHist]=useState([]);const [hIdx,setHIdx]=useState(-1);const endRef=useRef(null);
   useEffect(()=>{endRef.current?.scrollIntoView({behavior:"smooth"});},[lines]);
-  const CMDS={help:()=>["Commands: help, whoami, date, echo <text>, version, sysinfo, ls, neofetch, clear"],whoami:()=>[user],date:()=>[new Date().toLocaleString()],version:()=>["NOVA OS v5.3.0 — Nova Systems Inc."],sysinfo:()=>["CPU: Nova Virtual Core™","RAM: 8.0 GB","Storage: Firebase Firestore","Resolution: "+window.innerWidth+"x"+window.innerHeight,"Uptime: "+Math.floor(performance.now()/1000)+"s"],ls:()=>["notes/ tasks/ files/ paint/ browser/ snake/ 2048/ store/ terminal/ settings/"],neofetch:()=>[" ███╗   ██╗ ██████╗ ██╗   ██╗ █████╗ "," ████╗  ██║██╔═══██╗██║   ██║██╔══██╗"," ██╔██╗ ██║██║   ██║██║   ██║███████║"," ██║╚██╗██║██║   ██║╚██╗ ██╔╝██╔══██║"," ██║ ╚████║╚██████╔╝ ╚████╔╝ ██║  ██║","OS: Nova v5.3  User: "+user,"Widgets: Clock·Weather·Notes·Tasks·Calendar·SysInfo"],echo:args=>[args.join(" ")||"(empty)"],clear:()=>"__clear__"};
+  const CMDS={help:()=>["Commands: help, whoami, date, echo <text>, version, sysinfo, ls, neofetch, clear"],whoami:()=>[user],date:()=>[new Date().toLocaleString()],version:()=>["NOVA OS v6.0.0 — Nova Systems Inc."],sysinfo:()=>["CPU: Nova Virtual Core™","RAM: 8.0 GB","Storage: Firebase Firestore","Resolution: "+window.innerWidth+"x"+window.innerHeight,"Uptime: "+Math.floor(performance.now()/1000)+"s"],ls:()=>["notes/ tasks/ files/ paint/ browser/ snake/ 2048/ store/ terminal/ settings/"],neofetch:()=>[" ███╗   ██╗ ██████╗ ██╗   ██╗ █████╗ "," ████╗  ██║██╔═══██╗██║   ██║██╔══██╗"," ██╔██╗ ██║██║   ██║██║   ██║███████║"," ██║╚██╗██║██║   ██║╚██╗ ██╔╝██╔══██║"," ██║ ╚████║╚██████╔╝ ╚████╔╝ ██║  ██║","OS: Nova v6.0  User: "+user,"Widgets: Clock·Weather·Notes·Tasks·Calendar·SysInfo"],echo:args=>[args.join(" ")||"(empty)"],clear:()=>"__clear__"};
   function run(){const raw=cmd.trim();if(!raw)return;const parts=raw.split(" ");const c=parts[0].toLowerCase();const args=parts.slice(1);setHist(h=>[raw,...h]);setHIdx(-1);setCmd("");const nl=[...lines,{t:"in",v:raw}];const h=CMDS[c];if(!h){nl.push({t:"err",v:c+': not found. Try "help".'});}else{const r=h(args);if(r==="__clear__"){setLines([]);return;}r.forEach(v=>nl.push({t:"out",v}));}nl.push({t:"gap"});setLines(nl);}
   function onKey(e){if(e.key==="Enter"){run();return;}if(e.key==="ArrowUp"){const i=Math.min(hIdx+1,hist.length-1);setHIdx(i);if(hist[i])setCmd(hist[i]);}if(e.key==="ArrowDown"){const i=Math.max(hIdx-1,-1);setHIdx(i);setCmd(i===-1?"":(hist[i]||""));}}
   return(<div style={{width:"100%",fontFamily:FFM}}><div style={{background:"#030407",borderRadius:8,padding:"13px 15px",height:"100%",minHeight:280,overflowY:"auto",border:"1px solid rgba(255,255,255,0.07)"}}>{lines.map((l,i)=><div key={i} style={{color:l.t==="in"?AC:l.t==="err"?"#ff7878":"rgba(180,210,255,0.58)",fontSize:12,marginBottom:l.t==="gap"?5:2,minHeight:l.t==="gap"?4:undefined,whiteSpace:"pre"}}>{l.t==="in"?"$ "+l.v:l.t==="gap"?null:l.v}</div>)}<div style={{display:"flex",alignItems:"center"}}><span style={{color:"#4cef90",marginRight:7,fontSize:12}}>$</span><input value={cmd} onChange={e=>setCmd(e.target.value)} onKeyDown={onKey} autoFocus style={{flex:1,background:"none",border:"none",outline:"none",color:AC,fontFamily:FFM,fontSize:12,caretColor:AC}}/></div><div ref={endRef}/></div></div>);
 }
  
-function SettingsApp({user,data,updateSettings,showToast,AC,onCustomWallpaper}){
+function SettingsApp({user,data,updateSettings,showToast,AC,onCustomWallpaper,onLogout}){
+  // Sound preferences live in localStorage (read inside playSound on each call)
+  // so they take effect instantly without a Firestore round-trip. We mirror
+  // them into local state here purely so the slider/toggle re-render.
+  const [soundCfg, setSoundCfgState] = useState(()=>getSoundConfig());
+  function updateSoundCfg(patch){
+    const next = {...soundCfg, ...patch};
+    setSoundCfgState(next);
+    setSoundConfig(next);
+  }
   const settings=data?.settings||{};const fileRef=useRef(null);
   function handleUpload(e){const file=e.target.files[0];if(!file)return;if(file.size>8*1024*1024){showToast("File too large (max 8MB)");return;}const reader=new FileReader();reader.onload=ev=>{const img=new Image();img.onload=()=>{const canvas=document.createElement("canvas");const MAX=900;const ratio=Math.min(MAX/img.width,MAX/img.height,1);canvas.width=Math.round(img.width*ratio);canvas.height=Math.round(img.height*ratio);canvas.getContext("2d").drawImage(img,0,0,canvas.width,canvas.height);onCustomWallpaper(canvas.toDataURL("image/jpeg",0.72));};img.src=ev.target.result;};reader.readAsDataURL(file);e.target.value="";}
   const wpId=settings.wallpaper||data?.wallpaper||"mesh";
@@ -1920,8 +2329,25 @@ function SettingsApp({user,data,updateSettings,showToast,AC,onCustomWallpaper}){
         })}
       </div>
       <div style={{fontSize:10,color:"rgba(255,255,255,0.22)",marginBottom:22,fontStyle:"italic"}}>Resize the browser window to test — Nova will re-detect on the fly.</div>
-      <div style={{...SEC,marginTop:0}}>Account</div>
-      <div style={{padding:"11px 14px",background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:8}}><div style={{fontSize:11,color:"rgba(255,255,255,0.35)",marginBottom:2}}>Signed in as</div><div style={{fontFamily:FFB,fontWeight:600,fontSize:16,color:"#fff"}}>@{user}</div></div>
+
+      <div style={SEC}>Sounds</div>
+      <Toggle label="System sounds" value={soundCfg.enabled} onChange={v=>updateSoundCfg({enabled:v})} ac={AC}/>
+      <div style={{display:"flex",alignItems:"center",gap:10,marginTop:10,marginBottom:8,opacity:soundCfg.enabled?1:0.4,pointerEvents:soundCfg.enabled?"auto":"none"}}>
+        <span style={{fontSize:11,fontFamily:FFM,color:"rgba(255,255,255,0.4)",width:54}}>Volume</span>
+        <input type="range" min={0} max={1} step={0.05} value={soundCfg.volume} onChange={e=>updateSoundCfg({volume:+e.target.value})} style={{flex:1,accentColor:AC}}/>
+        <span style={{fontSize:11,fontFamily:FFM,color:"rgba(255,255,255,0.4)",width:32}}>{Math.round(soundCfg.volume*100)}%</span>
+      </div>
+      <div style={{display:"flex",flexWrap:"wrap",gap:5,marginBottom:22,opacity:soundCfg.enabled?1:0.4}}>
+        {["startup","login","logout","notification","appLaunch","windowOpen","windowClose","toast","error"].map(s=>(
+          <button key={s} onClick={()=>playSound(s)} style={{padding:"4px 10px",background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:6,cursor:"pointer",fontFamily:FFM,fontWeight:500,fontSize:10,color:"rgba(255,255,255,0.55)"}}>▶ {s}</button>
+        ))}
+      </div>
+
+      <div style={SEC}>Account</div>
+      <div style={{padding:"11px 14px",background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:8,marginBottom:8}}><div style={{fontSize:11,color:"rgba(255,255,255,0.35)",marginBottom:2}}>Signed in as</div><div style={{fontFamily:FFB,fontWeight:600,fontSize:16,color:"#fff"}}>@{user}</div></div>
+      {onLogout && (
+        <button onClick={onLogout} style={{width:"100%",padding:"10px",background:"rgba(255,80,80,0.08)",border:"1px solid rgba(255,80,80,0.3)",borderRadius:8,cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:12,color:"#ff8b8b"}}>Sign Out</button>
+      )}
     </div>
   );
 }
@@ -2735,7 +3161,7 @@ const ALERT_COLOR = {
   Minor:    {bg:"rgba(100,200,255,0.12)",border:"rgba(100,200,255,0.4)", fg:"#88c8ff"},
 };
 
-function AtmosApp({AC,showToast}){
+function AtmosApp({AC,showToast,pushNotification,openNovaAi}){
   const [query,setQuery]=useState("");
   const [suggestions,setSuggestions]=useState([]);    // array of suggestion objects
   const [openSuggest,setOpenSuggest]=useState(false);
@@ -2804,6 +3230,18 @@ function AtmosApp({AC,showToast}){
               speak(summary);
             }
           }, 3100);
+          // Mirror each active alert into the persistent notification center
+          // so the user can revisit them later via the bell icon.
+          if(pushNotification){
+            for(const a of parsed){
+              pushNotification({
+                kind: (a.severity==="Extreme"||a.severity==="Severe")?"alert":"warning",
+                title: a.event + " — " + s.label,
+                body: a.headline || a.description?.slice(0,180) || "",
+                appId: "atmos",
+              });
+            }
+          }
         }
       }catch{/* alerts are optional — don't surface error */}
     }
@@ -2882,7 +3320,17 @@ function AtmosApp({AC,showToast}){
           <>
             {/* Current conditions */}
             <div style={{padding:"16px 18px",background:"linear-gradient(135deg,"+fill(AC)+",rgba(255,255,255,0.03))",border:"1px solid "+bdr(AC),borderRadius:12}}>
-              <div style={{fontSize:11,fontFamily:FFM,color:"rgba(255,255,255,0.55)",letterSpacing:1,marginBottom:4}}>CURRENT · {loc.label}</div>
+              <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:4}}>
+                <div style={{flex:1,fontSize:11,fontFamily:FFM,color:"rgba(255,255,255,0.55)",letterSpacing:1}}>CURRENT · {loc.label}</div>
+                <AiAssist AC={AC} openNovaAi={openNovaAi} actions={[
+                  {icon:"🧠",label:"Explain this weather",prompt:"In 2-3 sentences, explain what this weather means in plain English for someone planning their day:"},
+                  {icon:"👕",label:"What should I wear?",prompt:"Based on this weather, suggest practical clothing recommendations:"},
+                  {icon:"⚠",label:"Any safety concerns?",prompt:"Briefly note any safety or health considerations from this weather (heat, cold, UV, air quality, etc.):"},
+                ]} getContext={()=>{
+                  const c=forecast.current;
+                  return `Location: ${loc.label}\nCurrent: ${Math.round(c.temp)}${forecast.units.temp}, ${wmoLabel(c.code)}\nFeels like: ${Math.round(c.feelsLike)}${forecast.units.temp}\nHumidity: ${c.humidity}%\nWind: ${Math.round(c.wind)} ${forecast.units.wind}\n\n7-day forecast highs/lows: ${forecast.days.map(d=>Math.round(d.high)+"/"+Math.round(d.low)).join(", ")}`;
+                }}/>
+              </div>
               <div style={{display:"flex",alignItems:"center",gap:14,marginTop:4}}>
                 <div style={{fontSize:62,lineHeight:1}}>{wmoIcon(forecast.current.code)}</div>
                 <div style={{flex:1}}>

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { playTone, speak, cancelSpeech } from '../audio.js';
+import { playTone, speak, cancelSpeech, playSound, getSoundConfig, setSoundConfig, SOUND_NAMES } from '../audio.js';
 
 // Build a minimal AudioContext mock that records calls so we can assert
 // playTone wired everything correctly without needing a real audio device
@@ -224,5 +224,134 @@ describe('cancelSpeech', () => {
   it('no-ops without speechSynthesis available', () => {
     delete window.speechSynthesis;
     expect(() => cancelSpeech()).not.toThrow();
+  });
+});
+
+// ── Sound preferences ──────────────────────────────────────────────────
+
+describe('getSoundConfig / setSoundConfig', () => {
+  beforeEach(() => { try { localStorage.clear(); } catch {} });
+
+  it('defaults to enabled + 0.6 volume when nothing saved', () => {
+    const cfg = getSoundConfig();
+    expect(cfg.enabled).toBe(true);
+    expect(cfg.volume).toBeCloseTo(0.6);
+  });
+
+  it('round-trips through localStorage', () => {
+    setSoundConfig({ enabled: false, volume: 0.3 });
+    const cfg = getSoundConfig();
+    expect(cfg.enabled).toBe(false);
+    expect(cfg.volume).toBeCloseTo(0.3);
+  });
+
+  it('clamps volume into 0..1', () => {
+    setSoundConfig({ volume: 5 });
+    expect(getSoundConfig().volume).toBe(1);
+    setSoundConfig({ volume: -3 });
+    expect(getSoundConfig().volume).toBe(0);
+  });
+
+  it('survives a corrupt localStorage value', () => {
+    try { localStorage.setItem('nova-sounds', '{not json'); } catch {}
+    const cfg = getSoundConfig();
+    expect(cfg.enabled).toBe(true);
+    expect(cfg.volume).toBeCloseTo(0.6);
+  });
+});
+
+describe('SOUND_NAMES', () => {
+  it('includes the core system sounds we promised', () => {
+    expect(SOUND_NAMES).toContain('notification');
+    expect(SOUND_NAMES).toContain('startup');
+    expect(SOUND_NAMES).toContain('login');
+    expect(SOUND_NAMES).toContain('logout');
+    expect(SOUND_NAMES).toContain('error');
+    expect(SOUND_NAMES).toContain('windowOpen');
+    expect(SOUND_NAMES).toContain('windowClose');
+    expect(SOUND_NAMES).toContain('appLaunch');
+    expect(SOUND_NAMES).toContain('toast');
+  });
+});
+
+describe('playSound', () => {
+  let originalAC;
+  beforeEach(() => {
+    originalAC = window.AudioContext;
+    try { localStorage.clear(); } catch {}
+  });
+  afterEach(() => {
+    window.AudioContext = originalAC;
+    vi.restoreAllMocks();
+  });
+
+  function installMockAC() {
+    const oscNodes = [];
+    class MockOsc {
+      constructor() {
+        this.type = ""; this.frequency = { value: 0 };
+        this.connect = vi.fn(function () { return this; });
+        this.start = vi.fn(); this.stop = vi.fn(); this.onended = null;
+        oscNodes.push(this);
+      }
+    }
+    class MockGain {
+      constructor() {
+        this.gain = {
+          setValueAtTime: vi.fn(),
+          linearRampToValueAtTime: vi.fn(),
+          exponentialRampToValueAtTime: vi.fn(),
+        };
+        this.connect = vi.fn(function () { return this; });
+      }
+    }
+    class MockAC {
+      constructor() { this.currentTime = 0; this.destination = {}; this.state = "running"; }
+      createOscillator() { return new MockOsc(); }
+      createGain() { return new MockGain(); }
+      resume() { return Promise.resolve(); }
+      close() { return Promise.resolve(); }
+    }
+    window.AudioContext = MockAC;
+    return { oscNodes };
+  }
+
+  it('schedules at least one oscillator for a known sound', () => {
+    const { oscNodes } = installMockAC();
+    playSound('notification');
+    expect(oscNodes.length).toBeGreaterThan(0);
+  });
+
+  it('schedules multiple oscillators for layered sounds (startup arpeggio)', () => {
+    const { oscNodes } = installMockAC();
+    playSound('startup');
+    // startup has 4 notes
+    expect(oscNodes.length).toBe(4);
+  });
+
+  it('does nothing when sounds are disabled in config', () => {
+    const { oscNodes } = installMockAC();
+    setSoundConfig({ enabled: false });
+    playSound('notification');
+    expect(oscNodes.length).toBe(0);
+  });
+
+  it('does nothing when volume is zero', () => {
+    const { oscNodes } = installMockAC();
+    setSoundConfig({ volume: 0 });
+    playSound('notification');
+    expect(oscNodes.length).toBe(0);
+  });
+
+  it('does nothing for an unknown sound name', () => {
+    const { oscNodes } = installMockAC();
+    playSound('totally-made-up');
+    expect(oscNodes.length).toBe(0);
+  });
+
+  it('no-ops when AudioContext is unavailable', () => {
+    delete window.AudioContext;
+    delete window.webkitAudioContext;
+    expect(() => playSound('notification')).not.toThrow();
   });
 });
