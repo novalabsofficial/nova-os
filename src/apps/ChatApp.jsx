@@ -4,6 +4,7 @@ import { fill, bdr, hexRgb } from "../lib/format.js";
 import { autoModerate, isAdmin } from "../lib/moderation.js";
 import { doc, getDoc, setDoc, updateDoc, deleteDoc, collection, addDoc, query, orderBy, limit, onSnapshot, serverTimestamp } from "firebase/firestore";
 import { firestoreDb } from "../firebase.js";
+import { getDbUid } from "../lib/db.js";
 
 export function ChatApp({ user, AC }) {
   const [messages,  setMessages]  = useState([]);
@@ -52,8 +53,12 @@ export function ChatApp({ user, AC }) {
           messages.map(m => deleteDoc(doc(firestoreDb, "nova_chat", m.id)))
         );
       }
+      // v6.3: stamp every message with the sender's Firebase Auth uid so
+      // security rules can verify ownership for the delete path. The
+      // username `user` stays for display (@mentions, color hash).
       await addDoc(collection(firestoreDb, "nova_chat"), {
         user,
+        uid: getDbUid(),
         text,
         ts: Date.now(),
       });

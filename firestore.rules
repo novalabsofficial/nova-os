@@ -1,0 +1,154 @@
+rules_version = '2';
+
+// Nova OS v6.3 Firestore security rules
+// ─────────────────────────────────────────────────────────────────────────
+//
+// Authentication: Firebase Auth (Email/Password). Synthesized emails follow
+// the pattern `<username>@nova.local`. The Auth uid is the source of truth
+// for ownership; usernames are display-only.
+//
+// Collections covered:
+//   nova_storage     — per-user data docs (notes, tasks, settings, wallpaper)
+//   nova_chat        — global real-time chat
+//   nova_user_apps   — community-submitted app entries for the Store
+//   nova_ratings     — per-user-per-app star ratings
+//   nova_mods        — moderator allowlist (managed manually via console)
+//
+// Mod check: `isMod()` reads from /nova_mods/{uid}. To grant someone mod
+// status, manually create a doc at nova_mods/<their-uid> via the Firebase
+// Console. To revoke, delete the doc.
+//
+// Legacy-migration window: docs in nova_storage that still carry a
+// `password` field (i.e. haven't been upgraded to Firebase Auth yet) are
+// readable without auth so the migration handshake can verify the password.
+// Once the user logs in for the first time post-6.3, the password field is
+// removed and only the owner's uid can read/write the doc thereafter.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ── helpers ─────────────────────────────────────────────────────────
+    function signedIn()      { return request.auth != null; }
+    function ownUid(field)   { return signedIn() && resource.data[field] == request.auth.uid; }
+    function willOwnUid(field){ return signedIn() && request.resource.data[field] == request.auth.uid; }
+    function isMod() {
+      return signedIn() && exists(/databases/$(database)/documents/nova_mods/$(request.auth.uid));
+    }
+
+    // ── per-user data ────────────────────────────────────────────────────
+    // nova_storage holds docs like:
+    //   user_<username>_data
+    //   user_<username>_iconpos
+    //   user_<username>_wpimg     (base64 custom wallpaper)
+    //   user_<username>_pw        (LEGACY — plaintext pw, deleted on migration)
+    //
+    // Modern (post-6.3) docs carry a `uid` field; legacy docs carry a
+    // `value` containing the plaintext password. Reads of legacy docs stay
+    // open during the migration window so the auth handshake works.
+    match /nova_storage/{docId} {
+      // Reads:
+      //   - signed-in owner reads their own (uid-stamped) docs (steady state)
+      //   - unauth read of legacy *_pw docs so the migration handshake can
+      //     verify the plaintext password before signing the user in
+      //   - signed-in read of *unstamped* legacy docs so the migration can
+      //     load data/iconpos/wpimg before re-stamping them with the new uid.
+      //     This branch becomes a no-op once every user logs in once post-6.3.
+      allow read: if
+        (signedIn() && resource.data.uid == request.auth.uid) ||
+        (docId.matches('user_.*_pw')) ||
+        (signedIn() && !('uid' in resource.data));
+
+      // Creates: any signed-in user can create their own user docs, as long
+      // as the new doc is stamped with their uid.
+      allow create: if willOwnUid('uid');
+
+      // Updates: only the doc's owner, or a signed-in user claiming a
+      // previously-unstamped legacy doc (must stamp it with their own uid
+      // in the write), or a mod.
+      allow update: if
+        (signedIn() && resource.data.uid == request.auth.uid) ||
+        (signedIn() && !('uid' in resource.data) && request.resource.data.uid == request.auth.uid) ||
+        isMod();
+
+      // Deletes: owner, mod, or the migration handshake removing its own
+      // legacy *_pw doc (the docId hardcodes the username and the migration
+      // just verified the password client-side).
+      allow delete: if
+        (signedIn() && resource.data.uid == request.auth.uid) ||
+        isMod() ||
+        (signedIn() && docId.matches('user_.*_pw'));
+    }
+
+    // ── global chat ──────────────────────────────────────────────────────
+    match /nova_chat/{msgId} {
+      // Any signed-in user can read all chat messages.
+      allow read: if signedIn();
+
+      // Creating a message: must stamp own uid, can't impersonate.
+      // The 120-message cap and per-sender rate limit live client-side
+      // (intentionally — this rule file shouldn't be a performance bottleneck).
+      allow create: if willOwnUid('uid') &&
+        request.resource.data.text is string &&
+        request.resource.data.text.size() > 0 &&
+        request.resource.data.text.size() <= 500;
+
+      // Updates aren't allowed — chat is append-only.
+      allow update: if false;
+
+      // Deletes: own message or mod. Messages from the pre-6.3 era have no
+      // uid field; only mods can clean those up.
+      allow delete: if
+        (signedIn() && 'uid' in resource.data && resource.data.uid == request.auth.uid) ||
+        isMod();
+    }
+
+    // ── community store apps ─────────────────────────────────────────────
+    match /nova_user_apps/{appId} {
+      // Anyone signed in can browse the catalog.
+      allow read: if signedIn();
+
+      // Submissions must stamp the submitter's uid.
+      allow create: if willOwnUid('submitterUid');
+
+      // Updates: only the submitter can edit their own pending submission,
+      // mods can change status / add reject reasons.
+      allow update: if
+        (signedIn() && resource.data.submitterUid == request.auth.uid) ||
+        isMod();
+
+      // Deletes: submitter (withdraw) or mod (remove).
+      allow delete: if
+        (signedIn() && resource.data.submitterUid == request.auth.uid) ||
+        isMod();
+    }
+
+    // ── ratings ──────────────────────────────────────────────────────────
+    // Doc id pattern: `<appId>_<username>` (legacy) — we don't gate on the
+    // doc id, we gate on the `uid` field inside the doc.
+    match /nova_ratings/{ratingId} {
+      allow read: if signedIn();
+      allow create, update: if willOwnUid('uid') &&
+        request.resource.data.rating is number &&
+        request.resource.data.rating >= 1 &&
+        request.resource.data.rating <= 5;
+      allow delete: if
+        (signedIn() && resource.data.uid == request.auth.uid) ||
+        isMod();
+    }
+
+    // ── mod allowlist ────────────────────────────────────────────────────
+    // Any signed-in user can read this (the rule helpers need to check
+    // membership) but writes are admin-console only — there is intentionally
+    // no rule that allows writes from the client.
+    match /nova_mods/{uid} {
+      allow read: if signedIn();
+      allow write: if false;
+    }
+
+    // ── catch-all ────────────────────────────────────────────────────────
+    // Anything else is denied. New collections need an explicit rule above.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

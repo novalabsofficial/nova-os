@@ -14,6 +14,13 @@ export const ADMINS = ["NovaMod"];
 // registration/login (see handleAuth), so a user typing "NovaMod" is stored
 // as "novamod". Comparing both sides lowercased keeps ADMINS readable AND
 // the check correct regardless of how the username was typed.
+//
+// v6.3 note: this client-side check is what drives the UI (showing the MOD
+// badge, the 🛡 delete buttons, etc.). The *enforcement* mod check lives in
+// firestore.rules and reads from the `nova_mods` Firestore collection,
+// keyed by Firebase Auth uid. The two lists need to be kept in sync — when
+// you grant someone mod status, add their username here AND add a doc at
+// nova_mods/<their-uid> via the Firebase Console.
 export function isAdmin(username) {
   if (typeof username !== "string") return false;
   const u = username.toLowerCase();
