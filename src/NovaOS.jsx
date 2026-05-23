@@ -1068,6 +1068,11 @@ export default function NovaOS(){
   },[widgetResize]);
  
   const showToast     =useCallback((msg)=>{setToast(msg);playSound("toast");setTimeout(()=>setToast(null),2500);},[]);
+  // saveData has to live up here (instead of with updateData/updateSettings
+  // below) because the Notification Center callbacks below depend on it via
+  // useCallback deps — defining them before saveData hits a temporal dead
+  // zone and kills the initial render with a ReferenceError.
+  const saveData      =useCallback(async(d)=>{if(user)await db.set("user:"+user+":data",d);},[user]);
 
   // ── Context Menu ─────────────────────────────────────────────────────
   // A single global menu — only one can be open at a time. Each handler
@@ -1140,7 +1145,6 @@ export default function NovaOS(){
     const id = setTimeout(()=>markAllNotificationsRead(), 250);
     return ()=>clearTimeout(id);
   },[notifsOpen, markAllNotificationsRead]);
-  const saveData      =useCallback(async(d)=>{if(user)await db.set("user:"+user+":data",d);},[user]);
   const updateData    =useCallback((patch)=>{setData(prev=>{const next=typeof patch==="function"?patch(prev):{...prev,...patch};saveData(next);return next;});},[saveData]);
   const updateSettings=useCallback((patch)=>{updateData(prev=>({...prev,settings:{...(prev.settings||{}),...patch}}));},[updateData]);
   const handleCustomWallpaper=useCallback(async(url)=>{setCustomWp(url);await db.set("user:"+user+":wpimg",url);updateSettings({wallpaper:"custom"});showToast("Custom wallpaper set ✓");},[user,updateSettings,showToast]);
