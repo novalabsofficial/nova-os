@@ -1,8 +1,8 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "Nova OS",
-  "version": "7.0.1",
-  "identifier": "com.sammygoldencars.novaos",
+  "version": "7.0.2",
+  "identifier": "com.novalabsofficial.novaos",
   "build": {
     "frontendDist": "../dist",
     "devUrl": "http://localhost:5173",
