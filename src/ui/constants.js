@@ -1,0 +1,197 @@
+// Shared data constants. Anything that's a static value used across multiple
+// files lives here so we don't end up with circular imports or duplicated lists.
+
+export const COLL = "nova_storage";
+
+// Widget metadata: label/emoji + minimum size constraints used by WidgetShell.
+export const WIDGET_CONFIGS = {
+  clock:    { label:"Clock",        emoji:"🕐", minW:180, minH:80  },
+  weather:  { label:"Weather",      emoji:"🌤️", minW:170, minH:120 },
+  notesw:   { label:"Quick Notes",  emoji:"📝", minW:200, minH:160 },
+  tasksw:   { label:"Tasks",        emoji:"✅", minW:200, minH:160 },
+  calendar: { label:"Calendar",     emoji:"📅", minW:240, minH:220 },
+  sysinfo:  { label:"System Info",  emoji:"💻", minW:180, minH:110 },
+};
+
+// Initial widget positions/sizes for a freshly-registered account.
+export const DEFAULT_WIDGET_STATE = {
+  clock:    { x:200, y:80,  w:240, h:112 },
+  weather:  { x:450, y:80,  w:200, h:158 },
+  notesw:   { x:200, y:220, w:260, h:280 },
+  tasksw:   { x:480, y:220, w:260, h:280 },
+  calendar: { x:200, y:220, w:280, h:264 },
+  sysinfo:  { x:490, y:220, w:220, h:140 },
+};
+
+// Default open size per app type. App ids that aren't listed get {w:520,h:480}.
+export const DEFAULT_SIZES = {
+  notes:{w:500,h:520},tasks:{w:460,h:520},files:{w:540,h:520},
+  paint:{w:700,h:560},browser:{w:760,h:620},
+  snake:{w:460,h:560},"2048":{w:480,h:580},
+  store:{w:680,h:600},terminal:{w:580,h:460},
+  settings:{w:480,h:640},profile:{w:440,h:540},chat:{w:480,h:580},
+  // 5.1 additions
+  calculator:{w:300,h:460},clock:{w:480,h:520},
+  minesweeper:{w:520,h:600},wordle:{w:430,h:600},tetris:{w:340,h:620},
+  pdf:{w:680,h:680},music:{w:480,h:560},calendar:{w:560,h:560},
+  atmos:{w:680,h:640},
+  // 5.2
+  novaai:{w:760,h:640},
+};
+
+// The master app list — drives the desktop, start menu, and store icons.
+export const APPS = [
+  {id:"notes",   icon:"📝",label:"Notes",   desc:"Write & save notes"},
+  {id:"tasks",   icon:"✅",label:"Tasks",   desc:"Manage to-dos"},
+  {id:"files",   icon:"📁",label:"Files",   desc:"Browse your files"},
+  {id:"paint",   icon:"🎨",label:"Paint",   desc:"Draw & create"},
+  {id:"browser", icon:"🌐",label:"Browser", desc:"Nova Search & Browse"},
+  {id:"snake",   icon:"🐍",label:"Snake",   desc:"Classic snake game"},
+  {id:"2048",    icon:"🎮",label:"2048",    desc:"Sliding tile puzzle"},
+  {id:"store",   icon:"🏪",label:"Store",   desc:"Nova App Store"},
+  {id:"chat",    icon:"💬",label:"Chat",    desc:"Global Nova chat"},
+  {id:"terminal",icon:"💻",label:"Terminal",desc:"System terminal"},
+  {id:"settings",icon:"⚙️",label:"Settings",desc:"Customize Nova OS"},
+  {id:"profile", icon:"👤",label:"Profile", desc:"Your account"},
+  // 5.1 additions
+  {id:"calculator", icon:"🔢",label:"Calculator", desc:"Quick math"},
+  {id:"clock",      icon:"⏰",label:"Clock",      desc:"World clock, stopwatch, timer"},
+  {id:"calendar",   icon:"📅",label:"Calendar",   desc:"Schedule events"},
+  {id:"music",      icon:"🎵",label:"Music",      desc:"Play local audio files"},
+  {id:"pdf",        icon:"📄",label:"PDF Viewer", desc:"Read PDFs in-app"},
+  {id:"atmos",      icon:"🌤️",label:"Atmos",     desc:"Weather, forecast & alerts"},
+  {id:"minesweeper",icon:"💣",label:"Minesweeper",desc:"Classic mine-grid puzzle"},
+  {id:"wordle",     icon:"🟩",label:"Wordle",     desc:"Daily 5-letter word puzzle"},
+  {id:"tetris",     icon:"🟪",label:"Tetris",     desc:"Falling-block classic"},
+  // 5.2
+  {id:"novaai",     icon:"✨",label:"Nova AI",    desc:"Chat with Claude or ChatGPT (BYOK)"},
+];
+
+// Curated catalog of external apps shown in the Store's "Official" tab.
+// domain enables Clearbit logo lookup.
+export const STORE_CATALOG = [
+  {id:"roblox",    name:"Roblox",       domain:"roblox.com",          icon:"🟥",cat:"Games", url:"https://www.roblox.com",                 newTab:true, badge:"↗ New Tab",desc:"World's leading gaming platform"},
+  {id:"xbox",      name:"Xbox Cloud",   domain:"xbox.com",            icon:"🎮",cat:"Games", url:"https://www.xbox.com/en-US/play",        newTab:true, badge:"↗ New Tab",desc:"Stream Xbox Game Pass titles in your browser"},
+  {id:"steam",     name:"Steam",        domain:"steampowered.com",    icon:"🎯",cat:"Games", url:"https://store.steampowered.com",         newTab:true, badge:"↗ New Tab",desc:"The ultimate PC gaming destination"},
+  {id:"ps",        name:"PlayStation",  domain:"playstation.com",     icon:"🔵",cat:"Games", url:"https://www.playstation.com/en-us/ps-now/",newTab:true,badge:"↗ New Tab",desc:"PlayStation cloud gaming"},
+  {id:"itchio",    name:"itch.io",      domain:"itch.io",             icon:"🕹️",cat:"Games", url:"https://itch.io",                        newTab:false,badge:"✓ In-App",desc:"Thousands of free indie & browser games"},
+  {id:"poki",      name:"Poki",         domain:"poki.com",            icon:"🎪",cat:"Games", url:"https://poki.com",                       newTab:false,badge:"✓ In-App",desc:"Free online browser games"},
+  {id:"crazygames",name:"CrazyGames",   domain:"crazygames.com",      icon:"🃏",cat:"Games", url:"https://www.crazygames.com",             newTab:false,badge:"✓ In-App",desc:"Hundreds of free browser games"},
+  {id:"youtube",   name:"YouTube",      domain:"youtube.com",         icon:"▶️", cat:"Media", url:"https://www.youtube.com",                newTab:true, badge:"↗ New Tab",desc:"Watch, share, and create videos"},
+  {id:"spotify",   name:"Spotify",      domain:"spotify.com",         icon:"🎵",cat:"Media", url:"https://open.spotify.com",               newTab:true, badge:"↗ New Tab",desc:"Stream 100M+ songs and podcasts"},
+  {id:"twitch",    name:"Twitch",       domain:"twitch.tv",           icon:"💜",cat:"Media", url:"https://www.twitch.tv",                  newTab:true, badge:"↗ New Tab",desc:"Live streaming for gaming and more"},
+  {id:"soundcloud",name:"SoundCloud",   domain:"soundcloud.com",      icon:"🎧",cat:"Media", url:"https://soundcloud.com",                 newTab:false,badge:"✓ In-App",desc:"Discover and stream independent music"},
+  {id:"github",    name:"GitHub",       domain:"github.com",          icon:"🐙",cat:"Tools", url:"https://github.com",                     newTab:true, badge:"↗ New Tab",desc:"Code hosting and collaboration"},
+  {id:"figma",     name:"Figma",        domain:"figma.com",           icon:"🎨",cat:"Tools", url:"https://www.figma.com",                  newTab:true, badge:"↗ New Tab",desc:"Collaborative UI design tool"},
+  {id:"notion",    name:"Notion",       domain:"notion.so",           icon:"📓",cat:"Tools", url:"https://www.notion.so",                  newTab:true, badge:"↗ New Tab",desc:"All-in-one notes and docs workspace"},
+  {id:"codepen",   name:"CodePen",      domain:"codepen.io",          icon:"✏️", cat:"Tools", url:"https://codepen.io",                     newTab:false,badge:"✓ In-App",desc:"Front-end coding environment"},
+  {id:"discord",   name:"Discord",      domain:"discord.com",         icon:"💬",cat:"Social",url:"https://discord.com/app",                newTab:true, badge:"↗ New Tab",desc:"Chat, voice, and communities"},
+  {id:"reddit",    name:"Reddit",       domain:"reddit.com",          icon:"🤖",cat:"Social",url:"https://www.reddit.com",                 newTab:true, badge:"↗ New Tab",desc:"The front page of the internet"},
+  {id:"twitter",   name:"X / Twitter",  domain:"x.com",               icon:"🐦",cat:"Social",url:"https://x.com",                          newTab:true, badge:"↗ New Tab",desc:"Real-time news and conversation"},
+  {id:"hn",        name:"Hacker News",  domain:"ycombinator.com",     icon:"🟠",cat:"News",  url:"https://news.ycombinator.com",           newTab:false,badge:"✓ In-App",desc:"Tech news, startups, programming"},
+  {id:"wiki",      name:"Wikipedia",    domain:"wikipedia.org",       icon:"📚",cat:"News",  url:"https://en.m.wikipedia.org",             newTab:false,badge:"✓ In-App",desc:"Free encyclopedia"},
+  {id:"arxiv",     name:"arXiv",        domain:"arxiv.org",           icon:"🔬",cat:"News",  url:"https://arxiv.org",                      newTab:false,badge:"✓ In-App",desc:"Open-access research papers"},
+];
+
+export const STORE_CATS = ["All","Games","Media","Tools","Social","News"];
+
+export const BOOT_MSGS = [
+  "NOVA OS v6.2 — Nova Systems",
+  "Initializing kernel... OK",
+  "Loading hardware abstraction layer... OK",
+  "Mounting filesystems... OK",
+  "Starting widget engine... OK",
+  "Initializing Nova Store... OK",
+  "Loading user environment... OK",
+  "System ready.",
+];
+
+export const ACCENT_PRESETS = ["#4f9eff","#ff6b6b","#4cef90","#ffcc44","#cc44ff","#ff8c44","#44ddcc","#ff44aa"];
+
+export const BOOKMARKS = [
+  {label:"Hacker News", url:"https://news.ycombinator.com"},
+  {label:"Wikipedia",   url:"https://en.m.wikipedia.org"},
+  {label:"Archive.org", url:"https://archive.org"},
+  {label:"itch.io",     url:"https://itch.io"},
+];
+
+export const PAINT_COLORS = ["#fff","#000","#ff4444","#ff8800","#ffdd00","#44dd44","#00ccff","#4466ff","#cc44ff","#ff44aa","#8b4513","#888"];
+
+// Available wallpapers + their preview gradients for the Settings picker.
+// SVG-based wallpapers (mesh, aurora, nova, bliss) have their own components
+// in src/ui/wallpapers.jsx; gradient-only ones (everything else) render
+// directly via the wp.grad style.
+//
+// Mesh is first — it's the system default. v6.2 added Ocean, Sunset,
+// Cyberpunk, and Zen to the lineup.
+//
+// Each wallpaper also carries a `semitones` value that shifts the system
+// sound palette up or down. The default (mesh) is 0; positive values brighten
+// the chime tones, negative values darken them. See src/lib/audio.js.
+export const WALLPAPERS = {
+  mesh:     {name:"Mesh",      semitones: 0,  preview:"radial-gradient(ellipse at 18% 22%,#6366f1 0%,transparent 45%),radial-gradient(ellipse at 82% 18%,#ec4899 0%,transparent 40%),radial-gradient(ellipse at 60% 85%,#06b6d4 0%,transparent 45%),linear-gradient(135deg,#0a0a14,#050510)"},
+  aurora:   {name:"Aurora",    semitones: 5,  preview:"linear-gradient(180deg,#0a0218 0%,#3b1d6a 35%,#10b981 60%,#0a0218 100%),radial-gradient(ellipse at 50% 90%,#a855f7 0%,transparent 50%)"},
+  nova:     {name:"Nova",      semitones:-2,  preview:"radial-gradient(ellipse at 25% 20%,#0ea5e9 0%,transparent 55%),radial-gradient(ellipse at 80% 85%,#7c3aed 0%,transparent 50%),linear-gradient(135deg,#07080f,#0d0a1a)"},
+  ocean:    {name:"Ocean",     semitones:-4,  preview:"radial-gradient(ellipse at 50% 20%,#42a5f5 0%,transparent 55%),linear-gradient(180deg,#031a2e 0%,#0a3a66 40%,#1565c0 100%)", grad:"radial-gradient(ellipse at 50% 25%,#42a5f5 0%,transparent 60%),radial-gradient(ellipse at 20% 90%,#00acc1 0%,transparent 45%),linear-gradient(180deg,#02101f 0%,#072b4d 35%,#0d3b66 65%,#1565c0 100%)"},
+  sunset:   {name:"Sunset",    semitones: 4,  preview:"linear-gradient(180deg,#1a0033 0%,#4a148c 20%,#d84315 55%,#ff6f00 80%,#ffab40 100%)", grad:"radial-gradient(ellipse at 50% 95%,#ffab40 0%,transparent 50%),radial-gradient(ellipse at 80% 75%,#ff6f00 0%,transparent 45%),linear-gradient(180deg,#0d001f 0%,#3a0a5c 25%,#7b1fa2 50%,#d84315 75%,#ff7043 100%)"},
+  cyber:    {name:"Cyberpunk", semitones: 3,  preview:"radial-gradient(ellipse at 85% 15%,#ec4899 0%,transparent 45%),radial-gradient(ellipse at 15% 85%,#06b6d4 0%,transparent 40%),linear-gradient(135deg,#0d0221 0%,#3b0764 50%,#1a0033 100%)", grad:"radial-gradient(ellipse at 80% 20%,#ec4899 0%,transparent 50%),radial-gradient(ellipse at 15% 80%,#06b6d4 0%,transparent 50%),radial-gradient(ellipse at 50% 50%,#7c1fa0 0%,transparent 60%),linear-gradient(135deg,#0d0221 0%,#1f0540 50%,#0a0118 100%)"},
+  zen:      {name:"Zen",       semitones:-7,  preview:"linear-gradient(160deg,#fef9e7 0%,#f5e6d3 50%,#d4a574 100%)", grad:"radial-gradient(ellipse at 30% 30%,#fffef5 0%,transparent 55%),linear-gradient(160deg,#fef9e7 0%,#f5e6d3 45%,#e0c8a0 80%,#c8a060 100%)"},
+  bliss:    {name:"Bliss",     semitones: 7,  preview:"linear-gradient(180deg,#4a9fd1 44%,#6ec82e 44%)"},
+  night:    {name:"Night",     semitones:-5,  preview:"radial-gradient(#1a0f40,#03020d)",  grad:"radial-gradient(ellipse at 50% 0%,#1a0f40,#03020d)"},
+  sakura:   {name:"Sakura",    semitones: 9,  preview:"linear-gradient(155deg,#ffd6e7,#ff8fa3)", grad:"linear-gradient(155deg,#ffd6e7,#ffb3c6,#ff8fa3)"},
+  forest:   {name:"Forest",    semitones:-3,  preview:"radial-gradient(#1a5010,#051204)",  grad:"radial-gradient(ellipse at 50% 100%,#1a5010,#051204)"},
+  slate:    {name:"Slate",     semitones: 1,  preview:"linear-gradient(135deg,#1e2235,#0f1219)", grad:"linear-gradient(135deg,#1e2235,#0f1219)"},
+  custom:   {name:"Custom",    semitones: 0,  preview:"conic-gradient(#888,#555)"},
+};
+
+// WMO weather codes (used by Open-Meteo) → emoji glyphs for the weather widget.
+// Full descriptions live in src/lib/weather.js.
+export const WMO = {0:"☀️",1:"🌤️",2:"⛅",3:"☁️",45:"🌫️",48:"🌫️",51:"🌦️",53:"🌦️",55:"🌧️",61:"🌧️",63:"🌧️",65:"🌧️",71:"🌨️",73:"🌨️",75:"❄️",80:"🌦️",81:"🌧️",82:"⛈️",95:"⛈️",99:"⛈️"};
+
+// App ids that have a custom SVG in NovaSvgIcon. Anything not in here gets
+// the app.icon emoji as a fallback via AppIconDisplay.
+export const HAS_SVG_ICON = new Set([
+  "notes","tasks","files","paint","browser","snake","2048",
+  "store","terminal","settings","profile","chat",
+  // 5.1 apps
+  "calculator","clock","calendar","music","pdf","atmos",
+  "minesweeper","wordle","tetris",
+  // 5.2
+  "novaai",
+]);
+
+// Window resize handle definitions (thin for mouse, fat for touch).
+export const HANDLE_DEFS_MOUSE = [
+  {id:"n",s:{top:0,left:8,right:8,height:5,cursor:"n-resize"}},{id:"s",s:{bottom:0,left:8,right:8,height:5,cursor:"s-resize"}},
+  {id:"w",s:{top:8,left:0,bottom:8,width:5,cursor:"w-resize"}},{id:"e",s:{top:8,right:0,bottom:8,width:5,cursor:"e-resize"}},
+  {id:"nw",s:{top:0,left:0,width:12,height:12,cursor:"nw-resize"}},{id:"ne",s:{top:0,right:0,width:12,height:12,cursor:"ne-resize"}},
+  {id:"sw",s:{bottom:0,left:0,width:12,height:12,cursor:"sw-resize"}},{id:"se",s:{bottom:0,right:0,width:12,height:12,cursor:"se-resize"}},
+];
+export const HANDLE_DEFS_TOUCH = [
+  {id:"n",s:{top:0,left:14,right:14,height:14,cursor:"n-resize"}},{id:"s",s:{bottom:0,left:14,right:14,height:14,cursor:"s-resize"}},
+  {id:"w",s:{top:14,left:0,bottom:14,width:14,cursor:"w-resize"}},{id:"e",s:{top:14,right:0,bottom:14,width:14,cursor:"e-resize"}},
+  {id:"nw",s:{top:0,left:0,width:22,height:22,cursor:"nw-resize"}},{id:"ne",s:{top:0,right:0,width:22,height:22,cursor:"ne-resize"}},
+  {id:"sw",s:{bottom:0,left:0,width:22,height:22,cursor:"sw-resize"}},{id:"se",s:{bottom:0,right:0,width:22,height:22,cursor:"se-resize"}},
+];
+
+// Widget shell resize handles (same shape, different ids/zIndex).
+export const WGT_HANDLES_MOUSE = [
+  {id:"n", s:{top:0,left:8,right:8,height:5,cursor:"n-resize"}},
+  {id:"s", s:{bottom:0,left:8,right:8,height:5,cursor:"s-resize"}},
+  {id:"w", s:{top:8,left:0,bottom:8,width:5,cursor:"w-resize"}},
+  {id:"e", s:{top:8,right:0,bottom:8,width:5,cursor:"e-resize"}},
+  {id:"nw",s:{top:0,left:0,width:12,height:12,cursor:"nw-resize"}},
+  {id:"ne",s:{top:0,right:0,width:12,height:12,cursor:"ne-resize"}},
+  {id:"sw",s:{bottom:0,left:0,width:12,height:12,cursor:"sw-resize"}},
+  {id:"se",s:{bottom:0,right:0,width:12,height:12,cursor:"se-resize"}},
+];
+export const WGT_HANDLES_TOUCH = [
+  {id:"n", s:{top:0,left:14,right:14,height:14,cursor:"n-resize"}},
+  {id:"s", s:{bottom:0,left:14,right:14,height:14,cursor:"s-resize"}},
+  {id:"w", s:{top:14,left:0,bottom:14,width:14,cursor:"w-resize"}},
+  {id:"e", s:{top:14,right:0,bottom:14,width:14,cursor:"e-resize"}},
+  {id:"nw",s:{top:0,left:0,width:22,height:22,cursor:"nw-resize"}},
+  {id:"ne",s:{top:0,right:0,width:22,height:22,cursor:"ne-resize"}},
+  {id:"sw",s:{bottom:0,left:0,width:22,height:22,cursor:"sw-resize"}},
+  {id:"se",s:{bottom:0,right:0,width:22,height:22,cursor:"se-resize"}},
+];

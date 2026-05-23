@@ -1,0 +1,10 @@
+import { useState } from "react";
+import { FF, FFB, FFM, INP, SEC } from "../ui/styles.js";
+import { fill, bdr } from "../lib/format.js";
+
+export function ProfileApp({user,data,updateData,showToast,AC}){
+  const [bio,setBio]=useState(data?.bio||"");
+  const joined=data?.joined?new Date(data.joined).toLocaleDateString([],{year:"numeric",month:"long",day:"numeric"}):"Unknown";
+  const installed=data?.installedApps?.length||0;
+  return(<div style={{width:"100%",fontFamily:FF}}><div style={SEC}>Profile</div><div style={{display:"flex",flexDirection:"column",alignItems:"center",paddingBottom:16,marginBottom:16,borderBottom:"1px solid rgba(255,255,255,0.07)"}}><div style={{width:62,height:62,borderRadius:"50%",background:fill(AC),border:"2px solid "+AC,display:"flex",alignItems:"center",justifyContent:"center",fontSize:26,marginBottom:11}}>👤</div><div style={{fontFamily:FFB,fontWeight:700,fontSize:20,color:"#fff",marginBottom:2}}>@{user}</div><div style={{fontFamily:FFM,fontSize:10,color:"rgba(255,255,255,0.28)"}}>Member since {joined}</div></div><div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8,marginBottom:18}}>{[["📝",data?.notes?.length||0,"Notes"],["✅",(data?.tasks?.filter(t=>t.done).length||0)+"/"+(data?.tasks?.length||0),"Tasks"],["🏪",installed,"Installed"]].map(([ic,v,k])=>(<div key={k} style={{padding:"11px 10px",background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.07)",borderRadius:8,textAlign:"center"}}><div style={{fontSize:10,marginBottom:3}}>{ic}</div><div style={{fontFamily:FFB,fontWeight:700,fontSize:20,color:AC}}>{v}</div><div style={{fontSize:10,color:"rgba(255,255,255,0.32)",marginTop:2}}>{k}</div></div>))}</div><div style={SEC}>Bio</div><textarea value={bio} onChange={e=>setBio(e.target.value)} placeholder="Write something about yourself…" style={{...INP,minHeight:64,marginBottom:8}}/><button onClick={()=>{updateData({bio});showToast("Bio saved ✓");}} style={{width:"100%",padding:"9px",background:fill(AC),border:"1px solid "+bdr(AC),borderRadius:7,cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:12,color:AC}}>Save Bio</button></div>);
+}
