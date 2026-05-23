@@ -1474,6 +1474,11 @@ function StoreApp({user,data,updateData,showToast,AC}){
           </div>
         </div>
       )}
+
+      {/* Clearbit attribution — required by their Logo API terms */}
+      <div style={{marginTop:16,paddingTop:10,borderTop:"1px solid rgba(255,255,255,0.05)",fontSize:10,fontFamily:FF,color:"rgba(255,255,255,0.25)",textAlign:"center"}}>
+        App logos provided by <a href="https://clearbit.com" target="_blank" rel="noreferrer" style={{color:"rgba(255,255,255,0.4)",textDecoration:"none"}}>Clearbit</a>
+      </div>
     </div>
   );
 }
