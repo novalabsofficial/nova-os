@@ -13,7 +13,7 @@ const ALERT_COLOR = {
   Minor:    {bg:"rgba(100,200,255,0.12)",border:"rgba(100,200,255,0.4)", fg:"#88c8ff"},
 };
 
-export function AtmosApp({AC,showToast,pushNotification,openNovaAi}){
+export function AtmosApp({AC,showToast,pushNotification,openNovaAi,data,updateSettings}){
   const [query,setQuery]=useState("");
   const [suggestions,setSuggestions]=useState([]);    // array of suggestion objects
   const [openSuggest,setOpenSuggest]=useState(false);
@@ -25,6 +25,9 @@ export function AtmosApp({AC,showToast,pushNotification,openNovaAi}){
   const [units,setUnits]=useState("imperial");        // imperial | metric
   const [expandedAlert,setExpandedAlert]=useState(null);
   const debounceRef=useRef(null);
+  // v6.4: the user can pin a default location that persists across sessions
+  // AND drives the Weather desktop widget. Saved at data.settings.weatherLocation.
+  const savedLoc = data?.settings?.weatherLocation || null;
 
   // Debounced geocode lookup as the user types. 350ms is just slow enough to
   // not hammer Nominatim's 1-req/sec policy, and just fast enough to feel live.
@@ -44,7 +47,17 @@ export function AtmosApp({AC,showToast,pushNotification,openNovaAi}){
     return ()=>clearTimeout(debounceRef.current);
   },[query]);
 
-  async function pickLocation(s){
+  // v6.4: on mount, if the user has a pinned location from a previous
+  // session, auto-load it so they don't have to re-search every time. Only
+  // fires once (loc starts null), and skips if no saved location.
+  useEffect(()=>{
+    if(savedLoc && !loc){
+      pickLocation(savedLoc, /*skipSave=*/true);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[]);
+
+  async function pickLocation(s, skipSave){
     // Whenever we switch locations we want to silence any in-progress TTS
     // read-out from the previous location's alerts. Otherwise queued
     // utterances would keep playing over the new selection.
@@ -54,6 +67,14 @@ export function AtmosApp({AC,showToast,pushNotification,openNovaAi}){
     setOpenSuggest(false);
     setLoadingForecast(true);
     setForecast(null);setAlerts([]);
+    // v6.4: persist the choice so it survives reloads and so the Weather
+    // widget picks it up. skipSave is set when we're re-loading the already-
+    // saved value on mount — no need to round-trip a write for a no-op.
+    if(!skipSave && updateSettings){
+      // Only save the fields we actually need — strip any extra props the
+      // geocoder may have attached so the Firestore doc stays slim.
+      updateSettings({weatherLocation:{label:s.label, lat:s.lat, lon:s.lon, countryCode:s.countryCode || null}});
+    }
     try{
       const fres=await fetch(forecastUrl(s.lat,s.lon,units));
       const fjson=await fres.json();
@@ -173,7 +194,18 @@ export function AtmosApp({AC,showToast,pushNotification,openNovaAi}){
             {/* Current conditions */}
             <div style={{padding:"16px 18px",background:"linear-gradient(135deg,"+fill(AC)+",rgba(255,255,255,0.03))",border:"1px solid "+bdr(AC),borderRadius:12}}>
               <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:4}}>
-                <div style={{flex:1,fontSize:11,fontFamily:FFM,color:"rgba(255,255,255,0.55)",letterSpacing:1}}>CURRENT · {loc.label}</div>
+                <div style={{flex:1,fontSize:11,fontFamily:FFM,color:"rgba(255,255,255,0.55)",letterSpacing:1,display:"flex",alignItems:"center",gap:6}}>
+                  {/* v6.4: 📌 indicates this is the user's saved default location
+                      (drives the Weather widget too). Showing it everywhere
+                      where loc.label appears would be noisy, so just here. */}
+                  {savedLoc && loc && savedLoc.lat===loc.lat && savedLoc.lon===loc.lon && (
+                    <span title="Pinned — also shown by the Weather widget" style={{fontSize:13,opacity:0.85}}>📌</span>
+                  )}
+                  <span>CURRENT · {loc.label}</span>
+                  {savedLoc && loc && savedLoc.lat===loc.lat && savedLoc.lon===loc.lon && updateSettings && (
+                    <button onClick={()=>{updateSettings({weatherLocation:null});showToast?.("Pinned location cleared");}} title="Clear pinned location" style={{background:"none",border:"none",cursor:"pointer",color:"rgba(255,255,255,0.4)",fontSize:11,padding:"0 4px"}}>✕</button>
+                  )}
+                </div>
                 <AiAssist AC={AC} openNovaAi={openNovaAi} actions={[
                   {icon:"🧠",label:"Explain this weather",prompt:"In 2-3 sentences, explain what this weather means in plain English for someone planning their day:"},
                   {icon:"👕",label:"What should I wear?",prompt:"Based on this weather, suggest practical clothing recommendations:"},

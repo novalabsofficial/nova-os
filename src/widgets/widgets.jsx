@@ -42,11 +42,32 @@ export function ClockWidgetContent({ state, tick, use24h, AC }) {
   );
 }
 
-export function WeatherWidgetContent({ state }) {
+export function WeatherWidgetContent({ state, data }) {
   const [weather, setWeather] = useState(null);
   const [loc, setLoc] = useState("");
   const [status, setStatus] = useState("loading");
+  // v6.4: if the user has pinned a location in Atmos, use that instead of
+  // hitting the browser geolocation prompt. Falls back to geolocation when
+  // no pinned location exists (preserves the v6.0–6.3 behavior).
+  const savedLoc = data?.settings?.weatherLocation || null;
   useEffect(() => {
+    // Branch A: pinned location — fetch directly, no permission prompt,
+    // re-runs if the pin changes (e.g. user picks a new city in Atmos).
+    if (savedLoc) {
+      (async () => {
+        try {
+          const wR = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${savedLoc.lat}&longitude=${savedLoc.lon}&current=temperature_2m,weathercode,windspeed_10m&temperature_unit=celsius&timezone=auto`).then(r => r.json());
+          if (wR?.current) setWeather(wR.current);
+          // We already know the label from Atmos — no reverse-geocode needed.
+          // Atmos stores e.g. "Brooklyn, New York, USA" — first segment is usually
+          // the city, which is what the widget wants to show.
+          setLoc((savedLoc.label || "").split(",")[0].trim());
+          setStatus("ok");
+        } catch { setStatus("error"); }
+      })();
+      return;
+    }
+    // Branch B: no pin — fall back to browser geolocation.
     if (!navigator.geolocation) { setStatus("error"); return; }
     navigator.geolocation.getCurrentPosition(async ({coords:{latitude:lat, longitude:lon}}) => {
       try {
@@ -62,7 +83,7 @@ export function WeatherWidgetContent({ state }) {
         setStatus("ok");
       } catch { setStatus("error"); }
     }, () => setStatus("error"), {timeout: 8000});
-  }, []);
+  }, [savedLoc?.lat, savedLoc?.lon]);
   const h = state.h - 26, w = state.w;
   const iconSize = Math.max(24, Math.min(h * 0.35, 52));
   const tempSize = Math.max(18, Math.min(h * 0.28, 44));
