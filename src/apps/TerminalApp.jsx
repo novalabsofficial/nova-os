@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { FF, FFM } from "../ui/styles.js";
 import { fill, bdr } from "../lib/format.js";
 

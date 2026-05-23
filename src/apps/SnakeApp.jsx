@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { FF, FFB, FFM } from "../ui/styles.js";
-import { fill, bdr } from "../lib/format.js";
+import { fill, bdr, hexRgb } from "../lib/format.js";
 import { playSound } from "../lib/audio.js";
 
 export function SnakeApp({AC}){

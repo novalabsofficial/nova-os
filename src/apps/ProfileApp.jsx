@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { FF, FFB, INP, SEC } from "../ui/styles.js";
+import { FF, FFB, FFM, INP, SEC } from "../ui/styles.js";
 import { fill, bdr } from "../lib/format.js";
 
 export function ProfileApp({user,data,updateData,showToast,AC}){

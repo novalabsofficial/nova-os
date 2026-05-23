@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { FF, FFB, FFM } from "../ui/styles.js";
+import { FF, FFB, FFM, SEC } from "../ui/styles.js";
 import { fill, bdr } from "../lib/format.js";
 
 export function MusicApp({AC,showToast}){

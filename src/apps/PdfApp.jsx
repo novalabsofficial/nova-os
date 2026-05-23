@@ -1,5 +1,5 @@
-import { useState, useRef } from "react";
-import { FF, FFB } from "../ui/styles.js";
+import { useState, useEffect, useRef } from "react";
+import { FF, FFB, FFM } from "../ui/styles.js";
 import { fill, bdr } from "../lib/format.js";
 
 export function PdfApp({AC,showToast}){

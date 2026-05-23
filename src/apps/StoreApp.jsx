@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
-import { FF, FFB, FFM, INP, SEC } from "../ui/styles.js";
-import { fill, bdr } from "../lib/format.js";
+import { FF, FFB, FFM, INP, SEC, DEFAULT_AC } from "../ui/styles.js";
+import { fill, bdr, hexRgb } from "../lib/format.js";
 import { APPS, STORE_CATALOG, STORE_CATS } from "../ui/constants.js";
 import { AppIconDisplay } from "../ui/icons.jsx";
 import { autoModerate, isAdmin, isPubliclyVisible } from "../lib/moderation.js";

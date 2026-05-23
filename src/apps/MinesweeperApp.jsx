@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { FF, FFB, FFM } from "../ui/styles.js";
 import { fill, bdr } from "../lib/format.js";
 import { createBoard as mineCreateBoard, floodReveal, isWin as mineIsWin, mineTotal, MINE_DIFFICULTIES } from "../lib/minesweeper.js";

@@ -1,9 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { FF, FFB, FFM, INP, SEC } from "../ui/styles.js";
 import { fill, bdr } from "../lib/format.js";
-import { WALLPAPERS, ACCENT_PRESETS } from "../ui/constants.js";
+import { WALLPAPERS, ACCENT_PRESETS, WIDGET_CONFIGS } from "../ui/constants.js";
 import { Toggle } from "../ui/Toggle.jsx";
-import { getSoundConfig, setSoundConfig } from "../lib/audio.js";
+import { getSoundConfig, setSoundConfig, playSound } from "../lib/audio.js";
 import { db } from "../lib/db.js";
 
 export function SettingsApp({user,data,updateSettings,showToast,AC,onCustomWallpaper,onLogout}){

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { FF, FFB, FFM, INP, SEC } from "../ui/styles.js";
-import { fill, bdr } from "../lib/format.js";
+import { fill, bdr, hexRgb } from "../lib/format.js";
 import { autoModerate, isAdmin } from "../lib/moderation.js";
 import { doc, getDoc, setDoc, updateDoc, deleteDoc, collection, addDoc, query, orderBy, limit, onSnapshot, serverTimestamp } from "firebase/firestore";
 import { firestoreDb } from "../firebase.js";
