@@ -1,5 +1,5 @@
 
-// NOVA OS v4.3 — Nova Systems
+// NOVA OS v5.0 — Nova Systems
 // Drop this into src/NovaOS.jsx
  
 import { useState, useEffect, useRef, useCallback } from "react";
@@ -14,6 +14,7 @@ import { hexRgb, fill, bdr, isUrl } from "./lib/format.js";
 import { defaultIconPos, snapToFreeGrid, snapW } from "./lib/geometry.js";
 import { autoModerate, isAdmin, isPubliclyVisible } from "./lib/moderation.js";
 import { rewriteForIframe, isLikelyUnframable } from "./lib/browser.js";
+import { detectDevice, effectiveDeviceMode, isTouchMode } from "./lib/device.js";
 
 // ─── CONSTANTS ────────────────────────────────────────────────────────────────
 const DEFAULT_AC = "#4f9eff";
@@ -86,7 +87,7 @@ const STORE_CATALOG = [
 ];
  
 const STORE_CATS    = ["All","Games","Media","Tools","Social","News"];
-const BOOT_MSGS     = ["NOVA OS v4.3 — Nova Systems","Initializing kernel... OK","Loading hardware abstraction layer... OK","Mounting filesystems... OK","Starting widget engine... OK","Initializing Nova Store... OK","Loading user environment... OK","System ready."];
+const BOOT_MSGS     = ["NOVA OS v5.0 — Nova Systems","Initializing kernel... OK","Loading hardware abstraction layer... OK","Mounting filesystems... OK","Starting widget engine... OK","Initializing Nova Store... OK","Loading user environment... OK","System ready."];
 const ACCENT_PRESETS= ["#4f9eff","#ff6b6b","#4cef90","#ffcc44","#cc44ff","#ff8c44","#44ddcc","#ff44aa"];
 const BOOKMARKS     = [{label:"Hacker News",url:"https://news.ycombinator.com"},{label:"Wikipedia",url:"https://en.m.wikipedia.org"},{label:"Archive.org",url:"https://archive.org"},{label:"itch.io",url:"https://itch.io"}];
 const PAINT_COLORS  = ["#fff","#000","#ff4444","#ff8800","#ffdd00","#44dd44","#00ccff","#4466ff","#cc44ff","#ff44aa","#8b4513","#888"];
@@ -277,7 +278,8 @@ function AppIconDisplay({app,size=26}){
 }
  
 // ─── WIDGET SHELL (drag handle + 8-way resize + close button) ─────────────────
-const WGT_HANDLES=[
+// Two sizes — fat handles for touch devices, thin for mouse precision.
+const WGT_HANDLES_MOUSE=[
   {id:"n", s:{top:0,left:8,right:8,height:5,cursor:"n-resize"}},
   {id:"s", s:{bottom:0,left:8,right:8,height:5,cursor:"s-resize"}},
   {id:"w", s:{top:8,left:0,bottom:8,width:5,cursor:"w-resize"}},
@@ -287,16 +289,27 @@ const WGT_HANDLES=[
   {id:"sw",s:{bottom:0,left:0,width:12,height:12,cursor:"sw-resize"}},
   {id:"se",s:{bottom:0,right:0,width:12,height:12,cursor:"se-resize"}},
 ];
- 
-function WidgetShell({id,state,onDragStart,onResizeStart,onClose,children}){
+const WGT_HANDLES_TOUCH=[
+  {id:"n", s:{top:0,left:14,right:14,height:14,cursor:"n-resize"}},
+  {id:"s", s:{bottom:0,left:14,right:14,height:14,cursor:"s-resize"}},
+  {id:"w", s:{top:14,left:0,bottom:14,width:14,cursor:"w-resize"}},
+  {id:"e", s:{top:14,right:0,bottom:14,width:14,cursor:"e-resize"}},
+  {id:"nw",s:{top:0,left:0,width:22,height:22,cursor:"nw-resize"}},
+  {id:"ne",s:{top:0,right:0,width:22,height:22,cursor:"ne-resize"}},
+  {id:"sw",s:{bottom:0,left:0,width:22,height:22,cursor:"sw-resize"}},
+  {id:"se",s:{bottom:0,right:0,width:22,height:22,cursor:"se-resize"}},
+];
+
+function WidgetShell({id,state,onDragStart,onResizeStart,onClose,children,touchy}){
   const {x,y,w,h}=state;
+  const handles = touchy ? WGT_HANDLES_TOUCH : WGT_HANDLES_MOUSE;
   return(
     <div className="wgt" style={{position:"absolute",left:x,top:y,width:w,height:h,zIndex:4,background:"rgba(7,8,18,0.72)",backdropFilter:"blur(20px)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:14,overflow:"hidden",boxShadow:"0 8px 32px rgba(0,0,0,0.45)",display:"flex",flexDirection:"column"}}>
       {/* Resize handles */}
-      {WGT_HANDLES.map(hh=><div key={hh.id} onMouseDown={e=>{e.stopPropagation();onResizeStart(e,id,hh.id);}} style={{position:"absolute",...hh.s,zIndex:12}}/>)}
+      {handles.map(hh=><div key={hh.id} onPointerDown={e=>{e.stopPropagation();onResizeStart(e,id,hh.id);}} style={{position:"absolute",...hh.s,zIndex:12,touchAction:"none"}}/>)}
       {/* Header drag strip */}
-      <div onMouseDown={e=>{e.stopPropagation();onDragStart(e,id);}}
-        style={{height:26,display:"flex",alignItems:"center",padding:"0 8px 0 12px",background:"rgba(255,255,255,0.04)",borderBottom:"1px solid rgba(255,255,255,0.06)",cursor:"grab",userSelect:"none",flexShrink:0,zIndex:11}}>
+      <div onPointerDown={e=>{e.stopPropagation();onDragStart(e,id);}}
+        style={{height:26,display:"flex",alignItems:"center",padding:"0 8px 0 12px",background:"rgba(255,255,255,0.04)",borderBottom:"1px solid rgba(255,255,255,0.06)",cursor:"grab",userSelect:"none",flexShrink:0,zIndex:11,touchAction:"none"}}>
         <span style={{fontFamily:FFB,fontWeight:600,fontSize:10,letterSpacing:1,color:"rgba(255,255,255,0.4)",textTransform:"uppercase",flex:1}}>{WIDGET_CONFIGS[id]?.label||id}</span>
         <button onClick={e=>{e.stopPropagation();onClose();}}
           style={{width:16,height:16,borderRadius:4,background:"none",border:"none",cursor:"pointer",color:"rgba(255,255,255,0.3)",fontSize:10,display:"flex",alignItems:"center",justifyContent:"center",padding:0}}>✕</button>
@@ -479,13 +492,24 @@ function BrowserNav({bar,setBar,onGo,onBack,onFwd,onRefresh,canBack,canFwd,canRe
     </div>
   );
 }
-const HANDLE_DEFS=[
+// Two sizes of resize handles: thin for mouse precision, fat for touch hit targets.
+// Tablet/mobile users get the fat version (~3x the hit area) so resize is actually usable.
+const HANDLE_DEFS_MOUSE=[
   {id:"n",s:{top:0,left:8,right:8,height:5,cursor:"n-resize"}},{id:"s",s:{bottom:0,left:8,right:8,height:5,cursor:"s-resize"}},
   {id:"w",s:{top:8,left:0,bottom:8,width:5,cursor:"w-resize"}},{id:"e",s:{top:8,right:0,bottom:8,width:5,cursor:"e-resize"}},
   {id:"nw",s:{top:0,left:0,width:12,height:12,cursor:"nw-resize"}},{id:"ne",s:{top:0,right:0,width:12,height:12,cursor:"ne-resize"}},
   {id:"sw",s:{bottom:0,left:0,width:12,height:12,cursor:"sw-resize"}},{id:"se",s:{bottom:0,right:0,width:12,height:12,cursor:"se-resize"}},
 ];
-function ResizeHandles({winId,onStartResize}){return HANDLE_DEFS.map(h=><div key={h.id} onMouseDown={e=>{e.stopPropagation();onStartResize(e,winId,h.id);}} style={{position:"absolute",...h.s,zIndex:20}}/>);}
+const HANDLE_DEFS_TOUCH=[
+  {id:"n",s:{top:0,left:14,right:14,height:14,cursor:"n-resize"}},{id:"s",s:{bottom:0,left:14,right:14,height:14,cursor:"s-resize"}},
+  {id:"w",s:{top:14,left:0,bottom:14,width:14,cursor:"w-resize"}},{id:"e",s:{top:14,right:0,bottom:14,width:14,cursor:"e-resize"}},
+  {id:"nw",s:{top:0,left:0,width:22,height:22,cursor:"nw-resize"}},{id:"ne",s:{top:0,right:0,width:22,height:22,cursor:"ne-resize"}},
+  {id:"sw",s:{bottom:0,left:0,width:22,height:22,cursor:"sw-resize"}},{id:"se",s:{bottom:0,right:0,width:22,height:22,cursor:"se-resize"}},
+];
+function ResizeHandles({winId,onStartResize,touchy}){
+  const defs=touchy?HANDLE_DEFS_TOUCH:HANDLE_DEFS_MOUSE;
+  return defs.map(h=><div key={h.id} onPointerDown={e=>{e.stopPropagation();onStartResize(e,winId,h.id);}} style={{position:"absolute",...h.s,zIndex:20,touchAction:"none"}}/>);
+}
  
 // ─── ROOT ─────────────────────────────────────────────────────────────────────
 export default function NovaOS(){
@@ -511,7 +535,15 @@ export default function NovaOS(){
   const [widgetState,setWidgetState]= useState(DEFAULT_WIDGET_STATE);
   const [widgetDrag, setWidgetDrag] = useState(null);
   const [widgetResize,setWidgetResize]=useState(null);
- 
+  // Detected device mode — re-detect on window resize so rotating a tablet
+  // or resizing the browser shifts the layout. The user's saved preference
+  // (data.settings.displayMode) is layered on top via effectiveDeviceMode.
+  const [detectedMode, setDetectedMode] = useState(()=>detectDevice());
+  // localStorage flag so the mobile-notice splash only shows once per device.
+  const [mobileNoticeAck, setMobileNoticeAck] = useState(
+    ()=>typeof localStorage!=="undefined" && localStorage.getItem("nova-mobile-ack")==="1"
+  );
+
   const iconPosRef    = useRef({});
   const widgetRef     = useRef(DEFAULT_WIDGET_STATE);
   const menuRef       = useRef(null);
@@ -527,35 +559,54 @@ export default function NovaOS(){
   const largeFnt=settings.largeFont ||false;
   const wpId    =settings.wallpaper ||data?.wallpaper||"aurora";
   const widgets =settings.widgets   ||{};
+  // Resolved device mode: user's saved preference overrides detection. "auto"
+  // (or any unset/invalid value) defers to the viewport+touch heuristic.
+  const deviceMode = effectiveDeviceMode(settings.displayMode, detectedMode);
+  const touchy = isTouchMode(deviceMode);
  
   useEffect(()=>{let i=0,dead=false;function nxt(){if(dead)return;if(i>=BOOT_MSGS.length){setTimeout(()=>{if(!dead)setScreen("login");},700);return;}setBootLines(p=>[...p,BOOT_MSGS[i++]]);setTimeout(nxt,i<2?90:230);}setTimeout(nxt,380);return()=>{dead=true;};},[]);
   useEffect(()=>{const t=setInterval(()=>setTick(new Date()),1000);return()=>clearInterval(t);},[]);
+  // Watch viewport size so the detected device mode stays current (e.g. on
+  // rotation or window resize). Throttled-by-debounce isn't needed — resize
+  // fires sparingly and detectDevice is cheap.
+  useEffect(()=>{
+    function onResize(){setDetectedMode(detectDevice());}
+    window.addEventListener("resize",onResize);
+    return ()=>window.removeEventListener("resize",onResize);
+  },[]);
   useEffect(()=>{if(user&&wpId==="custom")db.get("user:"+user+":wpimg").then(url=>{if(url)setCustomWp(url);});},[user,wpId]);
-  useEffect(()=>{if(!menuOpen)return;function h(e){if(menuRef.current&&!menuRef.current.contains(e.target))setMenuOpen(false);}setTimeout(()=>document.addEventListener("mousedown",h),0);return()=>document.removeEventListener("mousedown",h);},[menuOpen]);
- 
+  // Outside-click closes menu. pointerdown covers both mouse and touch in one go.
+  useEffect(()=>{if(!menuOpen)return;function h(e){if(menuRef.current&&!menuRef.current.contains(e.target))setMenuOpen(false);}setTimeout(()=>document.addEventListener("pointerdown",h),0);return()=>document.removeEventListener("pointerdown",h);},[menuOpen]);
+
+  // All drag/resize tracking uses Pointer Events (pointermove/pointerup/pointercancel).
+  // Pointer Events fire for mouse, touch, AND pen with a unified API — this is what
+  // makes drag/resize work on tablet touchscreens without a separate touch code path.
+  // pointercancel fires if the OS interrupts the gesture (system gesture, call, etc.);
+  // we clean up exactly like pointerup so the dragged item doesn't get stuck.
+
   // Window drag/resize
   useEffect(()=>{
     function onMove(e){if(!drag)return;if(drag.type==="move"){setWins(ws=>ws.map(w=>{if(w.id!==drag.winId)return w;return{...w,x:Math.max(0,e.clientX-drag.ox),y:Math.max(0,Math.min(e.clientY-drag.oy,window.innerHeight-80))};}));}else if(drag.type==="resize"){const dx=e.clientX-drag.sx,dy=e.clientY-drag.sy;setWins(ws=>ws.map(w=>{if(w.id!==drag.winId)return w;let nx=drag.wx,ny=drag.wy,nw=drag.ww,nh=drag.wh;if(drag.edge.includes("e"))nw=Math.max(MIN_W,drag.ww+dx);if(drag.edge.includes("s"))nh=Math.max(MIN_H,drag.wh+dy);if(drag.edge.includes("w")){nw=Math.max(MIN_W,drag.ww-dx);nx=drag.wx+drag.ww-nw;}if(drag.edge.includes("n")){nh=Math.max(MIN_H,drag.wh-dy);ny=drag.wy+drag.wh-nh;}return{...w,x:nx,y:ny,width:nw,height:nh};}));}}
     function onUp(){setDrag(null);}
-    window.addEventListener("mousemove",onMove);window.addEventListener("mouseup",onUp);return()=>{window.removeEventListener("mousemove",onMove);window.removeEventListener("mouseup",onUp);};
+    window.addEventListener("pointermove",onMove);window.addEventListener("pointerup",onUp);window.addEventListener("pointercancel",onUp);return()=>{window.removeEventListener("pointermove",onMove);window.removeEventListener("pointerup",onUp);window.removeEventListener("pointercancel",onUp);};
   },[drag]);
- 
+
   // Icon drag — free move, snap-to-free-grid on release
   useEffect(()=>{
     if(!iconDrag)return;
     function onMove(e){const nx=Math.max(0,Math.min(e.clientX-iconDrag.ox,window.innerWidth-ICON_W));const ny=Math.max(0,Math.min(e.clientY-iconDrag.oy,window.innerHeight-TASKBAR_H-ICON_H));setIconPos(prev=>({...prev,[iconDrag.id]:{x:nx,y:ny}}));}
     function onUp(){const allPos={};(iconDrag.allIcons||[]).forEach((app,idx)=>{allPos[app.id]=iconPosRef.current[app.id]||defaultIconPos(idx);});const raw=iconPosRef.current[iconDrag.id]||allPos[iconDrag.id];const snapped=raw?snapToFreeGrid(iconDrag.id,raw.x,raw.y,allPos):null;const fp=snapped?{...iconPosRef.current,[iconDrag.id]:snapped}:iconPosRef.current;setIconPos(fp);db.set("user:"+iconDrag.user+":iconpos",fp).catch(()=>{});setIconDrag(null);}
-    window.addEventListener("mousemove",onMove);window.addEventListener("mouseup",onUp);return()=>{window.removeEventListener("mousemove",onMove);window.removeEventListener("mouseup",onUp);};
+    window.addEventListener("pointermove",onMove);window.addEventListener("pointerup",onUp);window.addEventListener("pointercancel",onUp);return()=>{window.removeEventListener("pointermove",onMove);window.removeEventListener("pointerup",onUp);window.removeEventListener("pointercancel",onUp);};
   },[iconDrag]);
- 
+
   // Widget drag — free move, snap to 20px grid on release
   useEffect(()=>{
     if(!widgetDrag)return;
     function onMove(e){const nx=Math.max(0,Math.min(e.clientX-widgetDrag.ox,window.innerWidth-100));const ny=Math.max(0,Math.min(e.clientY-widgetDrag.oy,window.innerHeight-TASKBAR_H-60));setWidgetState(prev=>({...prev,[widgetDrag.id]:{...prev[widgetDrag.id],x:nx,y:ny}}));}
     function onUp(){setWidgetState(prev=>{const s=prev[widgetDrag.id];const snapped=snapW(s.x,s.y);const np={...prev,[widgetDrag.id]:{...s,...snapped}};const fin=np;updateData(d=>({...d,settings:{...(d.settings||{}),widgetState:fin}}));return fin;});setWidgetDrag(null);}
-    window.addEventListener("mousemove",onMove);window.addEventListener("mouseup",onUp);return()=>{window.removeEventListener("mousemove",onMove);window.removeEventListener("mouseup",onUp);};
+    window.addEventListener("pointermove",onMove);window.addEventListener("pointerup",onUp);window.addEventListener("pointercancel",onUp);return()=>{window.removeEventListener("pointermove",onMove);window.removeEventListener("pointerup",onUp);window.removeEventListener("pointercancel",onUp);};
   },[widgetDrag]);
- 
+
   // Widget resize — 8-direction, snap position to grid on release
   useEffect(()=>{
     if(!widgetResize)return;
@@ -576,7 +627,7 @@ export default function NovaOS(){
       setWidgetState(prev=>{const s=prev[widgetResize.id];const snapped=snapW(s.x,s.y);const np={...prev,[widgetResize.id]:{...s,...snapped}};updateData(d=>({...d,settings:{...(d.settings||{}),widgetState:np}}));return np;});
       setWidgetResize(null);
     }
-    window.addEventListener("mousemove",onMove);window.addEventListener("mouseup",onUp);return()=>{window.removeEventListener("mousemove",onMove);window.removeEventListener("mouseup",onUp);};
+    window.addEventListener("pointermove",onMove);window.addEventListener("pointerup",onUp);window.addEventListener("pointercancel",onUp);return()=>{window.removeEventListener("pointermove",onMove);window.removeEventListener("pointerup",onUp);window.removeEventListener("pointercancel",onUp);};
   },[widgetResize]);
  
   const showToast     =useCallback((msg)=>{setToast(msg);setTimeout(()=>setToast(null),2500);},[]);
@@ -595,7 +646,41 @@ export default function NovaOS(){
   function onWidgetDragStart(e,id){if(e.button!==0)return;e.stopPropagation();e.preventDefault();const s=widgetState[id]||DEFAULT_WIDGET_STATE[id];setWidgetDrag({id,ox:e.clientX-s.x,oy:e.clientY-s.y});}
   function onWidgetResizeStart(e,id,edge){if(e.button!==0)return;e.stopPropagation();e.preventDefault();const s=widgetState[id]||DEFAULT_WIDGET_STATE[id];setWidgetResize({id,edge,sx:e.clientX,sy:e.clientY,x0:s.x,y0:s.y,w0:s.w,h0:s.h});}
   function closeWidget(id){updateSettings({widgets:{...widgets,[id]:false}});}
- 
+
+  // Mobile splash visibility — only show when the effective mode actually
+  // resolves to mobile (so a user who set Tablet override won't see it).
+  const showMobileNotice = deviceMode === "mobile" && !mobileNoticeAck;
+  function ackMobileNotice(){
+    if(typeof localStorage!=="undefined") localStorage.setItem("nova-mobile-ack","1");
+    setMobileNoticeAck(true);
+  }
+  function switchToTabletMode(){
+    if(user) updateSettings({displayMode:"tablet"});
+    ackMobileNotice();
+  }
+
+  // Reusable mobile-notice overlay — rendered on top of every screen state
+  // when showMobileNotice is true. Phones get this on first load (or any time
+  // the saved ack is cleared).
+  const MobileNotice = !showMobileNotice ? null : (
+    <div style={{position:"fixed",inset:0,zIndex:99999,background:"rgba(7,8,18,0.96)",backdropFilter:"blur(12px)",display:"flex",alignItems:"center",justifyContent:"center",padding:20,fontFamily:FF}}>
+      <div style={{maxWidth:380,width:"100%",background:"rgba(15,18,32,0.96)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:16,padding:"28px 24px",textAlign:"center",boxShadow:"0 30px 90px rgba(0,0,0,0.7)"}}>
+        <div style={{fontSize:48,marginBottom:12}}>📱</div>
+        <div style={{fontFamily:FFB,fontWeight:700,fontSize:20,color:"#fff",marginBottom:10,letterSpacing:0.3}}>Small Screen Detected</div>
+        <div style={{fontSize:13,color:"rgba(255,255,255,0.6)",lineHeight:1.65,marginBottom:20}}>
+          Nova OS is built around draggable windows and a desktop metaphor — it works best on a <strong style={{color:"rgba(255,255,255,0.85)"}}>tablet or computer</strong>. On a phone-sized screen, windows and controls get tight.
+        </div>
+        <div style={{display:"flex",flexDirection:"column",gap:8}}>
+          {user && (
+            <button onClick={switchToTabletMode} style={{padding:"11px 14px",background:fill(AC),border:"1px solid "+bdr(AC),borderRadius:9,cursor:"pointer",fontFamily:FFB,fontWeight:700,fontSize:13,color:AC}}>Try Tablet Layout</button>
+          )}
+          <button onClick={ackMobileNotice} style={{padding:"11px 14px",background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.12)",borderRadius:9,cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:13,color:"rgba(255,255,255,0.78)"}}>Continue Anyway</button>
+        </div>
+        <div style={{fontSize:10,color:"rgba(255,255,255,0.3)",marginTop:14,fontStyle:"italic"}}>Change this any time in Settings → Display Mode.</div>
+      </div>
+    </div>
+  );
+
   async function handleAuth(){
     const u=uname.trim().toLowerCase().replace(/[^a-z0-9_]/g,"");const p=pass.trim();
     if(!u||!p){setAuthErr("All fields required.");return;}if(u.length<3){setAuthErr("Username needs 3+ characters.");return;}
@@ -635,10 +720,10 @@ export default function NovaOS(){
   const dragCursor=drag?(drag.type==="move"?"grabbing":drag.edge+"-resize"):widgetResize?(widgetResize.edge+"-resize"):isAnyDrag?"grabbing":"default";
  
   // ── BOOT ─────────────────────────────────────────────────────────────────
-  if(screen==="boot")return(<div style={{width:"100%",height:"100vh",background:"#07080f",display:"flex",flexDirection:"column",justifyContent:"center",padding:"10vh 12%"}}><style>{CSS}</style><div style={{fontFamily:FFB,fontWeight:700,fontSize:66,letterSpacing:4,color:"#fff",marginBottom:4,lineHeight:1}}>NOVA</div><div style={{fontFamily:FF,fontSize:12,color:"rgba(255,255,255,0.22)",letterSpacing:5,marginBottom:46}}>OPERATING SYSTEM  ·  v4.3</div>{bootLines.map((l,i)=><div key={i} style={{fontFamily:FFM,fontSize:12,color:l.includes("ready")?"#4f9eff":"rgba(255,255,255,0.42)",marginBottom:5,animation:"boot-in 0.22s cubic-bezier(0.4,0,0.2,1)"}}>{l.includes("OK")?<>{l.replace("... OK","")}... <span style={{color:"#4cef90"}}>OK</span></>:l}</div>)}</div>);
+  if(screen==="boot")return(<div style={{width:"100%",height:"100vh",background:"#07080f",display:"flex",flexDirection:"column",justifyContent:"center",padding:"10vh 12%"}}><style>{CSS}</style><div style={{fontFamily:FFB,fontWeight:700,fontSize:66,letterSpacing:4,color:"#fff",marginBottom:4,lineHeight:1}}>NOVA</div><div style={{fontFamily:FF,fontSize:12,color:"rgba(255,255,255,0.22)",letterSpacing:5,marginBottom:46}}>OPERATING SYSTEM  ·  v5.0</div>{bootLines.map((l,i)=><div key={i} style={{fontFamily:FFM,fontSize:12,color:l.includes("ready")?"#4f9eff":"rgba(255,255,255,0.42)",marginBottom:5,animation:"boot-in 0.22s cubic-bezier(0.4,0,0.2,1)"}}>{l.includes("OK")?<>{l.replace("... OK","")}... <span style={{color:"#4cef90"}}>OK</span></>:l}</div>)}{MobileNotice}</div>);
  
   // ── LOGIN ────────────────────────────────────────────────────────────────
-  if(screen==="login")return(<div style={{width:"100%",height:"100vh",position:"relative",overflow:"hidden"}}><style>{CSS}</style><NovaBg/><div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center"}}><div style={{background:"rgba(8,10,22,0.86)",backdropFilter:"blur(24px)",border:"1px solid rgba(255,255,255,0.11)",borderRadius:16,padding:"44px 40px",width:376,boxShadow:"0 40px 100px rgba(0,0,0,0.6)",position:"relative",overflow:"hidden"}}><div style={{position:"absolute",top:0,left:0,right:0,height:2,background:"linear-gradient(90deg,transparent,"+DEFAULT_AC+",transparent)"}}/><div style={{fontFamily:FFB,fontWeight:700,fontSize:38,color:"#fff",textAlign:"center",letterSpacing:4,marginBottom:4}}>NOVA</div><div style={{fontFamily:FF,fontSize:11,color:"rgba(255,255,255,0.22)",textAlign:"center",letterSpacing:4,marginBottom:36}}>OPERATING SYSTEM  ·  v4.3</div><div style={{display:"flex",borderBottom:"1px solid rgba(255,255,255,0.09)",marginBottom:24}}>{["login","register"].map(m=><button key={m} className="lt" onClick={()=>{setMode(m);setAuthErr("");}} style={{flex:1,padding:"10px 0",background:"none",border:"none",borderBottom:mode===m?"2px solid "+DEFAULT_AC:"2px solid transparent",cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:12,letterSpacing:1,color:mode===m?DEFAULT_AC:"rgba(255,255,255,0.28)",transition:"color 0.15s"}}>{m==="login"?"SIGN IN":"REGISTER"}</button>)}</div><input style={{...INP,marginBottom:11}} placeholder="Username" value={uname} onChange={e=>setUname(e.target.value)} onKeyDown={e=>e.key==="Enter"&&handleAuth()} autoFocus/><input style={INP} type="password" placeholder="Password" value={pass} onChange={e=>setPass(e.target.value)} onKeyDown={e=>e.key==="Enter"&&handleAuth()}/><button className="ls" disabled={busy} onClick={handleAuth} style={{width:"100%",padding:"12px",background:fill(DEFAULT_AC),border:"1px solid "+bdr(DEFAULT_AC),borderRadius:8,cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:14,letterSpacing:1,color:"#fff",marginTop:14,transition:"opacity 0.15s"}}>{busy?"AUTHENTICATING…":mode==="login"?"SIGN IN →":"CREATE ACCOUNT →"}</button>{authErr&&<div style={{color:"#ff7878",fontFamily:FF,fontSize:13,textAlign:"center",marginTop:12}}>⚠ {authErr}</div>}<div style={{marginTop:20,fontFamily:FF,fontStyle:"italic",fontSize:11,color:"rgba(255,255,255,0.14)",textAlign:"center"}}>Don't reuse real passwords — demo auth only.</div></div></div></div>);
+  if(screen==="login")return(<div style={{width:"100%",height:"100vh",position:"relative",overflow:"hidden"}}><style>{CSS}</style><NovaBg/><div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center"}}><div style={{background:"rgba(8,10,22,0.86)",backdropFilter:"blur(24px)",border:"1px solid rgba(255,255,255,0.11)",borderRadius:16,padding:"44px 40px",width:376,boxShadow:"0 40px 100px rgba(0,0,0,0.6)",position:"relative",overflow:"hidden"}}><div style={{position:"absolute",top:0,left:0,right:0,height:2,background:"linear-gradient(90deg,transparent,"+DEFAULT_AC+",transparent)"}}/><div style={{fontFamily:FFB,fontWeight:700,fontSize:38,color:"#fff",textAlign:"center",letterSpacing:4,marginBottom:4}}>NOVA</div><div style={{fontFamily:FF,fontSize:11,color:"rgba(255,255,255,0.22)",textAlign:"center",letterSpacing:4,marginBottom:36}}>OPERATING SYSTEM  ·  v5.0</div><div style={{display:"flex",borderBottom:"1px solid rgba(255,255,255,0.09)",marginBottom:24}}>{["login","register"].map(m=><button key={m} className="lt" onClick={()=>{setMode(m);setAuthErr("");}} style={{flex:1,padding:"10px 0",background:"none",border:"none",borderBottom:mode===m?"2px solid "+DEFAULT_AC:"2px solid transparent",cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:12,letterSpacing:1,color:mode===m?DEFAULT_AC:"rgba(255,255,255,0.28)",transition:"color 0.15s"}}>{m==="login"?"SIGN IN":"REGISTER"}</button>)}</div><input style={{...INP,marginBottom:11}} placeholder="Username" value={uname} onChange={e=>setUname(e.target.value)} onKeyDown={e=>e.key==="Enter"&&handleAuth()} autoFocus/><input style={INP} type="password" placeholder="Password" value={pass} onChange={e=>setPass(e.target.value)} onKeyDown={e=>e.key==="Enter"&&handleAuth()}/><button className="ls" disabled={busy} onClick={handleAuth} style={{width:"100%",padding:"12px",background:fill(DEFAULT_AC),border:"1px solid "+bdr(DEFAULT_AC),borderRadius:8,cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:14,letterSpacing:1,color:"#fff",marginTop:14,transition:"opacity 0.15s"}}>{busy?"AUTHENTICATING…":mode==="login"?"SIGN IN →":"CREATE ACCOUNT →"}</button>{authErr&&<div style={{color:"#ff7878",fontFamily:FF,fontSize:13,textAlign:"center",marginTop:12}}>⚠ {authErr}</div>}<div style={{marginTop:20,fontFamily:FF,fontStyle:"italic",fontSize:11,color:"rgba(255,255,255,0.14)",textAlign:"center"}}>Don't reuse real passwords — demo auth only.</div></div></div>{MobileNotice}</div>);
  
   // ── DESKTOP ──────────────────────────────────────────────────────────────
   return(
@@ -652,7 +737,7 @@ export default function NovaOS(){
         if(!widgets[id])return null;
         const s=widgetState[id]||DEFAULT_WIDGET_STATE[id]||{x:200,y:200,w:240,h:140};
         return(
-          <WidgetShell key={id} id={id} state={s} onDragStart={onWidgetDragStart} onResizeStart={onWidgetResizeStart} onClose={()=>closeWidget(id)}>
+          <WidgetShell key={id} id={id} state={s} onDragStart={onWidgetDragStart} onResizeStart={onWidgetResizeStart} onClose={()=>closeWidget(id)} touchy={touchy}>
             {id==="clock"   &&<ClockWidgetContent   state={s} tick={tick} use24h={use24h} AC={AC}/>}
             {id==="weather" &&<WeatherWidgetContent  state={s}/>}
             {id==="notesw"  &&<NotesWidgetContent    state={s} data={data}/>}
@@ -670,7 +755,7 @@ export default function NovaOS(){
         function launch(){if(app.storeApp){if(app.storeApp.newTab)window.open(app.storeApp.url,"_blank");else openApp("browser");}else openApp(app.id);}
         return(
           <div key={app.id} style={{position:"absolute",left:pos.x,top:pos.y,width:ICON_W,zIndex:isDrg?500:2,cursor:isDrg?"grabbing":"grab",userSelect:"none",display:"flex",flexDirection:"column",alignItems:"center",gap:4,padding:"8px 4px",borderRadius:9,background:"rgba(0,0,0,0.1)",border:"1px solid transparent",transition:isDrg?"none":"background 0.18s cubic-bezier(0.4,0,0.2,1), left 0.25s cubic-bezier(0.4,0,0.2,1), top 0.25s cubic-bezier(0.4,0,0.2,1)",boxShadow:isDrg?"0 8px 32px rgba(0,0,0,0.6)":"none"}}
-            className={isDrg?"":"di"} title={app.desc} onMouseDown={e=>onIconMouseDown(e,app.id,allDesktopIcons)} onDoubleClick={launch}>
+            className={isDrg?"":"di"} title={app.desc} onPointerDown={e=>onIconMouseDown(e,app.id,allDesktopIcons)} onDoubleClick={launch}>
             <div style={{pointerEvents:"none",display:"flex",alignItems:"center",justifyContent:"center",filter:"drop-shadow(0 2px 6px rgba(0,0,0,0.7))"}}>
               <AppIconDisplay app={app} size={28}/>
             </div>
@@ -697,7 +782,7 @@ export default function NovaOS(){
         </div>
         <div style={{padding:"10px 16px",borderTop:"1px solid rgba(255,255,255,0.07)",display:"flex",alignItems:"center",gap:10}}>
           <div style={{width:32,height:32,borderRadius:"50%",background:fill(AC),border:"1.5px solid "+AC,display:"flex",alignItems:"center",justifyContent:"center",fontSize:15,flexShrink:0}}>👤</div>
-          <div style={{flex:1}}><div style={{fontFamily:FFB,fontWeight:600,fontSize:13,color:"#fff"}}>@{user}</div><div style={{fontFamily:FF,fontSize:10,color:"rgba(255,255,255,0.3)"}}>Nova OS v4.3</div></div>
+          <div style={{flex:1}}><div style={{fontFamily:FFB,fontWeight:600,fontSize:13,color:"#fff"}}>@{user}</div><div style={{fontFamily:FF,fontSize:10,color:"rgba(255,255,255,0.3)"}}>Nova OS v5.0</div></div>
           <button onClick={logout} style={{padding:"6px 12px",background:"rgba(200,40,40,0.12)",border:"1px solid rgba(200,40,40,0.3)",borderRadius:6,cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:11,color:"rgba(255,140,140,0.9)"}}>Logout</button>
         </div>
       </div>)}
@@ -710,13 +795,13 @@ export default function NovaOS(){
         const winStyle=isMax?{position:"fixed",top:0,left:0,right:0,bottom:TASKBAR_H+"px",zIndex:win.z,borderRadius:0}:{position:"absolute",left:win.x,top:win.y,width:win.width,height:win.height,zIndex:win.z,borderRadius:12};
         return(
           <div key={win.id} onClick={()=>focusWin(win.id)} style={{...winStyle,background:"rgba(10,12,26,0.93)",border:"1px solid rgba(255,255,255,0.1)",boxShadow:"0 "+(isDrg?30:15)+"px "+(isDrg?90:50)+"px rgba(0,0,0,"+(isDrg?0.8:0.6)+")",display:"flex",flexDirection:"column",animation:"win-in 0.24s cubic-bezier(0.16,1,0.3,1)",backdropFilter:"blur("+winBlur+"px)",transition:isDrg?"box-shadow 0.18s cubic-bezier(0.4,0,0.2,1)":"box-shadow 0.18s cubic-bezier(0.4,0,0.2,1), left 0.28s cubic-bezier(0.4,0,0.2,1), top 0.28s cubic-bezier(0.4,0,0.2,1), width 0.28s cubic-bezier(0.4,0,0.2,1), height 0.28s cubic-bezier(0.4,0,0.2,1)",overflow:"hidden"}}>
-            {!isMax&&<ResizeHandles winId={win.id} onStartResize={startResize}/>}
-            <div onMouseDown={e=>!isMax&&startDrag(e,win.id)} style={{height:38,display:"flex",alignItems:"center",padding:"0 8px 0 12px",gap:9,background:"rgba(255,255,255,0.04)",borderBottom:"1px solid rgba(255,255,255,0.07)",borderRadius:isMax?"0":"12px 12px 0 0",cursor:isMax?"default":isDrg?"grabbing":"grab",userSelect:"none",flexShrink:0}}>
+            {!isMax&&<ResizeHandles winId={win.id} onStartResize={startResize} touchy={touchy}/>}
+            <div onPointerDown={e=>!isMax&&startDrag(e,win.id)} style={{height:38,display:"flex",alignItems:"center",padding:"0 8px 0 12px",gap:9,background:"rgba(255,255,255,0.04)",borderBottom:"1px solid rgba(255,255,255,0.07)",borderRadius:isMax?"0":"12px 12px 0 0",cursor:isMax?"default":isDrg?"grabbing":"grab",userSelect:"none",flexShrink:0,touchAction:"none"}}>
               <div style={{display:"flex",alignItems:"center",justifyContent:"center"}}><AppIconDisplay app={{id:win.app,icon:app?.icon||"📦"}} size={16}/></div>
               <span style={{flex:1,fontFamily:FFB,fontWeight:600,fontSize:13,color:"rgba(255,255,255,0.88)"}}>{app?.label}</span>
-              <button className="wn" onMouseDown={e=>e.stopPropagation()} onClick={e=>{e.stopPropagation();minimizeWin(win.id);}} style={{width:26,height:26,borderRadius:6,background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.09)",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,color:"rgba(255,255,255,0.5)",transition:"background 0.12s",flexShrink:0}}>–</button>
-              <button className="wm" onMouseDown={e=>e.stopPropagation()} onClick={e=>{e.stopPropagation();maximizeWin(win.id);}} style={{width:26,height:26,borderRadius:6,background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.09)",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,color:"rgba(255,255,255,0.5)",transition:"background 0.12s",flexShrink:0}}>{isMax?"❐":"⬜"}</button>
-              <button className="wx" onMouseDown={e=>e.stopPropagation()} onClick={e=>{e.stopPropagation();closeWin(win.id);}} style={{width:26,height:26,borderRadius:6,background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.09)",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,color:"rgba(255,255,255,0.5)",transition:"background 0.12s, color 0.12s",flexShrink:0}}>✕</button>
+              <button className="wn" onPointerDown={e=>e.stopPropagation()} onClick={e=>{e.stopPropagation();minimizeWin(win.id);}} style={{width:26,height:26,borderRadius:6,background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.09)",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,color:"rgba(255,255,255,0.5)",transition:"background 0.12s",flexShrink:0}}>–</button>
+              <button className="wm" onPointerDown={e=>e.stopPropagation()} onClick={e=>{e.stopPropagation();maximizeWin(win.id);}} style={{width:26,height:26,borderRadius:6,background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.09)",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,color:"rgba(255,255,255,0.5)",transition:"background 0.12s",flexShrink:0}}>{isMax?"❐":"⬜"}</button>
+              <button className="wx" onPointerDown={e=>e.stopPropagation()} onClick={e=>{e.stopPropagation();closeWin(win.id);}} style={{width:26,height:26,borderRadius:6,background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.09)",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,color:"rgba(255,255,255,0.5)",transition:"background 0.12s, color 0.12s",flexShrink:0}}>✕</button>
             </div>
             <div style={{flex:1,overflowY:"auto",overflowX:"hidden",padding:18,minWidth:0}}>
               {win.app==="notes"    &&<NotesApp    data={data} updateData={updateData} showToast={showToast} AC={AC}/>}
@@ -747,6 +832,7 @@ export default function NovaOS(){
         <button className="sb" onClick={()=>openApp("settings")} style={{width:30,height:30,borderRadius:7,background:"none",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,color:"rgba(255,255,255,0.45)",transition:"background 0.12s"}}>⚙️</button>
         <div style={{textAlign:"right",cursor:"default"}}><div style={{fontFamily:FFM,fontWeight:500,fontSize:12,color:"rgba(255,255,255,0.78)"}}>{fmtTime(tick)}</div><div style={{fontFamily:FF,fontSize:9,color:"rgba(255,255,255,0.35)"}}>{fmtDate(tick)}</div></div>
       </div>
+      {MobileNotice}
     </div>
   );
 }
@@ -965,7 +1051,7 @@ function PaintApp({showToast,AC}){
   function move(e){if(!drawing||!lastPos.current)return;e.stopPropagation();const pos=gp(e);const ctx=canvasRef.current.getContext("2d");ctx.beginPath();ctx.moveTo(lastPos.current.x,lastPos.current.y);ctx.lineTo(pos.x,pos.y);ctx.strokeStyle=tool==="eraser"?"#fff":color;ctx.lineWidth=size;ctx.lineCap="round";ctx.lineJoin="round";ctx.stroke();lastPos.current=pos;}
   function up(e){e.stopPropagation();setDrawing(false);lastPos.current=null;}
   function TBtn({id,lbl}){return<button onClick={()=>setTool(id)} style={{padding:"6px 11px",background:tool===id?fill(AC):"rgba(255,255,255,0.06)",border:"1px solid "+(tool===id?bdr(AC):"rgba(255,255,255,0.11)"),borderRadius:6,cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:11,color:tool===id?AC:"rgba(255,255,255,0.6)"}}>{lbl}</button>;}
-  return(<div style={{width:"100%",display:"flex",flexDirection:"column",gap:10,fontFamily:FF}}><div style={{display:"flex",alignItems:"center",gap:7,flexWrap:"wrap"}}><TBtn id="pen" lbl="✏️ Pen"/><TBtn id="eraser" lbl="⬜ Eraser"/><div style={{display:"flex",alignItems:"center",gap:6,marginLeft:4}}><span style={{fontSize:10,fontFamily:FFB,fontWeight:600,letterSpacing:1,color:"rgba(255,255,255,0.3)"}}>SIZE</span><input type="range" min={2} max={60} value={size} onChange={e=>setSize(+e.target.value)} style={{width:80,accentColor:AC}}/><span style={{fontSize:10,color:"rgba(255,255,255,0.5)",width:20}}>{size}</span></div><div style={{flex:1}}/><button onClick={()=>{const c=canvasRef.current;const ctx=c.getContext("2d");ctx.fillStyle="#fff";ctx.fillRect(0,0,CW,CH);}} style={{padding:"6px 11px",background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.11)",borderRadius:6,cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:11,color:"rgba(255,255,255,0.55)"}}>Clear</button><button onClick={()=>{const a=document.createElement("a");a.download="nova-paint.png";a.href=canvasRef.current.toDataURL();a.click();showToast("Saved ✓");}} style={{padding:"6px 11px",background:fill(AC),border:"1px solid "+bdr(AC),borderRadius:6,cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:11,color:AC}}>⬇ Save</button></div><canvas ref={canvasRef} width={CW} height={CH} style={{width:"100%",height:"auto",borderRadius:7,cursor:tool==="eraser"?"cell":"crosshair",display:"block",border:"1px solid rgba(255,255,255,0.1)"}} onMouseDown={down} onMouseMove={move} onMouseUp={up} onMouseLeave={up}/><div style={{display:"flex",alignItems:"center",gap:5,flexWrap:"wrap"}}>{PAINT_COLORS.map(c=><div key={c} className="ps" onClick={()=>{setColor(c);setTool("pen");}} style={{width:22,height:22,borderRadius:5,background:c,cursor:"pointer",border:(color===c&&tool==="pen")?"2.5px solid #fff":"2px solid rgba(255,255,255,0.14)",transition:"transform 0.1s",boxSizing:"border-box"}}/>)}<input type="color" value={color} onChange={e=>{setColor(e.target.value);setTool("pen");}} style={{width:26,height:26,borderRadius:5,border:"1px solid rgba(255,255,255,0.15)",cursor:"pointer",background:"none",marginLeft:4}}/></div></div>);
+  return(<div style={{width:"100%",display:"flex",flexDirection:"column",gap:10,fontFamily:FF}}><div style={{display:"flex",alignItems:"center",gap:7,flexWrap:"wrap"}}><TBtn id="pen" lbl="✏️ Pen"/><TBtn id="eraser" lbl="⬜ Eraser"/><div style={{display:"flex",alignItems:"center",gap:6,marginLeft:4}}><span style={{fontSize:10,fontFamily:FFB,fontWeight:600,letterSpacing:1,color:"rgba(255,255,255,0.3)"}}>SIZE</span><input type="range" min={2} max={60} value={size} onChange={e=>setSize(+e.target.value)} style={{width:80,accentColor:AC}}/><span style={{fontSize:10,color:"rgba(255,255,255,0.5)",width:20}}>{size}</span></div><div style={{flex:1}}/><button onClick={()=>{const c=canvasRef.current;const ctx=c.getContext("2d");ctx.fillStyle="#fff";ctx.fillRect(0,0,CW,CH);}} style={{padding:"6px 11px",background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.11)",borderRadius:6,cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:11,color:"rgba(255,255,255,0.55)"}}>Clear</button><button onClick={()=>{const a=document.createElement("a");a.download="nova-paint.png";a.href=canvasRef.current.toDataURL();a.click();showToast("Saved ✓");}} style={{padding:"6px 11px",background:fill(AC),border:"1px solid "+bdr(AC),borderRadius:6,cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:11,color:AC}}>⬇ Save</button></div><canvas ref={canvasRef} width={CW} height={CH} style={{width:"100%",height:"auto",borderRadius:7,cursor:tool==="eraser"?"cell":"crosshair",display:"block",border:"1px solid rgba(255,255,255,0.1)",touchAction:"none"}} onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={up} onPointerLeave={up}/><div style={{display:"flex",alignItems:"center",gap:5,flexWrap:"wrap"}}>{PAINT_COLORS.map(c=><div key={c} className="ps" onClick={()=>{setColor(c);setTool("pen");}} style={{width:22,height:22,borderRadius:5,background:c,cursor:"pointer",border:(color===c&&tool==="pen")?"2.5px solid #fff":"2px solid rgba(255,255,255,0.14)",transition:"transform 0.1s",boxSizing:"border-box"}}/>)}<input type="color" value={color} onChange={e=>{setColor(e.target.value);setTool("pen");}} style={{width:26,height:26,borderRadius:5,border:"1px solid rgba(255,255,255,0.15)",cursor:"pointer",background:"none",marginLeft:4}}/></div></div>);
 }
  
 function BrowserApp({AC}){
@@ -1343,7 +1429,7 @@ function StoreApp({user,data,updateData,showToast,AC}){
     <div style={{width:"100%",fontFamily:FF}}>
       {/* Header + search */}
       <div style={{marginBottom:12}}>
-        <div style={{fontFamily:FFB,fontWeight:700,fontSize:20,color:"#fff",marginBottom:8}}>🏪 Nova Store 4.3</div>
+        <div style={{fontFamily:FFB,fontWeight:700,fontSize:20,color:"#fff",marginBottom:8}}>🏪 Nova Store 5.0</div>
         <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search all apps…" style={INP}/>
       </div>
  
@@ -1484,10 +1570,10 @@ function StoreApp({user,data,updateData,showToast,AC}){
 }
  
 function TerminalApp({user,AC}){
-  const [lines,setLines]=useState([{t:"out",v:"NOVA Terminal v4.3.0"},{t:"out",v:"Session: "+user+" — "+new Date().toLocaleString()},{t:"out",v:'Type "help" for commands.'},{t:"gap"}]);
+  const [lines,setLines]=useState([{t:"out",v:"NOVA Terminal v5.0.0"},{t:"out",v:"Session: "+user+" — "+new Date().toLocaleString()},{t:"out",v:'Type "help" for commands.'},{t:"gap"}]);
   const [cmd,setCmd]=useState("");const [hist,setHist]=useState([]);const [hIdx,setHIdx]=useState(-1);const endRef=useRef(null);
   useEffect(()=>{endRef.current?.scrollIntoView({behavior:"smooth"});},[lines]);
-  const CMDS={help:()=>["Commands: help, whoami, date, echo <text>, version, sysinfo, ls, neofetch, clear"],whoami:()=>[user],date:()=>[new Date().toLocaleString()],version:()=>["NOVA OS v4.3.0 — Nova Systems Inc."],sysinfo:()=>["CPU: Nova Virtual Core™","RAM: 8.0 GB","Storage: Firebase Firestore","Resolution: "+window.innerWidth+"x"+window.innerHeight,"Uptime: "+Math.floor(performance.now()/1000)+"s"],ls:()=>["notes/ tasks/ files/ paint/ browser/ snake/ 2048/ store/ terminal/ settings/"],neofetch:()=>[" ███╗   ██╗ ██████╗ ██╗   ██╗ █████╗ "," ████╗  ██║██╔═══██╗██║   ██║██╔══██╗"," ██╔██╗ ██║██║   ██║██║   ██║███████║"," ██║╚██╗██║██║   ██║╚██╗ ██╔╝██╔══██║"," ██║ ╚████║╚██████╔╝ ╚████╔╝ ██║  ██║","OS: Nova v4.3  User: "+user,"Widgets: Clock·Weather·Notes·Tasks·Calendar·SysInfo"],echo:args=>[args.join(" ")||"(empty)"],clear:()=>"__clear__"};
+  const CMDS={help:()=>["Commands: help, whoami, date, echo <text>, version, sysinfo, ls, neofetch, clear"],whoami:()=>[user],date:()=>[new Date().toLocaleString()],version:()=>["NOVA OS v5.0.0 — Nova Systems Inc."],sysinfo:()=>["CPU: Nova Virtual Core™","RAM: 8.0 GB","Storage: Firebase Firestore","Resolution: "+window.innerWidth+"x"+window.innerHeight,"Uptime: "+Math.floor(performance.now()/1000)+"s"],ls:()=>["notes/ tasks/ files/ paint/ browser/ snake/ 2048/ store/ terminal/ settings/"],neofetch:()=>[" ███╗   ██╗ ██████╗ ██╗   ██╗ █████╗ "," ████╗  ██║██╔═══██╗██║   ██║██╔══██╗"," ██╔██╗ ██║██║   ██║██║   ██║███████║"," ██║╚██╗██║██║   ██║╚██╗ ██╔╝██╔══██║"," ██║ ╚████║╚██████╔╝ ╚████╔╝ ██║  ██║","OS: Nova v5.0  User: "+user,"Widgets: Clock·Weather·Notes·Tasks·Calendar·SysInfo"],echo:args=>[args.join(" ")||"(empty)"],clear:()=>"__clear__"};
   function run(){const raw=cmd.trim();if(!raw)return;const parts=raw.split(" ");const c=parts[0].toLowerCase();const args=parts.slice(1);setHist(h=>[raw,...h]);setHIdx(-1);setCmd("");const nl=[...lines,{t:"in",v:raw}];const h=CMDS[c];if(!h){nl.push({t:"err",v:c+': not found. Try "help".'});}else{const r=h(args);if(r==="__clear__"){setLines([]);return;}r.forEach(v=>nl.push({t:"out",v}));}nl.push({t:"gap"});setLines(nl);}
   function onKey(e){if(e.key==="Enter"){run();return;}if(e.key==="ArrowUp"){const i=Math.min(hIdx+1,hist.length-1);setHIdx(i);if(hist[i])setCmd(hist[i]);}if(e.key==="ArrowDown"){const i=Math.max(hIdx-1,-1);setHIdx(i);setCmd(i===-1?"":(hist[i]||""));}}
   return(<div style={{width:"100%",fontFamily:FFM}}><div style={{background:"#030407",borderRadius:8,padding:"13px 15px",height:"100%",minHeight:280,overflowY:"auto",border:"1px solid rgba(255,255,255,0.07)"}}>{lines.map((l,i)=><div key={i} style={{color:l.t==="in"?AC:l.t==="err"?"#ff7878":"rgba(180,210,255,0.58)",fontSize:12,marginBottom:l.t==="gap"?5:2,minHeight:l.t==="gap"?4:undefined,whiteSpace:"pre"}}>{l.t==="in"?"$ "+l.v:l.t==="gap"?null:l.v}</div>)}<div style={{display:"flex",alignItems:"center"}}><span style={{color:"#4cef90",marginRight:7,fontSize:12}}>$</span><input value={cmd} onChange={e=>setCmd(e.target.value)} onKeyDown={onKey} autoFocus style={{flex:1,background:"none",border:"none",outline:"none",color:AC,fontFamily:FFM,fontSize:12,caretColor:AC}}/></div><div ref={endRef}/></div></div>);
@@ -1519,7 +1605,27 @@ function SettingsApp({user,data,updateSettings,showToast,AC,onCustomWallpaper}){
       <div style={SEC}>Display</div>
       <Toggle label="24-Hour Clock" value={!!settings.clock24h}  onChange={v=>updateSettings({clock24h:v})}  ac={AC}/>
       <Toggle label="Large Text"    value={!!settings.largeFont} onChange={v=>updateSettings({largeFont:v})} ac={AC}/>
-      <div style={{...SEC,marginTop:22}}>Account</div>
+      <div style={{...SEC,marginTop:22}}>Display Mode</div>
+      <div style={{fontSize:11,color:"rgba(255,255,255,0.3)",marginBottom:9,lineHeight:1.55}}>How Nova OS sizes for your device. "Auto" picks based on screen size + touch capability — override here if you want a specific look.</div>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:7,marginBottom:6}}>
+        {[
+          {id:"auto",   label:"⚙ Auto",     desc:"Detect from device"},
+          {id:"desktop",label:"🖥 Desktop",  desc:"Mouse-precision UI"},
+          {id:"tablet", label:"📱 Tablet",  desc:"Larger touch targets"},
+          {id:"mobile", label:"📲 Mobile",  desc:"Phone-size notice"},
+        ].map(m=>{
+          const active=(settings.displayMode||"auto")===m.id;
+          return(
+            <button key={m.id} onClick={()=>{updateSettings({displayMode:m.id});showToast("Display: "+m.label+" ✓");}}
+              style={{textAlign:"left",padding:"10px 12px",background:active?fill(AC):"rgba(255,255,255,0.04)",border:"1px solid "+(active?bdr(AC):"rgba(255,255,255,0.08)"),borderRadius:8,cursor:"pointer",fontFamily:FF,color:active?AC:"rgba(255,255,255,0.7)"}}>
+              <div style={{fontFamily:FFB,fontWeight:600,fontSize:12}}>{m.label}</div>
+              <div style={{fontSize:10,color:active?AC:"rgba(255,255,255,0.4)",marginTop:1,opacity:active?0.85:1}}>{m.desc}</div>
+            </button>
+          );
+        })}
+      </div>
+      <div style={{fontSize:10,color:"rgba(255,255,255,0.22)",marginBottom:22,fontStyle:"italic"}}>Resize the browser window to test — Nova will re-detect on the fly.</div>
+      <div style={{...SEC,marginTop:0}}>Account</div>
       <div style={{padding:"11px 14px",background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:8}}><div style={{fontSize:11,color:"rgba(255,255,255,0.35)",marginBottom:2}}>Signed in as</div><div style={{fontFamily:FFB,fontWeight:600,fontSize:16,color:"#fff"}}>@{user}</div></div>
     </div>
   );
