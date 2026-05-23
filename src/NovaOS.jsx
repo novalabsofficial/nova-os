@@ -1,5 +1,5 @@
 
-// NOVA OS v6.2 — Nova Systems
+// NOVA OS v6.3 — Nova Systems
 // Drop this into src/NovaOS.jsx
  
 import { useState, useEffect, useRef, useCallback, lazy, Suspense } from "react";
@@ -23,7 +23,8 @@ import { emptyGrid as tetrisEmpty, randomPiece as tetrisRandom, shapeOf, fits as
 import { wmoIcon, wmoLabel, geocodeUrl, parseGeocode, forecastUrl, parseForecast, alertsUrl, parseAlerts, isLikelyUS } from "./lib/weather.js";
 import { PROVIDERS as AI_PROVIDERS, streamResponse as aiStream, deriveTitle as aiDeriveTitle } from "./lib/ai.js";
 import { playTone, speak, cancelSpeech, playSound, getSoundConfig, setSoundConfig, setSoundWallpaper } from "./lib/audio.js";
-import { db } from "./lib/db.js";
+import { db, setDbUid } from "./lib/db.js";
+import { login as authLogin, register as authRegister, logoutUser as authLogout, normalizeUsername } from "./lib/auth.js";
 import { aiLoad, aiSave, AI_LS_KEYS, AI_LS_CONFIG, AI_LS_CHATS } from "./lib/ai-storage.js";
 // UI (shared components + visual constants)
 import { DEFAULT_AC, FF, FFB, FFM, INP, SEC, CSS } from "./ui/styles.js";
@@ -84,6 +85,10 @@ export default function NovaOS(){
   const [authErr,    setAuthErr]    = useState("");
   const [busy,       setBusy]       = useState(false);
   const [user,       setUser]       = useState(null);
+  // v6.3: track the Firebase Auth uid alongside the display username. The
+  // username drives all UI ("@username", mod check, doc-key building); the
+  // uid drives Firestore security rule checks.
+  const [uid,        setUid]        = useState(null);
   const [data,       setData]       = useState(null);
   const [customWp,   setCustomWp]   = useState(null);
   const [wins,       setWins]       = useState([]);
@@ -373,47 +378,74 @@ export default function NovaOS(){
     // error chime. setAuthErr("") (the success-path clear) intentionally skips
     // the sound.
     const authErr=(msg)=>{setAuthErr(msg);playSound("error");};
-    const u=uname.trim().toLowerCase().replace(/[^a-z0-9_]/g,"");const p=pass.trim();
+    const u=normalizeUsername(uname);const p=pass;  // don't trim password — leading/trailing spaces are valid characters
     if(!u||!p){authErr("All fields required.");return;}if(u.length<3){authErr("Username needs 3+ characters.");return;}
     setBusy(true);setAuthErr("");
+
+    // v6.3: auth goes through Firebase Auth. The new auth.js handles both
+    // greenfield accounts and silent migration of pre-6.3 plaintext accounts.
+    const initData={notes:[],tasks:[],wallpaper:"mesh",bio:"",joined:Date.now(),settings:{},installedApps:[],folders:[],migratedTo41:true,migratedTo52:true};
+
     if(mode==="register"){
-      const ex=await db.get("user:"+u+":pw");if(ex!==null){authErr("Username taken.");setBusy(false);return;}
-      await db.set("user:"+u+":pw",p);const init={notes:[],tasks:[],wallpaper:"mesh",bio:"",joined:Date.now(),settings:{},installedApps:[],folders:[],migratedTo41:true,migratedTo52:true};
-      await db.set("user:"+u+":data",init);setUser(u);setData(init);setIconPos({});setWidgetState(DEFAULT_WIDGET_STATE);setScreen("desktop");playSound("login");
-    }else{
-      const stored=await db.get("user:"+u+":pw");if(stored===null){authErr("Account not found.");setBusy(false);return;}
-      if(stored!==p){authErr("Incorrect password.");setBusy(false);return;}
-      const d=await db.get("user:"+u+":data");const savedIconPos=await db.get("user:"+u+":iconpos");
+      try {
+        const {uid:newUid} = await authRegister(u, p, initData);
+        setDbUid(newUid);  // tell the db wrapper to stamp future writes
+        setUser(u);setUid(newUid);setData(initData);
+        setIconPos({});setWidgetState(DEFAULT_WIDGET_STATE);
+        setScreen("desktop");playSound("login");
+      } catch (e) {
+        authErr(e?.message || "Could not create account.");
+        setBusy(false); return;
+      }
+    } else {
+      let result;
+      try {
+        result = await authLogin(u, p);
+      } catch (e) {
+        authErr(e?.message || "Sign-in failed.");
+        setBusy(false); return;
+      }
+      const {uid:newUid, migrated} = result;
+      setDbUid(newUid);
+      // Now load the user's data via the regular db wrapper.
+      const d=await db.get("user:"+u+":data");
+      const savedIconPos=await db.get("user:"+u+":iconpos");
       // One-time migrations layered by release. Each runs at most once per user
       // (gated by its own migratedToX.Y flag) and only re-points the wallpaper
       // if the user is on the *previous* default — anyone who deliberately
       // picked sakura / forest / etc. keeps their choice.
       let migratedNow = false;
       if(d&&!d.migratedTo41){
-        // 4.1: Nova → Aurora as the default wallpaper.
         if(d.wallpaper==="nova")d.wallpaper="aurora";
         if(d.settings?.wallpaper==="nova")d.settings={...d.settings,wallpaper:"aurora"};
-        d.migratedTo41=true;
-        migratedNow=true;
+        d.migratedTo41=true; migratedNow=true;
       }
       if(d&&!d.migratedTo52){
-        // 5.2: Aurora → Mesh as the default wallpaper. This runs *after* the
-        // 4.1 step above, so a user who came from v3.x (wallpaper: "nova")
-        // gets bumped nova → aurora → mesh in a single login.
         if(d.wallpaper==="aurora")d.wallpaper="mesh";
         if(d.settings?.wallpaper==="aurora")d.settings={...d.settings,wallpaper:"mesh"};
-        d.migratedTo52=true;
-        migratedNow=true;
+        d.migratedTo52=true; migratedNow=true;
       }
       if(migratedNow) await db.set("user:"+u+":data",d);
-      setUser(u);setData(d||{notes:[],tasks:[],wallpaper:"mesh",bio:"",joined:Date.now(),settings:{},installedApps:[],folders:[],migratedTo41:true,migratedTo52:true});
+      setUser(u);setUid(newUid);setData(d||initData);
       setIconPos(savedIconPos||{});
       if(d?.settings?.widgetState)setWidgetState({...DEFAULT_WIDGET_STATE,...d.settings.widgetState});
       setScreen("desktop");playSound("login");
+      // Let the user know if this was a silent 6.3 migration. Toast fires
+      // after the desktop renders so it's noticeable but unobtrusive.
+      // showToast (not raw setToast) → uses the standard string format the
+      // toast renderer expects AND auto-clears after 2.5s.
+      if(migrated) setTimeout(()=>showToast("Account secured ✓ — upgraded to Firebase Auth"), 600);
     }
     setBusy(false);
   }
-  function logout(){playSound("logout");setUser(null);setData(null);setCustomWp(null);setWins([]);setMaxZ(100);setMenuOpen(false);setIconPos({});setIconDrag(null);setWidgetState(DEFAULT_WIDGET_STATE);setWidgetDrag(null);setWidgetResize(null);setUname("");setPass("");setAuthErr("");setMode("login");setScreen("login");}
+  async function logout(){
+    playSound("logout");
+    await authLogout();
+    setDbUid(null);
+    setUser(null);setUid(null);setData(null);setCustomWp(null);setWins([]);setMaxZ(100);setMenuOpen(false);
+    setIconPos({});setIconDrag(null);setWidgetState(DEFAULT_WIDGET_STATE);setWidgetDrag(null);setWidgetResize(null);
+    setUname("");setPass("");setAuthErr("");setMode("login");setScreen("login");
+  }
  
   const fmtTime=d=>use24h?d.toLocaleTimeString([],{hour:"2-digit",minute:"2-digit",hour12:false}):d.toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"});
   const fmtDate=d=>d.toLocaleDateString([],{weekday:"short",month:"short",day:"numeric"});
@@ -425,10 +457,10 @@ export default function NovaOS(){
   const dragCursor=drag?(drag.type==="move"?"grabbing":drag.edge+"-resize"):widgetResize?(widgetResize.edge+"-resize"):isAnyDrag?"grabbing":"default";
  
   // ── BOOT ─────────────────────────────────────────────────────────────────
-  if(screen==="boot")return(<div style={{width:"100%",height:"100vh",background:"#07080f",display:"flex",flexDirection:"column",justifyContent:"center",padding:"10vh max(24px, 12%)"}}><style>{CSS}</style><div style={{fontFamily:FFB,fontWeight:700,fontSize:"clamp(40px, 12vw, 66px)",letterSpacing:4,color:"#fff",marginBottom:4,lineHeight:1}}>NOVA</div><div style={{fontFamily:FF,fontSize:12,color:"rgba(255,255,255,0.22)",letterSpacing:5,marginBottom:46}}>OPERATING SYSTEM  ·  v6.2</div>{bootLines.map((l,i)=><div key={i} style={{fontFamily:FFM,fontSize:12,color:l.includes("ready")?"#4f9eff":"rgba(255,255,255,0.42)",marginBottom:5,animation:"boot-in 0.22s cubic-bezier(0.4,0,0.2,1)"}}>{l.includes("OK")?<>{l.replace("... OK","")}... <span style={{color:"#4cef90"}}>OK</span></>:l}</div>)}{MobileNotice}</div>);
+  if(screen==="boot")return(<div style={{width:"100%",height:"100vh",background:"#07080f",display:"flex",flexDirection:"column",justifyContent:"center",padding:"10vh max(24px, 12%)"}}><style>{CSS}</style><div style={{fontFamily:FFB,fontWeight:700,fontSize:"clamp(40px, 12vw, 66px)",letterSpacing:4,color:"#fff",marginBottom:4,lineHeight:1}}>NOVA</div><div style={{fontFamily:FF,fontSize:12,color:"rgba(255,255,255,0.22)",letterSpacing:5,marginBottom:46}}>OPERATING SYSTEM  ·  v6.3</div>{bootLines.map((l,i)=><div key={i} style={{fontFamily:FFM,fontSize:12,color:l.includes("ready")?"#4f9eff":"rgba(255,255,255,0.42)",marginBottom:5,animation:"boot-in 0.22s cubic-bezier(0.4,0,0.2,1)"}}>{l.includes("OK")?<>{l.replace("... OK","")}... <span style={{color:"#4cef90"}}>OK</span></>:l}</div>)}{MobileNotice}</div>);
  
   // ── LOGIN ────────────────────────────────────────────────────────────────
-  if(screen==="login")return(<div style={{width:"100%",height:"100vh",position:"relative",overflow:"hidden"}}><style>{CSS}</style><MeshBg/><div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center"}}><div style={{background:"rgba(8,10,22,0.86)",backdropFilter:"blur(24px)",border:"1px solid rgba(255,255,255,0.11)",borderRadius:16,padding:"44px 40px",width:376,maxWidth:"calc(100vw - 24px)",boxShadow:"0 40px 100px rgba(0,0,0,0.6)",position:"relative",overflow:"hidden"}}><div style={{position:"absolute",top:0,left:0,right:0,height:2,background:"linear-gradient(90deg,transparent,"+DEFAULT_AC+",transparent)"}}/><div style={{fontFamily:FFB,fontWeight:700,fontSize:38,color:"#fff",textAlign:"center",letterSpacing:4,marginBottom:4}}>NOVA</div><div style={{fontFamily:FF,fontSize:11,color:"rgba(255,255,255,0.22)",textAlign:"center",letterSpacing:4,marginBottom:36}}>OPERATING SYSTEM  ·  v6.2</div><div style={{display:"flex",borderBottom:"1px solid rgba(255,255,255,0.09)",marginBottom:24}}>{["login","register"].map(m=><button key={m} className="lt" onClick={()=>{setMode(m);setAuthErr("");}} style={{flex:1,padding:"10px 0",background:"none",border:"none",borderBottom:mode===m?"2px solid "+DEFAULT_AC:"2px solid transparent",cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:12,letterSpacing:1,color:mode===m?DEFAULT_AC:"rgba(255,255,255,0.28)",transition:"color 0.15s"}}>{m==="login"?"SIGN IN":"REGISTER"}</button>)}</div><input style={{...INP,marginBottom:11}} placeholder="Username" value={uname} onChange={e=>setUname(e.target.value)} onKeyDown={e=>e.key==="Enter"&&handleAuth()} autoFocus/><input style={INP} type="password" placeholder="Password" value={pass} onChange={e=>setPass(e.target.value)} onKeyDown={e=>e.key==="Enter"&&handleAuth()}/><button className="ls" disabled={busy} onClick={handleAuth} style={{width:"100%",padding:"12px",background:fill(DEFAULT_AC),border:"1px solid "+bdr(DEFAULT_AC),borderRadius:8,cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:14,letterSpacing:1,color:"#fff",marginTop:14,transition:"opacity 0.15s"}}>{busy?"AUTHENTICATING…":mode==="login"?"SIGN IN →":"CREATE ACCOUNT →"}</button>{authErr&&<div style={{color:"#ff7878",fontFamily:FF,fontSize:13,textAlign:"center",marginTop:12}}>⚠ {authErr}</div>}<div style={{marginTop:20,fontFamily:FF,fontStyle:"italic",fontSize:11,color:"rgba(255,255,255,0.14)",textAlign:"center"}}>Don't reuse real passwords — demo auth only.</div></div></div>{MobileNotice}</div>);
+  if(screen==="login")return(<div style={{width:"100%",height:"100vh",position:"relative",overflow:"hidden"}}><style>{CSS}</style><MeshBg/><div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center"}}><div style={{background:"rgba(8,10,22,0.86)",backdropFilter:"blur(24px)",border:"1px solid rgba(255,255,255,0.11)",borderRadius:16,padding:"44px 40px",width:376,maxWidth:"calc(100vw - 24px)",boxShadow:"0 40px 100px rgba(0,0,0,0.6)",position:"relative",overflow:"hidden"}}><div style={{position:"absolute",top:0,left:0,right:0,height:2,background:"linear-gradient(90deg,transparent,"+DEFAULT_AC+",transparent)"}}/><div style={{fontFamily:FFB,fontWeight:700,fontSize:38,color:"#fff",textAlign:"center",letterSpacing:4,marginBottom:4}}>NOVA</div><div style={{fontFamily:FF,fontSize:11,color:"rgba(255,255,255,0.22)",textAlign:"center",letterSpacing:4,marginBottom:36}}>OPERATING SYSTEM  ·  v6.3</div><div style={{display:"flex",borderBottom:"1px solid rgba(255,255,255,0.09)",marginBottom:24}}>{["login","register"].map(m=><button key={m} className="lt" onClick={()=>{setMode(m);setAuthErr("");}} style={{flex:1,padding:"10px 0",background:"none",border:"none",borderBottom:mode===m?"2px solid "+DEFAULT_AC:"2px solid transparent",cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:12,letterSpacing:1,color:mode===m?DEFAULT_AC:"rgba(255,255,255,0.28)",transition:"color 0.15s"}}>{m==="login"?"SIGN IN":"REGISTER"}</button>)}</div><input style={{...INP,marginBottom:11}} placeholder="Username" value={uname} onChange={e=>setUname(e.target.value)} onKeyDown={e=>e.key==="Enter"&&handleAuth()} autoFocus/><input style={INP} type="password" placeholder="Password" value={pass} onChange={e=>setPass(e.target.value)} onKeyDown={e=>e.key==="Enter"&&handleAuth()}/><button className="ls" disabled={busy} onClick={handleAuth} style={{width:"100%",padding:"12px",background:fill(DEFAULT_AC),border:"1px solid "+bdr(DEFAULT_AC),borderRadius:8,cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:14,letterSpacing:1,color:"#fff",marginTop:14,transition:"opacity 0.15s"}}>{busy?"AUTHENTICATING…":mode==="login"?"SIGN IN →":"CREATE ACCOUNT →"}</button>{authErr&&<div style={{color:"#ff7878",fontFamily:FF,fontSize:13,textAlign:"center",marginTop:12}}>⚠ {authErr}</div>}<div style={{marginTop:20,fontFamily:FF,fontStyle:"italic",fontSize:11,color:"rgba(255,255,255,0.14)",textAlign:"center"}}>Don't reuse real passwords — demo auth only.</div></div></div>{MobileNotice}</div>);
  
   // ── DESKTOP ──────────────────────────────────────────────────────────────
   return(
@@ -514,7 +546,7 @@ export default function NovaOS(){
         </div>
         <div style={{padding:"10px 16px",borderTop:"1px solid rgba(255,255,255,0.07)",display:"flex",alignItems:"center",gap:10}}>
           <div style={{width:32,height:32,borderRadius:"50%",background:fill(AC),border:"1.5px solid "+AC,display:"flex",alignItems:"center",justifyContent:"center",fontSize:15,flexShrink:0}}>👤</div>
-          <div style={{flex:1}}><div style={{fontFamily:FFB,fontWeight:600,fontSize:13,color:"#fff"}}>@{user}</div><div style={{fontFamily:FF,fontSize:10,color:"rgba(255,255,255,0.3)"}}>Nova OS v6.2</div></div>
+          <div style={{flex:1}}><div style={{fontFamily:FFB,fontWeight:600,fontSize:13,color:"#fff"}}>@{user}</div><div style={{fontFamily:FF,fontSize:10,color:"rgba(255,255,255,0.3)"}}>Nova OS v6.3</div></div>
           <button onClick={logout} style={{padding:"6px 12px",background:"rgba(200,40,40,0.12)",border:"1px solid rgba(200,40,40,0.3)",borderRadius:6,cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:11,color:"rgba(255,140,140,0.9)"}}>Logout</button>
         </div>
       </div>)}

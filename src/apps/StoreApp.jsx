@@ -6,6 +6,7 @@ import { AppIconDisplay } from "../ui/icons.jsx";
 import { autoModerate, isAdmin, isPubliclyVisible } from "../lib/moderation.js";
 import { doc, getDoc, setDoc, updateDoc, deleteDoc, collection, addDoc, query, orderBy, limit, onSnapshot, serverTimestamp } from "firebase/firestore";
 import { firestoreDb } from "../firebase.js";
+import { getDbUid } from "../lib/db.js";
 
 export function Stars({appId, ratings, rateApp, ac}){
   const r=ratings[appId]||{avg:0,count:0,mine:0};
@@ -107,7 +108,9 @@ export function StoreApp({user,data,updateData,showToast,AC}){
   },[]);
  
   async function rateApp(appId,rating){
-    try{await setDoc(doc(firestoreDb,"nova_ratings",appId+"_"+user),{appId,user,rating,ts:Date.now()});showToast("Rated "+rating+"★ ✓");}
+    // v6.3: stamp uid so rules can verify the rating actually came from the
+    // signed-in user (and not someone forging a different `user` field).
+    try{await setDoc(doc(firestoreDb,"nova_ratings",appId+"_"+user),{appId,user,uid:getDbUid(),rating,ts:Date.now()});showToast("Rated "+rating+"★ ✓");}
     catch{showToast("Rating failed");}
   }
   async function submitApp(){
@@ -120,8 +123,10 @@ export function StoreApp({user,data,updateData,showToast,AC}){
     // so admins can prioritize what to look at first.
     const autoFlags=autoModerate({name,desc,url});
     try{
+      // v6.3: store submitterUid alongside the username display field so
+      // rules can verify ownership for later updates/deletes.
       await addDoc(collection(firestoreDb,"nova_user_apps"),{
-        name,url,desc,cat:sCat,icon:sIcon,submitter:user,ts:Date.now(),
+        name,url,desc,cat:sCat,icon:sIcon,submitter:user,submitterUid:getDbUid(),ts:Date.now(),
         newTab:true,badge:"↗ New Tab",
         status:"pending",autoFlags,reviewedBy:null,reviewedAt:null,rejectReason:null,
       });
