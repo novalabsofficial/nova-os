@@ -13,8 +13,12 @@ const CLOCK_ZONES = [
   {label:"São Paulo",  tz:"America/Sao_Paulo"},
 ];
 
-export function ClockApp({AC}){
-  const [tab,setTab]=useState("world");
+export function ClockApp({AC, data, updateSettings}){
+  // v6.4: last-used tab persists per-account so Clock opens to whichever pane
+  // (World / Stopwatch / Timer) you were last using. selectTab() is the
+  // setTab call site for the tab buttons — wraps setTab + the persist write.
+  const [tab,setTab]=useState(()=>data?.settings?.clockTab||"world");
+  function selectTab(t){ setTab(t); if(updateSettings) updateSettings({clockTab:t}); }
   const [tick,setTick]=useState(()=>new Date());
   // Stopwatch state
   const [swRunning,setSwRunning]=useState(false);
@@ -111,7 +115,7 @@ export function ClockApp({AC}){
   }
 
   const tabBtn=(id,label)=>(
-    <button onClick={()=>setTab(id)} style={{flex:1,padding:"10px 8px",background:"none",border:"none",borderBottom:tab===id?"2px solid "+AC:"2px solid transparent",cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:12,color:tab===id?AC:"rgba(255,255,255,0.4)"}}>{label}</button>
+    <button onClick={()=>selectTab(id)} style={{flex:1,padding:"10px 8px",background:"none",border:"none",borderBottom:tab===id?"2px solid "+AC:"2px solid transparent",cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:12,color:tab===id?AC:"rgba(255,255,255,0.4)"}}>{label}</button>
   );
   const ctrlBtn=(label,onClick,active=false,danger=false)=>(
     <button onClick={onClick} style={{
