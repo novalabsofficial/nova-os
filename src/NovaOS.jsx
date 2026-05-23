@@ -1,5 +1,5 @@
 
-// NOVA OS v5.1 — Nova Systems
+// NOVA OS v5.2 — Nova Systems
 // Drop this into src/NovaOS.jsx
  
 import { useState, useEffect, useRef, useCallback } from "react";
@@ -20,6 +20,7 @@ import { createBoard as mineCreateBoard, floodReveal, isWin as mineIsWin, mineTo
 import { dailyWord, scoreGuess, normalizeGuess } from "./lib/wordle.js";
 import { emptyGrid as tetrisEmpty, randomPiece as tetrisRandom, shapeOf, fits as tetrisFits, lockPiece as tetrisLock, clearLines as tetrisClearLines, scoreForLines, tickInterval, PIECE_COLORS, BOARD_W as TETRIS_W, BOARD_H as TETRIS_H } from "./lib/tetris.js";
 import { wmoIcon, wmoLabel, geocodeUrl, parseGeocode, forecastUrl, parseForecast, alertsUrl, parseAlerts, isLikelyUS } from "./lib/weather.js";
+import { PROVIDERS as AI_PROVIDERS, streamResponse as aiStream, deriveTitle as aiDeriveTitle } from "./lib/ai.js";
 
 // ─── CONSTANTS ────────────────────────────────────────────────────────────────
 const DEFAULT_AC = "#4f9eff";
@@ -54,6 +55,8 @@ const DEFAULT_SIZES = {
   minesweeper:{w:520,h:600},wordle:{w:430,h:600},tetris:{w:340,h:620},
   pdf:{w:680,h:680},music:{w:480,h:560},calendar:{w:560,h:560},
   atmos:{w:680,h:640},
+  // 5.2
+  novaai:{w:760,h:640},
 };
 
 const APPS = [
@@ -79,6 +82,8 @@ const APPS = [
   {id:"minesweeper",icon:"💣",label:"Minesweeper",desc:"Classic mine-grid puzzle"},
   {id:"wordle",     icon:"🟩",label:"Wordle",     desc:"Daily 5-letter word puzzle"},
   {id:"tetris",     icon:"🟪",label:"Tetris",     desc:"Falling-block classic"},
+  // 5.2
+  {id:"novaai",     icon:"✨",label:"Nova AI",    desc:"Chat with Claude or ChatGPT (BYOK)"},
 ];
  
 // domain field enables Clearbit logo lookup
@@ -107,12 +112,13 @@ const STORE_CATALOG = [
 ];
  
 const STORE_CATS    = ["All","Games","Media","Tools","Social","News"];
-const BOOT_MSGS     = ["NOVA OS v5.1 — Nova Systems","Initializing kernel... OK","Loading hardware abstraction layer... OK","Mounting filesystems... OK","Starting widget engine... OK","Initializing Nova Store... OK","Loading user environment... OK","System ready."];
+const BOOT_MSGS     = ["NOVA OS v5.2 — Nova Systems","Initializing kernel... OK","Loading hardware abstraction layer... OK","Mounting filesystems... OK","Starting widget engine... OK","Initializing Nova Store... OK","Loading user environment... OK","System ready."];
 const ACCENT_PRESETS= ["#4f9eff","#ff6b6b","#4cef90","#ffcc44","#cc44ff","#ff8c44","#44ddcc","#ff44aa"];
 const BOOKMARKS     = [{label:"Hacker News",url:"https://news.ycombinator.com"},{label:"Wikipedia",url:"https://en.m.wikipedia.org"},{label:"Archive.org",url:"https://archive.org"},{label:"itch.io",url:"https://itch.io"}];
 const PAINT_COLORS  = ["#fff","#000","#ff4444","#ff8800","#ffdd00","#44dd44","#00ccff","#4466ff","#cc44ff","#ff44aa","#8b4513","#888"];
 const WALLPAPERS    = {
   aurora:{name:"Aurora",preview:"linear-gradient(180deg,#0a0218 0%,#3b1d6a 35%,#10b981 60%,#0a0218 100%),radial-gradient(ellipse at 50% 90%,#a855f7 0%,transparent 50%)"},
+  mesh:  {name:"Mesh",  preview:"radial-gradient(ellipse at 18% 22%,#6366f1 0%,transparent 45%),radial-gradient(ellipse at 82% 18%,#ec4899 0%,transparent 40%),radial-gradient(ellipse at 60% 85%,#06b6d4 0%,transparent 45%),linear-gradient(135deg,#0a0a14,#050510)"},
   nova:  {name:"Nova",  preview:"radial-gradient(ellipse at 25% 20%,#0ea5e9 0%,transparent 55%),radial-gradient(ellipse at 80% 85%,#7c3aed 0%,transparent 50%),linear-gradient(135deg,#07080f,#0d0a1a)"},
   bliss: {name:"Bliss", preview:"linear-gradient(180deg,#4a9fd1 44%,#6ec82e 44%)"},
   night: {name:"Night", preview:"radial-gradient(#1a0f40,#03020d)",  grad:"radial-gradient(ellipse at 50% 0%,#1a0f40,#03020d)"},
@@ -253,12 +259,66 @@ function AuroraBg(){
   );
 }
 
+// Mesh: clean, modern multi-blob gradient. Designed to feel like the
+// landing-page wallpapers of Linear/Vercel/Stripe — minimal, premium,
+// large soft color fields without busy texture. Added in 5.2.
+function MeshBg(){
+  return(
+    <svg style={{position:"absolute",inset:0,width:"100%",height:"100%"}} viewBox="0 0 1440 900" preserveAspectRatio="xMidYMid slice">
+      <defs>
+        <radialGradient id="me1" cx="20%" cy="22%" r="55%">
+          <stop offset="0%"   stopColor="#6366f1" stopOpacity="0.9"/>
+          <stop offset="55%"  stopColor="#4338ca" stopOpacity="0.25"/>
+          <stop offset="100%" stopColor="#0a0a14" stopOpacity="0"/>
+        </radialGradient>
+        <radialGradient id="me2" cx="80%" cy="18%" r="48%">
+          <stop offset="0%"   stopColor="#ec4899" stopOpacity="0.8"/>
+          <stop offset="55%"  stopColor="#be185d" stopOpacity="0.2"/>
+          <stop offset="100%" stopColor="#0a0a14" stopOpacity="0"/>
+        </radialGradient>
+        <radialGradient id="me3" cx="62%" cy="82%" r="52%">
+          <stop offset="0%"   stopColor="#06b6d4" stopOpacity="0.85"/>
+          <stop offset="55%"  stopColor="#0e7490" stopOpacity="0.22"/>
+          <stop offset="100%" stopColor="#0a0a14" stopOpacity="0"/>
+        </radialGradient>
+        <radialGradient id="me4" cx="10%" cy="88%" r="42%">
+          <stop offset="0%"   stopColor="#a855f7" stopOpacity="0.6"/>
+          <stop offset="100%" stopColor="#0a0a14" stopOpacity="0"/>
+        </radialGradient>
+        <radialGradient id="me5" cx="95%" cy="55%" r="35%">
+          <stop offset="0%"   stopColor="#f59e0b" stopOpacity="0.32"/>
+          <stop offset="100%" stopColor="#0a0a14" stopOpacity="0"/>
+        </radialGradient>
+        {/* Heavy blur sums the blobs into one continuous "mesh" surface */}
+        <filter id="meblur"><feGaussianBlur stdDeviation="80"/></filter>
+      </defs>
+      {/* Deep base */}
+      <rect width="1440" height="900" fill="#0a0a14"/>
+      <g filter="url(#meblur)">
+        <rect width="1440" height="900" fill="url(#me1)"/>
+        <rect width="1440" height="900" fill="url(#me2)"/>
+        <rect width="1440" height="900" fill="url(#me3)"/>
+        <rect width="1440" height="900" fill="url(#me4)"/>
+        <rect width="1440" height="900" fill="url(#me5)"/>
+      </g>
+      {/* Subtle vignette to keep edges feeling intentional */}
+      <radialGradient id="mevign" cx="50%" cy="50%" r="75%">
+        <stop offset="60%"  stopColor="#000000" stopOpacity="0"/>
+        <stop offset="100%" stopColor="#000000" stopOpacity="0.35"/>
+      </radialGradient>
+      <rect width="1440" height="900" fill="url(#mevign)"/>
+    </svg>
+  );
+}
+
 function Wallpaper({id,customUrl}){
   if(id==="custom"&&customUrl)return<div style={{position:"absolute",inset:0,background:'url("'+customUrl+'") center/cover no-repeat'}}/>;
-  if(!id||id==="aurora")return<AuroraBg/>;
+  // 5.2 made Mesh the new system default. Aurora is still selectable.
+  if(!id||id==="mesh")return<MeshBg/>;
+  if(id==="aurora")return<AuroraBg/>;
   if(id==="nova")return<NovaBg/>;
   if(id==="bliss")return<BlissBg/>;
-  const wp=WALLPAPERS[id];if(wp&&wp.grad)return<div style={{position:"absolute",inset:0,background:wp.grad}}/>;return<AuroraBg/>;
+  const wp=WALLPAPERS[id];if(wp&&wp.grad)return<div style={{position:"absolute",inset:0,background:wp.grad}}/>;return<MeshBg/>;
 }
  
 // ─── ICONS ────────────────────────────────────────────────────────────────────
@@ -281,6 +341,141 @@ function NovaSvgIcon({id,size=26}){
   }
   if(id==="profile")return(<svg width={w} height={h} viewBox="0 0 32 32"><rect width="32" height="32" rx={r} fill="#4f9eff"/><circle cx="16" cy="12" r="5.5" fill="rgba(255,255,255,0.95)"/><path d="M5 28 Q5 21 16 21 Q27 21 27 28" fill="rgba(255,255,255,0.9)"/></svg>);
   if(id==="chat")return(<svg width={w} height={h} viewBox="0 0 32 32"><rect width="32" height="32" rx={r} fill="#6366f1"/><path d="M6 8 Q6 6 8 6 L24 6 Q26 6 26 8 L26 19 Q26 21 24 21 L14 21 L9 26 L9 21 L8 21 Q6 21 6 19 Z" fill="rgba(255,255,255,0.92)"/><rect x="10" y="11" width="12" height="1.8" rx="0.9" fill="rgba(99,102,241,0.7)"/><rect x="10" y="14.5" width="8" height="1.8" rx="0.9" fill="rgba(99,102,241,0.5)"/></svg>);
+  // ─── 5.1 app icons ────────────────────────────────────────────────────
+  if(id==="calculator")return(
+    <svg width={w} height={h} viewBox="0 0 32 32">
+      <rect width="32" height="32" rx={r} fill="#475569"/>
+      <rect x="6" y="6" width="20" height="6.5" rx="1.5" fill="rgba(255,255,255,0.92)"/>
+      <rect x="6.5" y="14.5" width="5" height="4" rx="1" fill="rgba(255,255,255,0.7)"/>
+      <rect x="13.5" y="14.5" width="5" height="4" rx="1" fill="rgba(255,255,255,0.7)"/>
+      <rect x="20.5" y="14.5" width="5" height="4" rx="1" fill="rgba(255,255,255,0.7)"/>
+      <rect x="6.5" y="20" width="5" height="4" rx="1" fill="rgba(255,255,255,0.7)"/>
+      <rect x="13.5" y="20" width="5" height="4" rx="1" fill="rgba(255,255,255,0.7)"/>
+      <rect x="20.5" y="20" width="5" height="4" rx="1" fill="#fb923c"/>
+    </svg>
+  );
+  if(id==="clock")return(
+    <svg width={w} height={h} viewBox="0 0 32 32">
+      <rect width="32" height="32" rx={r} fill="#0ea5e9"/>
+      <circle cx="16" cy="16" r="10" fill="rgba(255,255,255,0.95)"/>
+      <circle cx="16" cy="16" r="10" fill="none" stroke="rgba(255,255,255,0.4)" strokeWidth="0.5"/>
+      <line x1="16" y1="16" x2="16" y2="10" stroke="#0ea5e9" strokeWidth="2" strokeLinecap="round"/>
+      <line x1="16" y1="16" x2="21" y2="16" stroke="#0ea5e9" strokeWidth="1.5" strokeLinecap="round"/>
+      <circle cx="16" cy="16" r="1.2" fill="#0ea5e9"/>
+      <circle cx="16" cy="8.5" r="0.6" fill="#0ea5e9"/>
+      <circle cx="23.5" cy="16" r="0.6" fill="#0ea5e9"/>
+      <circle cx="16" cy="23.5" r="0.6" fill="#0ea5e9"/>
+      <circle cx="8.5" cy="16" r="0.6" fill="#0ea5e9"/>
+    </svg>
+  );
+  if(id==="calendar")return(
+    <svg width={w} height={h} viewBox="0 0 32 32">
+      <rect width="32" height="32" rx={r} fill="#ffffff"/>
+      <rect x="5" y="7" width="22" height="20" rx="2" fill="rgba(255,255,255,0.97)" stroke="rgba(0,0,0,0.12)" strokeWidth="0.5"/>
+      <rect x="5" y="7" width="22" height="6" rx="2" fill="#dc2626"/>
+      <rect x="9" y="5" width="2" height="5" rx="1" fill="#7f1d1d"/>
+      <rect x="21" y="5" width="2" height="5" rx="1" fill="#7f1d1d"/>
+      <text x="16" y="23" textAnchor="middle" fill="#1f2937" fontSize="9" fontFamily="sans-serif" fontWeight="700">31</text>
+    </svg>
+  );
+  if(id==="music")return(
+    <svg width={w} height={h} viewBox="0 0 32 32">
+      <rect width="32" height="32" rx={r} fill="#a855f7"/>
+      <ellipse cx="12.5" cy="22" rx="3.5" ry="2.8" fill="rgba(255,255,255,0.95)"/>
+      <ellipse cx="22" cy="19.5" rx="3.5" ry="2.8" fill="rgba(255,255,255,0.95)"/>
+      <rect x="15" y="8" width="1.8" height="14.2" fill="rgba(255,255,255,0.95)"/>
+      <rect x="24.5" y="6" width="1.8" height="13.5" fill="rgba(255,255,255,0.95)"/>
+      <path d="M15 8 Q21 6.5 26.3 6 L26.3 9 Q21 9.5 15 11 Z" fill="rgba(255,255,255,0.95)"/>
+    </svg>
+  );
+  if(id==="pdf")return(
+    <svg width={w} height={h} viewBox="0 0 32 32">
+      <rect width="32" height="32" rx={r} fill="#fef2f2"/>
+      <path d="M8 4 L8 28 L24 28 L24 10 L18 4 Z" fill="rgba(255,255,255,0.95)" stroke="rgba(0,0,0,0.15)" strokeWidth="0.5"/>
+      <path d="M18 4 L18 10 L24 10 Z" fill="#fca5a5"/>
+      <rect x="10" y="18" width="12" height="6" rx="1" fill="#dc2626"/>
+      <text x="16" y="22.8" textAnchor="middle" fill="white" fontSize="4.5" fontFamily="sans-serif" fontWeight="800">PDF</text>
+    </svg>
+  );
+  if(id==="atmos")return(
+    <svg width={w} height={h} viewBox="0 0 32 32">
+      <defs>
+        <linearGradient id="atmosBg" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#38bdf8"/>
+          <stop offset="100%" stopColor="#0284c7"/>
+        </linearGradient>
+      </defs>
+      <rect width="32" height="32" rx={r} fill="url(#atmosBg)"/>
+      <circle cx="11" cy="11" r="5" fill="#fde047"/>
+      <path d="M10 18 Q10 16 12 16 Q12.5 14 14.5 14 Q16 12.5 18 14 Q21 13.5 22 16.5 Q24 16.5 24 19 Q24 21 22 21 L12 21 Q10 21 10 19 Z" fill="rgba(255,255,255,0.95)"/>
+    </svg>
+  );
+  if(id==="minesweeper")return(
+    <svg width={w} height={h} viewBox="0 0 32 32">
+      <rect width="32" height="32" rx={r} fill="#475569"/>
+      <rect x="6" y="6" width="20" height="20" rx="1.5" fill="rgba(255,255,255,0.08)" stroke="rgba(255,255,255,0.15)" strokeWidth="0.5"/>
+      <rect x="6" y="13" width="20" height="0.5" fill="rgba(255,255,255,0.15)"/>
+      <rect x="6" y="20" width="20" height="0.5" fill="rgba(255,255,255,0.15)"/>
+      <rect x="12.7" y="6" width="0.5" height="20" fill="rgba(255,255,255,0.15)"/>
+      <rect x="19.3" y="6" width="0.5" height="20" fill="rgba(255,255,255,0.15)"/>
+      <circle cx="16" cy="16.5" r="3.5" fill="#0f172a"/>
+      <circle cx="14.8" cy="15.3" r="0.7" fill="rgba(255,255,255,0.7)"/>
+      <line x1="16" y1="11.5" x2="16" y2="13" stroke="#0f172a" strokeWidth="1.2" strokeLinecap="round"/>
+      <line x1="11.5" y1="16.5" x2="13" y2="16.5" stroke="#0f172a" strokeWidth="1.2" strokeLinecap="round"/>
+      <line x1="19" y1="16.5" x2="20.5" y2="16.5" stroke="#0f172a" strokeWidth="1.2" strokeLinecap="round"/>
+      <line x1="16" y1="20" x2="16" y2="21.5" stroke="#0f172a" strokeWidth="1.2" strokeLinecap="round"/>
+      <text x="9" y="11" fill="#88c8ff" fontSize="4" fontFamily="monospace" fontWeight="700">2</text>
+      <text x="21" y="25" fill="#ff7878" fontSize="4" fontFamily="monospace" fontWeight="700">3</text>
+    </svg>
+  );
+  if(id==="wordle")return(
+    <svg width={w} height={h} viewBox="0 0 32 32">
+      <rect width="32" height="32" rx={r} fill="#0f172a"/>
+      <rect x="3" y="9" width="5" height="6" rx="0.5" fill="#4cef90"/>
+      <text x="5.5" y="13.7" textAnchor="middle" fill="white" fontSize="4.5" fontFamily="sans-serif" fontWeight="800">N</text>
+      <rect x="9" y="9" width="5" height="6" rx="0.5" fill="rgba(255,255,255,0.1)" stroke="rgba(255,255,255,0.15)" strokeWidth="0.5"/>
+      <text x="11.5" y="13.7" textAnchor="middle" fill="rgba(255,255,255,0.4)" fontSize="4.5" fontFamily="sans-serif" fontWeight="800">O</text>
+      <rect x="15" y="9" width="5" height="6" rx="0.5" fill="#fbbf24"/>
+      <text x="17.5" y="13.7" textAnchor="middle" fill="white" fontSize="4.5" fontFamily="sans-serif" fontWeight="800">V</text>
+      <rect x="21" y="9" width="5" height="6" rx="0.5" fill="rgba(255,255,255,0.1)" stroke="rgba(255,255,255,0.15)" strokeWidth="0.5"/>
+      <text x="23.5" y="13.7" textAnchor="middle" fill="rgba(255,255,255,0.4)" fontSize="4.5" fontFamily="sans-serif" fontWeight="800">A</text>
+      <rect x="11" y="17" width="5" height="6" rx="0.5" fill="#4cef90"/>
+      <text x="13.5" y="21.7" textAnchor="middle" fill="white" fontSize="4.5" fontFamily="sans-serif" fontWeight="800">5</text>
+      <rect x="17" y="17" width="5" height="6" rx="0.5" fill="#4cef90"/>
+      <text x="19.5" y="21.7" textAnchor="middle" fill="white" fontSize="4.5" fontFamily="sans-serif" fontWeight="800">.2</text>
+    </svg>
+  );
+  if(id==="tetris")return(
+    <svg width={w} height={h} viewBox="0 0 32 32">
+      <rect width="32" height="32" rx={r} fill="#18181b"/>
+      <rect x="6" y="6" width="4" height="4" rx="0.5" fill="#22d3ee"/>
+      <rect x="10" y="6" width="4" height="4" rx="0.5" fill="#22d3ee"/>
+      <rect x="14" y="6" width="4" height="4" rx="0.5" fill="#22d3ee"/>
+      <rect x="18" y="6" width="4" height="4" rx="0.5" fill="#22d3ee"/>
+      <rect x="10" y="13" width="4" height="4" rx="0.5" fill="#a855f7"/>
+      <rect x="14" y="13" width="4" height="4" rx="0.5" fill="#a855f7"/>
+      <rect x="18" y="13" width="4" height="4" rx="0.5" fill="#a855f7"/>
+      <rect x="14" y="17" width="4" height="4" rx="0.5" fill="#a855f7"/>
+      <rect x="6" y="22" width="4" height="4" rx="0.5" fill="#fb923c"/>
+      <rect x="10" y="22" width="4" height="4" rx="0.5" fill="#fb923c"/>
+      <rect x="14" y="22" width="4" height="4" rx="0.5" fill="#fb923c"/>
+      <rect x="6" y="18" width="4" height="4" rx="0.5" fill="#fb923c"/>
+    </svg>
+  );
+  if(id==="novaai")return(
+    <svg width={w} height={h} viewBox="0 0 32 32">
+      <defs>
+        <linearGradient id="aiBg" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stopColor="#a855f7"/>
+          <stop offset="100%" stopColor="#06b6d4"/>
+        </linearGradient>
+      </defs>
+      <rect width="32" height="32" rx={r} fill="url(#aiBg)"/>
+      <path d="M16 7 L18.5 13.5 L25 16 L18.5 18.5 L16 25 L13.5 18.5 L7 16 L13.5 13.5 Z" fill="rgba(255,255,255,0.95)"/>
+      <circle cx="23" cy="10" r="1.4" fill="rgba(255,255,255,0.85)"/>
+      <circle cx="9" cy="22" r="1.1" fill="rgba(255,255,255,0.7)"/>
+    </svg>
+  );
   return null; // unknown id — caller falls back to app.icon emoji
 }
 
@@ -290,6 +485,11 @@ function NovaSvgIcon({id,size=26}){
 const HAS_SVG_ICON = new Set([
   "notes","tasks","files","paint","browser","snake","2048",
   "store","terminal","settings","profile","chat",
+  // 5.1 apps
+  "calculator","clock","calendar","music","pdf","atmos",
+  "minesweeper","wordle","tetris",
+  // 5.2
+  "novaai",
 ]);
 
 // Store app icon using Clearbit logo API with emoji fallback
@@ -587,7 +787,7 @@ export default function NovaOS(){
   const use24h  =settings.clock24h  ||false;
   const winBlur =settings.winBlur   ??18;
   const largeFnt=settings.largeFont ||false;
-  const wpId    =settings.wallpaper ||data?.wallpaper||"aurora";
+  const wpId    =settings.wallpaper ||data?.wallpaper||"mesh";
   const widgets =settings.widgets   ||{};
   // Resolved device mode: user's saved preference overrides detection. "auto"
   // (or any unset/invalid value) defers to the viewport+touch heuristic.
@@ -752,21 +952,35 @@ export default function NovaOS(){
     setBusy(true);setAuthErr("");
     if(mode==="register"){
       const ex=await db.get("user:"+u+":pw");if(ex!==null){setAuthErr("Username taken.");setBusy(false);return;}
-      await db.set("user:"+u+":pw",p);const init={notes:[],tasks:[],wallpaper:"aurora",bio:"",joined:Date.now(),settings:{},installedApps:[],folders:[],migratedTo41:true};
+      await db.set("user:"+u+":pw",p);const init={notes:[],tasks:[],wallpaper:"mesh",bio:"",joined:Date.now(),settings:{},installedApps:[],folders:[],migratedTo41:true,migratedTo52:true};
       await db.set("user:"+u+":data",init);setUser(u);setData(init);setIconPos({});setWidgetState(DEFAULT_WIDGET_STATE);setScreen("desktop");
     }else{
       const stored=await db.get("user:"+u+":pw");if(stored===null){setAuthErr("Account not found.");setBusy(false);return;}
       if(stored!==p){setAuthErr("Incorrect password.");setBusy(false);return;}
       const d=await db.get("user:"+u+":data");const savedIconPos=await db.get("user:"+u+":iconpos");
-      // One-time migration: NOVA OS 4.1 makes Aurora the default wallpaper.
-      // Bump any account still on the old "nova" default exactly once.
+      // One-time migrations layered by release. Each runs at most once per user
+      // (gated by its own migratedToX.Y flag) and only re-points the wallpaper
+      // if the user is on the *previous* default — anyone who deliberately
+      // picked sakura / forest / etc. keeps their choice.
+      let migratedNow = false;
       if(d&&!d.migratedTo41){
+        // 4.1: Nova → Aurora as the default wallpaper.
         if(d.wallpaper==="nova")d.wallpaper="aurora";
         if(d.settings?.wallpaper==="nova")d.settings={...d.settings,wallpaper:"aurora"};
         d.migratedTo41=true;
-        await db.set("user:"+u+":data",d);
+        migratedNow=true;
       }
-      setUser(u);setData(d||{notes:[],tasks:[],wallpaper:"aurora",bio:"",joined:Date.now(),settings:{},installedApps:[],folders:[],migratedTo41:true});
+      if(d&&!d.migratedTo52){
+        // 5.2: Aurora → Mesh as the default wallpaper. This runs *after* the
+        // 4.1 step above, so a user who came from v3.x (wallpaper: "nova")
+        // gets bumped nova → aurora → mesh in a single login.
+        if(d.wallpaper==="aurora")d.wallpaper="mesh";
+        if(d.settings?.wallpaper==="aurora")d.settings={...d.settings,wallpaper:"mesh"};
+        d.migratedTo52=true;
+        migratedNow=true;
+      }
+      if(migratedNow) await db.set("user:"+u+":data",d);
+      setUser(u);setData(d||{notes:[],tasks:[],wallpaper:"mesh",bio:"",joined:Date.now(),settings:{},installedApps:[],folders:[],migratedTo41:true,migratedTo52:true});
       setIconPos(savedIconPos||{});
       if(d?.settings?.widgetState)setWidgetState({...DEFAULT_WIDGET_STATE,...d.settings.widgetState});
       setScreen("desktop");
@@ -785,10 +999,10 @@ export default function NovaOS(){
   const dragCursor=drag?(drag.type==="move"?"grabbing":drag.edge+"-resize"):widgetResize?(widgetResize.edge+"-resize"):isAnyDrag?"grabbing":"default";
  
   // ── BOOT ─────────────────────────────────────────────────────────────────
-  if(screen==="boot")return(<div style={{width:"100%",height:"100vh",background:"#07080f",display:"flex",flexDirection:"column",justifyContent:"center",padding:"10vh max(24px, 12%)"}}><style>{CSS}</style><div style={{fontFamily:FFB,fontWeight:700,fontSize:"clamp(40px, 12vw, 66px)",letterSpacing:4,color:"#fff",marginBottom:4,lineHeight:1}}>NOVA</div><div style={{fontFamily:FF,fontSize:12,color:"rgba(255,255,255,0.22)",letterSpacing:5,marginBottom:46}}>OPERATING SYSTEM  ·  v5.1</div>{bootLines.map((l,i)=><div key={i} style={{fontFamily:FFM,fontSize:12,color:l.includes("ready")?"#4f9eff":"rgba(255,255,255,0.42)",marginBottom:5,animation:"boot-in 0.22s cubic-bezier(0.4,0,0.2,1)"}}>{l.includes("OK")?<>{l.replace("... OK","")}... <span style={{color:"#4cef90"}}>OK</span></>:l}</div>)}{MobileNotice}</div>);
+  if(screen==="boot")return(<div style={{width:"100%",height:"100vh",background:"#07080f",display:"flex",flexDirection:"column",justifyContent:"center",padding:"10vh max(24px, 12%)"}}><style>{CSS}</style><div style={{fontFamily:FFB,fontWeight:700,fontSize:"clamp(40px, 12vw, 66px)",letterSpacing:4,color:"#fff",marginBottom:4,lineHeight:1}}>NOVA</div><div style={{fontFamily:FF,fontSize:12,color:"rgba(255,255,255,0.22)",letterSpacing:5,marginBottom:46}}>OPERATING SYSTEM  ·  v5.2</div>{bootLines.map((l,i)=><div key={i} style={{fontFamily:FFM,fontSize:12,color:l.includes("ready")?"#4f9eff":"rgba(255,255,255,0.42)",marginBottom:5,animation:"boot-in 0.22s cubic-bezier(0.4,0,0.2,1)"}}>{l.includes("OK")?<>{l.replace("... OK","")}... <span style={{color:"#4cef90"}}>OK</span></>:l}</div>)}{MobileNotice}</div>);
  
   // ── LOGIN ────────────────────────────────────────────────────────────────
-  if(screen==="login")return(<div style={{width:"100%",height:"100vh",position:"relative",overflow:"hidden"}}><style>{CSS}</style><NovaBg/><div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center"}}><div style={{background:"rgba(8,10,22,0.86)",backdropFilter:"blur(24px)",border:"1px solid rgba(255,255,255,0.11)",borderRadius:16,padding:"44px 40px",width:376,maxWidth:"calc(100vw - 24px)",boxShadow:"0 40px 100px rgba(0,0,0,0.6)",position:"relative",overflow:"hidden"}}><div style={{position:"absolute",top:0,left:0,right:0,height:2,background:"linear-gradient(90deg,transparent,"+DEFAULT_AC+",transparent)"}}/><div style={{fontFamily:FFB,fontWeight:700,fontSize:38,color:"#fff",textAlign:"center",letterSpacing:4,marginBottom:4}}>NOVA</div><div style={{fontFamily:FF,fontSize:11,color:"rgba(255,255,255,0.22)",textAlign:"center",letterSpacing:4,marginBottom:36}}>OPERATING SYSTEM  ·  v5.1</div><div style={{display:"flex",borderBottom:"1px solid rgba(255,255,255,0.09)",marginBottom:24}}>{["login","register"].map(m=><button key={m} className="lt" onClick={()=>{setMode(m);setAuthErr("");}} style={{flex:1,padding:"10px 0",background:"none",border:"none",borderBottom:mode===m?"2px solid "+DEFAULT_AC:"2px solid transparent",cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:12,letterSpacing:1,color:mode===m?DEFAULT_AC:"rgba(255,255,255,0.28)",transition:"color 0.15s"}}>{m==="login"?"SIGN IN":"REGISTER"}</button>)}</div><input style={{...INP,marginBottom:11}} placeholder="Username" value={uname} onChange={e=>setUname(e.target.value)} onKeyDown={e=>e.key==="Enter"&&handleAuth()} autoFocus/><input style={INP} type="password" placeholder="Password" value={pass} onChange={e=>setPass(e.target.value)} onKeyDown={e=>e.key==="Enter"&&handleAuth()}/><button className="ls" disabled={busy} onClick={handleAuth} style={{width:"100%",padding:"12px",background:fill(DEFAULT_AC),border:"1px solid "+bdr(DEFAULT_AC),borderRadius:8,cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:14,letterSpacing:1,color:"#fff",marginTop:14,transition:"opacity 0.15s"}}>{busy?"AUTHENTICATING…":mode==="login"?"SIGN IN →":"CREATE ACCOUNT →"}</button>{authErr&&<div style={{color:"#ff7878",fontFamily:FF,fontSize:13,textAlign:"center",marginTop:12}}>⚠ {authErr}</div>}<div style={{marginTop:20,fontFamily:FF,fontStyle:"italic",fontSize:11,color:"rgba(255,255,255,0.14)",textAlign:"center"}}>Don't reuse real passwords — demo auth only.</div></div></div>{MobileNotice}</div>);
+  if(screen==="login")return(<div style={{width:"100%",height:"100vh",position:"relative",overflow:"hidden"}}><style>{CSS}</style><MeshBg/><div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center"}}><div style={{background:"rgba(8,10,22,0.86)",backdropFilter:"blur(24px)",border:"1px solid rgba(255,255,255,0.11)",borderRadius:16,padding:"44px 40px",width:376,maxWidth:"calc(100vw - 24px)",boxShadow:"0 40px 100px rgba(0,0,0,0.6)",position:"relative",overflow:"hidden"}}><div style={{position:"absolute",top:0,left:0,right:0,height:2,background:"linear-gradient(90deg,transparent,"+DEFAULT_AC+",transparent)"}}/><div style={{fontFamily:FFB,fontWeight:700,fontSize:38,color:"#fff",textAlign:"center",letterSpacing:4,marginBottom:4}}>NOVA</div><div style={{fontFamily:FF,fontSize:11,color:"rgba(255,255,255,0.22)",textAlign:"center",letterSpacing:4,marginBottom:36}}>OPERATING SYSTEM  ·  v5.2</div><div style={{display:"flex",borderBottom:"1px solid rgba(255,255,255,0.09)",marginBottom:24}}>{["login","register"].map(m=><button key={m} className="lt" onClick={()=>{setMode(m);setAuthErr("");}} style={{flex:1,padding:"10px 0",background:"none",border:"none",borderBottom:mode===m?"2px solid "+DEFAULT_AC:"2px solid transparent",cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:12,letterSpacing:1,color:mode===m?DEFAULT_AC:"rgba(255,255,255,0.28)",transition:"color 0.15s"}}>{m==="login"?"SIGN IN":"REGISTER"}</button>)}</div><input style={{...INP,marginBottom:11}} placeholder="Username" value={uname} onChange={e=>setUname(e.target.value)} onKeyDown={e=>e.key==="Enter"&&handleAuth()} autoFocus/><input style={INP} type="password" placeholder="Password" value={pass} onChange={e=>setPass(e.target.value)} onKeyDown={e=>e.key==="Enter"&&handleAuth()}/><button className="ls" disabled={busy} onClick={handleAuth} style={{width:"100%",padding:"12px",background:fill(DEFAULT_AC),border:"1px solid "+bdr(DEFAULT_AC),borderRadius:8,cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:14,letterSpacing:1,color:"#fff",marginTop:14,transition:"opacity 0.15s"}}>{busy?"AUTHENTICATING…":mode==="login"?"SIGN IN →":"CREATE ACCOUNT →"}</button>{authErr&&<div style={{color:"#ff7878",fontFamily:FF,fontSize:13,textAlign:"center",marginTop:12}}>⚠ {authErr}</div>}<div style={{marginTop:20,fontFamily:FF,fontStyle:"italic",fontSize:11,color:"rgba(255,255,255,0.14)",textAlign:"center"}}>Don't reuse real passwords — demo auth only.</div></div></div>{MobileNotice}</div>);
  
   // ── DESKTOP ──────────────────────────────────────────────────────────────
   return(
@@ -847,7 +1061,7 @@ export default function NovaOS(){
         </div>
         <div style={{padding:"10px 16px",borderTop:"1px solid rgba(255,255,255,0.07)",display:"flex",alignItems:"center",gap:10}}>
           <div style={{width:32,height:32,borderRadius:"50%",background:fill(AC),border:"1.5px solid "+AC,display:"flex",alignItems:"center",justifyContent:"center",fontSize:15,flexShrink:0}}>👤</div>
-          <div style={{flex:1}}><div style={{fontFamily:FFB,fontWeight:600,fontSize:13,color:"#fff"}}>@{user}</div><div style={{fontFamily:FF,fontSize:10,color:"rgba(255,255,255,0.3)"}}>Nova OS v5.1</div></div>
+          <div style={{flex:1}}><div style={{fontFamily:FFB,fontWeight:600,fontSize:13,color:"#fff"}}>@{user}</div><div style={{fontFamily:FF,fontSize:10,color:"rgba(255,255,255,0.3)"}}>Nova OS v5.2</div></div>
           <button onClick={logout} style={{padding:"6px 12px",background:"rgba(200,40,40,0.12)",border:"1px solid rgba(200,40,40,0.3)",borderRadius:6,cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:11,color:"rgba(255,140,140,0.9)"}}>Logout</button>
         </div>
       </div>)}
@@ -890,6 +1104,7 @@ export default function NovaOS(){
               {win.app==="minesweeper"&&<MinesweeperApp AC={AC}/>}
               {win.app==="wordle"     &&<WordleApp AC={AC} showToast={showToast}/>}
               {win.app==="tetris"     &&<TetrisApp AC={AC}/>}
+              {win.app==="novaai"     &&<NovaAiApp AC={AC} showToast={showToast}/>}
             </div>
           </div>
         );
@@ -1508,7 +1723,7 @@ function StoreApp({user,data,updateData,showToast,AC}){
     <div style={{width:"100%",fontFamily:FF}}>
       {/* Header + search */}
       <div style={{marginBottom:12}}>
-        <div style={{fontFamily:FFB,fontWeight:700,fontSize:20,color:"#fff",marginBottom:8}}>🏪 Nova Store 5.1</div>
+        <div style={{fontFamily:FFB,fontWeight:700,fontSize:20,color:"#fff",marginBottom:8}}>🏪 Nova Store 5.2</div>
         <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search all apps…" style={INP}/>
       </div>
  
@@ -1649,10 +1864,10 @@ function StoreApp({user,data,updateData,showToast,AC}){
 }
  
 function TerminalApp({user,AC}){
-  const [lines,setLines]=useState([{t:"out",v:"NOVA Terminal v5.1.0"},{t:"out",v:"Session: "+user+" — "+new Date().toLocaleString()},{t:"out",v:'Type "help" for commands.'},{t:"gap"}]);
+  const [lines,setLines]=useState([{t:"out",v:"NOVA Terminal v5.2.0"},{t:"out",v:"Session: "+user+" — "+new Date().toLocaleString()},{t:"out",v:'Type "help" for commands.'},{t:"gap"}]);
   const [cmd,setCmd]=useState("");const [hist,setHist]=useState([]);const [hIdx,setHIdx]=useState(-1);const endRef=useRef(null);
   useEffect(()=>{endRef.current?.scrollIntoView({behavior:"smooth"});},[lines]);
-  const CMDS={help:()=>["Commands: help, whoami, date, echo <text>, version, sysinfo, ls, neofetch, clear"],whoami:()=>[user],date:()=>[new Date().toLocaleString()],version:()=>["NOVA OS v5.1.0 — Nova Systems Inc."],sysinfo:()=>["CPU: Nova Virtual Core™","RAM: 8.0 GB","Storage: Firebase Firestore","Resolution: "+window.innerWidth+"x"+window.innerHeight,"Uptime: "+Math.floor(performance.now()/1000)+"s"],ls:()=>["notes/ tasks/ files/ paint/ browser/ snake/ 2048/ store/ terminal/ settings/"],neofetch:()=>[" ███╗   ██╗ ██████╗ ██╗   ██╗ █████╗ "," ████╗  ██║██╔═══██╗██║   ██║██╔══██╗"," ██╔██╗ ██║██║   ██║██║   ██║███████║"," ██║╚██╗██║██║   ██║╚██╗ ██╔╝██╔══██║"," ██║ ╚████║╚██████╔╝ ╚████╔╝ ██║  ██║","OS: Nova v5.1  User: "+user,"Widgets: Clock·Weather·Notes·Tasks·Calendar·SysInfo"],echo:args=>[args.join(" ")||"(empty)"],clear:()=>"__clear__"};
+  const CMDS={help:()=>["Commands: help, whoami, date, echo <text>, version, sysinfo, ls, neofetch, clear"],whoami:()=>[user],date:()=>[new Date().toLocaleString()],version:()=>["NOVA OS v5.2.0 — Nova Systems Inc."],sysinfo:()=>["CPU: Nova Virtual Core™","RAM: 8.0 GB","Storage: Firebase Firestore","Resolution: "+window.innerWidth+"x"+window.innerHeight,"Uptime: "+Math.floor(performance.now()/1000)+"s"],ls:()=>["notes/ tasks/ files/ paint/ browser/ snake/ 2048/ store/ terminal/ settings/"],neofetch:()=>[" ███╗   ██╗ ██████╗ ██╗   ██╗ █████╗ "," ████╗  ██║██╔═══██╗██║   ██║██╔══██╗"," ██╔██╗ ██║██║   ██║██║   ██║███████║"," ██║╚██╗██║██║   ██║╚██╗ ██╔╝██╔══██║"," ██║ ╚████║╚██████╔╝ ╚████╔╝ ██║  ██║","OS: Nova v5.2  User: "+user,"Widgets: Clock·Weather·Notes·Tasks·Calendar·SysInfo"],echo:args=>[args.join(" ")||"(empty)"],clear:()=>"__clear__"};
   function run(){const raw=cmd.trim();if(!raw)return;const parts=raw.split(" ");const c=parts[0].toLowerCase();const args=parts.slice(1);setHist(h=>[raw,...h]);setHIdx(-1);setCmd("");const nl=[...lines,{t:"in",v:raw}];const h=CMDS[c];if(!h){nl.push({t:"err",v:c+': not found. Try "help".'});}else{const r=h(args);if(r==="__clear__"){setLines([]);return;}r.forEach(v=>nl.push({t:"out",v}));}nl.push({t:"gap"});setLines(nl);}
   function onKey(e){if(e.key==="Enter"){run();return;}if(e.key==="ArrowUp"){const i=Math.min(hIdx+1,hist.length-1);setHIdx(i);if(hist[i])setCmd(hist[i]);}if(e.key==="ArrowDown"){const i=Math.max(hIdx-1,-1);setHIdx(i);setCmd(i===-1?"":(hist[i]||""));}}
   return(<div style={{width:"100%",fontFamily:FFM}}><div style={{background:"#030407",borderRadius:8,padding:"13px 15px",height:"100%",minHeight:280,overflowY:"auto",border:"1px solid rgba(255,255,255,0.07)"}}>{lines.map((l,i)=><div key={i} style={{color:l.t==="in"?AC:l.t==="err"?"#ff7878":"rgba(180,210,255,0.58)",fontSize:12,marginBottom:l.t==="gap"?5:2,minHeight:l.t==="gap"?4:undefined,whiteSpace:"pre"}}>{l.t==="in"?"$ "+l.v:l.t==="gap"?null:l.v}</div>)}<div style={{display:"flex",alignItems:"center"}}><span style={{color:"#4cef90",marginRight:7,fontSize:12}}>$</span><input value={cmd} onChange={e=>setCmd(e.target.value)} onKeyDown={onKey} autoFocus style={{flex:1,background:"none",border:"none",outline:"none",color:AC,fontFamily:FFM,fontSize:12,caretColor:AC}}/></div><div ref={endRef}/></div></div>);
@@ -1661,7 +1876,7 @@ function TerminalApp({user,AC}){
 function SettingsApp({user,data,updateSettings,showToast,AC,onCustomWallpaper}){
   const settings=data?.settings||{};const fileRef=useRef(null);
   function handleUpload(e){const file=e.target.files[0];if(!file)return;if(file.size>8*1024*1024){showToast("File too large (max 8MB)");return;}const reader=new FileReader();reader.onload=ev=>{const img=new Image();img.onload=()=>{const canvas=document.createElement("canvas");const MAX=900;const ratio=Math.min(MAX/img.width,MAX/img.height,1);canvas.width=Math.round(img.width*ratio);canvas.height=Math.round(img.height*ratio);canvas.getContext("2d").drawImage(img,0,0,canvas.width,canvas.height);onCustomWallpaper(canvas.toDataURL("image/jpeg",0.72));};img.src=ev.target.result;};reader.readAsDataURL(file);e.target.value="";}
-  const wpId=settings.wallpaper||data?.wallpaper||"aurora";
+  const wpId=settings.wallpaper||data?.wallpaper||"mesh";
   const widgets=settings.widgets||{};
   function setWidget(id,val){updateSettings({widgets:{...widgets,[id]:val}});}
   return(
@@ -3138,3 +3353,274 @@ function TetrisApp({AC}){
   );
 }
 
+// ─── 5.2 APPS ─────────────────────────────────────────────────────────────────
+
+// LocalStorage keys for Nova AI. We store everything client-side per the BYOK
+// promise — no API key, no conversation history, no model preferences ever
+// touch Firestore. That means data is per-device per-browser. Users who want
+// cross-device sync can copy/paste their API key into each device.
+const AI_LS_KEYS    = "nova-ai-keys";    // {claude, openai}
+const AI_LS_CONFIG  = "nova-ai-config";  // {provider, model:{claude,openai}}
+const AI_LS_CHATS   = "nova-ai-chats";   // [{id,title,provider,model,messages,createdAt,updatedAt}]
+
+function aiLoad(key, fallback) {
+  if (typeof localStorage === "undefined") return fallback;
+  try { const raw = localStorage.getItem(key); return raw ? JSON.parse(raw) : fallback; }
+  catch { return fallback; }
+}
+function aiSave(key, value) {
+  if (typeof localStorage === "undefined") return;
+  try { localStorage.setItem(key, JSON.stringify(value)); } catch {}
+}
+
+function NovaAiApp({AC, showToast}){
+  // Persistent state — loaded from localStorage at first render.
+  const [keys, setKeys]       = useState(()=>aiLoad(AI_LS_KEYS, {claude:"", openai:""}));
+  const [config, setConfig]   = useState(()=>aiLoad(AI_LS_CONFIG, {provider:"claude", model:{claude:AI_PROVIDERS.claude.defaultModel, openai:AI_PROVIDERS.openai.defaultModel}}));
+  const [chats, setChats]     = useState(()=>aiLoad(AI_LS_CHATS, []));
+  const [activeId, setActiveId] = useState(()=>chats[0]?.id || null);
+  const [input, setInput]     = useState("");
+  const [sending, setSending] = useState(false);
+  const [streamBuf, setStreamBuf] = useState("");      // live-updating assistant text mid-stream
+  const [error, setError]     = useState(null);
+  const [view, setView]       = useState("chat");      // chat | settings — controls right-side panel
+  const [showSidebar, setShowSidebar] = useState(true);
+  const scrollRef = useRef(null);
+
+  // Persist on every change
+  useEffect(()=>aiSave(AI_LS_KEYS, keys),     [keys]);
+  useEffect(()=>aiSave(AI_LS_CONFIG, config), [config]);
+  useEffect(()=>aiSave(AI_LS_CHATS, chats),   [chats]);
+
+  // Scroll the message list to the bottom whenever it grows.
+  useEffect(()=>{scrollRef.current?.scrollTo({top:scrollRef.current.scrollHeight, behavior:"smooth"});}, [activeId, streamBuf, chats]);
+
+  const provider = config.provider;
+  const model    = config.model[provider] || AI_PROVIDERS[provider].defaultModel;
+  const apiKey   = keys[provider] || "";
+  const hasKey   = !!apiKey.trim();
+  const active   = chats.find(c=>c.id===activeId) || null;
+
+  function newChat(){
+    setActiveId(null);
+    setInput("");
+    setError(null);
+    setStreamBuf("");
+  }
+  function selectChat(id){
+    setActiveId(id);
+    setError(null);
+    setStreamBuf("");
+  }
+  function deleteChat(id){
+    setChats(prev=>prev.filter(c=>c.id!==id));
+    if(id===activeId) setActiveId(null);
+  }
+
+  async function send(){
+    const text = input.trim();
+    if (!text || sending) return;
+    if (!hasKey) { setError("Add your API key in Settings first."); setView("settings"); return; }
+
+    setError(null);
+    setSending(true);
+    setInput("");
+    setStreamBuf("");
+
+    // Build/extend the conversation. If we're not in one yet, create it.
+    let chatId = activeId;
+    let chatMessages;
+    if (!chatId) {
+      const newId = "c-" + Date.now() + "-" + Math.random().toString(36).slice(2,7);
+      const newChatObj = {
+        id: newId,
+        title: aiDeriveTitle(text),
+        provider, model,
+        messages: [{role:"user", content:text}],
+        createdAt: Date.now(), updatedAt: Date.now(),
+      };
+      setChats(prev=>[newChatObj, ...prev]);
+      setActiveId(newId);
+      chatId = newId;
+      chatMessages = newChatObj.messages;
+    } else {
+      chatMessages = [...active.messages, {role:"user", content:text}];
+      setChats(prev=>prev.map(c=>c.id===chatId?{...c,messages:chatMessages,updatedAt:Date.now()}:c));
+    }
+
+    let acc = "";
+    try {
+      for await (const chunk of aiStream(provider, model, apiKey, chatMessages)) {
+        acc += chunk;
+        setStreamBuf(acc);
+      }
+      // Stream finished — bake the assistant response into the chat record.
+      setChats(prev=>prev.map(c=>c.id===chatId?{...c, messages:[...chatMessages,{role:"assistant",content:acc}], updatedAt:Date.now()}:c));
+      setStreamBuf("");
+    } catch (err) {
+      // Surface API error; don't drop the user message (it's already saved).
+      const msg = err?.message || "Request failed";
+      setError(msg);
+      setStreamBuf("");
+    } finally {
+      setSending(false);
+    }
+  }
+  function onKey(e){
+    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); }
+  }
+
+  // Renders the message list area (right side of layout).
+  function renderMessages(){
+    if (view === "settings") return renderSettings();
+    if (!active && streamBuf === "" && !sending) {
+      return (
+        <div style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:14,padding:30,textAlign:"center",minHeight:0}}>
+          <div style={{fontSize:46,filter:"drop-shadow(0 0 18px rgba(168,85,247,0.4))"}}>✨</div>
+          <div style={{fontFamily:FFB,fontWeight:700,fontSize:20,color:"rgba(255,255,255,0.85)"}}>Nova AI</div>
+          <div style={{fontSize:12,color:"rgba(255,255,255,0.4)",maxWidth:380,lineHeight:1.7}}>
+            Chat with <strong>{AI_PROVIDERS.claude.label}</strong> or <strong>{AI_PROVIDERS.openai.label}</strong> using your own API key.<br/>
+            <span style={{color:"rgba(255,255,255,0.3)"}}>All requests go from your browser straight to the provider — Nova OS never sees your key or your messages.</span>
+          </div>
+          {!hasKey && (
+            <button onClick={()=>setView("settings")} style={{padding:"10px 18px",background:fill(AC),border:"1px solid "+bdr(AC),borderRadius:9,cursor:"pointer",fontFamily:FFB,fontWeight:700,fontSize:13,color:AC,marginTop:6}}>Add your API key</button>
+          )}
+        </div>
+      );
+    }
+    const msgs = active?.messages || [];
+    return (
+      <div ref={scrollRef} style={{flex:1,overflowY:"auto",padding:"14px 14px 18px",display:"flex",flexDirection:"column",gap:10,minHeight:0}}>
+        {msgs.map((m,i)=>(
+          <div key={i} style={{display:"flex",justifyContent:m.role==="user"?"flex-end":"flex-start"}}>
+            <div style={{
+              maxWidth:"82%",padding:"10px 14px",borderRadius:m.role==="user"?"14px 14px 4px 14px":"14px 14px 14px 4px",
+              background:m.role==="user"?fill(AC):"rgba(255,255,255,0.05)",
+              border:"1px solid "+(m.role==="user"?bdr(AC):"rgba(255,255,255,0.08)"),
+              fontSize:13,color:"rgba(255,255,255,0.92)",lineHeight:1.6,whiteSpace:"pre-wrap",wordBreak:"break-word",fontFamily:FF,
+            }}>{m.content}</div>
+          </div>
+        ))}
+        {(streamBuf || sending) && (
+          <div style={{display:"flex",justifyContent:"flex-start"}}>
+            <div style={{maxWidth:"82%",padding:"10px 14px",borderRadius:"14px 14px 14px 4px",background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.08)",fontSize:13,color:"rgba(255,255,255,0.92)",lineHeight:1.6,whiteSpace:"pre-wrap",wordBreak:"break-word",fontFamily:FF}}>
+              {streamBuf || <span style={{opacity:0.5,fontStyle:"italic"}}>Thinking…</span>}
+              {streamBuf && sending && <span style={{opacity:0.5,animation:"pulse 1s ease-in-out infinite"}}>▍</span>}
+            </div>
+          </div>
+        )}
+        {error && (
+          <div style={{padding:"8px 12px",background:"rgba(255,80,80,0.1)",border:"1px solid rgba(255,80,80,0.35)",borderRadius:7,fontSize:12,color:"#ff8b8b",fontFamily:FFM}}>⚠ {error}</div>
+        )}
+      </div>
+    );
+  }
+
+  function renderSettings(){
+    const p = AI_PROVIDERS[provider];
+    return (
+      <div style={{flex:1,overflowY:"auto",padding:"14px 16px",minHeight:0}}>
+        <div style={SEC}>Provider</div>
+        <div style={{display:"flex",gap:6,marginBottom:18}}>
+          {Object.keys(AI_PROVIDERS).map(k=>(
+            <button key={k} onClick={()=>setConfig(c=>({...c,provider:k}))} style={{flex:1,padding:"8px 12px",background:provider===k?fill(AC):"rgba(255,255,255,0.05)",border:"1px solid "+(provider===k?bdr(AC):"rgba(255,255,255,0.1)"),borderRadius:8,cursor:"pointer",fontFamily:FFB,fontWeight:700,fontSize:12,color:provider===k?AC:"rgba(255,255,255,0.7)"}}>{AI_PROVIDERS[k].label}</button>
+          ))}
+        </div>
+
+        <div style={SEC}>API Key</div>
+        <div style={{fontSize:11,color:"rgba(255,255,255,0.4)",marginBottom:8,lineHeight:1.55}}>
+          Get a key from <a href={p.keyDocsUrl} target="_blank" rel="noreferrer" style={{color:AC}}>{p.keyDocsUrl.replace(/^https?:\/\//,"")}</a> — {p.keyHint}. Stored only in this browser's localStorage; never sent to Nova OS servers.
+        </div>
+        <div style={{display:"flex",gap:6,marginBottom:6}}>
+          <input
+            type="password"
+            value={apiKey}
+            onChange={e=>setKeys(k=>({...k,[provider]:e.target.value}))}
+            placeholder={"Paste your "+p.label+" API key"}
+            style={{...INP,flex:1,fontFamily:FFM,fontSize:12}}
+          />
+          {apiKey && <button onClick={()=>setKeys(k=>({...k,[provider]:""}))} style={{padding:"7px 12px",background:"rgba(255,80,80,0.08)",border:"1px solid rgba(255,80,80,0.3)",borderRadius:7,cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:11,color:"#ff8b8b"}}>Clear</button>}
+        </div>
+        <div style={{fontSize:10,color:hasKey?"#4cef90":"rgba(255,255,255,0.3)",marginBottom:20,fontFamily:FFM}}>{hasKey?"✓ Key saved locally":"No key yet"}</div>
+
+        <div style={SEC}>Model</div>
+        <div style={{display:"flex",gap:4,marginBottom:6,flexWrap:"wrap"}}>
+          {p.presetModels.map(m=>(
+            <button key={m} onClick={()=>setConfig(c=>({...c,model:{...c.model,[provider]:m}}))} style={{padding:"5px 10px",background:model===m?fill(AC):"rgba(255,255,255,0.05)",border:"1px solid "+(model===m?bdr(AC):"rgba(255,255,255,0.08)"),borderRadius:6,cursor:"pointer",fontFamily:FFM,fontWeight:500,fontSize:10,color:model===m?AC:"rgba(255,255,255,0.6)"}}>{m}</button>
+          ))}
+        </div>
+        <input
+          value={model}
+          onChange={e=>setConfig(c=>({...c,model:{...c.model,[provider]:e.target.value}}))}
+          placeholder="Or type any model id…"
+          style={{...INP,fontFamily:FFM,fontSize:11,marginBottom:22}}
+        />
+
+        <div style={SEC}>About</div>
+        <div style={{fontSize:11,color:"rgba(255,255,255,0.45)",lineHeight:1.65,padding:"10px 12px",background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.06)",borderRadius:7}}>
+          Nova AI runs entirely in your browser — your API key, model choice, and chat history live in <code style={{fontFamily:FFM,color:"#fff"}}>localStorage</code> on this device only.<br/><br/>
+          Every API call goes directly from your browser to {AI_PROVIDERS.claude.label} or {AI_PROVIDERS.openai.label}. Nova OS and its operator pay nothing for your usage; you pay your provider's normal per-token rates.
+        </div>
+
+        <button onClick={()=>setView("chat")} style={{marginTop:18,width:"100%",padding:"10px 14px",background:fill(AC),border:"1px solid "+bdr(AC),borderRadius:8,cursor:"pointer",fontFamily:FFB,fontWeight:700,fontSize:13,color:AC}}>← Back to chat</button>
+      </div>
+    );
+  }
+
+  // Sidebar — chat list, hidden on mobile-narrow widths
+  const sidebar = (
+    <div style={{width:200,flexShrink:0,borderRight:"1px solid rgba(255,255,255,0.06)",display:"flex",flexDirection:"column",minHeight:0,background:"rgba(0,0,0,0.15)"}}>
+      <div style={{padding:"10px 10px 8px",borderBottom:"1px solid rgba(255,255,255,0.05)",flexShrink:0}}>
+        <button onClick={newChat} style={{width:"100%",padding:"8px 10px",background:fill(AC),border:"1px solid "+bdr(AC),borderRadius:7,cursor:"pointer",fontFamily:FFB,fontWeight:700,fontSize:12,color:AC}}>＋ New chat</button>
+      </div>
+      <div style={{flex:1,overflowY:"auto",minHeight:0,padding:"6px 6px"}}>
+        {chats.length===0 ? (
+          <div style={{padding:"14px 8px",fontSize:11,color:"rgba(255,255,255,0.3)",fontStyle:"italic",textAlign:"center"}}>No chats yet</div>
+        ) : chats.map(c=>(
+          <div key={c.id} onClick={()=>{selectChat(c.id);setView("chat");}} style={{padding:"7px 9px",marginBottom:3,borderRadius:6,cursor:"pointer",background:c.id===activeId?fill(AC):"transparent",border:"1px solid "+(c.id===activeId?bdr(AC):"transparent"),display:"flex",alignItems:"center",gap:6}}>
+            <span style={{flex:1,minWidth:0,fontSize:11,color:c.id===activeId?AC:"rgba(255,255,255,0.7)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c.title}</span>
+            <button className="dl" onClick={e=>{e.stopPropagation();deleteChat(c.id);}} style={{background:"none",border:"none",cursor:"pointer",color:"rgba(255,80,80,0.4)",fontSize:11,padding:"2px 4px",lineHeight:1}}>✕</button>
+          </div>
+        ))}
+      </div>
+      <div style={{padding:"8px 10px",borderTop:"1px solid rgba(255,255,255,0.05)",flexShrink:0,fontSize:10,fontFamily:FFM,color:"rgba(255,255,255,0.32)"}}>
+        <div style={{marginBottom:2}}>{AI_PROVIDERS[provider].label} · {hasKey?"key set":"no key"}</div>
+        <div style={{overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{model}</div>
+      </div>
+    </div>
+  );
+
+  return (
+    <div style={{display:"flex",height:"100%",fontFamily:FF,minHeight:0}}>
+      {showSidebar && sidebar}
+      <div style={{flex:1,display:"flex",flexDirection:"column",minHeight:0,minWidth:0}}>
+        {/* Header */}
+        <div style={{display:"flex",alignItems:"center",gap:8,padding:"9px 12px",borderBottom:"1px solid rgba(255,255,255,0.06)",flexShrink:0}}>
+          <button onClick={()=>setShowSidebar(s=>!s)} title="Toggle sidebar" style={{width:30,height:30,borderRadius:6,background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.1)",cursor:"pointer",color:"rgba(255,255,255,0.7)",fontSize:14}}>☰</button>
+          <div style={{flex:1,minWidth:0,fontFamily:FFB,fontWeight:700,fontSize:13,color:"#fff",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+            {active ? active.title : "New chat"}
+          </div>
+          <button onClick={()=>setView(v=>v==="chat"?"settings":"chat")} title="Settings" style={{width:30,height:30,borderRadius:6,background:view==="settings"?fill(AC):"rgba(255,255,255,0.06)",border:"1px solid "+(view==="settings"?bdr(AC):"rgba(255,255,255,0.1)"),cursor:"pointer",color:view==="settings"?AC:"rgba(255,255,255,0.7)",fontSize:14}}>⚙</button>
+        </div>
+
+        {renderMessages()}
+
+        {/* Input bar — hidden in settings */}
+        {view === "chat" && (
+          <div style={{display:"flex",gap:7,padding:"10px 12px 12px",borderTop:"1px solid rgba(255,255,255,0.06)",flexShrink:0}}>
+            <textarea
+              value={input}
+              onChange={e=>setInput(e.target.value)}
+              onKeyDown={onKey}
+              placeholder={hasKey ? "Ask Nova AI… (Enter to send, Shift+Enter for newline)" : "Add your API key in Settings to start chatting"}
+              rows={1}
+              disabled={sending}
+              style={{flex:1,padding:"10px 14px",background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:10,color:"rgba(255,255,255,0.92)",fontFamily:FF,fontSize:13,outline:"none",resize:"none",minHeight:40,maxHeight:160,lineHeight:1.5,opacity:sending?0.5:1}}
+            />
+            <button onClick={send} disabled={sending||!input.trim()} style={{padding:"0 18px",background:fill(AC),border:"1px solid "+bdr(AC),borderRadius:10,cursor:sending||!input.trim()?"default":"pointer",fontFamily:FFB,fontWeight:700,fontSize:13,color:AC,opacity:sending||!input.trim()?0.4:1,whiteSpace:"nowrap"}}>{sending?"…":"Send"}</button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
