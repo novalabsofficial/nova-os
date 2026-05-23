@@ -21,7 +21,7 @@ import { dailyWord, scoreGuess, normalizeGuess } from "./lib/wordle.js";
 import { emptyGrid as tetrisEmpty, randomPiece as tetrisRandom, shapeOf, fits as tetrisFits, lockPiece as tetrisLock, clearLines as tetrisClearLines, scoreForLines, tickInterval, PIECE_COLORS, BOARD_W as TETRIS_W, BOARD_H as TETRIS_H } from "./lib/tetris.js";
 import { wmoIcon, wmoLabel, geocodeUrl, parseGeocode, forecastUrl, parseForecast, alertsUrl, parseAlerts, isLikelyUS } from "./lib/weather.js";
 import { PROVIDERS as AI_PROVIDERS, streamResponse as aiStream, deriveTitle as aiDeriveTitle } from "./lib/ai.js";
-import { playTone } from "./lib/audio.js";
+import { playTone, speak, cancelSpeech } from "./lib/audio.js";
 
 // ─── CONSTANTS ────────────────────────────────────────────────────────────────
 const DEFAULT_AC = "#4f9eff";
@@ -2767,6 +2767,10 @@ function AtmosApp({AC,showToast}){
   },[query]);
 
   async function pickLocation(s){
+    // Whenever we switch locations we want to silence any in-progress TTS
+    // read-out from the previous location's alerts. Otherwise queued
+    // utterances would keep playing over the new selection.
+    cancelSpeech();
     setLoc(s);
     setQuery(s.label);
     setOpenSuggest(false);
@@ -2785,10 +2789,22 @@ function AtmosApp({AC,showToast}){
         const ajson=await ares.json();
         const parsed=parseAlerts(ajson);
         setAlerts(parsed);
-        // NWS alert audible cue: 607 Hz / 3 s tone whenever a location loads
-        // with at least one active alert. Plays each time the location is
-        // (re-)loaded while alerts are still in the response.
-        if(parsed.length>0) playTone(607, 3000);
+        // Audible alert sequence when active alerts are present:
+        //   1. 607 Hz tone for 3 seconds (jolts the user to look)
+        //   2. After ~3.1 s, TTS reads each alert's event + headline so the
+        //      user can hear what's happening without looking at the screen.
+        // The tone plays each time a location with alerts is loaded; the
+        // TTS queues all alerts in order, automatically read back-to-back
+        // by the browser's SpeechSynthesis queue.
+        if(parsed.length>0){
+          playTone(607, 3000);
+          setTimeout(()=>{
+            for(const a of parsed){
+              const summary = a.event + (a.headline ? ". " + a.headline : "");
+              speak(summary);
+            }
+          }, 3100);
+        }
       }catch{/* alerts are optional — don't surface error */}
     }
     setLoadingForecast(false);
@@ -2851,7 +2867,7 @@ function AtmosApp({AC,showToast}){
           <div style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:14,padding:30,textAlign:"center",border:"1px solid rgba(255,255,255,0.06)",borderRadius:12,background:"linear-gradient(180deg,rgba(255,255,255,0.025),rgba(255,255,255,0.005))"}}>
             <div style={{fontSize:60,filter:"drop-shadow(0 0 16px rgba(79,158,255,0.4))"}}>🌤️</div>
             <div style={{fontFamily:FFB,fontWeight:700,fontSize:22,color:"rgba(255,255,255,0.9)",letterSpacing:0.4}}>Atmos</div>
-            <div style={{fontSize:12,color:"rgba(255,255,255,0.45)",maxWidth:340,lineHeight:1.7}}>Search any location to see current conditions, live radar, hourly + 7-day forecast, and active NWS alerts for US locations. US locations with active alerts also trigger an audible 607 Hz tone.</div>
+            <div style={{fontSize:12,color:"rgba(255,255,255,0.45)",maxWidth:340,lineHeight:1.7}}>Search any location to see current conditions, live radar, hourly + 7-day forecast, and active NWS alerts for US locations. US locations with active alerts also trigger an audible 607 Hz tone followed by a TTS read-out of each alert.</div>
           </div>
         )}
 

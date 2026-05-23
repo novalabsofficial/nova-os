@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { playTone } from '../audio.js';
+import { playTone, speak, cancelSpeech } from '../audio.js';
 
 // Build a minimal AudioContext mock that records calls so we can assert
 // playTone wired everything correctly without needing a real audio device
@@ -123,5 +123,106 @@ describe('playTone', () => {
     expect(typeof oscNode.onended).toBe('function');
     oscNode.onended();
     expect(calls.contextClosed).toBe(1);
+  });
+});
+
+// ── TTS ─────────────────────────────────────────────────────────────────
+// jsdom has no real SpeechSynthesis, so we stub a minimal one and assert
+// that speak() forwards the text + options correctly.
+
+describe('speak', () => {
+  let originalSpeech, originalUtterance;
+  beforeEach(() => {
+    originalSpeech = window.speechSynthesis;
+    originalUtterance = globalThis.SpeechSynthesisUtterance;
+  });
+  afterEach(() => {
+    if (originalSpeech === undefined) delete window.speechSynthesis;
+    else window.speechSynthesis = originalSpeech;
+    if (originalUtterance === undefined) delete globalThis.SpeechSynthesisUtterance;
+    else globalThis.SpeechSynthesisUtterance = originalUtterance;
+  });
+
+  function installMockSpeech() {
+    const spoken = [];
+    class MockUtterance {
+      constructor(text) {
+        this.text = text;
+        this.rate = 1; this.pitch = 1; this.volume = 1; this.lang = "en-US";
+      }
+    }
+    globalThis.SpeechSynthesisUtterance = MockUtterance;
+    window.speechSynthesis = {
+      speak: vi.fn(u => { spoken.push(u); }),
+      cancel: vi.fn(),
+    };
+    return { spoken };
+  }
+
+  it('forwards the text to speechSynthesis.speak()', () => {
+    const { spoken } = installMockSpeech();
+    speak("Tornado Warning for Travis County");
+    expect(spoken).toHaveLength(1);
+    expect(spoken[0].text).toBe("Tornado Warning for Travis County");
+  });
+
+  it('applies provided opts (rate, pitch, volume, lang)', () => {
+    const { spoken } = installMockSpeech();
+    speak("test", { rate: 1.4, pitch: 0.8, volume: 0.7, lang: "en-GB" });
+    expect(spoken[0].rate).toBe(1.4);
+    expect(spoken[0].pitch).toBe(0.8);
+    expect(spoken[0].volume).toBe(0.7);
+    expect(spoken[0].lang).toBe("en-GB");
+  });
+
+  it('uses sensible defaults when no opts are passed', () => {
+    const { spoken } = installMockSpeech();
+    speak("hi");
+    expect(spoken[0].rate).toBe(1.0);
+    expect(spoken[0].pitch).toBe(1.0);
+    expect(spoken[0].volume).toBe(1.0);
+    expect(spoken[0].lang).toBe("en-US");
+  });
+
+  it('ignores empty / whitespace / non-string input', () => {
+    const { spoken } = installMockSpeech();
+    speak("");
+    speak("   ");
+    speak(null);
+    speak(42);
+    expect(spoken).toHaveLength(0);
+  });
+
+  it('no-ops when speechSynthesis is not available', () => {
+    delete window.speechSynthesis;
+    expect(() => speak("hello")).not.toThrow();
+  });
+
+  it('no-ops when SpeechSynthesisUtterance is not available', () => {
+    window.speechSynthesis = { speak: vi.fn(), cancel: vi.fn() };
+    delete globalThis.SpeechSynthesisUtterance;
+    expect(() => speak("hello")).not.toThrow();
+    expect(window.speechSynthesis.speak).not.toHaveBeenCalled();
+  });
+});
+
+describe('cancelSpeech', () => {
+  let originalSpeech;
+  beforeEach(() => { originalSpeech = window.speechSynthesis; });
+  afterEach(() => {
+    if (originalSpeech === undefined) delete window.speechSynthesis;
+    else window.speechSynthesis = originalSpeech;
+  });
+
+  it('calls speechSynthesis.cancel()', () => {
+    const cancelFn = vi.fn();
+    window.speechSynthesis = { speak: vi.fn(), cancel: cancelFn };
+    cancelSpeech();
+    expect(cancelFn).toHaveBeenCalledOnce();
+  });
+
+  it('no-ops without speechSynthesis available', () => {
+    delete window.speechSynthesis;
+    expect(() => cancelSpeech()).not.toThrow();
   });
 });
