@@ -1,5 +1,5 @@
 
-// NOVA OS v4.2 — Nova Systems
+// NOVA OS v4.3 — Nova Systems
 // Drop this into src/NovaOS.jsx
  
 import { useState, useEffect, useRef, useCallback } from "react";
@@ -13,6 +13,7 @@ import {
 import { hexRgb, fill, bdr, isUrl } from "./lib/format.js";
 import { defaultIconPos, snapToFreeGrid, snapW } from "./lib/geometry.js";
 import { autoModerate, isAdmin, isPubliclyVisible } from "./lib/moderation.js";
+import { rewriteForIframe, isLikelyUnframable } from "./lib/browser.js";
 
 // ─── CONSTANTS ────────────────────────────────────────────────────────────────
 const DEFAULT_AC = "#4f9eff";
@@ -85,7 +86,7 @@ const STORE_CATALOG = [
 ];
  
 const STORE_CATS    = ["All","Games","Media","Tools","Social","News"];
-const BOOT_MSGS     = ["NOVA OS v4.2 — Nova Systems","Initializing kernel... OK","Loading hardware abstraction layer... OK","Mounting filesystems... OK","Starting widget engine... OK","Initializing Nova Store... OK","Loading user environment... OK","System ready."];
+const BOOT_MSGS     = ["NOVA OS v4.3 — Nova Systems","Initializing kernel... OK","Loading hardware abstraction layer... OK","Mounting filesystems... OK","Starting widget engine... OK","Initializing Nova Store... OK","Loading user environment... OK","System ready."];
 const ACCENT_PRESETS= ["#4f9eff","#ff6b6b","#4cef90","#ffcc44","#cc44ff","#ff8c44","#44ddcc","#ff44aa"];
 const BOOKMARKS     = [{label:"Hacker News",url:"https://news.ycombinator.com"},{label:"Wikipedia",url:"https://en.m.wikipedia.org"},{label:"Archive.org",url:"https://archive.org"},{label:"itch.io",url:"https://itch.io"}];
 const PAINT_COLORS  = ["#fff","#000","#ff4444","#ff8800","#ffdd00","#44dd44","#00ccff","#4466ff","#cc44ff","#ff44aa","#8b4513","#888"];
@@ -443,13 +444,38 @@ function Toggle({label,value,onChange,ac}){
     </div>
   );
 }
-function BrowserNav({bar,setBar,onGo,onBack,onFwd,canBack,canFwd,AC}){
+function BrowserNav({bar,setBar,onGo,onBack,onFwd,onRefresh,canBack,canFwd,canRefresh,AC}){
+  const navBtn=(enabled)=>({
+    width:30,height:30,borderRadius:8,
+    background:enabled?"rgba(255,255,255,0.07)":"rgba(255,255,255,0.03)",
+    border:"1px solid "+(enabled?"rgba(255,255,255,0.12)":"rgba(255,255,255,0.05)"),
+    cursor:enabled?"pointer":"default",
+    color:enabled?"rgba(255,255,255,0.7)":"rgba(255,255,255,0.25)",
+    fontSize:14,
+    display:"flex",alignItems:"center",justifyContent:"center",
+    flexShrink:0,
+  });
   return(
-    <div style={{display:"flex",gap:6,marginBottom:8,alignItems:"center"}}>
-      <button onClick={onBack} disabled={!canBack} style={{width:28,height:28,borderRadius:6,background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.1)",cursor:canBack?"pointer":"default",color:"rgba(255,255,255,0.5)",fontSize:13,opacity:canBack?1:0.3}}>←</button>
-      <button onClick={onFwd}  disabled={!canFwd}  style={{width:28,height:28,borderRadius:6,background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.1)",cursor:canFwd?"pointer":"default",color:"rgba(255,255,255,0.5)",fontSize:13,opacity:canFwd?1:0.3}}>→</button>
-      <input value={bar} onChange={e=>setBar(e.target.value)} onKeyDown={e=>e.key==="Enter"&&onGo()} placeholder="Search or enter URL…" style={{...INP,flex:1,fontFamily:FFM,fontSize:12}}/>
-      <button onClick={onGo} style={{padding:"7px 14px",background:fill(AC),border:"1px solid "+bdr(AC),borderRadius:6,cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:12,color:AC}}>Go</button>
+    <div style={{display:"flex",gap:6,marginBottom:9,alignItems:"center"}}>
+      <button onClick={onBack}    disabled={!canBack}    title="Back"    style={navBtn(canBack)}>←</button>
+      <button onClick={onFwd}     disabled={!canFwd}     title="Forward" style={navBtn(canFwd)}>→</button>
+      <button onClick={onRefresh} disabled={!canRefresh} title="Refresh" style={navBtn(canRefresh)}>↻</button>
+      <input
+        value={bar}
+        onChange={e=>setBar(e.target.value)}
+        onKeyDown={e=>e.key==="Enter"&&onGo()}
+        placeholder="Search or enter URL…"
+        style={{
+          flex:1,minWidth:0,
+          padding:"8px 14px",
+          background:"rgba(255,255,255,0.05)",
+          border:"1px solid rgba(255,255,255,0.1)",
+          borderRadius:18,
+          color:"rgba(255,255,255,0.92)",
+          fontFamily:FFM,fontSize:12,
+          outline:"none",
+        }}/>
+      <button onClick={onGo} style={{padding:"7px 16px",background:fill(AC),border:"1px solid "+bdr(AC),borderRadius:16,cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:12,color:AC,flexShrink:0}}>Go</button>
     </div>
   );
 }
@@ -609,10 +635,10 @@ export default function NovaOS(){
   const dragCursor=drag?(drag.type==="move"?"grabbing":drag.edge+"-resize"):widgetResize?(widgetResize.edge+"-resize"):isAnyDrag?"grabbing":"default";
  
   // ── BOOT ─────────────────────────────────────────────────────────────────
-  if(screen==="boot")return(<div style={{width:"100%",height:"100vh",background:"#07080f",display:"flex",flexDirection:"column",justifyContent:"center",padding:"10vh 12%"}}><style>{CSS}</style><div style={{fontFamily:FFB,fontWeight:700,fontSize:66,letterSpacing:4,color:"#fff",marginBottom:4,lineHeight:1}}>NOVA</div><div style={{fontFamily:FF,fontSize:12,color:"rgba(255,255,255,0.22)",letterSpacing:5,marginBottom:46}}>OPERATING SYSTEM  ·  v4.2</div>{bootLines.map((l,i)=><div key={i} style={{fontFamily:FFM,fontSize:12,color:l.includes("ready")?"#4f9eff":"rgba(255,255,255,0.42)",marginBottom:5,animation:"boot-in 0.22s cubic-bezier(0.4,0,0.2,1)"}}>{l.includes("OK")?<>{l.replace("... OK","")}... <span style={{color:"#4cef90"}}>OK</span></>:l}</div>)}</div>);
+  if(screen==="boot")return(<div style={{width:"100%",height:"100vh",background:"#07080f",display:"flex",flexDirection:"column",justifyContent:"center",padding:"10vh 12%"}}><style>{CSS}</style><div style={{fontFamily:FFB,fontWeight:700,fontSize:66,letterSpacing:4,color:"#fff",marginBottom:4,lineHeight:1}}>NOVA</div><div style={{fontFamily:FF,fontSize:12,color:"rgba(255,255,255,0.22)",letterSpacing:5,marginBottom:46}}>OPERATING SYSTEM  ·  v4.3</div>{bootLines.map((l,i)=><div key={i} style={{fontFamily:FFM,fontSize:12,color:l.includes("ready")?"#4f9eff":"rgba(255,255,255,0.42)",marginBottom:5,animation:"boot-in 0.22s cubic-bezier(0.4,0,0.2,1)"}}>{l.includes("OK")?<>{l.replace("... OK","")}... <span style={{color:"#4cef90"}}>OK</span></>:l}</div>)}</div>);
  
   // ── LOGIN ────────────────────────────────────────────────────────────────
-  if(screen==="login")return(<div style={{width:"100%",height:"100vh",position:"relative",overflow:"hidden"}}><style>{CSS}</style><NovaBg/><div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center"}}><div style={{background:"rgba(8,10,22,0.86)",backdropFilter:"blur(24px)",border:"1px solid rgba(255,255,255,0.11)",borderRadius:16,padding:"44px 40px",width:376,boxShadow:"0 40px 100px rgba(0,0,0,0.6)",position:"relative",overflow:"hidden"}}><div style={{position:"absolute",top:0,left:0,right:0,height:2,background:"linear-gradient(90deg,transparent,"+DEFAULT_AC+",transparent)"}}/><div style={{fontFamily:FFB,fontWeight:700,fontSize:38,color:"#fff",textAlign:"center",letterSpacing:4,marginBottom:4}}>NOVA</div><div style={{fontFamily:FF,fontSize:11,color:"rgba(255,255,255,0.22)",textAlign:"center",letterSpacing:4,marginBottom:36}}>OPERATING SYSTEM  ·  v4.2</div><div style={{display:"flex",borderBottom:"1px solid rgba(255,255,255,0.09)",marginBottom:24}}>{["login","register"].map(m=><button key={m} className="lt" onClick={()=>{setMode(m);setAuthErr("");}} style={{flex:1,padding:"10px 0",background:"none",border:"none",borderBottom:mode===m?"2px solid "+DEFAULT_AC:"2px solid transparent",cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:12,letterSpacing:1,color:mode===m?DEFAULT_AC:"rgba(255,255,255,0.28)",transition:"color 0.15s"}}>{m==="login"?"SIGN IN":"REGISTER"}</button>)}</div><input style={{...INP,marginBottom:11}} placeholder="Username" value={uname} onChange={e=>setUname(e.target.value)} onKeyDown={e=>e.key==="Enter"&&handleAuth()} autoFocus/><input style={INP} type="password" placeholder="Password" value={pass} onChange={e=>setPass(e.target.value)} onKeyDown={e=>e.key==="Enter"&&handleAuth()}/><button className="ls" disabled={busy} onClick={handleAuth} style={{width:"100%",padding:"12px",background:fill(DEFAULT_AC),border:"1px solid "+bdr(DEFAULT_AC),borderRadius:8,cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:14,letterSpacing:1,color:"#fff",marginTop:14,transition:"opacity 0.15s"}}>{busy?"AUTHENTICATING…":mode==="login"?"SIGN IN →":"CREATE ACCOUNT →"}</button>{authErr&&<div style={{color:"#ff7878",fontFamily:FF,fontSize:13,textAlign:"center",marginTop:12}}>⚠ {authErr}</div>}<div style={{marginTop:20,fontFamily:FF,fontStyle:"italic",fontSize:11,color:"rgba(255,255,255,0.14)",textAlign:"center"}}>Don't reuse real passwords — demo auth only.</div></div></div></div>);
+  if(screen==="login")return(<div style={{width:"100%",height:"100vh",position:"relative",overflow:"hidden"}}><style>{CSS}</style><NovaBg/><div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center"}}><div style={{background:"rgba(8,10,22,0.86)",backdropFilter:"blur(24px)",border:"1px solid rgba(255,255,255,0.11)",borderRadius:16,padding:"44px 40px",width:376,boxShadow:"0 40px 100px rgba(0,0,0,0.6)",position:"relative",overflow:"hidden"}}><div style={{position:"absolute",top:0,left:0,right:0,height:2,background:"linear-gradient(90deg,transparent,"+DEFAULT_AC+",transparent)"}}/><div style={{fontFamily:FFB,fontWeight:700,fontSize:38,color:"#fff",textAlign:"center",letterSpacing:4,marginBottom:4}}>NOVA</div><div style={{fontFamily:FF,fontSize:11,color:"rgba(255,255,255,0.22)",textAlign:"center",letterSpacing:4,marginBottom:36}}>OPERATING SYSTEM  ·  v4.3</div><div style={{display:"flex",borderBottom:"1px solid rgba(255,255,255,0.09)",marginBottom:24}}>{["login","register"].map(m=><button key={m} className="lt" onClick={()=>{setMode(m);setAuthErr("");}} style={{flex:1,padding:"10px 0",background:"none",border:"none",borderBottom:mode===m?"2px solid "+DEFAULT_AC:"2px solid transparent",cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:12,letterSpacing:1,color:mode===m?DEFAULT_AC:"rgba(255,255,255,0.28)",transition:"color 0.15s"}}>{m==="login"?"SIGN IN":"REGISTER"}</button>)}</div><input style={{...INP,marginBottom:11}} placeholder="Username" value={uname} onChange={e=>setUname(e.target.value)} onKeyDown={e=>e.key==="Enter"&&handleAuth()} autoFocus/><input style={INP} type="password" placeholder="Password" value={pass} onChange={e=>setPass(e.target.value)} onKeyDown={e=>e.key==="Enter"&&handleAuth()}/><button className="ls" disabled={busy} onClick={handleAuth} style={{width:"100%",padding:"12px",background:fill(DEFAULT_AC),border:"1px solid "+bdr(DEFAULT_AC),borderRadius:8,cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:14,letterSpacing:1,color:"#fff",marginTop:14,transition:"opacity 0.15s"}}>{busy?"AUTHENTICATING…":mode==="login"?"SIGN IN →":"CREATE ACCOUNT →"}</button>{authErr&&<div style={{color:"#ff7878",fontFamily:FF,fontSize:13,textAlign:"center",marginTop:12}}>⚠ {authErr}</div>}<div style={{marginTop:20,fontFamily:FF,fontStyle:"italic",fontSize:11,color:"rgba(255,255,255,0.14)",textAlign:"center"}}>Don't reuse real passwords — demo auth only.</div></div></div></div>);
  
   // ── DESKTOP ──────────────────────────────────────────────────────────────
   return(
@@ -671,7 +697,7 @@ export default function NovaOS(){
         </div>
         <div style={{padding:"10px 16px",borderTop:"1px solid rgba(255,255,255,0.07)",display:"flex",alignItems:"center",gap:10}}>
           <div style={{width:32,height:32,borderRadius:"50%",background:fill(AC),border:"1.5px solid "+AC,display:"flex",alignItems:"center",justifyContent:"center",fontSize:15,flexShrink:0}}>👤</div>
-          <div style={{flex:1}}><div style={{fontFamily:FFB,fontWeight:600,fontSize:13,color:"#fff"}}>@{user}</div><div style={{fontFamily:FF,fontSize:10,color:"rgba(255,255,255,0.3)"}}>Nova OS v4.2</div></div>
+          <div style={{flex:1}}><div style={{fontFamily:FFB,fontWeight:600,fontSize:13,color:"#fff"}}>@{user}</div><div style={{fontFamily:FF,fontSize:10,color:"rgba(255,255,255,0.3)"}}>Nova OS v4.3</div></div>
           <button onClick={logout} style={{padding:"6px 12px",background:"rgba(200,40,40,0.12)",border:"1px solid rgba(200,40,40,0.3)",borderRadius:6,cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:11,color:"rgba(255,140,140,0.9)"}}>Logout</button>
         </div>
       </div>)}
@@ -943,18 +969,147 @@ function PaintApp({showToast,AC}){
 }
  
 function BrowserApp({AC}){
-  const [bar,setBar]=useState("");const [view,setView]=useState("home");const [results,setResults]=useState(null);const [frameUrl,setFrameUrl]=useState("");const [loading,setLoading]=useState(false);const [hist,setHist]=useState([]);const [hIdx,setHIdx]=useState(-1);
-  function browse(url){const full=url.startsWith("http")?url:"https://"+url;const nh=[...hist.slice(0,hIdx+1),full];setHist(nh);setHIdx(nh.length-1);setFrameUrl(full);setBar(full);setView("browse");}
+  const [bar,setBar]=useState("");
+  const [view,setView]=useState("home");
+  const [results,setResults]=useState(null);
+  const [frameUrl,setFrameUrl]=useState("");
+  const [loading,setLoading]=useState(false);
+  const [hist,setHist]=useState([]);
+  const [hIdx,setHIdx]=useState(-1);
+  // Bumped to force a fresh iframe mount on manual refresh. We can't call
+  // iframe.contentWindow.location.reload() on cross-origin frames, so the
+  // remount-via-key trick is the cleanest reload mechanism.
+  const [reloadKey,setReloadKey]=useState(0);
+  // Tracks whether the current iframe page has fired onLoad yet, so we can
+  // show a thin progress bar at the top of the iframe while it's loading.
+  const [framing,setFraming]=useState(false);
+
+  // Whenever the URL or refresh key changes, the iframe will remount. Mark
+  // it as loading until onLoad fires.
+  useEffect(()=>{
+    if(view==="browse"&&frameUrl&&!isLikelyUnframable(frameUrl))setFraming(true);
+  },[frameUrl,reloadKey,view]);
+
+  // Wrapper around rewriteForIframe + history bookkeeping. Centralized so
+  // back/forward and bookmarks all flow through the same URL normalization.
+  function browse(url){
+    const full=rewriteForIframe(url);
+    if(!full)return;
+    const nh=[...hist.slice(0,hIdx+1),full];
+    setHist(nh);setHIdx(nh.length-1);
+    setFrameUrl(full);setBar(full);setView("browse");
+  }
   async function novaSearch(q){setLoading(true);setView("results");setResults(null);try{const[d,w]=await Promise.allSettled([fetch("https://api.duckduckgo.com/?q="+encodeURIComponent(q)+"&format=json&no_html=1&skip_disambig=1").then(r=>r.json()),fetch("https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch="+encodeURIComponent(q)+"&format=json&origin=*&srlimit=7").then(r=>r.json())]);setResults({q,ddg:d.status==="fulfilled"?d.value:null,wiki:w.status==="fulfilled"?w.value:null});}catch{setResults({q,ddg:null,wiki:null});}setLoading(false);}
   function go(i){const q=(i||bar).trim();if(!q)return;if(isUrl(q))browse(q);else novaSearch(q);}
   function back(){if(hIdx>0){const i=hIdx-1;setHIdx(i);setFrameUrl(hist[i]);setBar(hist[i]);setView("browse");}}
   function fwd(){if(hIdx<hist.length-1){const i=hIdx+1;setHIdx(i);setFrameUrl(hist[i]);setBar(hist[i]);setView("browse");}}
-  const Nav=<BrowserNav bar={bar} setBar={setBar} onGo={()=>go()} onBack={back} onFwd={fwd} canBack={hIdx>0} canFwd={hIdx<hist.length-1} AC={AC}/>;
-  const Bkm=(<div style={{display:"flex",gap:5,marginBottom:9,flexWrap:"wrap"}}>{BOOKMARKS.map(b=><button key={b.url} className="bp" onClick={()=>browse(b.url)} style={{padding:"4px 11px",background:"rgba(255,255,255,0.07)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:20,cursor:"pointer",fontFamily:FF,fontWeight:500,fontSize:11,color:"rgba(255,255,255,0.65)",transition:"background 0.12s"}}>{b.label}</button>)}<button className="bp" onClick={()=>window.open("https://www.bing.com","_blank")} style={{padding:"4px 11px",background:"rgba(255,255,255,0.07)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:20,cursor:"pointer",fontFamily:FF,fontWeight:500,fontSize:11,color:"rgba(255,255,255,0.65)"}}>Bing ↗</button><button className="bp" onClick={()=>window.open("https://www.google.com","_blank")} style={{padding:"4px 11px",background:"rgba(255,255,255,0.07)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:20,cursor:"pointer",fontFamily:FF,fontWeight:500,fontSize:11,color:"rgba(255,255,255,0.65)"}}>Google ↗</button></div>);
-  if(view==="home")return(<div style={{width:"100%",fontFamily:FF}}>{Nav}{Bkm}<div style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",minHeight:260,gap:14,border:"1px solid rgba(255,255,255,0.07)",borderRadius:9,background:"rgba(255,255,255,0.02)"}}><div style={{fontSize:44}}>🌐</div><div style={{fontFamily:FFB,fontWeight:700,fontSize:18,color:"rgba(255,255,255,0.55)"}}>Nova Browser</div><div style={{fontSize:12,color:"rgba(255,255,255,0.25)",textAlign:"center",lineHeight:1.7,maxWidth:380}}>Search with Nova Search (DDG + Wikipedia) or enter a URL.</div></div></div>);
-  if(view==="browse")return(<div style={{width:"100%",fontFamily:FF}}>{Nav}{Bkm}<iframe src={frameUrl} title="browser" sandbox="allow-scripts allow-same-origin allow-forms allow-popups" style={{width:"100%",height:"calc(100% - 80px)",minHeight:340,border:"1px solid rgba(255,255,255,0.08)",borderRadius:8,background:"#fff",display:"block"}}/></div>);
+  function refresh(){
+    if(view==="browse"&&frameUrl) setReloadKey(k=>k+1);
+    else if(view==="results"&&results?.q) novaSearch(results.q);
+  }
+
+  // CRITICAL: do NOT extract this into a Shell sub-component defined inside
+  // BrowserApp. Doing so creates a new component identity on every render,
+  // which makes React unmount/remount the iframe — and re-fetch the page —
+  // on every parent tick (the clock fires setTick every second, cascading
+  // a re-render to here). That bug shipped in 4.3 originally; the fix is
+  // to inline the layout in each branch below.
+
+  const canRefresh = (view==="browse" && !!frameUrl) || (view==="results" && !!results?.q);
+  const navProps={bar,setBar,onGo:()=>go(),onBack:back,onFwd:fwd,onRefresh:refresh,canBack:hIdx>0,canFwd:hIdx<hist.length-1,canRefresh,AC};
+
+  const bookmarks=(
+    <div style={{display:"flex",gap:5,marginBottom:9,flexWrap:"wrap",flexShrink:0}}>
+      {BOOKMARKS.map(b=>
+        <button key={b.url} className="bp" onClick={()=>browse(b.url)} style={{padding:"4px 12px",background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:20,cursor:"pointer",fontFamily:FF,fontWeight:500,fontSize:11,color:"rgba(255,255,255,0.6)"}}>{b.label}</button>
+      )}
+      <button className="bp" onClick={()=>window.open("https://www.bing.com","_blank","noopener,noreferrer")} style={{padding:"4px 12px",background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:20,cursor:"pointer",fontFamily:FF,fontWeight:500,fontSize:11,color:"rgba(255,255,255,0.6)"}}>Bing ↗</button>
+      <button className="bp" onClick={()=>window.open("https://www.google.com","_blank","noopener,noreferrer")} style={{padding:"4px 12px",background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:20,cursor:"pointer",fontFamily:FF,fontWeight:500,fontSize:11,color:"rgba(255,255,255,0.6)"}}>Google ↗</button>
+    </div>
+  );
+
+  if(view==="home"){
+    return(
+      <div style={{width:"100%",height:"100%",fontFamily:FF,display:"flex",flexDirection:"column",minHeight:0}}>
+        <BrowserNav {...navProps}/>
+        {bookmarks}
+        <div style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:14,border:"1px solid rgba(255,255,255,0.07)",borderRadius:12,background:"linear-gradient(180deg,rgba(255,255,255,0.025),rgba(255,255,255,0.005))",minHeight:0,padding:"30px 20px"}}>
+          <div style={{fontSize:48,filter:"drop-shadow(0 0 18px rgba(79,158,255,0.35))"}}>🌐</div>
+          <div style={{fontFamily:FFB,fontWeight:700,fontSize:20,color:"rgba(255,255,255,0.85)",letterSpacing:0.3}}>Nova Browser</div>
+          <div style={{fontSize:12,color:"rgba(255,255,255,0.4)",textAlign:"center",lineHeight:1.75,maxWidth:420}}>
+            Search with Nova Search (DDG + Wikipedia) or paste any URL.<br/>
+            <span style={{color:"rgba(255,255,255,0.3)"}}>YouTube watch links auto-convert to embed mode so videos play in-app.</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if(view==="browse"){
+    // X-Frame-Options / CSP can't be detected from JS for cross-origin iframes,
+    // so we use a curated host list to predict failures and short-circuit to a
+    // friendly card with an Open-in-new-tab button.
+    const blocked=isLikelyUnframable(frameUrl);
+    return(
+      <div style={{width:"100%",height:"100%",fontFamily:FF,display:"flex",flexDirection:"column",minHeight:0}}>
+        <BrowserNav {...navProps}/>
+        {bookmarks}
+        {blocked ? (
+          <div style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:14,padding:"30px 20px",textAlign:"center",border:"1px solid rgba(255,255,255,0.07)",borderRadius:12,background:"linear-gradient(180deg,rgba(255,255,255,0.025),rgba(255,255,255,0.005))",minHeight:0}}>
+            <div style={{fontSize:48,opacity:0.55}}>🚫</div>
+            <div style={{fontFamily:FFB,fontWeight:700,fontSize:18,color:"rgba(255,255,255,0.8)"}}>This site can't be embedded</div>
+            <div style={{fontSize:12,color:"rgba(255,255,255,0.45)",maxWidth:440,lineHeight:1.7}}>
+              <span style={{color:"rgba(255,255,255,0.75)",fontFamily:FFM,fontSize:11,wordBreak:"break-all"}}>{frameUrl}</span><br/>
+              blocks framing via X-Frame-Options or CSP — a security feature enforced by your browser, not a Nova OS limitation.
+            </div>
+            <div style={{display:"flex",gap:8,marginTop:4}}>
+              <button onClick={()=>setView("home")} style={{padding:"8px 16px",background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.12)",borderRadius:8,cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:12,color:"rgba(255,255,255,0.7)"}}>← Back</button>
+              <button onClick={()=>window.open(frameUrl,"_blank","noopener,noreferrer")} style={{padding:"8px 16px",background:fill(AC),border:"1px solid "+bdr(AC),borderRadius:8,cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:12,color:AC}}>Open in new tab ↗</button>
+            </div>
+          </div>
+        ) : (
+          <div style={{flex:1,minHeight:0,position:"relative",border:"1px solid rgba(255,255,255,0.08)",borderRadius:8,overflow:"hidden",background:"#fff"}}>
+            {/* Thin progress bar at top of iframe while loading */}
+            {framing && (
+              <div style={{position:"absolute",top:0,left:0,right:0,height:2,background:"rgba(255,255,255,0.1)",zIndex:2}}>
+                <div style={{height:"100%",width:"40%",background:AC,animation:"pulse 1.2s ease-in-out infinite"}}/>
+              </div>
+            )}
+            <iframe
+              key={frameUrl+":"+reloadKey}
+              src={frameUrl}
+              title="browser"
+              onLoad={()=>setFraming(false)}
+              sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-presentation"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              style={{width:"100%",height:"100%",border:"none",background:"#fff",display:"block"}}/>
+          </div>
+        )}
+      </div>
+    );
+  }
+
   const ddg=results?.ddg;const wiki=results?.wiki;const ddgT=(ddg?.RelatedTopics||[]).filter(t=>t.FirstURL&&t.Text).slice(0,7);const wikiH=wiki?.query?.search||[];
-  return(<div style={{width:"100%",fontFamily:FF}}>{Nav}{Bkm}{loading?(<div style={{display:"flex",alignItems:"center",justifyContent:"center",minHeight:280,gap:12,flexDirection:"column"}}><div style={{width:28,height:28,border:"3px solid rgba(255,255,255,0.1)",borderTopColor:AC,borderRadius:"50%",animation:"spin 0.8s linear infinite"}}/><div style={{fontSize:12,color:"rgba(255,255,255,0.35)"}}>Searching…</div></div>):(<div style={{overflowY:"auto"}}><div style={{...SEC,marginBottom:10}}>Results for "{results?.q}"</div>{ddg?.AbstractText&&<div style={{padding:"13px 14px",marginBottom:10,background:fill(AC),border:"1px solid "+bdr(AC),borderRadius:9}}><div style={{fontFamily:FFB,fontWeight:600,fontSize:13,color:AC,marginBottom:5}}>{ddg.Heading}</div><div style={{fontSize:12,color:"rgba(255,255,255,0.7)",lineHeight:1.65}}>{ddg.AbstractText}</div>{ddg.AbstractURL&&<a href={ddg.AbstractURL} target="_blank" rel="noreferrer" style={{fontSize:10,color:AC,opacity:0.7,marginTop:6,display:"inline-block",fontFamily:FFM}}>Source ↗</a>}</div>}{wikiH.length>0&&<><div style={SEC}>Wikipedia</div>{wikiH.map(h=><div key={h.pageid} className="sr" onClick={()=>browse("https://en.wikipedia.org/wiki/"+encodeURIComponent(h.title))} style={{padding:"10px 12px",marginBottom:5,background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:8,cursor:"pointer",transition:"background 0.12s"}}><div style={{fontWeight:600,fontSize:13,color:"rgba(255,255,255,0.9)",marginBottom:3}}>{h.title}</div><div style={{fontSize:11,color:"rgba(255,255,255,0.45)",lineHeight:1.55}}>{h.snippet?h.snippet.replace(/<[^>]*>/g,"")+"…":""}</div></div>)}</>}{ddgT.length>0&&<><div style={{...SEC,marginTop:10}}>Related</div>{ddgT.map((t,i)=><div key={i} className="sr" onClick={()=>browse(t.FirstURL)} style={{padding:"9px 12px",marginBottom:4,background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.07)",borderRadius:7,cursor:"pointer",transition:"background 0.12s"}}><div style={{fontSize:12,color:"rgba(255,255,255,0.75)",lineHeight:1.55}}>{t.Text}</div><div style={{fontSize:9,fontFamily:FFM,color:"rgba(255,255,255,0.2)",marginTop:3,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t.FirstURL}</div></div>)}</>}{!ddg?.AbstractText&&wikiH.length===0&&ddgT.length===0&&<div style={{textAlign:"center",padding:"40px 0",color:"rgba(255,255,255,0.2)",fontSize:13,fontStyle:"italic"}}>No results found.</div>}</div>)}</div>);
+  return(
+    <div style={{width:"100%",height:"100%",fontFamily:FF,display:"flex",flexDirection:"column",minHeight:0}}>
+      <BrowserNav {...navProps}/>
+      {bookmarks}
+      {loading?(
+        <div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",gap:12,flexDirection:"column",minHeight:0}}>
+          <div style={{width:28,height:28,border:"3px solid rgba(255,255,255,0.1)",borderTopColor:AC,borderRadius:"50%",animation:"spin 0.8s linear infinite"}}/>
+          <div style={{fontSize:12,color:"rgba(255,255,255,0.35)"}}>Searching…</div>
+        </div>
+      ):(
+        <div style={{flex:1,overflowY:"auto",minHeight:0}}>
+          <div style={{...SEC,marginBottom:10}}>Results for "{results?.q}"</div>
+          {ddg?.AbstractText&&<div style={{padding:"13px 14px",marginBottom:10,background:fill(AC),border:"1px solid "+bdr(AC),borderRadius:9}}><div style={{fontFamily:FFB,fontWeight:600,fontSize:13,color:AC,marginBottom:5}}>{ddg.Heading}</div><div style={{fontSize:12,color:"rgba(255,255,255,0.7)",lineHeight:1.65}}>{ddg.AbstractText}</div>{ddg.AbstractURL&&<a href={ddg.AbstractURL} target="_blank" rel="noreferrer" style={{fontSize:10,color:AC,opacity:0.7,marginTop:6,display:"inline-block",fontFamily:FFM}}>Source ↗</a>}</div>}
+          {wikiH.length>0&&<><div style={SEC}>Wikipedia</div>{wikiH.map(h=><div key={h.pageid} className="sr" onClick={()=>browse("https://en.wikipedia.org/wiki/"+encodeURIComponent(h.title))} style={{padding:"10px 12px",marginBottom:5,background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:8,cursor:"pointer"}}><div style={{fontWeight:600,fontSize:13,color:"rgba(255,255,255,0.9)",marginBottom:3}}>{h.title}</div><div style={{fontSize:11,color:"rgba(255,255,255,0.45)",lineHeight:1.55}}>{h.snippet?h.snippet.replace(/<[^>]*>/g,"")+"…":""}</div></div>)}</>}
+          {ddgT.length>0&&<><div style={{...SEC,marginTop:10}}>Related</div>{ddgT.map((t,i)=><div key={i} className="sr" onClick={()=>browse(t.FirstURL)} style={{padding:"9px 12px",marginBottom:4,background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.07)",borderRadius:7,cursor:"pointer"}}><div style={{fontSize:12,color:"rgba(255,255,255,0.75)",lineHeight:1.55}}>{t.Text}</div><div style={{fontSize:9,fontFamily:FFM,color:"rgba(255,255,255,0.2)",marginTop:3,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t.FirstURL}</div></div>)}</>}
+          {!ddg?.AbstractText&&wikiH.length===0&&ddgT.length===0&&<div style={{textAlign:"center",padding:"40px 0",color:"rgba(255,255,255,0.2)",fontSize:13,fontStyle:"italic"}}>No results found.</div>}
+        </div>
+      )}
+    </div>
+  );
 }
  
 function SnakeApp({AC}){
@@ -1188,7 +1343,7 @@ function StoreApp({user,data,updateData,showToast,AC}){
     <div style={{width:"100%",fontFamily:FF}}>
       {/* Header + search */}
       <div style={{marginBottom:12}}>
-        <div style={{fontFamily:FFB,fontWeight:700,fontSize:20,color:"#fff",marginBottom:8}}>🏪 Nova Store 4.2</div>
+        <div style={{fontFamily:FFB,fontWeight:700,fontSize:20,color:"#fff",marginBottom:8}}>🏪 Nova Store 4.3</div>
         <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search all apps…" style={INP}/>
       </div>
  
@@ -1319,15 +1474,20 @@ function StoreApp({user,data,updateData,showToast,AC}){
           </div>
         </div>
       )}
+
+      {/* Clearbit attribution — required by their Logo API terms */}
+      <div style={{marginTop:16,paddingTop:10,borderTop:"1px solid rgba(255,255,255,0.05)",fontSize:10,fontFamily:FF,color:"rgba(255,255,255,0.25)",textAlign:"center"}}>
+        App logos provided by <a href="https://clearbit.com" target="_blank" rel="noreferrer" style={{color:"rgba(255,255,255,0.4)",textDecoration:"none"}}>Clearbit</a>
+      </div>
     </div>
   );
 }
  
 function TerminalApp({user,AC}){
-  const [lines,setLines]=useState([{t:"out",v:"NOVA Terminal v4.2.0"},{t:"out",v:"Session: "+user+" — "+new Date().toLocaleString()},{t:"out",v:'Type "help" for commands.'},{t:"gap"}]);
+  const [lines,setLines]=useState([{t:"out",v:"NOVA Terminal v4.3.0"},{t:"out",v:"Session: "+user+" — "+new Date().toLocaleString()},{t:"out",v:'Type "help" for commands.'},{t:"gap"}]);
   const [cmd,setCmd]=useState("");const [hist,setHist]=useState([]);const [hIdx,setHIdx]=useState(-1);const endRef=useRef(null);
   useEffect(()=>{endRef.current?.scrollIntoView({behavior:"smooth"});},[lines]);
-  const CMDS={help:()=>["Commands: help, whoami, date, echo <text>, version, sysinfo, ls, neofetch, clear"],whoami:()=>[user],date:()=>[new Date().toLocaleString()],version:()=>["NOVA OS v4.2.0 — Nova Systems Inc."],sysinfo:()=>["CPU: Nova Virtual Core™","RAM: 8.0 GB","Storage: Firebase Firestore","Resolution: "+window.innerWidth+"x"+window.innerHeight,"Uptime: "+Math.floor(performance.now()/1000)+"s"],ls:()=>["notes/ tasks/ files/ paint/ browser/ snake/ 2048/ store/ terminal/ settings/"],neofetch:()=>[" ███╗   ██╗ ██████╗ ██╗   ██╗ █████╗ "," ████╗  ██║██╔═══██╗██║   ██║██╔══██╗"," ██╔██╗ ██║██║   ██║██║   ██║███████║"," ██║╚██╗██║██║   ██║╚██╗ ██╔╝██╔══██║"," ██║ ╚████║╚██████╔╝ ╚████╔╝ ██║  ██║","OS: Nova v4.2  User: "+user,"Widgets: Clock·Weather·Notes·Tasks·Calendar·SysInfo"],echo:args=>[args.join(" ")||"(empty)"],clear:()=>"__clear__"};
+  const CMDS={help:()=>["Commands: help, whoami, date, echo <text>, version, sysinfo, ls, neofetch, clear"],whoami:()=>[user],date:()=>[new Date().toLocaleString()],version:()=>["NOVA OS v4.3.0 — Nova Systems Inc."],sysinfo:()=>["CPU: Nova Virtual Core™","RAM: 8.0 GB","Storage: Firebase Firestore","Resolution: "+window.innerWidth+"x"+window.innerHeight,"Uptime: "+Math.floor(performance.now()/1000)+"s"],ls:()=>["notes/ tasks/ files/ paint/ browser/ snake/ 2048/ store/ terminal/ settings/"],neofetch:()=>[" ███╗   ██╗ ██████╗ ██╗   ██╗ █████╗ "," ████╗  ██║██╔═══██╗██║   ██║██╔══██╗"," ██╔██╗ ██║██║   ██║██║   ██║███████║"," ██║╚██╗██║██║   ██║╚██╗ ██╔╝██╔══██║"," ██║ ╚████║╚██████╔╝ ╚████╔╝ ██║  ██║","OS: Nova v4.3  User: "+user,"Widgets: Clock·Weather·Notes·Tasks·Calendar·SysInfo"],echo:args=>[args.join(" ")||"(empty)"],clear:()=>"__clear__"};
   function run(){const raw=cmd.trim();if(!raw)return;const parts=raw.split(" ");const c=parts[0].toLowerCase();const args=parts.slice(1);setHist(h=>[raw,...h]);setHIdx(-1);setCmd("");const nl=[...lines,{t:"in",v:raw}];const h=CMDS[c];if(!h){nl.push({t:"err",v:c+': not found. Try "help".'});}else{const r=h(args);if(r==="__clear__"){setLines([]);return;}r.forEach(v=>nl.push({t:"out",v}));}nl.push({t:"gap"});setLines(nl);}
   function onKey(e){if(e.key==="Enter"){run();return;}if(e.key==="ArrowUp"){const i=Math.min(hIdx+1,hist.length-1);setHIdx(i);if(hist[i])setCmd(hist[i]);}if(e.key==="ArrowDown"){const i=Math.max(hIdx-1,-1);setHIdx(i);setCmd(i===-1?"":(hist[i]||""));}}
   return(<div style={{width:"100%",fontFamily:FFM}}><div style={{background:"#030407",borderRadius:8,padding:"13px 15px",height:"100%",minHeight:280,overflowY:"auto",border:"1px solid rgba(255,255,255,0.07)"}}>{lines.map((l,i)=><div key={i} style={{color:l.t==="in"?AC:l.t==="err"?"#ff7878":"rgba(180,210,255,0.58)",fontSize:12,marginBottom:l.t==="gap"?5:2,minHeight:l.t==="gap"?4:undefined,whiteSpace:"pre"}}>{l.t==="in"?"$ "+l.v:l.t==="gap"?null:l.v}</div>)}<div style={{display:"flex",alignItems:"center"}}><span style={{color:"#4cef90",marginRight:7,fontSize:12}}>$</span><input value={cmd} onChange={e=>setCmd(e.target.value)} onKeyDown={onKey} autoFocus style={{flex:1,background:"none",border:"none",outline:"none",color:AC,fontFamily:FFM,fontSize:12,caretColor:AC}}/></div><div ref={endRef}/></div></div>);
