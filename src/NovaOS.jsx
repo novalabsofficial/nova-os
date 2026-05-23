@@ -444,13 +444,38 @@ function Toggle({label,value,onChange,ac}){
     </div>
   );
 }
-function BrowserNav({bar,setBar,onGo,onBack,onFwd,canBack,canFwd,AC}){
+function BrowserNav({bar,setBar,onGo,onBack,onFwd,onRefresh,canBack,canFwd,canRefresh,AC}){
+  const navBtn=(enabled)=>({
+    width:30,height:30,borderRadius:8,
+    background:enabled?"rgba(255,255,255,0.07)":"rgba(255,255,255,0.03)",
+    border:"1px solid "+(enabled?"rgba(255,255,255,0.12)":"rgba(255,255,255,0.05)"),
+    cursor:enabled?"pointer":"default",
+    color:enabled?"rgba(255,255,255,0.7)":"rgba(255,255,255,0.25)",
+    fontSize:14,
+    display:"flex",alignItems:"center",justifyContent:"center",
+    flexShrink:0,
+  });
   return(
-    <div style={{display:"flex",gap:6,marginBottom:8,alignItems:"center"}}>
-      <button onClick={onBack} disabled={!canBack} style={{width:28,height:28,borderRadius:6,background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.1)",cursor:canBack?"pointer":"default",color:"rgba(255,255,255,0.5)",fontSize:13,opacity:canBack?1:0.3}}>←</button>
-      <button onClick={onFwd}  disabled={!canFwd}  style={{width:28,height:28,borderRadius:6,background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.1)",cursor:canFwd?"pointer":"default",color:"rgba(255,255,255,0.5)",fontSize:13,opacity:canFwd?1:0.3}}>→</button>
-      <input value={bar} onChange={e=>setBar(e.target.value)} onKeyDown={e=>e.key==="Enter"&&onGo()} placeholder="Search or enter URL…" style={{...INP,flex:1,fontFamily:FFM,fontSize:12}}/>
-      <button onClick={onGo} style={{padding:"7px 14px",background:fill(AC),border:"1px solid "+bdr(AC),borderRadius:6,cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:12,color:AC}}>Go</button>
+    <div style={{display:"flex",gap:6,marginBottom:9,alignItems:"center"}}>
+      <button onClick={onBack}    disabled={!canBack}    title="Back"    style={navBtn(canBack)}>←</button>
+      <button onClick={onFwd}     disabled={!canFwd}     title="Forward" style={navBtn(canFwd)}>→</button>
+      <button onClick={onRefresh} disabled={!canRefresh} title="Refresh" style={navBtn(canRefresh)}>↻</button>
+      <input
+        value={bar}
+        onChange={e=>setBar(e.target.value)}
+        onKeyDown={e=>e.key==="Enter"&&onGo()}
+        placeholder="Search or enter URL…"
+        style={{
+          flex:1,minWidth:0,
+          padding:"8px 14px",
+          background:"rgba(255,255,255,0.05)",
+          border:"1px solid rgba(255,255,255,0.1)",
+          borderRadius:18,
+          color:"rgba(255,255,255,0.92)",
+          fontFamily:FFM,fontSize:12,
+          outline:"none",
+        }}/>
+      <button onClick={onGo} style={{padding:"7px 16px",background:fill(AC),border:"1px solid "+bdr(AC),borderRadius:16,cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:12,color:AC,flexShrink:0}}>Go</button>
     </div>
   );
 }
@@ -951,6 +976,19 @@ function BrowserApp({AC}){
   const [loading,setLoading]=useState(false);
   const [hist,setHist]=useState([]);
   const [hIdx,setHIdx]=useState(-1);
+  // Bumped to force a fresh iframe mount on manual refresh. We can't call
+  // iframe.contentWindow.location.reload() on cross-origin frames, so the
+  // remount-via-key trick is the cleanest reload mechanism.
+  const [reloadKey,setReloadKey]=useState(0);
+  // Tracks whether the current iframe page has fired onLoad yet, so we can
+  // show a thin progress bar at the top of the iframe while it's loading.
+  const [framing,setFraming]=useState(false);
+
+  // Whenever the URL or refresh key changes, the iframe will remount. Mark
+  // it as loading until onLoad fires.
+  useEffect(()=>{
+    if(view==="browse"&&frameUrl&&!isLikelyUnframable(frameUrl))setFraming(true);
+  },[frameUrl,reloadKey,view]);
 
   // Wrapper around rewriteForIframe + history bookkeeping. Centralized so
   // back/forward and bookmarks all flow through the same URL normalization.
@@ -965,70 +1003,113 @@ function BrowserApp({AC}){
   function go(i){const q=(i||bar).trim();if(!q)return;if(isUrl(q))browse(q);else novaSearch(q);}
   function back(){if(hIdx>0){const i=hIdx-1;setHIdx(i);setFrameUrl(hist[i]);setBar(hist[i]);setView("browse");}}
   function fwd(){if(hIdx<hist.length-1){const i=hIdx+1;setHIdx(i);setFrameUrl(hist[i]);setBar(hist[i]);setView("browse");}}
-  const Nav=<BrowserNav bar={bar} setBar={setBar} onGo={()=>go()} onBack={back} onFwd={fwd} canBack={hIdx>0} canFwd={hIdx<hist.length-1} AC={AC}/>;
-  const Bkm=(<div style={{display:"flex",gap:5,marginBottom:9,flexWrap:"wrap",flexShrink:0}}>{BOOKMARKS.map(b=><button key={b.url} className="bp" onClick={()=>browse(b.url)} style={{padding:"4px 11px",background:"rgba(255,255,255,0.07)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:20,cursor:"pointer",fontFamily:FF,fontWeight:500,fontSize:11,color:"rgba(255,255,255,0.65)"}}>{b.label}</button>)}<button className="bp" onClick={()=>window.open("https://www.bing.com","_blank","noopener,noreferrer")} style={{padding:"4px 11px",background:"rgba(255,255,255,0.07)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:20,cursor:"pointer",fontFamily:FF,fontWeight:500,fontSize:11,color:"rgba(255,255,255,0.65)"}}>Bing ↗</button><button className="bp" onClick={()=>window.open("https://www.google.com","_blank","noopener,noreferrer")} style={{padding:"4px 11px",background:"rgba(255,255,255,0.07)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:20,cursor:"pointer",fontFamily:FF,fontWeight:500,fontSize:11,color:"rgba(255,255,255,0.65)"}}>Google ↗</button></div>);
+  function refresh(){
+    if(view==="browse"&&frameUrl) setReloadKey(k=>k+1);
+    else if(view==="results"&&results?.q) novaSearch(results.q);
+  }
 
-  // Wrapper for every view that pins layout to fill the window. Nav and bookmarks
-  // shrink to content; the third child stretches to fill the rest.
-  const Shell=({children})=>(
-    <div style={{width:"100%",height:"100%",fontFamily:FF,display:"flex",flexDirection:"column",minHeight:0}}>
-      <div style={{flexShrink:0}}>{Nav}</div>
-      {Bkm}
-      {children}
+  // CRITICAL: do NOT extract this into a Shell sub-component defined inside
+  // BrowserApp. Doing so creates a new component identity on every render,
+  // which makes React unmount/remount the iframe — and re-fetch the page —
+  // on every parent tick (the clock fires setTick every second, cascading
+  // a re-render to here). That bug shipped in 4.3 originally; the fix is
+  // to inline the layout in each branch below.
+
+  const canRefresh = (view==="browse" && !!frameUrl) || (view==="results" && !!results?.q);
+  const navProps={bar,setBar,onGo:()=>go(),onBack:back,onFwd:fwd,onRefresh:refresh,canBack:hIdx>0,canFwd:hIdx<hist.length-1,canRefresh,AC};
+
+  const bookmarks=(
+    <div style={{display:"flex",gap:5,marginBottom:9,flexWrap:"wrap",flexShrink:0}}>
+      {BOOKMARKS.map(b=>
+        <button key={b.url} className="bp" onClick={()=>browse(b.url)} style={{padding:"4px 12px",background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:20,cursor:"pointer",fontFamily:FF,fontWeight:500,fontSize:11,color:"rgba(255,255,255,0.6)"}}>{b.label}</button>
+      )}
+      <button className="bp" onClick={()=>window.open("https://www.bing.com","_blank","noopener,noreferrer")} style={{padding:"4px 12px",background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:20,cursor:"pointer",fontFamily:FF,fontWeight:500,fontSize:11,color:"rgba(255,255,255,0.6)"}}>Bing ↗</button>
+      <button className="bp" onClick={()=>window.open("https://www.google.com","_blank","noopener,noreferrer")} style={{padding:"4px 12px",background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:20,cursor:"pointer",fontFamily:FF,fontWeight:500,fontSize:11,color:"rgba(255,255,255,0.6)"}}>Google ↗</button>
     </div>
   );
 
-  if(view==="home")return(<Shell>
-    <div style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:14,border:"1px solid rgba(255,255,255,0.07)",borderRadius:9,background:"rgba(255,255,255,0.02)",minHeight:0}}>
-      <div style={{fontSize:44}}>🌐</div>
-      <div style={{fontFamily:FFB,fontWeight:700,fontSize:18,color:"rgba(255,255,255,0.55)"}}>Nova Browser</div>
-      <div style={{fontSize:12,color:"rgba(255,255,255,0.25)",textAlign:"center",lineHeight:1.7,maxWidth:380,padding:"0 20px"}}>Search with Nova Search (DDG + Wikipedia) or enter a URL. YouTube watch links auto-convert to embed mode so videos play in-app.</div>
-    </div>
-  </Shell>);
+  if(view==="home"){
+    return(
+      <div style={{width:"100%",height:"100%",fontFamily:FF,display:"flex",flexDirection:"column",minHeight:0}}>
+        <BrowserNav {...navProps}/>
+        {bookmarks}
+        <div style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:14,border:"1px solid rgba(255,255,255,0.07)",borderRadius:12,background:"linear-gradient(180deg,rgba(255,255,255,0.025),rgba(255,255,255,0.005))",minHeight:0,padding:"30px 20px"}}>
+          <div style={{fontSize:48,filter:"drop-shadow(0 0 18px rgba(79,158,255,0.35))"}}>🌐</div>
+          <div style={{fontFamily:FFB,fontWeight:700,fontSize:20,color:"rgba(255,255,255,0.85)",letterSpacing:0.3}}>Nova Browser</div>
+          <div style={{fontSize:12,color:"rgba(255,255,255,0.4)",textAlign:"center",lineHeight:1.75,maxWidth:420}}>
+            Search with Nova Search (DDG + Wikipedia) or paste any URL.<br/>
+            <span style={{color:"rgba(255,255,255,0.3)"}}>YouTube watch links auto-convert to embed mode so videos play in-app.</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if(view==="browse"){
     // X-Frame-Options / CSP can't be detected from JS for cross-origin iframes,
     // so we use a curated host list to predict failures and short-circuit to a
-    // friendly card with an Open-in-new-tab button. The lib/browser test suite
-    // pins the list's behavior.
+    // friendly card with an Open-in-new-tab button.
     const blocked=isLikelyUnframable(frameUrl);
-    return(<Shell>
-      {blocked ? (
-        <div style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:14,padding:"30px 20px",textAlign:"center",border:"1px solid rgba(255,255,255,0.07)",borderRadius:9,background:"rgba(255,255,255,0.02)",minHeight:0}}>
-          <div style={{fontSize:48,opacity:0.55}}>🚫</div>
-          <div style={{fontFamily:FFB,fontWeight:700,fontSize:18,color:"rgba(255,255,255,0.75)"}}>This site can't be embedded</div>
-          <div style={{fontSize:12,color:"rgba(255,255,255,0.42)",maxWidth:440,lineHeight:1.7}}>
-            <span style={{color:"rgba(255,255,255,0.7)",fontFamily:FFM,fontSize:11}}>{frameUrl}</span><br/>
-            blocks framing via X-Frame-Options or CSP — a security feature enforced by your browser, not a Nova OS limitation.
+    return(
+      <div style={{width:"100%",height:"100%",fontFamily:FF,display:"flex",flexDirection:"column",minHeight:0}}>
+        <BrowserNav {...navProps}/>
+        {bookmarks}
+        {blocked ? (
+          <div style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:14,padding:"30px 20px",textAlign:"center",border:"1px solid rgba(255,255,255,0.07)",borderRadius:12,background:"linear-gradient(180deg,rgba(255,255,255,0.025),rgba(255,255,255,0.005))",minHeight:0}}>
+            <div style={{fontSize:48,opacity:0.55}}>🚫</div>
+            <div style={{fontFamily:FFB,fontWeight:700,fontSize:18,color:"rgba(255,255,255,0.8)"}}>This site can't be embedded</div>
+            <div style={{fontSize:12,color:"rgba(255,255,255,0.45)",maxWidth:440,lineHeight:1.7}}>
+              <span style={{color:"rgba(255,255,255,0.75)",fontFamily:FFM,fontSize:11,wordBreak:"break-all"}}>{frameUrl}</span><br/>
+              blocks framing via X-Frame-Options or CSP — a security feature enforced by your browser, not a Nova OS limitation.
+            </div>
+            <div style={{display:"flex",gap:8,marginTop:4}}>
+              <button onClick={()=>setView("home")} style={{padding:"8px 16px",background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.12)",borderRadius:8,cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:12,color:"rgba(255,255,255,0.7)"}}>← Back</button>
+              <button onClick={()=>window.open(frameUrl,"_blank","noopener,noreferrer")} style={{padding:"8px 16px",background:fill(AC),border:"1px solid "+bdr(AC),borderRadius:8,cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:12,color:AC}}>Open in new tab ↗</button>
+            </div>
           </div>
-          <div style={{display:"flex",gap:8,marginTop:4}}>
-            <button onClick={()=>setView("home")} style={{padding:"8px 16px",background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.12)",borderRadius:7,cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:12,color:"rgba(255,255,255,0.7)"}}>← Back</button>
-            <button onClick={()=>window.open(frameUrl,"_blank","noopener,noreferrer")} style={{padding:"8px 16px",background:fill(AC),border:"1px solid "+bdr(AC),borderRadius:7,cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:12,color:AC}}>Open in new tab ↗</button>
+        ) : (
+          <div style={{flex:1,minHeight:0,position:"relative",border:"1px solid rgba(255,255,255,0.08)",borderRadius:8,overflow:"hidden",background:"#fff"}}>
+            {/* Thin progress bar at top of iframe while loading */}
+            {framing && (
+              <div style={{position:"absolute",top:0,left:0,right:0,height:2,background:"rgba(255,255,255,0.1)",zIndex:2}}>
+                <div style={{height:"100%",width:"40%",background:AC,animation:"pulse 1.2s ease-in-out infinite"}}/>
+              </div>
+            )}
+            <iframe
+              key={frameUrl+":"+reloadKey}
+              src={frameUrl}
+              title="browser"
+              onLoad={()=>setFraming(false)}
+              sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-presentation"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              style={{width:"100%",height:"100%",border:"none",background:"#fff",display:"block"}}/>
           </div>
-        </div>
-      ) : (
-        <iframe src={frameUrl} title="browser" sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-presentation" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" style={{flex:1,width:"100%",border:"1px solid rgba(255,255,255,0.08)",borderRadius:8,background:"#fff",display:"block",minHeight:0}}/>
-      )}
-    </Shell>);
+        )}
+      </div>
+    );
   }
 
   const ddg=results?.ddg;const wiki=results?.wiki;const ddgT=(ddg?.RelatedTopics||[]).filter(t=>t.FirstURL&&t.Text).slice(0,7);const wikiH=wiki?.query?.search||[];
-  return(<Shell>
-    {loading?(
-      <div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",gap:12,flexDirection:"column",minHeight:0}}>
-        <div style={{width:28,height:28,border:"3px solid rgba(255,255,255,0.1)",borderTopColor:AC,borderRadius:"50%",animation:"spin 0.8s linear infinite"}}/>
-        <div style={{fontSize:12,color:"rgba(255,255,255,0.35)"}}>Searching…</div>
-      </div>
-    ):(
-      <div style={{flex:1,overflowY:"auto",minHeight:0}}>
-        <div style={{...SEC,marginBottom:10}}>Results for "{results?.q}"</div>
-        {ddg?.AbstractText&&<div style={{padding:"13px 14px",marginBottom:10,background:fill(AC),border:"1px solid "+bdr(AC),borderRadius:9}}><div style={{fontFamily:FFB,fontWeight:600,fontSize:13,color:AC,marginBottom:5}}>{ddg.Heading}</div><div style={{fontSize:12,color:"rgba(255,255,255,0.7)",lineHeight:1.65}}>{ddg.AbstractText}</div>{ddg.AbstractURL&&<a href={ddg.AbstractURL} target="_blank" rel="noreferrer" style={{fontSize:10,color:AC,opacity:0.7,marginTop:6,display:"inline-block",fontFamily:FFM}}>Source ↗</a>}</div>}
-        {wikiH.length>0&&<><div style={SEC}>Wikipedia</div>{wikiH.map(h=><div key={h.pageid} className="sr" onClick={()=>browse("https://en.wikipedia.org/wiki/"+encodeURIComponent(h.title))} style={{padding:"10px 12px",marginBottom:5,background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:8,cursor:"pointer"}}><div style={{fontWeight:600,fontSize:13,color:"rgba(255,255,255,0.9)",marginBottom:3}}>{h.title}</div><div style={{fontSize:11,color:"rgba(255,255,255,0.45)",lineHeight:1.55}}>{h.snippet?h.snippet.replace(/<[^>]*>/g,"")+"…":""}</div></div>)}</>}
-        {ddgT.length>0&&<><div style={{...SEC,marginTop:10}}>Related</div>{ddgT.map((t,i)=><div key={i} className="sr" onClick={()=>browse(t.FirstURL)} style={{padding:"9px 12px",marginBottom:4,background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.07)",borderRadius:7,cursor:"pointer"}}><div style={{fontSize:12,color:"rgba(255,255,255,0.75)",lineHeight:1.55}}>{t.Text}</div><div style={{fontSize:9,fontFamily:FFM,color:"rgba(255,255,255,0.2)",marginTop:3,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t.FirstURL}</div></div>)}</>}
-        {!ddg?.AbstractText&&wikiH.length===0&&ddgT.length===0&&<div style={{textAlign:"center",padding:"40px 0",color:"rgba(255,255,255,0.2)",fontSize:13,fontStyle:"italic"}}>No results found.</div>}
-      </div>
-    )}
-  </Shell>);
+  return(
+    <div style={{width:"100%",height:"100%",fontFamily:FF,display:"flex",flexDirection:"column",minHeight:0}}>
+      <BrowserNav {...navProps}/>
+      {bookmarks}
+      {loading?(
+        <div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",gap:12,flexDirection:"column",minHeight:0}}>
+          <div style={{width:28,height:28,border:"3px solid rgba(255,255,255,0.1)",borderTopColor:AC,borderRadius:"50%",animation:"spin 0.8s linear infinite"}}/>
+          <div style={{fontSize:12,color:"rgba(255,255,255,0.35)"}}>Searching…</div>
+        </div>
+      ):(
+        <div style={{flex:1,overflowY:"auto",minHeight:0}}>
+          <div style={{...SEC,marginBottom:10}}>Results for "{results?.q}"</div>
+          {ddg?.AbstractText&&<div style={{padding:"13px 14px",marginBottom:10,background:fill(AC),border:"1px solid "+bdr(AC),borderRadius:9}}><div style={{fontFamily:FFB,fontWeight:600,fontSize:13,color:AC,marginBottom:5}}>{ddg.Heading}</div><div style={{fontSize:12,color:"rgba(255,255,255,0.7)",lineHeight:1.65}}>{ddg.AbstractText}</div>{ddg.AbstractURL&&<a href={ddg.AbstractURL} target="_blank" rel="noreferrer" style={{fontSize:10,color:AC,opacity:0.7,marginTop:6,display:"inline-block",fontFamily:FFM}}>Source ↗</a>}</div>}
+          {wikiH.length>0&&<><div style={SEC}>Wikipedia</div>{wikiH.map(h=><div key={h.pageid} className="sr" onClick={()=>browse("https://en.wikipedia.org/wiki/"+encodeURIComponent(h.title))} style={{padding:"10px 12px",marginBottom:5,background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:8,cursor:"pointer"}}><div style={{fontWeight:600,fontSize:13,color:"rgba(255,255,255,0.9)",marginBottom:3}}>{h.title}</div><div style={{fontSize:11,color:"rgba(255,255,255,0.45)",lineHeight:1.55}}>{h.snippet?h.snippet.replace(/<[^>]*>/g,"")+"…":""}</div></div>)}</>}
+          {ddgT.length>0&&<><div style={{...SEC,marginTop:10}}>Related</div>{ddgT.map((t,i)=><div key={i} className="sr" onClick={()=>browse(t.FirstURL)} style={{padding:"9px 12px",marginBottom:4,background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.07)",borderRadius:7,cursor:"pointer"}}><div style={{fontSize:12,color:"rgba(255,255,255,0.75)",lineHeight:1.55}}>{t.Text}</div><div style={{fontSize:9,fontFamily:FFM,color:"rgba(255,255,255,0.2)",marginTop:3,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t.FirstURL}</div></div>)}</>}
+          {!ddg?.AbstractText&&wikiH.length===0&&ddgT.length===0&&<div style={{textAlign:"center",padding:"40px 0",color:"rgba(255,255,255,0.2)",fontSize:13,fontStyle:"italic"}}>No results found.</div>}
+        </div>
+      )}
+    </div>
+  );
 }
  
 function SnakeApp({AC}){
