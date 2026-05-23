@@ -136,7 +136,29 @@ export default function NovaOS(){
   // startup sound + transition to login. Most browsers block audio before a
   // user gesture, so the startup chime may silently fail on first cold load
   // — that's OK, the login sound after the user clicks Sign In will play.
-  useEffect(()=>{let i=0,dead=false;function nxt(){if(dead)return;if(i>=BOOT_MSGS.length){playSound("startup");setTimeout(()=>{if(!dead)setScreen("login");},700);return;}setBootLines(p=>[...p,BOOT_MSGS[i++]]);setTimeout(nxt,i<2?90:230);}setTimeout(nxt,380);return()=>{dead=true;};},[]);
+  // Boot sequence — when the last "System ready" message lands, queue the
+  // startup sound + transition to login. The cursor `i` is incremented
+  // OUTSIDE the setState updater because React 18's StrictMode invokes
+  // state updaters twice in dev to catch impure code; an `i++` inside the
+  // updater would compound, eventually pushing an out-of-bounds undefined.
+  // (Latent in browser dev; surfaced as a crash in Tauri's webview.)
+  useEffect(()=>{
+    let i = 0, dead = false;
+    function nxt() {
+      if (dead) return;
+      if (i >= BOOT_MSGS.length) {
+        playSound("startup");
+        setTimeout(()=>{ if (!dead) setScreen("login"); }, 700);
+        return;
+      }
+      const msg = BOOT_MSGS[i];        // capture BEFORE updater; safe in StrictMode
+      i++;
+      setBootLines(p => [...p, msg]);
+      setTimeout(nxt, i < 2 ? 90 : 230);
+    }
+    setTimeout(nxt, 380);
+    return ()=>{ dead = true; };
+  },[]);
   useEffect(()=>{const t=setInterval(()=>setTick(new Date()),1000);return()=>clearInterval(t);},[]);
   // Watch viewport size so the detected device mode stays current (e.g. on
   // rotation or window resize). Throttled-by-debounce isn't needed — resize
