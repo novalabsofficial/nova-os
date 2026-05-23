@@ -432,7 +432,9 @@ export default function NovaOS(){
       setScreen("desktop");playSound("login");
       // Let the user know if this was a silent 6.3 migration. Toast fires
       // after the desktop renders so it's noticeable but unobtrusive.
-      if(migrated) setTimeout(()=>setToast({msg:"Account secured ✓ — upgraded to Firebase Auth", ts:Date.now()}), 600);
+      // showToast (not raw setToast) → uses the standard string format the
+      // toast renderer expects AND auto-clears after 2.5s.
+      if(migrated) setTimeout(()=>showToast("Account secured ✓ — upgraded to Firebase Auth"), 600);
     }
     setBusy(false);
   }
