@@ -2,7 +2,7 @@
 // NOVA OS v6.1 — Nova Systems
 // Drop this into src/NovaOS.jsx
  
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, lazy, Suspense } from "react";
 import { doc, getDoc, setDoc, updateDoc, deleteDoc, collection, addDoc, query, orderBy, limit, onSnapshot, serverTimestamp } from "firebase/firestore";
 import { firestoreDb } from "./firebase.js";
 // Lib (pure helpers, testable)
@@ -45,29 +45,33 @@ import {
   ClockWidgetContent, WeatherWidgetContent, NotesWidgetContent,
   TasksWidgetContent, CalendarWidgetContent, SysInfoWidgetContent,
 } from "./widgets/widgets.jsx";
-// Apps
-import { NotesApp }       from "./apps/NotesApp.jsx";
-import { TasksApp }       from "./apps/TasksApp.jsx";
-import { FilesApp }       from "./apps/FilesApp.jsx";
-import { PaintApp }       from "./apps/PaintApp.jsx";
-import { BrowserApp }     from "./apps/BrowserApp.jsx";
-import { SnakeApp }       from "./apps/SnakeApp.jsx";
-import { Game2048App }    from "./apps/Game2048App.jsx";
-import { StoreApp }       from "./apps/StoreApp.jsx";
-import { TerminalApp }    from "./apps/TerminalApp.jsx";
-import { SettingsApp }    from "./apps/SettingsApp.jsx";
-import { ProfileApp }     from "./apps/ProfileApp.jsx";
-import { ChatApp }        from "./apps/ChatApp.jsx";
-import { CalculatorApp }  from "./apps/CalculatorApp.jsx";
-import { ClockApp }       from "./apps/ClockApp.jsx";
-import { CalendarApp }    from "./apps/CalendarApp.jsx";
-import { MusicApp }       from "./apps/MusicApp.jsx";
-import { PdfApp }         from "./apps/PdfApp.jsx";
-import { AtmosApp }       from "./apps/AtmosApp.jsx";
-import { MinesweeperApp } from "./apps/MinesweeperApp.jsx";
-import { WordleApp }      from "./apps/WordleApp.jsx";
-import { TetrisApp }      from "./apps/TetrisApp.jsx";
-import { NovaAiApp }      from "./apps/NovaAiApp.jsx";
+// Apps — lazy-loaded via React.lazy so each app ships in its own chunk.
+// Vite splits these into separate JS files; the first time you open Notes,
+// notes-<hash>.js downloads; opening Tetris later pulls tetris-<hash>.js.
+// Suspense (wired around the window content below) shows the fallback while
+// each chunk is in flight.
+const NotesApp       = lazy(() => import("./apps/NotesApp.jsx").then(m       => ({default: m.NotesApp})));
+const TasksApp       = lazy(() => import("./apps/TasksApp.jsx").then(m       => ({default: m.TasksApp})));
+const FilesApp       = lazy(() => import("./apps/FilesApp.jsx").then(m       => ({default: m.FilesApp})));
+const PaintApp       = lazy(() => import("./apps/PaintApp.jsx").then(m       => ({default: m.PaintApp})));
+const BrowserApp     = lazy(() => import("./apps/BrowserApp.jsx").then(m     => ({default: m.BrowserApp})));
+const SnakeApp       = lazy(() => import("./apps/SnakeApp.jsx").then(m       => ({default: m.SnakeApp})));
+const Game2048App    = lazy(() => import("./apps/Game2048App.jsx").then(m    => ({default: m.Game2048App})));
+const StoreApp       = lazy(() => import("./apps/StoreApp.jsx").then(m       => ({default: m.StoreApp})));
+const TerminalApp    = lazy(() => import("./apps/TerminalApp.jsx").then(m    => ({default: m.TerminalApp})));
+const SettingsApp    = lazy(() => import("./apps/SettingsApp.jsx").then(m    => ({default: m.SettingsApp})));
+const ProfileApp     = lazy(() => import("./apps/ProfileApp.jsx").then(m     => ({default: m.ProfileApp})));
+const ChatApp        = lazy(() => import("./apps/ChatApp.jsx").then(m        => ({default: m.ChatApp})));
+const CalculatorApp  = lazy(() => import("./apps/CalculatorApp.jsx").then(m  => ({default: m.CalculatorApp})));
+const ClockApp       = lazy(() => import("./apps/ClockApp.jsx").then(m       => ({default: m.ClockApp})));
+const CalendarApp    = lazy(() => import("./apps/CalendarApp.jsx").then(m    => ({default: m.CalendarApp})));
+const MusicApp       = lazy(() => import("./apps/MusicApp.jsx").then(m       => ({default: m.MusicApp})));
+const PdfApp         = lazy(() => import("./apps/PdfApp.jsx").then(m         => ({default: m.PdfApp})));
+const AtmosApp       = lazy(() => import("./apps/AtmosApp.jsx").then(m       => ({default: m.AtmosApp})));
+const MinesweeperApp = lazy(() => import("./apps/MinesweeperApp.jsx").then(m => ({default: m.MinesweeperApp})));
+const WordleApp      = lazy(() => import("./apps/WordleApp.jsx").then(m      => ({default: m.WordleApp})));
+const TetrisApp      = lazy(() => import("./apps/TetrisApp.jsx").then(m      => ({default: m.TetrisApp})));
+const NovaAiApp      = lazy(() => import("./apps/NovaAiApp.jsx").then(m      => ({default: m.NovaAiApp})));
 
  
 // ─── ROOT ─────────────────────────────────────────────────────────────────────
@@ -526,28 +530,39 @@ export default function NovaOS(){
               <button className="wx" onPointerDown={e=>e.stopPropagation()} onClick={e=>{e.stopPropagation();closeWin(win.id);}} style={{width:26,height:26,borderRadius:6,background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.09)",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,color:"rgba(255,255,255,0.5)",transition:"background 0.12s, color 0.12s",flexShrink:0}}>✕</button>
             </div>
             <div style={{flex:1,overflowY:"auto",overflowX:"hidden",padding:18,minWidth:0}}>
-              {win.app==="notes"    &&<NotesApp    data={data} updateData={updateData} showToast={showToast} AC={AC} openNovaAi={()=>openApp("novaai")}/>}
-              {win.app==="tasks"    &&<TasksApp    data={data} updateData={updateData} showToast={showToast} AC={AC} openNovaAi={()=>openApp("novaai")}/>}
-              {win.app==="files"    &&<FilesApp    data={data} updateData={updateData} showToast={showToast}/>}
-              {win.app==="paint"    &&<PaintApp    showToast={showToast} AC={AC}/>}
-              {win.app==="browser"  &&<BrowserApp  AC={AC}/>}
-              {win.app==="snake"    &&<SnakeApp    AC={AC}/>}
-              {win.app==="2048"     &&<Game2048App AC={AC}/>}
-              {win.app==="store"    &&<StoreApp    user={user} data={data} updateData={updateData} showToast={showToast} AC={AC}/>}
-              {win.app==="terminal" &&<TerminalApp user={user} AC={AC}/>}
-              {win.app==="chat"     &&<ChatApp     user={user} AC={AC}/>}
-              {win.app==="settings" &&<SettingsApp user={user} data={data} updateSettings={updateSettings} showToast={showToast} AC={AC} onCustomWallpaper={handleCustomWallpaper} onLogout={logout}/>}
-              {win.app==="profile"  &&<ProfileApp  user={user} data={data} updateData={updateData} showToast={showToast} AC={AC}/>}
-              {win.app==="calculator" &&<CalculatorApp AC={AC}/>}
-              {win.app==="clock"      &&<ClockApp AC={AC}/>}
-              {win.app==="calendar"   &&<CalendarApp data={data} updateData={updateData} showToast={showToast} AC={AC}/>}
-              {win.app==="music"      &&<MusicApp AC={AC} showToast={showToast}/>}
-              {win.app==="pdf"        &&<PdfApp AC={AC} showToast={showToast}/>}
-              {win.app==="atmos"      &&<AtmosApp AC={AC} showToast={showToast} pushNotification={pushNotification} openNovaAi={()=>openApp("novaai")}/>}
-              {win.app==="minesweeper"&&<MinesweeperApp AC={AC}/>}
-              {win.app==="wordle"     &&<WordleApp AC={AC} showToast={showToast}/>}
-              {win.app==="tetris"     &&<TetrisApp AC={AC}/>}
-              {win.app==="novaai"     &&<NovaAiApp AC={AC} showToast={showToast}/>}
+              {/* Each app is lazy-loaded — Suspense shows the spinner while the
+                  chunk is downloading. Once cached, reopens are instant.
+                  Per-window Suspense means opening Tetris doesn't blank out
+                  an already-loaded Notes window in another tab. */}
+              <Suspense fallback={
+                <div style={{display:"flex",alignItems:"center",justifyContent:"center",height:"100%",gap:10,color:"rgba(255,255,255,0.4)",padding:24}}>
+                  <div style={{width:18,height:18,border:"2px solid rgba(255,255,255,0.15)",borderTopColor:AC,borderRadius:"50%",animation:"spin 0.8s linear infinite"}}/>
+                  <span style={{fontFamily:FF,fontSize:12}}>Loading {app?.label||"app"}…</span>
+                </div>
+              }>
+                {win.app==="notes"    &&<NotesApp    data={data} updateData={updateData} showToast={showToast} AC={AC} openNovaAi={()=>openApp("novaai")}/>}
+                {win.app==="tasks"    &&<TasksApp    data={data} updateData={updateData} showToast={showToast} AC={AC} openNovaAi={()=>openApp("novaai")}/>}
+                {win.app==="files"    &&<FilesApp    data={data} updateData={updateData} showToast={showToast}/>}
+                {win.app==="paint"    &&<PaintApp    showToast={showToast} AC={AC}/>}
+                {win.app==="browser"  &&<BrowserApp  AC={AC}/>}
+                {win.app==="snake"    &&<SnakeApp    AC={AC}/>}
+                {win.app==="2048"     &&<Game2048App AC={AC}/>}
+                {win.app==="store"    &&<StoreApp    user={user} data={data} updateData={updateData} showToast={showToast} AC={AC}/>}
+                {win.app==="terminal" &&<TerminalApp user={user} AC={AC}/>}
+                {win.app==="chat"     &&<ChatApp     user={user} AC={AC}/>}
+                {win.app==="settings" &&<SettingsApp user={user} data={data} updateSettings={updateSettings} showToast={showToast} AC={AC} onCustomWallpaper={handleCustomWallpaper} onLogout={logout}/>}
+                {win.app==="profile"  &&<ProfileApp  user={user} data={data} updateData={updateData} showToast={showToast} AC={AC}/>}
+                {win.app==="calculator" &&<CalculatorApp AC={AC}/>}
+                {win.app==="clock"      &&<ClockApp AC={AC}/>}
+                {win.app==="calendar"   &&<CalendarApp data={data} updateData={updateData} showToast={showToast} AC={AC}/>}
+                {win.app==="music"      &&<MusicApp AC={AC} showToast={showToast}/>}
+                {win.app==="pdf"        &&<PdfApp AC={AC} showToast={showToast}/>}
+                {win.app==="atmos"      &&<AtmosApp AC={AC} showToast={showToast} pushNotification={pushNotification} openNovaAi={()=>openApp("novaai")}/>}
+                {win.app==="minesweeper"&&<MinesweeperApp AC={AC}/>}
+                {win.app==="wordle"     &&<WordleApp AC={AC} showToast={showToast}/>}
+                {win.app==="tetris"     &&<TetrisApp AC={AC}/>}
+                {win.app==="novaai"     &&<NovaAiApp AC={AC} showToast={showToast}/>}
+              </Suspense>
             </div>
           </div>
         );
