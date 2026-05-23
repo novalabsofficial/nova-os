@@ -1,5 +1,5 @@
 
-// NOVA OS v5.0 — Nova Systems
+// NOVA OS v5.1 — Nova Systems
 // Drop this into src/NovaOS.jsx
  
 import { useState, useEffect, useRef, useCallback } from "react";
@@ -15,6 +15,11 @@ import { defaultIconPos, snapToFreeGrid, snapW } from "./lib/geometry.js";
 import { autoModerate, isAdmin, isPubliclyVisible } from "./lib/moderation.js";
 import { rewriteForIframe, isLikelyUnframable } from "./lib/browser.js";
 import { detectDevice, effectiveDeviceMode, isTouchMode } from "./lib/device.js";
+import { applyOp, formatDisplay, toggleSign, appendKey } from "./lib/calc.js";
+import { createBoard as mineCreateBoard, floodReveal, isWin as mineIsWin, mineTotal, MINE_DIFFICULTIES } from "./lib/minesweeper.js";
+import { dailyWord, scoreGuess, normalizeGuess } from "./lib/wordle.js";
+import { emptyGrid as tetrisEmpty, randomPiece as tetrisRandom, shapeOf, fits as tetrisFits, lockPiece as tetrisLock, clearLines as tetrisClearLines, scoreForLines, tickInterval, PIECE_COLORS, BOARD_W as TETRIS_W, BOARD_H as TETRIS_H } from "./lib/tetris.js";
+import { wmoIcon, wmoLabel, geocodeUrl, parseGeocode, forecastUrl, parseForecast, alertsUrl, parseAlerts, isLikelyUS } from "./lib/weather.js";
 
 // ─── CONSTANTS ────────────────────────────────────────────────────────────────
 const DEFAULT_AC = "#4f9eff";
@@ -44,8 +49,13 @@ const DEFAULT_SIZES = {
   snake:{w:460,h:560},"2048":{w:480,h:580},
   store:{w:680,h:600},terminal:{w:580,h:460},
   settings:{w:480,h:640},profile:{w:440,h:540},chat:{w:480,h:580},
+  // 5.1 additions
+  calculator:{w:300,h:460},clock:{w:480,h:520},
+  minesweeper:{w:520,h:600},wordle:{w:430,h:600},tetris:{w:340,h:620},
+  pdf:{w:680,h:680},music:{w:480,h:560},calendar:{w:560,h:560},
+  atmos:{w:680,h:640},
 };
- 
+
 const APPS = [
   {id:"notes",   icon:"📝",label:"Notes",   desc:"Write & save notes"},
   {id:"tasks",   icon:"✅",label:"Tasks",   desc:"Manage to-dos"},
@@ -59,6 +69,16 @@ const APPS = [
   {id:"terminal",icon:"💻",label:"Terminal",desc:"System terminal"},
   {id:"settings",icon:"⚙️",label:"Settings",desc:"Customize Nova OS"},
   {id:"profile", icon:"👤",label:"Profile", desc:"Your account"},
+  // 5.1 additions
+  {id:"calculator", icon:"🔢",label:"Calculator", desc:"Quick math"},
+  {id:"clock",      icon:"⏰",label:"Clock",      desc:"World clock, stopwatch, timer"},
+  {id:"calendar",   icon:"📅",label:"Calendar",   desc:"Schedule events"},
+  {id:"music",      icon:"🎵",label:"Music",      desc:"Play local audio files"},
+  {id:"pdf",        icon:"📄",label:"PDF Viewer", desc:"Read PDFs in-app"},
+  {id:"atmos",      icon:"🌤️",label:"Atmos",     desc:"Weather, forecast & alerts"},
+  {id:"minesweeper",icon:"💣",label:"Minesweeper",desc:"Classic mine-grid puzzle"},
+  {id:"wordle",     icon:"🟩",label:"Wordle",     desc:"Daily 5-letter word puzzle"},
+  {id:"tetris",     icon:"🟪",label:"Tetris",     desc:"Falling-block classic"},
 ];
  
 // domain field enables Clearbit logo lookup
@@ -87,7 +107,7 @@ const STORE_CATALOG = [
 ];
  
 const STORE_CATS    = ["All","Games","Media","Tools","Social","News"];
-const BOOT_MSGS     = ["NOVA OS v5.0 — Nova Systems","Initializing kernel... OK","Loading hardware abstraction layer... OK","Mounting filesystems... OK","Starting widget engine... OK","Initializing Nova Store... OK","Loading user environment... OK","System ready."];
+const BOOT_MSGS     = ["NOVA OS v5.1 — Nova Systems","Initializing kernel... OK","Loading hardware abstraction layer... OK","Mounting filesystems... OK","Starting widget engine... OK","Initializing Nova Store... OK","Loading user environment... OK","System ready."];
 const ACCENT_PRESETS= ["#4f9eff","#ff6b6b","#4cef90","#ffcc44","#cc44ff","#ff8c44","#44ddcc","#ff44aa"];
 const BOOKMARKS     = [{label:"Hacker News",url:"https://news.ycombinator.com"},{label:"Wikipedia",url:"https://en.m.wikipedia.org"},{label:"Archive.org",url:"https://archive.org"},{label:"itch.io",url:"https://itch.io"}];
 const PAINT_COLORS  = ["#fff","#000","#ff4444","#ff8800","#ffdd00","#44dd44","#00ccff","#4466ff","#cc44ff","#ff44aa","#8b4513","#888"];
@@ -261,20 +281,30 @@ function NovaSvgIcon({id,size=26}){
   }
   if(id==="profile")return(<svg width={w} height={h} viewBox="0 0 32 32"><rect width="32" height="32" rx={r} fill="#4f9eff"/><circle cx="16" cy="12" r="5.5" fill="rgba(255,255,255,0.95)"/><path d="M5 28 Q5 21 16 21 Q27 21 27 28" fill="rgba(255,255,255,0.9)"/></svg>);
   if(id==="chat")return(<svg width={w} height={h} viewBox="0 0 32 32"><rect width="32" height="32" rx={r} fill="#6366f1"/><path d="M6 8 Q6 6 8 6 L24 6 Q26 6 26 8 L26 19 Q26 21 24 21 L14 21 L9 26 L9 21 L8 21 Q6 21 6 19 Z" fill="rgba(255,255,255,0.92)"/><rect x="10" y="11" width="12" height="1.8" rx="0.9" fill="rgba(99,102,241,0.7)"/><rect x="10" y="14.5" width="8" height="1.8" rx="0.9" fill="rgba(99,102,241,0.5)"/></svg>);
-  return <span style={{fontSize:size*0.9,lineHeight:1,display:"block"}}>📦</span>;
+  return null; // unknown id — caller falls back to app.icon emoji
 }
- 
+
+// Set of app ids that NovaSvgIcon has a real SVG for. Anything not in here
+// gets the emoji fallback via AppIconDisplay so 5.1's new apps don't all
+// appear as the default 📦 placeholder.
+const HAS_SVG_ICON = new Set([
+  "notes","tasks","files","paint","browser","snake","2048",
+  "store","terminal","settings","profile","chat",
+]);
+
 // Store app icon using Clearbit logo API with emoji fallback
 function StoreIcon({domain,fallback,size=26}){
   const [failed,setFailed]=useState(false);
   if(failed||!domain)return<span style={{fontSize:size*0.88,lineHeight:1,display:"block"}}>{fallback}</span>;
   return<img src={"https://logo.clearbit.com/"+domain} width={size} height={size} style={{borderRadius:Math.max(3,size*0.2),objectFit:"contain",display:"block"}} onError={()=>setFailed(true)} alt=""/>;
 }
- 
-// Unified icon display — picks SVG for built-in, Clearbit for store apps
+
+// Unified icon display — picks SVG for built-in, Clearbit for store apps,
+// emoji for everything else (new apps without custom SVGs yet).
 function AppIconDisplay({app,size=26}){
   if(app.storeApp)return<StoreIcon domain={app.storeApp.domain} fallback={app.storeApp.icon} size={size}/>;
-  return<NovaSvgIcon id={app.id} size={size}/>;
+  if(HAS_SVG_ICON.has(app.id))return<NovaSvgIcon id={app.id} size={size}/>;
+  return<span style={{fontSize:size*0.85,lineHeight:1,display:"block"}}>{app.icon||"📦"}</span>;
 }
  
 // ─── WIDGET SHELL (drag handle + 8-way resize + close button) ─────────────────
@@ -755,10 +785,10 @@ export default function NovaOS(){
   const dragCursor=drag?(drag.type==="move"?"grabbing":drag.edge+"-resize"):widgetResize?(widgetResize.edge+"-resize"):isAnyDrag?"grabbing":"default";
  
   // ── BOOT ─────────────────────────────────────────────────────────────────
-  if(screen==="boot")return(<div style={{width:"100%",height:"100vh",background:"#07080f",display:"flex",flexDirection:"column",justifyContent:"center",padding:"10vh max(24px, 12%)"}}><style>{CSS}</style><div style={{fontFamily:FFB,fontWeight:700,fontSize:"clamp(40px, 12vw, 66px)",letterSpacing:4,color:"#fff",marginBottom:4,lineHeight:1}}>NOVA</div><div style={{fontFamily:FF,fontSize:12,color:"rgba(255,255,255,0.22)",letterSpacing:5,marginBottom:46}}>OPERATING SYSTEM  ·  v5.0</div>{bootLines.map((l,i)=><div key={i} style={{fontFamily:FFM,fontSize:12,color:l.includes("ready")?"#4f9eff":"rgba(255,255,255,0.42)",marginBottom:5,animation:"boot-in 0.22s cubic-bezier(0.4,0,0.2,1)"}}>{l.includes("OK")?<>{l.replace("... OK","")}... <span style={{color:"#4cef90"}}>OK</span></>:l}</div>)}{MobileNotice}</div>);
+  if(screen==="boot")return(<div style={{width:"100%",height:"100vh",background:"#07080f",display:"flex",flexDirection:"column",justifyContent:"center",padding:"10vh max(24px, 12%)"}}><style>{CSS}</style><div style={{fontFamily:FFB,fontWeight:700,fontSize:"clamp(40px, 12vw, 66px)",letterSpacing:4,color:"#fff",marginBottom:4,lineHeight:1}}>NOVA</div><div style={{fontFamily:FF,fontSize:12,color:"rgba(255,255,255,0.22)",letterSpacing:5,marginBottom:46}}>OPERATING SYSTEM  ·  v5.1</div>{bootLines.map((l,i)=><div key={i} style={{fontFamily:FFM,fontSize:12,color:l.includes("ready")?"#4f9eff":"rgba(255,255,255,0.42)",marginBottom:5,animation:"boot-in 0.22s cubic-bezier(0.4,0,0.2,1)"}}>{l.includes("OK")?<>{l.replace("... OK","")}... <span style={{color:"#4cef90"}}>OK</span></>:l}</div>)}{MobileNotice}</div>);
  
   // ── LOGIN ────────────────────────────────────────────────────────────────
-  if(screen==="login")return(<div style={{width:"100%",height:"100vh",position:"relative",overflow:"hidden"}}><style>{CSS}</style><NovaBg/><div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center"}}><div style={{background:"rgba(8,10,22,0.86)",backdropFilter:"blur(24px)",border:"1px solid rgba(255,255,255,0.11)",borderRadius:16,padding:"44px 40px",width:376,maxWidth:"calc(100vw - 24px)",boxShadow:"0 40px 100px rgba(0,0,0,0.6)",position:"relative",overflow:"hidden"}}><div style={{position:"absolute",top:0,left:0,right:0,height:2,background:"linear-gradient(90deg,transparent,"+DEFAULT_AC+",transparent)"}}/><div style={{fontFamily:FFB,fontWeight:700,fontSize:38,color:"#fff",textAlign:"center",letterSpacing:4,marginBottom:4}}>NOVA</div><div style={{fontFamily:FF,fontSize:11,color:"rgba(255,255,255,0.22)",textAlign:"center",letterSpacing:4,marginBottom:36}}>OPERATING SYSTEM  ·  v5.0</div><div style={{display:"flex",borderBottom:"1px solid rgba(255,255,255,0.09)",marginBottom:24}}>{["login","register"].map(m=><button key={m} className="lt" onClick={()=>{setMode(m);setAuthErr("");}} style={{flex:1,padding:"10px 0",background:"none",border:"none",borderBottom:mode===m?"2px solid "+DEFAULT_AC:"2px solid transparent",cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:12,letterSpacing:1,color:mode===m?DEFAULT_AC:"rgba(255,255,255,0.28)",transition:"color 0.15s"}}>{m==="login"?"SIGN IN":"REGISTER"}</button>)}</div><input style={{...INP,marginBottom:11}} placeholder="Username" value={uname} onChange={e=>setUname(e.target.value)} onKeyDown={e=>e.key==="Enter"&&handleAuth()} autoFocus/><input style={INP} type="password" placeholder="Password" value={pass} onChange={e=>setPass(e.target.value)} onKeyDown={e=>e.key==="Enter"&&handleAuth()}/><button className="ls" disabled={busy} onClick={handleAuth} style={{width:"100%",padding:"12px",background:fill(DEFAULT_AC),border:"1px solid "+bdr(DEFAULT_AC),borderRadius:8,cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:14,letterSpacing:1,color:"#fff",marginTop:14,transition:"opacity 0.15s"}}>{busy?"AUTHENTICATING…":mode==="login"?"SIGN IN →":"CREATE ACCOUNT →"}</button>{authErr&&<div style={{color:"#ff7878",fontFamily:FF,fontSize:13,textAlign:"center",marginTop:12}}>⚠ {authErr}</div>}<div style={{marginTop:20,fontFamily:FF,fontStyle:"italic",fontSize:11,color:"rgba(255,255,255,0.14)",textAlign:"center"}}>Don't reuse real passwords — demo auth only.</div></div></div>{MobileNotice}</div>);
+  if(screen==="login")return(<div style={{width:"100%",height:"100vh",position:"relative",overflow:"hidden"}}><style>{CSS}</style><NovaBg/><div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center"}}><div style={{background:"rgba(8,10,22,0.86)",backdropFilter:"blur(24px)",border:"1px solid rgba(255,255,255,0.11)",borderRadius:16,padding:"44px 40px",width:376,maxWidth:"calc(100vw - 24px)",boxShadow:"0 40px 100px rgba(0,0,0,0.6)",position:"relative",overflow:"hidden"}}><div style={{position:"absolute",top:0,left:0,right:0,height:2,background:"linear-gradient(90deg,transparent,"+DEFAULT_AC+",transparent)"}}/><div style={{fontFamily:FFB,fontWeight:700,fontSize:38,color:"#fff",textAlign:"center",letterSpacing:4,marginBottom:4}}>NOVA</div><div style={{fontFamily:FF,fontSize:11,color:"rgba(255,255,255,0.22)",textAlign:"center",letterSpacing:4,marginBottom:36}}>OPERATING SYSTEM  ·  v5.1</div><div style={{display:"flex",borderBottom:"1px solid rgba(255,255,255,0.09)",marginBottom:24}}>{["login","register"].map(m=><button key={m} className="lt" onClick={()=>{setMode(m);setAuthErr("");}} style={{flex:1,padding:"10px 0",background:"none",border:"none",borderBottom:mode===m?"2px solid "+DEFAULT_AC:"2px solid transparent",cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:12,letterSpacing:1,color:mode===m?DEFAULT_AC:"rgba(255,255,255,0.28)",transition:"color 0.15s"}}>{m==="login"?"SIGN IN":"REGISTER"}</button>)}</div><input style={{...INP,marginBottom:11}} placeholder="Username" value={uname} onChange={e=>setUname(e.target.value)} onKeyDown={e=>e.key==="Enter"&&handleAuth()} autoFocus/><input style={INP} type="password" placeholder="Password" value={pass} onChange={e=>setPass(e.target.value)} onKeyDown={e=>e.key==="Enter"&&handleAuth()}/><button className="ls" disabled={busy} onClick={handleAuth} style={{width:"100%",padding:"12px",background:fill(DEFAULT_AC),border:"1px solid "+bdr(DEFAULT_AC),borderRadius:8,cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:14,letterSpacing:1,color:"#fff",marginTop:14,transition:"opacity 0.15s"}}>{busy?"AUTHENTICATING…":mode==="login"?"SIGN IN →":"CREATE ACCOUNT →"}</button>{authErr&&<div style={{color:"#ff7878",fontFamily:FF,fontSize:13,textAlign:"center",marginTop:12}}>⚠ {authErr}</div>}<div style={{marginTop:20,fontFamily:FF,fontStyle:"italic",fontSize:11,color:"rgba(255,255,255,0.14)",textAlign:"center"}}>Don't reuse real passwords — demo auth only.</div></div></div>{MobileNotice}</div>);
  
   // ── DESKTOP ──────────────────────────────────────────────────────────────
   return(
@@ -817,7 +847,7 @@ export default function NovaOS(){
         </div>
         <div style={{padding:"10px 16px",borderTop:"1px solid rgba(255,255,255,0.07)",display:"flex",alignItems:"center",gap:10}}>
           <div style={{width:32,height:32,borderRadius:"50%",background:fill(AC),border:"1.5px solid "+AC,display:"flex",alignItems:"center",justifyContent:"center",fontSize:15,flexShrink:0}}>👤</div>
-          <div style={{flex:1}}><div style={{fontFamily:FFB,fontWeight:600,fontSize:13,color:"#fff"}}>@{user}</div><div style={{fontFamily:FF,fontSize:10,color:"rgba(255,255,255,0.3)"}}>Nova OS v5.0</div></div>
+          <div style={{flex:1}}><div style={{fontFamily:FFB,fontWeight:600,fontSize:13,color:"#fff"}}>@{user}</div><div style={{fontFamily:FF,fontSize:10,color:"rgba(255,255,255,0.3)"}}>Nova OS v5.1</div></div>
           <button onClick={logout} style={{padding:"6px 12px",background:"rgba(200,40,40,0.12)",border:"1px solid rgba(200,40,40,0.3)",borderRadius:6,cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:11,color:"rgba(255,140,140,0.9)"}}>Logout</button>
         </div>
       </div>)}
@@ -851,6 +881,15 @@ export default function NovaOS(){
               {win.app==="chat"     &&<ChatApp     user={user} AC={AC}/>}
               {win.app==="settings" &&<SettingsApp user={user} data={data} updateSettings={updateSettings} showToast={showToast} AC={AC} onCustomWallpaper={handleCustomWallpaper}/>}
               {win.app==="profile"  &&<ProfileApp  user={user} data={data} updateData={updateData} showToast={showToast} AC={AC}/>}
+              {win.app==="calculator" &&<CalculatorApp AC={AC}/>}
+              {win.app==="clock"      &&<ClockApp AC={AC}/>}
+              {win.app==="calendar"   &&<CalendarApp data={data} updateData={updateData} showToast={showToast} AC={AC}/>}
+              {win.app==="music"      &&<MusicApp AC={AC} showToast={showToast}/>}
+              {win.app==="pdf"        &&<PdfApp AC={AC} showToast={showToast}/>}
+              {win.app==="atmos"      &&<AtmosApp AC={AC} showToast={showToast}/>}
+              {win.app==="minesweeper"&&<MinesweeperApp AC={AC}/>}
+              {win.app==="wordle"     &&<WordleApp AC={AC} showToast={showToast}/>}
+              {win.app==="tetris"     &&<TetrisApp AC={AC}/>}
             </div>
           </div>
         );
@@ -1469,7 +1508,7 @@ function StoreApp({user,data,updateData,showToast,AC}){
     <div style={{width:"100%",fontFamily:FF}}>
       {/* Header + search */}
       <div style={{marginBottom:12}}>
-        <div style={{fontFamily:FFB,fontWeight:700,fontSize:20,color:"#fff",marginBottom:8}}>🏪 Nova Store 5.0</div>
+        <div style={{fontFamily:FFB,fontWeight:700,fontSize:20,color:"#fff",marginBottom:8}}>🏪 Nova Store 5.1</div>
         <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search all apps…" style={INP}/>
       </div>
  
@@ -1610,10 +1649,10 @@ function StoreApp({user,data,updateData,showToast,AC}){
 }
  
 function TerminalApp({user,AC}){
-  const [lines,setLines]=useState([{t:"out",v:"NOVA Terminal v5.0.0"},{t:"out",v:"Session: "+user+" — "+new Date().toLocaleString()},{t:"out",v:'Type "help" for commands.'},{t:"gap"}]);
+  const [lines,setLines]=useState([{t:"out",v:"NOVA Terminal v5.1.0"},{t:"out",v:"Session: "+user+" — "+new Date().toLocaleString()},{t:"out",v:'Type "help" for commands.'},{t:"gap"}]);
   const [cmd,setCmd]=useState("");const [hist,setHist]=useState([]);const [hIdx,setHIdx]=useState(-1);const endRef=useRef(null);
   useEffect(()=>{endRef.current?.scrollIntoView({behavior:"smooth"});},[lines]);
-  const CMDS={help:()=>["Commands: help, whoami, date, echo <text>, version, sysinfo, ls, neofetch, clear"],whoami:()=>[user],date:()=>[new Date().toLocaleString()],version:()=>["NOVA OS v5.0.0 — Nova Systems Inc."],sysinfo:()=>["CPU: Nova Virtual Core™","RAM: 8.0 GB","Storage: Firebase Firestore","Resolution: "+window.innerWidth+"x"+window.innerHeight,"Uptime: "+Math.floor(performance.now()/1000)+"s"],ls:()=>["notes/ tasks/ files/ paint/ browser/ snake/ 2048/ store/ terminal/ settings/"],neofetch:()=>[" ███╗   ██╗ ██████╗ ██╗   ██╗ █████╗ "," ████╗  ██║██╔═══██╗██║   ██║██╔══██╗"," ██╔██╗ ██║██║   ██║██║   ██║███████║"," ██║╚██╗██║██║   ██║╚██╗ ██╔╝██╔══██║"," ██║ ╚████║╚██████╔╝ ╚████╔╝ ██║  ██║","OS: Nova v5.0  User: "+user,"Widgets: Clock·Weather·Notes·Tasks·Calendar·SysInfo"],echo:args=>[args.join(" ")||"(empty)"],clear:()=>"__clear__"};
+  const CMDS={help:()=>["Commands: help, whoami, date, echo <text>, version, sysinfo, ls, neofetch, clear"],whoami:()=>[user],date:()=>[new Date().toLocaleString()],version:()=>["NOVA OS v5.1.0 — Nova Systems Inc."],sysinfo:()=>["CPU: Nova Virtual Core™","RAM: 8.0 GB","Storage: Firebase Firestore","Resolution: "+window.innerWidth+"x"+window.innerHeight,"Uptime: "+Math.floor(performance.now()/1000)+"s"],ls:()=>["notes/ tasks/ files/ paint/ browser/ snake/ 2048/ store/ terminal/ settings/"],neofetch:()=>[" ███╗   ██╗ ██████╗ ██╗   ██╗ █████╗ "," ████╗  ██║██╔═══██╗██║   ██║██╔══██╗"," ██╔██╗ ██║██║   ██║██║   ██║███████║"," ██║╚██╗██║██║   ██║╚██╗ ██╔╝██╔══██║"," ██║ ╚████║╚██████╔╝ ╚████╔╝ ██║  ██║","OS: Nova v5.1  User: "+user,"Widgets: Clock·Weather·Notes·Tasks·Calendar·SysInfo"],echo:args=>[args.join(" ")||"(empty)"],clear:()=>"__clear__"};
   function run(){const raw=cmd.trim();if(!raw)return;const parts=raw.split(" ");const c=parts[0].toLowerCase();const args=parts.slice(1);setHist(h=>[raw,...h]);setHIdx(-1);setCmd("");const nl=[...lines,{t:"in",v:raw}];const h=CMDS[c];if(!h){nl.push({t:"err",v:c+': not found. Try "help".'});}else{const r=h(args);if(r==="__clear__"){setLines([]);return;}r.forEach(v=>nl.push({t:"out",v}));}nl.push({t:"gap"});setLines(nl);}
   function onKey(e){if(e.key==="Enter"){run();return;}if(e.key==="ArrowUp"){const i=Math.min(hIdx+1,hist.length-1);setHIdx(i);if(hist[i])setCmd(hist[i]);}if(e.key==="ArrowDown"){const i=Math.max(hIdx-1,-1);setHIdx(i);setCmd(i===-1?"":(hist[i]||""));}}
   return(<div style={{width:"100%",fontFamily:FFM}}><div style={{background:"#030407",borderRadius:8,padding:"13px 15px",height:"100%",minHeight:280,overflowY:"auto",border:"1px solid rgba(255,255,255,0.07)"}}>{lines.map((l,i)=><div key={i} style={{color:l.t==="in"?AC:l.t==="err"?"#ff7878":"rgba(180,210,255,0.58)",fontSize:12,marginBottom:l.t==="gap"?5:2,minHeight:l.t==="gap"?4:undefined,whiteSpace:"pre"}}>{l.t==="in"?"$ "+l.v:l.t==="gap"?null:l.v}</div>)}<div style={{display:"flex",alignItems:"center"}}><span style={{color:"#4cef90",marginRight:7,fontSize:12}}>$</span><input value={cmd} onChange={e=>setCmd(e.target.value)} onKeyDown={onKey} autoFocus style={{flex:1,background:"none",border:"none",outline:"none",color:AC,fontFamily:FFM,fontSize:12,caretColor:AC}}/></div><div ref={endRef}/></div></div>);
@@ -1892,4 +1931,1210 @@ function ChatApp({ user, AC }) {
     </div>
   );
 }
- 
+
+// ─── 5.1 APPS ─────────────────────────────────────────────────────────────────
+
+function CalculatorApp({AC}){
+  // Display string holds the in-progress entry (or last result after =).
+  // pending holds {prev, op} when we're waiting for the second operand.
+  const [display,setDisplay]=useState("0");
+  const [pending,setPending]=useState(null);
+  const [justEvaluated,setJustEvaluated]=useState(false);
+
+  function pressDigit(d){
+    if(justEvaluated){setDisplay(d==="."?"0.":d);setJustEvaluated(false);return;}
+    setDisplay(prev=>appendKey(prev,d));
+  }
+  function pressOp(op){
+    const cur=parseFloat(display);
+    if(pending&&!justEvaluated){
+      const r=applyOp(pending.prev,pending.op,cur);
+      setDisplay(formatDisplay(r));
+      setPending({prev:r,op});
+    } else {
+      setPending({prev:cur,op});
+    }
+    setJustEvaluated(true); // next digit starts fresh entry
+  }
+  function pressEquals(){
+    if(!pending)return;
+    const cur=parseFloat(display);
+    const r=applyOp(pending.prev,pending.op,cur);
+    setDisplay(formatDisplay(r));
+    setPending(null);
+    setJustEvaluated(true);
+  }
+  function pressClear(){setDisplay("0");setPending(null);setJustEvaluated(false);}
+  function pressSign(){setDisplay(s=>toggleSign(s));}
+  function pressPercent(){const n=parseFloat(display);setDisplay(formatDisplay(n/100));setJustEvaluated(true);}
+  function pressBackspace(){
+    if(justEvaluated){pressClear();return;}
+    setDisplay(s=>{
+      if(s.length<=1||(s.length===2&&s.startsWith("-")))return "0";
+      return s.slice(0,-1);
+    });
+  }
+
+  // Layout: 5 rows × 4 cols. The "0" key spans two cols on the bottom row.
+  const btn=(label,onClick,style={})=>(
+    <button onClick={onClick} style={{
+      height:54,borderRadius:14,
+      background:"rgba(255,255,255,0.06)",
+      border:"1px solid rgba(255,255,255,0.08)",
+      cursor:"pointer",
+      fontFamily:FFB,fontWeight:600,fontSize:18,
+      color:"rgba(255,255,255,0.92)",
+      transition:"background 0.15s",
+      touchAction:"manipulation",
+      ...style,
+    }} onMouseOver={e=>e.currentTarget.style.background="rgba(255,255,255,0.11)"}
+       onMouseOut={e=>e.currentTarget.style.background=style.background||"rgba(255,255,255,0.06)"}>{label}</button>
+  );
+  const acStyle={background:fill(AC),border:"1px solid "+bdr(AC),color:AC};
+  const opStyle={background:"rgba(255,255,255,0.1)",border:"1px solid rgba(255,255,255,0.13)",color:"#fff"};
+
+  return(
+    <div style={{display:"flex",flexDirection:"column",gap:10,fontFamily:FF,height:"100%",minHeight:0}}>
+      {/* Display */}
+      <div style={{flexShrink:0,padding:"22px 14px 18px",background:"rgba(0,0,0,0.25)",borderRadius:14,border:"1px solid rgba(255,255,255,0.05)",textAlign:"right",minHeight:80,display:"flex",flexDirection:"column",justifyContent:"flex-end",overflow:"hidden"}}>
+        {pending && <div style={{fontFamily:FFM,fontSize:11,color:"rgba(255,255,255,0.4)",marginBottom:4}}>{formatDisplay(pending.prev)} {pending.op}</div>}
+        <div style={{fontFamily:FFM,fontWeight:500,fontSize:display.length>10?28:36,color:"#fff",letterSpacing:1,lineHeight:1,wordBreak:"break-all"}}>{display}</div>
+      </div>
+      {/* Keypad */}
+      <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:8,flex:1,minHeight:0}}>
+        {btn("AC",pressClear,acStyle)}
+        {btn("±",pressSign)}
+        {btn("%",pressPercent)}
+        {btn("÷",()=>pressOp("÷"),opStyle)}
+        {btn("7",()=>pressDigit("7"))}
+        {btn("8",()=>pressDigit("8"))}
+        {btn("9",()=>pressDigit("9"))}
+        {btn("×",()=>pressOp("×"),opStyle)}
+        {btn("4",()=>pressDigit("4"))}
+        {btn("5",()=>pressDigit("5"))}
+        {btn("6",()=>pressDigit("6"))}
+        {btn("−",()=>pressOp("-"),opStyle)}
+        {btn("1",()=>pressDigit("1"))}
+        {btn("2",()=>pressDigit("2"))}
+        {btn("3",()=>pressDigit("3"))}
+        {btn("+",()=>pressOp("+"),opStyle)}
+        {btn("0",()=>pressDigit("0"),{gridColumn:"span 2"})}
+        {btn(".",()=>pressDigit("."))}
+        {btn("=",pressEquals,{background:AC,border:"1px solid "+AC,color:"#fff"})}
+        {btn("⌫",pressBackspace,{gridColumn:"span 4",height:42,fontSize:14,background:"rgba(255,255,255,0.03)"})}
+      </div>
+    </div>
+  );
+}
+
+// Placeholders — each gets a real implementation below as we work through the list.
+const CLOCK_ZONES = [
+  {label:"New York",   tz:"America/New_York"},
+  {label:"Los Angeles",tz:"America/Los_Angeles"},
+  {label:"London",     tz:"Europe/London"},
+  {label:"Paris",      tz:"Europe/Paris"},
+  {label:"Tokyo",      tz:"Asia/Tokyo"},
+  {label:"Sydney",     tz:"Australia/Sydney"},
+  {label:"Dubai",      tz:"Asia/Dubai"},
+  {label:"São Paulo",  tz:"America/Sao_Paulo"},
+];
+
+function ClockApp({AC}){
+  const [tab,setTab]=useState("world");
+  const [tick,setTick]=useState(()=>new Date());
+  // Stopwatch state
+  const [swRunning,setSwRunning]=useState(false);
+  const [swElapsed,setSwElapsed]=useState(0);      // total elapsed ms
+  const [swStart,setSwStart]=useState(0);          // perf timestamp when last started
+  const [swLaps,setSwLaps]=useState([]);
+  // Timer state
+  const [tMin,setTMin]=useState(5);
+  const [tSec,setTSec]=useState(0);
+  const [tRemaining,setTRemaining]=useState(0);    // ms until done
+  const [tRunning,setTRunning]=useState(false);
+  const tEndRef=useRef(0);
+
+  // Drives world clock + stopwatch display + timer countdown. 100ms is plenty
+  // smooth and avoids draining the battery on phones.
+  useEffect(()=>{
+    const id=setInterval(()=>{
+      setTick(new Date());
+      if(swRunning) setSwElapsed(prev=>prev + (performance.now()-swStart));
+      // ^ that update pattern would over-count if swStart isn't reset every tick.
+      // We actually compute elapsed live from swStart in the render — keep that simple.
+    },1000);
+    return ()=>clearInterval(id);
+  },[swRunning,swStart]);
+
+  // Smoother stopwatch tick: 50ms refresh for hundredths
+  useEffect(()=>{
+    if(!swRunning)return;
+    const id=setInterval(()=>setTick(new Date()),50);
+    return ()=>clearInterval(id);
+  },[swRunning]);
+
+  // Timer countdown
+  useEffect(()=>{
+    if(!tRunning)return;
+    const id=setInterval(()=>{
+      const left=Math.max(0,tEndRef.current-performance.now());
+      setTRemaining(left);
+      if(left<=0){setTRunning(false);}
+    },100);
+    return ()=>clearInterval(id);
+  },[tRunning]);
+
+  function fmtTimeTZ(date,tz){
+    try{return date.toLocaleTimeString([],{timeZone:tz,hour:"2-digit",minute:"2-digit",second:"2-digit",hour12:false});}
+    catch{return "—";}
+  }
+  function fmtDateTZ(date,tz){
+    try{return date.toLocaleDateString([],{timeZone:tz,weekday:"short",month:"short",day:"numeric"});}
+    catch{return "";}
+  }
+  // Stopwatch: render the live elapsed, not the (lagging) stored swElapsed
+  const liveElapsed = swRunning ? swElapsed + (performance.now() - swStart) : swElapsed;
+  function fmtStopwatch(ms){
+    const total=Math.floor(ms);
+    const cs=Math.floor((total%1000)/10);
+    const s=Math.floor(total/1000)%60;
+    const m=Math.floor(total/60000)%60;
+    const h=Math.floor(total/3600000);
+    const pad=n=>String(n).padStart(2,"0");
+    return (h>0?pad(h)+":":"")+pad(m)+":"+pad(s)+"."+pad(cs);
+  }
+  function startStopwatch(){
+    if(swRunning){
+      setSwElapsed(prev=>prev + (performance.now()-swStart));
+      setSwRunning(false);
+    } else {
+      setSwStart(performance.now());
+      setSwRunning(true);
+    }
+  }
+  function lapStopwatch(){
+    if(!swRunning)return;
+    setSwLaps(l=>[liveElapsed,...l]);
+  }
+  function resetStopwatch(){
+    setSwRunning(false);setSwElapsed(0);setSwLaps([]);
+  }
+
+  function startTimer(){
+    const ms=Math.max(0,(tMin*60+tSec)*1000);
+    if(ms<=0)return;
+    tEndRef.current=performance.now()+ms;
+    setTRemaining(ms);
+    setTRunning(true);
+  }
+  function stopTimer(){setTRunning(false);}
+  function resetTimer(){setTRunning(false);setTRemaining(0);}
+  function fmtTimer(ms){
+    const total=Math.max(0,Math.ceil(ms/1000));
+    const s=total%60;const m=Math.floor(total/60)%60;const h=Math.floor(total/3600);
+    const pad=n=>String(n).padStart(2,"0");
+    return (h>0?pad(h)+":":"")+pad(m)+":"+pad(s);
+  }
+
+  const tabBtn=(id,label)=>(
+    <button onClick={()=>setTab(id)} style={{flex:1,padding:"10px 8px",background:"none",border:"none",borderBottom:tab===id?"2px solid "+AC:"2px solid transparent",cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:12,color:tab===id?AC:"rgba(255,255,255,0.4)"}}>{label}</button>
+  );
+  const ctrlBtn=(label,onClick,active=false,danger=false)=>(
+    <button onClick={onClick} style={{
+      flex:1,padding:"12px 0",borderRadius:9,cursor:"pointer",fontFamily:FFB,fontWeight:700,fontSize:13,touchAction:"manipulation",
+      background:danger?"rgba(255,80,80,0.1)":active?fill(AC):"rgba(255,255,255,0.07)",
+      border:"1px solid "+(danger?"rgba(255,80,80,0.4)":active?bdr(AC):"rgba(255,255,255,0.12)"),
+      color:danger?"#ff8b8b":active?AC:"rgba(255,255,255,0.8)",
+    }}>{label}</button>
+  );
+
+  return(
+    <div style={{display:"flex",flexDirection:"column",height:"100%",fontFamily:FF,minHeight:0}}>
+      <div style={{display:"flex",borderBottom:"1px solid rgba(255,255,255,0.08)",marginBottom:14,flexShrink:0}}>
+        {tabBtn("world","🌍 World")}{tabBtn("stop","⏱ Stopwatch")}{tabBtn("timer","⏲ Timer")}
+      </div>
+      {tab==="world"&&(
+        <div style={{flex:1,overflowY:"auto",minHeight:0,display:"flex",flexDirection:"column",gap:6}}>
+          <div style={{padding:"14px 14px",background:fill(AC),border:"1px solid "+bdr(AC),borderRadius:10,marginBottom:6}}>
+            <div style={{fontSize:11,fontFamily:FFB,fontWeight:600,color:AC,letterSpacing:1,marginBottom:5}}>LOCAL TIME</div>
+            <div style={{fontFamily:FFM,fontWeight:500,fontSize:30,color:"#fff",letterSpacing:1.5}}>{tick.toLocaleTimeString([],{hour:"2-digit",minute:"2-digit",second:"2-digit",hour12:false})}</div>
+            <div style={{fontFamily:FF,fontSize:11,color:"rgba(255,255,255,0.45)",marginTop:2}}>{tick.toLocaleDateString([],{weekday:"long",month:"long",day:"numeric",year:"numeric"})}</div>
+          </div>
+          {CLOCK_ZONES.map(z=>(
+            <div key={z.tz} style={{padding:"10px 14px",background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.06)",borderRadius:8,display:"flex",alignItems:"center",gap:10}}>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontFamily:FFB,fontWeight:600,fontSize:13,color:"rgba(255,255,255,0.85)"}}>{z.label}</div>
+                <div style={{fontSize:10,color:"rgba(255,255,255,0.35)",fontFamily:FFM}}>{fmtDateTZ(tick,z.tz)}</div>
+              </div>
+              <div style={{fontFamily:FFM,fontWeight:500,fontSize:18,color:"#fff",letterSpacing:1}}>{fmtTimeTZ(tick,z.tz)}</div>
+            </div>
+          ))}
+        </div>
+      )}
+      {tab==="stop"&&(
+        <div style={{flex:1,display:"flex",flexDirection:"column",minHeight:0}}>
+          <div style={{textAlign:"center",padding:"30px 0 24px"}}>
+            <div style={{fontFamily:FFM,fontWeight:400,fontSize:46,color:"#fff",letterSpacing:1.5}}>{fmtStopwatch(liveElapsed)}</div>
+          </div>
+          <div style={{display:"flex",gap:8,marginBottom:12,flexShrink:0}}>
+            {ctrlBtn(swRunning?"Pause":liveElapsed>0?"Resume":"Start",startStopwatch,true)}
+            {ctrlBtn("Lap",lapStopwatch)}
+            {ctrlBtn("Reset",resetStopwatch,false,true)}
+          </div>
+          <div style={{flex:1,overflowY:"auto",minHeight:0}}>
+            {swLaps.length===0?<div style={{textAlign:"center",color:"rgba(255,255,255,0.2)",fontStyle:"italic",fontSize:12,padding:"24px 0"}}>No laps yet</div>:swLaps.map((ms,i)=>(
+              <div key={i} style={{display:"flex",justifyContent:"space-between",padding:"7px 12px",borderBottom:"1px solid rgba(255,255,255,0.05)",fontFamily:FFM,fontSize:13,color:"rgba(255,255,255,0.75)"}}>
+                <span style={{color:"rgba(255,255,255,0.45)"}}>Lap {swLaps.length-i}</span><span>{fmtStopwatch(ms)}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+      {tab==="timer"&&(
+        <div style={{flex:1,display:"flex",flexDirection:"column",minHeight:0,alignItems:"center",justifyContent:"flex-start",paddingTop:18}}>
+          {!tRunning && tRemaining===0 ? (
+            <>
+              <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:18}}>
+                <input type="number" min={0} max={99} value={tMin} onChange={e=>setTMin(Math.max(0,Math.min(99,+e.target.value||0)))} style={{...INP,width:80,textAlign:"center",fontFamily:FFM,fontSize:24}}/>
+                <span style={{fontFamily:FFM,fontWeight:600,fontSize:22,color:"rgba(255,255,255,0.5)"}}>:</span>
+                <input type="number" min={0} max={59} value={tSec} onChange={e=>setTSec(Math.max(0,Math.min(59,+e.target.value||0)))} style={{...INP,width:80,textAlign:"center",fontFamily:FFM,fontSize:24}}/>
+              </div>
+              <div style={{fontSize:10,fontFamily:FFM,color:"rgba(255,255,255,0.3)",letterSpacing:1.5,marginBottom:18}}>MIN  :  SEC</div>
+            </>
+          ):(
+            <div style={{textAlign:"center",marginBottom:22}}>
+              <div style={{fontFamily:FFM,fontWeight:400,fontSize:56,color:tRunning?"#fff":AC,letterSpacing:2}}>{fmtTimer(tRemaining)}</div>
+              {!tRunning&&tRemaining===0&&<div style={{fontSize:14,fontFamily:FFB,fontWeight:700,color:AC,marginTop:8}}>Done ✓</div>}
+            </div>
+          )}
+          <div style={{display:"flex",gap:8,width:"100%",maxWidth:300}}>
+            {!tRunning ? ctrlBtn(tRemaining>0?"Resume":"Start",startTimer,true) : ctrlBtn("Stop",stopTimer,true,true)}
+            {(tRemaining>0||tRunning)&&ctrlBtn("Reset",resetTimer)}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+function CalendarApp({data,updateData,showToast,AC}){
+  const events = data?.calendarEvents || {};   // { "YYYY-MM-DD": [{id,title,time?}, ...] }
+  const today=new Date(); today.setHours(0,0,0,0);
+  const [viewYear,setViewYear]=useState(today.getFullYear());
+  const [viewMonth,setViewMonth]=useState(today.getMonth());  // 0-indexed
+  const [selectedKey,setSelectedKey]=useState(()=>dateKey(today));
+  const [newTitle,setNewTitle]=useState("");
+  const [newTime,setNewTime]=useState("");
+
+  function dateKey(d){
+    const y=d.getFullYear(), m=String(d.getMonth()+1).padStart(2,"0"), dd=String(d.getDate()).padStart(2,"0");
+    return y+"-"+m+"-"+dd;
+  }
+  function keyToParts(k){const [y,m,d]=k.split("-").map(Number);return {y,m:m-1,d};}
+
+  // Grid: render 42 cells (6 weeks). Start from the Sunday on or before the 1st of the month.
+  const first=new Date(viewYear,viewMonth,1);
+  const startOffset=first.getDay();
+  const gridStart=new Date(viewYear,viewMonth,1-startOffset);
+  const cells=Array.from({length:42}).map((_,i)=>{
+    const d=new Date(gridStart); d.setDate(gridStart.getDate()+i);
+    return d;
+  });
+
+  function nav(delta){
+    let m=viewMonth+delta, y=viewYear;
+    if(m<0){m=11;y--;} else if(m>11){m=0;y++;}
+    setViewMonth(m);setViewYear(y);
+  }
+  function goToday(){setViewMonth(today.getMonth());setViewYear(today.getFullYear());setSelectedKey(dateKey(today));}
+
+  function addEvent(){
+    const t=newTitle.trim();
+    if(!t){showToast?.("Add a title first");return;}
+    const ev={id:Date.now()+Math.random(),title:t,time:newTime||null};
+    const next={...events, [selectedKey]:[...(events[selectedKey]||[]), ev]};
+    updateData({calendarEvents:next});
+    setNewTitle("");setNewTime("");
+  }
+  function deleteEvent(key,id){
+    const list=(events[key]||[]).filter(e=>e.id!==id);
+    const next={...events};
+    if(list.length===0) delete next[key]; else next[key]=list;
+    updateData({calendarEvents:next});
+  }
+
+  const monthName=new Date(viewYear,viewMonth,1).toLocaleDateString([],{month:"long",year:"numeric"});
+  const todayKey=dateKey(today);
+  const selectedEvents=events[selectedKey]||[];
+
+  return(
+    <div style={{display:"flex",flexDirection:"column",gap:10,height:"100%",fontFamily:FF,minHeight:0}}>
+      {/* Header */}
+      <div style={{display:"flex",alignItems:"center",gap:6,flexShrink:0}}>
+        <button onClick={()=>nav(-1)} style={{width:30,height:30,borderRadius:7,background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.1)",cursor:"pointer",color:"rgba(255,255,255,0.75)",fontSize:14}}>←</button>
+        <div style={{flex:1,textAlign:"center",fontFamily:FFB,fontWeight:700,fontSize:15,color:"#fff"}}>{monthName}</div>
+        <button onClick={goToday} style={{padding:"5px 11px",borderRadius:7,background:fill(AC),border:"1px solid "+bdr(AC),cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:11,color:AC}}>Today</button>
+        <button onClick={()=>nav(1)}  style={{width:30,height:30,borderRadius:7,background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.1)",cursor:"pointer",color:"rgba(255,255,255,0.75)",fontSize:14}}>→</button>
+      </div>
+
+      {/* Weekday header */}
+      <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:3,flexShrink:0}}>
+        {["S","M","T","W","T","F","S"].map((d,i)=>(
+          <div key={i} style={{textAlign:"center",fontFamily:FFB,fontWeight:600,fontSize:10,color:"rgba(255,255,255,0.35)",letterSpacing:1}}>{d}</div>
+        ))}
+      </div>
+
+      {/* Date cells */}
+      <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gridAutoRows:"minmax(36px, 1fr)",gap:3,flexShrink:0}}>
+        {cells.map((d,i)=>{
+          const k=dateKey(d);
+          const inMonth=d.getMonth()===viewMonth;
+          const isToday=k===todayKey;
+          const isSel=k===selectedKey;
+          const has=events[k]&&events[k].length>0;
+          return(
+            <button key={i} onClick={()=>setSelectedKey(k)} style={{
+              padding:6,borderRadius:7,cursor:"pointer",fontFamily:FF,fontSize:12,
+              background:isSel?fill(AC):isToday?"rgba(255,255,255,0.08)":"rgba(255,255,255,0.02)",
+              border:"1px solid "+(isSel?bdr(AC):isToday?"rgba(255,255,255,0.18)":"rgba(255,255,255,0.05)"),
+              color:isSel?AC:inMonth?"rgba(255,255,255,0.85)":"rgba(255,255,255,0.25)",
+              fontWeight:isToday||isSel?700:400,
+              display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",position:"relative",
+            }}>
+              <span>{d.getDate()}</span>
+              {has && <div style={{position:"absolute",bottom:3,width:4,height:4,borderRadius:"50%",background:isSel?AC:"#4cef90"}}/>}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Events for the selected date */}
+      <div style={{flex:1,overflow:"hidden",display:"flex",flexDirection:"column",minHeight:0,marginTop:4}}>
+        <div style={{fontFamily:FFB,fontWeight:600,fontSize:11,color:"rgba(255,255,255,0.45)",letterSpacing:1,marginBottom:8,textTransform:"uppercase",flexShrink:0}}>
+          {(() => { const p=keyToParts(selectedKey); return new Date(p.y,p.m,p.d).toLocaleDateString([],{weekday:"long",month:"long",day:"numeric"}); })()}
+        </div>
+        <div style={{flex:1,overflowY:"auto",minHeight:0,marginBottom:8}}>
+          {selectedEvents.length===0 ? (
+            <div style={{fontSize:12,color:"rgba(255,255,255,0.3)",fontStyle:"italic",padding:"6px 0"}}>No events. Add one below.</div>
+          ) : selectedEvents.map(ev=>(
+            <div key={ev.id} style={{display:"flex",alignItems:"center",gap:8,padding:"7px 10px",marginBottom:4,background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:7}}>
+              {ev.time && <span style={{fontFamily:FFM,fontSize:10,color:AC,minWidth:42}}>{ev.time}</span>}
+              <span style={{flex:1,fontSize:13,color:"rgba(255,255,255,0.88)"}}>{ev.title}</span>
+              <button className="dl" onClick={()=>deleteEvent(selectedKey,ev.id)} style={{background:"none",border:"none",cursor:"pointer",color:"rgba(255,80,80,0.3)",fontSize:12}}>✕</button>
+            </div>
+          ))}
+        </div>
+        {/* New event form */}
+        <div style={{display:"flex",gap:6,flexShrink:0}}>
+          <input value={newTime} onChange={e=>setNewTime(e.target.value)} placeholder="HH:MM" style={{...INP,width:74,fontSize:12,fontFamily:FFM,textAlign:"center"}}/>
+          <input value={newTitle} onChange={e=>setNewTitle(e.target.value)} onKeyDown={e=>e.key==="Enter"&&addEvent()} placeholder="New event…" style={{...INP,flex:1,fontSize:12}}/>
+          <button onClick={addEvent} style={{padding:"7px 14px",background:fill(AC),border:"1px solid "+bdr(AC),borderRadius:7,cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:12,color:AC}}>Add</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+function MusicApp({AC,showToast}){
+  const [tracks,setTracks]=useState([]);     // [{name, url, size}]
+  const [idx,setIdx]=useState(-1);
+  const [playing,setPlaying]=useState(false);
+  const [progress,setProgress]=useState(0);  // current time in seconds
+  const [duration,setDuration]=useState(0);
+  const [volume,setVolume]=useState(0.8);
+  const audioRef=useRef(null);
+  const inputRef=useRef(null);
+
+  // Apply volume to the audio element whenever it changes.
+  useEffect(()=>{if(audioRef.current)audioRef.current.volume=volume;},[volume]);
+  // Cleanup blob URLs when the component unmounts (or tracks change).
+  useEffect(()=>()=>{tracks.forEach(t=>URL.revokeObjectURL(t.url));},[]); // eslint-disable-line
+
+  function handleFiles(e){
+    const files=Array.from(e.target.files||[]);
+    const audioFiles=files.filter(f=>f.type.startsWith("audio/")||/\.(mp3|wav|ogg|m4a|aac|flac)$/i.test(f.name));
+    if(audioFiles.length===0){showToast?.("No audio files selected");return;}
+    const next=audioFiles.map(f=>({name:f.name,url:URL.createObjectURL(f),size:f.size}));
+    setTracks(prev=>{
+      const combined=[...prev,...next];
+      // If nothing was playing, queue up the first new track
+      if(idx<0)setIdx(prev.length);
+      return combined;
+    });
+    e.target.value="";
+  }
+
+  function play(i){
+    if(i<0||i>=tracks.length)return;
+    setIdx(i);
+    // Browsers require play() after a user gesture; this handler IS one.
+    setTimeout(()=>{audioRef.current?.play().catch(()=>{});},0);
+  }
+  function togglePlay(){
+    if(idx<0)return;
+    if(playing) audioRef.current?.pause();
+    else audioRef.current?.play().catch(()=>{});
+  }
+  function prev(){if(idx>0)play(idx-1);}
+  function next(){if(idx<tracks.length-1)play(idx+1);}
+  function seek(e){
+    const el=audioRef.current;
+    if(!el||!duration)return;
+    const rect=e.currentTarget.getBoundingClientRect();
+    const ratio=Math.max(0,Math.min(1,(e.clientX-rect.left)/rect.width));
+    el.currentTime=ratio*duration;
+  }
+  function removeTrack(i){
+    setTracks(prev=>{
+      const copy=[...prev];
+      const removed=copy.splice(i,1)[0];
+      if(removed)URL.revokeObjectURL(removed.url);
+      return copy;
+    });
+    if(i===idx){setIdx(-1);setPlaying(false);}
+    else if(i<idx)setIdx(idx-1);
+  }
+  function fmt(s){
+    if(!Number.isFinite(s))return "0:00";
+    const m=Math.floor(s/60),sec=Math.floor(s%60);
+    return m+":"+String(sec).padStart(2,"0");
+  }
+
+  const cur=idx>=0?tracks[idx]:null;
+  const progPct=duration>0?(progress/duration)*100:0;
+
+  return(
+    <div style={{display:"flex",flexDirection:"column",gap:12,height:"100%",fontFamily:FF,minHeight:0}}>
+      <input ref={inputRef} type="file" accept="audio/*" multiple onChange={handleFiles} style={{display:"none"}}/>
+
+      {/* Now-playing card */}
+      <div style={{padding:"16px 16px",background:"linear-gradient(135deg,"+fill(AC)+", rgba(255,255,255,0.03))",border:"1px solid "+bdr(AC),borderRadius:12,flexShrink:0}}>
+        <div style={{display:"flex",alignItems:"center",gap:12}}>
+          <div style={{width:54,height:54,borderRadius:9,background:fill(AC),border:"1px solid "+bdr(AC),display:"flex",alignItems:"center",justifyContent:"center",fontSize:26,flexShrink:0}}>🎵</div>
+          <div style={{flex:1,minWidth:0}}>
+            <div style={{fontFamily:FFB,fontWeight:600,fontSize:14,color:"#fff",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{cur?cur.name:"No track loaded"}</div>
+            <div style={{fontSize:11,fontFamily:FFM,color:"rgba(255,255,255,0.5)",marginTop:2}}>{cur?fmt(progress)+" / "+fmt(duration):"—:—"}</div>
+          </div>
+        </div>
+        {/* Progress bar */}
+        <div onClick={seek} style={{marginTop:12,height:6,background:"rgba(255,255,255,0.08)",borderRadius:3,cursor:cur?"pointer":"default",overflow:"hidden"}}>
+          <div style={{height:"100%",width:progPct+"%",background:AC,transition:"width 0.1s linear"}}/>
+        </div>
+        {/* Controls */}
+        <div style={{display:"flex",alignItems:"center",gap:8,marginTop:12}}>
+          <button onClick={prev} disabled={idx<=0} style={{width:36,height:36,borderRadius:8,background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.1)",cursor:idx>0?"pointer":"default",color:"rgba(255,255,255,0.8)",fontSize:14,opacity:idx>0?1:0.4}}>⏮</button>
+          <button onClick={togglePlay} disabled={!cur} style={{width:44,height:44,borderRadius:10,background:fill(AC),border:"1px solid "+bdr(AC),cursor:cur?"pointer":"default",color:AC,fontSize:16,opacity:cur?1:0.4}}>{playing?"⏸":"▶"}</button>
+          <button onClick={next} disabled={idx>=tracks.length-1} style={{width:36,height:36,borderRadius:8,background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.1)",cursor:idx<tracks.length-1?"pointer":"default",color:"rgba(255,255,255,0.8)",fontSize:14,opacity:idx<tracks.length-1?1:0.4}}>⏭</button>
+          <div style={{flex:1}}/>
+          <span style={{fontSize:13,color:"rgba(255,255,255,0.5)"}}>🔊</span>
+          <input type="range" min={0} max={1} step={0.01} value={volume} onChange={e=>setVolume(+e.target.value)} style={{width:80,accentColor:AC}}/>
+        </div>
+      </div>
+
+      {/* Playlist */}
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",flexShrink:0}}>
+        <div style={SEC}>Playlist ({tracks.length})</div>
+        <button onClick={()=>inputRef.current?.click()} style={{padding:"5px 11px",background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.12)",borderRadius:7,cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:11,color:"rgba(255,255,255,0.75)"}}>+ Add files</button>
+      </div>
+      <div style={{flex:1,overflowY:"auto",minHeight:0}}>
+        {tracks.length===0 ? (
+          <div style={{textAlign:"center",padding:"30px 16px",color:"rgba(255,255,255,0.25)",fontStyle:"italic",fontSize:12}}>No tracks. Add audio files from your device — MP3, WAV, OGG, M4A all work.</div>
+        ) : tracks.map((t,i)=>(
+          <div key={i} className="sr" onClick={()=>play(i)} style={{display:"flex",alignItems:"center",gap:9,padding:"9px 12px",marginBottom:4,background:i===idx?fill(AC):"rgba(255,255,255,0.03)",border:"1px solid "+(i===idx?bdr(AC):"rgba(255,255,255,0.06)"),borderRadius:7,cursor:"pointer"}}>
+            <div style={{width:24,textAlign:"center",fontFamily:FFM,fontSize:11,color:i===idx?AC:"rgba(255,255,255,0.35)"}}>{i===idx&&playing?"▶":i+1}</div>
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{fontSize:12,color:i===idx?"#fff":"rgba(255,255,255,0.85)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t.name}</div>
+            </div>
+            <button className="dl" onClick={e=>{e.stopPropagation();removeTrack(i);}} style={{background:"none",border:"none",cursor:"pointer",color:"rgba(255,80,80,0.3)",fontSize:13,padding:"3px 6px"}}>✕</button>
+          </div>
+        ))}
+      </div>
+
+      {/* The actual <audio> element. Hidden — we drive it via refs. */}
+      {cur && <audio
+        ref={audioRef}
+        src={cur.url}
+        onPlay={()=>setPlaying(true)}
+        onPause={()=>setPlaying(false)}
+        onTimeUpdate={e=>setProgress(e.currentTarget.currentTime)}
+        onDurationChange={e=>setDuration(e.currentTarget.duration)}
+        onEnded={()=>{if(idx<tracks.length-1)play(idx+1);else setPlaying(false);}}
+      />}
+    </div>
+  );
+}
+function PdfApp({AC,showToast}){
+  // We render PDFs via an <iframe> pointed at a blob: URL. The browser's
+  // built-in PDF viewer handles paging, zoom, search, and print — no
+  // external dependency needed. Trade-off: we can't customize the toolbar.
+  const [url,setUrl]=useState(null);
+  const [name,setName]=useState("");
+  const inputRef=useRef(null);
+
+  // Clean up the blob URL when a new file is loaded or the app closes,
+  // otherwise the browser holds onto the file's memory indefinitely.
+  useEffect(()=>()=>{ if(url) URL.revokeObjectURL(url); },[url]);
+
+  function handleFile(e){
+    const file=e.target.files?.[0];
+    if(!file)return;
+    if(file.type && file.type!=="application/pdf" && !file.name.toLowerCase().endsWith(".pdf")){
+      showToast?.("Not a PDF file");
+      e.target.value="";
+      return;
+    }
+    if(url) URL.revokeObjectURL(url);
+    const next=URL.createObjectURL(file);
+    setUrl(next);
+    setName(file.name);
+    e.target.value="";
+  }
+
+  return(
+    <div style={{display:"flex",flexDirection:"column",gap:10,height:"100%",fontFamily:FF,minHeight:0}}>
+      <div style={{display:"flex",alignItems:"center",gap:10,flexShrink:0,flexWrap:"wrap"}}>
+        <input ref={inputRef} type="file" accept="application/pdf,.pdf" onChange={handleFile} style={{display:"none"}}/>
+        <button onClick={()=>inputRef.current?.click()} style={{padding:"8px 14px",background:fill(AC),border:"1px solid "+bdr(AC),borderRadius:8,cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:12,color:AC}}>📄 {url?"Open another":"Open PDF"}</button>
+        {name && <span style={{fontFamily:FFM,fontSize:11,color:"rgba(255,255,255,0.55)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",flex:1,minWidth:0}}>{name}</span>}
+      </div>
+      {url ? (
+        <iframe
+          src={url}
+          title="pdf"
+          style={{flex:1,width:"100%",border:"1px solid rgba(255,255,255,0.08)",borderRadius:8,background:"#fff",minHeight:0}}/>
+      ) : (
+        <div style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:12,border:"1px solid rgba(255,255,255,0.07)",borderRadius:12,background:"linear-gradient(180deg,rgba(255,255,255,0.025),rgba(255,255,255,0.005))",minHeight:0,padding:30,textAlign:"center"}}>
+          <div style={{fontSize:48,opacity:0.55}}>📄</div>
+          <div style={{fontFamily:FFB,fontWeight:700,fontSize:18,color:"rgba(255,255,255,0.75)"}}>No PDF loaded</div>
+          <div style={{fontSize:12,color:"rgba(255,255,255,0.4)",maxWidth:320,lineHeight:1.6}}>Open a PDF from your device. It opens in your browser's built-in viewer with paging, zoom, search, and print.</div>
+          <button onClick={()=>inputRef.current?.click()} style={{marginTop:8,padding:"10px 18px",background:fill(AC),border:"1px solid "+bdr(AC),borderRadius:8,cursor:"pointer",fontFamily:FFB,fontWeight:700,fontSize:13,color:AC}}>Browse files…</button>
+        </div>
+      )}
+    </div>
+  );
+}
+// Severity → swatch color for NWS alerts.
+const ALERT_COLOR = {
+  Extreme:  {bg:"rgba(255,80,80,0.18)",  border:"rgba(255,80,80,0.55)",  fg:"#ff8080"},
+  Severe:   {bg:"rgba(255,150,40,0.16)", border:"rgba(255,150,40,0.5)",  fg:"#ffaa44"},
+  Moderate: {bg:"rgba(255,200,80,0.14)", border:"rgba(255,200,80,0.45)", fg:"#ffd060"},
+  Minor:    {bg:"rgba(100,200,255,0.12)",border:"rgba(100,200,255,0.4)", fg:"#88c8ff"},
+};
+
+function AtmosApp({AC,showToast}){
+  const [query,setQuery]=useState("");
+  const [suggestions,setSuggestions]=useState([]);    // array of suggestion objects
+  const [openSuggest,setOpenSuggest]=useState(false);
+  const [loadingSuggest,setLoadingSuggest]=useState(false);
+  const [loc,setLoc]=useState(null);                  // selected {label,lat,lon,countryCode}
+  const [forecast,setForecast]=useState(null);
+  const [alerts,setAlerts]=useState([]);
+  const [loadingForecast,setLoadingForecast]=useState(false);
+  const [units,setUnits]=useState("imperial");        // imperial | metric
+  const [expandedAlert,setExpandedAlert]=useState(null);
+  const debounceRef=useRef(null);
+
+  // Debounced geocode lookup as the user types. 350ms is just slow enough to
+  // not hammer Nominatim's 1-req/sec policy, and just fast enough to feel live.
+  useEffect(()=>{
+    if(!query.trim()){setSuggestions([]);setOpenSuggest(false);return;}
+    clearTimeout(debounceRef.current);
+    debounceRef.current=setTimeout(async()=>{
+      setLoadingSuggest(true);
+      try{
+        const res=await fetch(geocodeUrl(query));
+        const json=await res.json();
+        setSuggestions(parseGeocode(json));
+        setOpenSuggest(true);
+      }catch{setSuggestions([]);}
+      setLoadingSuggest(false);
+    },350);
+    return ()=>clearTimeout(debounceRef.current);
+  },[query]);
+
+  async function pickLocation(s){
+    setLoc(s);
+    setQuery(s.label);
+    setOpenSuggest(false);
+    setLoadingForecast(true);
+    setForecast(null);setAlerts([]);
+    try{
+      const fres=await fetch(forecastUrl(s.lat,s.lon,units));
+      const fjson=await fres.json();
+      setForecast(parseForecast(fjson));
+    }catch{showToast?.("Couldn't load forecast");}
+    // Only ping NWS for US points — it returns empty for non-US anyway, and
+    // we'd rather not waste the request.
+    if(isLikelyUS(s.lat,s.lon)){
+      try{
+        const ares=await fetch(alertsUrl(s.lat,s.lon),{headers:{Accept:"application/geo+json"}});
+        const ajson=await ares.json();
+        setAlerts(parseAlerts(ajson));
+      }catch{/* alerts are optional — don't surface error */}
+    }
+    setLoadingForecast(false);
+  }
+
+  // Re-fetch forecast when units flip (only if we already have a location)
+  useEffect(()=>{
+    if(!loc)return;
+    setLoadingForecast(true);
+    (async()=>{
+      try{
+        const r=await fetch(forecastUrl(loc.lat,loc.lon,units));
+        setForecast(parseForecast(await r.json()));
+      }catch{}
+      setLoadingForecast(false);
+    })();
+  },[units]); // eslint-disable-line
+
+  function fmtHour(iso){
+    try{return new Date(iso).toLocaleTimeString([],{hour:"numeric",hour12:true});}
+    catch{return iso;}
+  }
+  function fmtDay(iso){
+    try{return new Date(iso+"T12:00:00").toLocaleDateString([],{weekday:"short"});}
+    catch{return iso;}
+  }
+
+  return(
+    <div style={{display:"flex",flexDirection:"column",gap:14,height:"100%",fontFamily:FF,minHeight:0}}>
+      {/* Header / search */}
+      <div style={{display:"flex",gap:8,alignItems:"center",flexShrink:0,position:"relative"}}>
+        <div style={{flex:1,position:"relative"}}>
+          <input
+            value={query}
+            onChange={e=>setQuery(e.target.value)}
+            onFocus={()=>suggestions.length>0&&setOpenSuggest(true)}
+            placeholder="Search for a city, town, ZIP code…"
+            style={{...INP,fontSize:13,fontFamily:FF,paddingLeft:34}}
+          />
+          <span style={{position:"absolute",left:11,top:"50%",transform:"translateY(-50%)",fontSize:14,opacity:0.5,pointerEvents:"none"}}>🔍</span>
+          {/* Autocomplete dropdown */}
+          {openSuggest && (loadingSuggest||suggestions.length>0) && (
+            <div style={{position:"absolute",top:"100%",left:0,right:0,marginTop:5,background:"rgba(15,18,32,0.97)",backdropFilter:"blur(16px)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:9,boxShadow:"0 20px 60px rgba(0,0,0,0.5)",maxHeight:220,overflowY:"auto",zIndex:10}}>
+              {loadingSuggest && <div style={{padding:"10px 13px",fontSize:11,color:"rgba(255,255,255,0.4)",fontStyle:"italic"}}>Searching…</div>}
+              {!loadingSuggest && suggestions.length===0 && <div style={{padding:"10px 13px",fontSize:11,color:"rgba(255,255,255,0.4)",fontStyle:"italic"}}>No matches</div>}
+              {!loadingSuggest && suggestions.map((s,i)=>(
+                <div key={i} className="sr" onClick={()=>pickLocation(s)} style={{padding:"9px 13px",cursor:"pointer",fontSize:13,color:"rgba(255,255,255,0.85)",borderBottom:i<suggestions.length-1?"1px solid rgba(255,255,255,0.05)":"none"}}>
+                  📍 {s.label}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+        <button onClick={()=>setUnits(u=>u==="imperial"?"metric":"imperial")} style={{padding:"8px 12px",background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:8,cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:11,color:"rgba(255,255,255,0.7)"}}>{units==="imperial"?"°F":"°C"}</button>
+      </div>
+
+      {/* Body */}
+      <div style={{flex:1,overflowY:"auto",minHeight:0,display:"flex",flexDirection:"column",gap:12}}>
+        {!loc && !loadingForecast && (
+          <div style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:14,padding:30,textAlign:"center",border:"1px solid rgba(255,255,255,0.06)",borderRadius:12,background:"linear-gradient(180deg,rgba(255,255,255,0.025),rgba(255,255,255,0.005))"}}>
+            <div style={{fontSize:60,filter:"drop-shadow(0 0 16px rgba(79,158,255,0.4))"}}>🌤️</div>
+            <div style={{fontFamily:FFB,fontWeight:700,fontSize:22,color:"rgba(255,255,255,0.9)",letterSpacing:0.4}}>Atmos</div>
+            <div style={{fontSize:12,color:"rgba(255,255,255,0.45)",maxWidth:340,lineHeight:1.7}}>Search any location to see current conditions, hourly + 7-day forecast, and active NWS alerts for US locations.</div>
+          </div>
+        )}
+
+        {loadingForecast && (
+          <div style={{padding:"30px 0",textAlign:"center"}}>
+            <div style={{width:30,height:30,border:"3px solid rgba(255,255,255,0.1)",borderTopColor:AC,borderRadius:"50%",animation:"spin 0.8s linear infinite",margin:"0 auto"}}/>
+            <div style={{fontSize:12,color:"rgba(255,255,255,0.4)",marginTop:10}}>Loading forecast for {loc?.label}…</div>
+          </div>
+        )}
+
+        {!loadingForecast && forecast && (
+          <>
+            {/* Current conditions */}
+            <div style={{padding:"16px 18px",background:"linear-gradient(135deg,"+fill(AC)+",rgba(255,255,255,0.03))",border:"1px solid "+bdr(AC),borderRadius:12}}>
+              <div style={{fontSize:11,fontFamily:FFM,color:"rgba(255,255,255,0.55)",letterSpacing:1,marginBottom:4}}>CURRENT · {loc.label}</div>
+              <div style={{display:"flex",alignItems:"center",gap:14,marginTop:4}}>
+                <div style={{fontSize:62,lineHeight:1}}>{wmoIcon(forecast.current.code)}</div>
+                <div style={{flex:1}}>
+                  <div style={{fontFamily:FFM,fontWeight:300,fontSize:48,color:"#fff",lineHeight:1}}>{Math.round(forecast.current.temp)}<span style={{fontSize:24,opacity:0.7}}>{forecast.units.temp}</span></div>
+                  <div style={{fontSize:14,color:"rgba(255,255,255,0.7)",marginTop:2}}>{wmoLabel(forecast.current.code)}</div>
+                </div>
+              </div>
+              <div style={{display:"flex",gap:14,marginTop:14,flexWrap:"wrap"}}>
+                <div style={{fontSize:11,color:"rgba(255,255,255,0.55)"}}>Feels like <span style={{color:"#fff",fontFamily:FFM}}>{Math.round(forecast.current.feelsLike)}{forecast.units.temp}</span></div>
+                <div style={{fontSize:11,color:"rgba(255,255,255,0.55)"}}>Humidity <span style={{color:"#fff",fontFamily:FFM}}>{forecast.current.humidity}%</span></div>
+                <div style={{fontSize:11,color:"rgba(255,255,255,0.55)"}}>Wind <span style={{color:"#fff",fontFamily:FFM}}>{Math.round(forecast.current.wind)} {forecast.units.wind}</span></div>
+              </div>
+            </div>
+
+            {/* NWS alerts */}
+            {alerts.length>0 && (
+              <div>
+                <div style={SEC}>⚠ NWS Alerts ({alerts.length})</div>
+                {alerts.map(a=>{
+                  const col=ALERT_COLOR[a.severity]||ALERT_COLOR.Minor;
+                  const expanded=expandedAlert===a.id;
+                  return(
+                    <div key={a.id} onClick={()=>setExpandedAlert(expanded?null:a.id)} style={{padding:"10px 13px",marginBottom:6,background:col.bg,border:"1px solid "+col.border,borderRadius:8,cursor:"pointer"}}>
+                      <div style={{display:"flex",alignItems:"center",gap:8}}>
+                        <span style={{fontFamily:FFB,fontWeight:700,fontSize:12,color:col.fg,padding:"2px 7px",border:"1px solid "+col.border,borderRadius:4,whiteSpace:"nowrap"}}>{a.severity}</span>
+                        <span style={{fontFamily:FFB,fontWeight:600,fontSize:13,color:"#fff",flex:1,minWidth:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{a.event}</span>
+                        <span style={{fontSize:11,color:"rgba(255,255,255,0.35)"}}>{expanded?"▲":"▼"}</span>
+                      </div>
+                      {expanded && (
+                        <div style={{marginTop:10,fontSize:12,color:"rgba(255,255,255,0.78)",lineHeight:1.6,whiteSpace:"pre-wrap"}}>
+                          {a.headline && <div style={{fontFamily:FFB,fontWeight:600,fontSize:13,color:"#fff",marginBottom:6}}>{a.headline}</div>}
+                          {a.description}
+                          {a.sender && <div style={{fontSize:10,color:"rgba(255,255,255,0.35)",marginTop:8,fontStyle:"italic"}}>— {a.sender}</div>}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Hourly */}
+            {forecast.hourly.length>0 && (
+              <div>
+                <div style={SEC}>Next 24 Hours</div>
+                <div style={{display:"flex",overflowX:"auto",gap:5,paddingBottom:6}}>
+                  {forecast.hourly.map((h,i)=>(
+                    <div key={i} style={{flex:"0 0 auto",minWidth:62,padding:"8px 6px",background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.07)",borderRadius:8,textAlign:"center"}}>
+                      <div style={{fontSize:10,fontFamily:FFM,color:"rgba(255,255,255,0.45)"}}>{i===0?"Now":fmtHour(h.time)}</div>
+                      <div style={{fontSize:20,marginTop:2}}>{wmoIcon(h.code)}</div>
+                      <div style={{fontFamily:FFM,fontSize:13,fontWeight:500,color:"#fff",marginTop:1}}>{Math.round(h.temp)}°</div>
+                      {h.pop>0&&<div style={{fontSize:9,color:"#88c8ff",fontFamily:FFM}}>{h.pop}%</div>}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* 7-day */}
+            <div>
+              <div style={SEC}>7-Day Forecast</div>
+              {forecast.days.map((d,i)=>(
+                <div key={d.date} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 12px",marginBottom:4,background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.06)",borderRadius:7}}>
+                  <div style={{width:60,fontFamily:FFB,fontWeight:600,fontSize:12,color:"rgba(255,255,255,0.85)"}}>{i===0?"Today":fmtDay(d.date)}</div>
+                  <div style={{fontSize:22,width:34,textAlign:"center"}}>{wmoIcon(d.code)}</div>
+                  <div style={{flex:1,fontSize:11,color:"rgba(255,255,255,0.55)"}}>{wmoLabel(d.code)}</div>
+                  <div style={{fontFamily:FFM,fontSize:13,color:"#fff",minWidth:62,textAlign:"right"}}>
+                    {Math.round(d.high)}° <span style={{color:"rgba(255,255,255,0.4)"}}>/ {Math.round(d.low)}°</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+
+        {/* Attribution — required by Nominatim's usage policy */}
+        <div style={{textAlign:"center",fontSize:10,color:"rgba(255,255,255,0.25)",paddingTop:10,borderTop:"1px solid rgba(255,255,255,0.05)",marginTop:"auto"}}>
+          Location data © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer" style={{color:"rgba(255,255,255,0.4)"}}>OpenStreetMap</a> contributors · Forecast by <a href="https://open-meteo.com" target="_blank" rel="noreferrer" style={{color:"rgba(255,255,255,0.4)"}}>Open-Meteo</a> · Alerts by <a href="https://www.weather.gov" target="_blank" rel="noreferrer" style={{color:"rgba(255,255,255,0.4)"}}>NWS</a>
+        </div>
+      </div>
+    </div>
+  );
+}
+const MINE_NUM_COLOR = ["", "#4f9eff", "#4cef90", "#ff6b6b", "#cc44ff", "#ff8c44", "#44ddcc", "#fff", "#888"];
+
+function MinesweeperApp({AC}){
+  const [diff,setDiff]=useState("easy");
+  const cfg=MINE_DIFFICULTIES[diff];
+  const [board,setBoard]=useState(null);             // null until first click
+  const [revealed,setRevealed]=useState(()=>new Set());
+  const [flagged,setFlagged]=useState(()=>new Set());
+  const [status,setStatus]=useState("idle");          // idle | playing | won | lost
+  const [startedAt,setStartedAt]=useState(0);
+  const [elapsed,setElapsed]=useState(0);
+  const pressTimer=useRef(null);
+  const pressIsLong=useRef(false);
+
+  // Timer tick during play
+  useEffect(()=>{
+    if(status!=="playing")return;
+    const id=setInterval(()=>setElapsed(Math.floor((Date.now()-startedAt)/1000)),250);
+    return ()=>clearInterval(id);
+  },[status,startedAt]);
+
+  function newGame(d=diff){
+    setDiff(d);
+    setBoard(null);
+    setRevealed(new Set());
+    setFlagged(new Set());
+    setStatus("idle");
+    setElapsed(0);
+  }
+
+  function reveal(r,c){
+    if(status==="won"||status==="lost")return;
+    const key=r+","+c;
+    if(flagged.has(key))return;
+    let b=board;
+    if(!b){
+      // First click — generate the board, guaranteed safe at (r,c)
+      b=mineCreateBoard(cfg.rows,cfg.cols,cfg.mines,r,c);
+      setBoard(b);
+      setStartedAt(Date.now());
+      setStatus("playing");
+    }
+    if(revealed.has(key))return;
+    if(b[r][c].isMine){
+      setRevealed(new Set([...revealed,key]));
+      setStatus("lost");
+      return;
+    }
+    const flood=floodReveal(b,r,c);
+    const next=new Set(revealed);
+    flood.forEach(k=>next.add(k));
+    setRevealed(next);
+    if(mineIsWin(b,next))setStatus("won");
+  }
+
+  function toggleFlag(r,c){
+    if(status==="won"||status==="lost")return;
+    const key=r+","+c;
+    if(revealed.has(key))return;
+    const next=new Set(flagged);
+    if(next.has(key))next.delete(key); else next.add(key);
+    setFlagged(next);
+  }
+
+  // Long-press detection for touch users — short press reveals, long press flags.
+  function onCellPointerDown(r,c){
+    pressIsLong.current=false;
+    pressTimer.current=setTimeout(()=>{
+      pressIsLong.current=true;
+      toggleFlag(r,c);
+    },350);
+  }
+  function onCellPointerUp(r,c){
+    clearTimeout(pressTimer.current);
+    if(!pressIsLong.current) reveal(r,c);
+  }
+  function onCellPointerCancel(){
+    clearTimeout(pressTimer.current);
+    pressIsLong.current=false;
+  }
+  function onCellContextMenu(e,r,c){
+    e.preventDefault();
+    toggleFlag(r,c);
+  }
+
+  const minesLeft=cfg.mines-flagged.size;
+  const cellSize=Math.max(22,Math.min(34,Math.floor(280/cfg.cols)));
+
+  return(
+    <div style={{display:"flex",flexDirection:"column",gap:10,fontFamily:FF,height:"100%",minHeight:0}}>
+      <div style={{display:"flex",gap:6,alignItems:"center",flexShrink:0,flexWrap:"wrap"}}>
+        {Object.keys(MINE_DIFFICULTIES).map(d=>(
+          <button key={d} onClick={()=>newGame(d)} style={{padding:"5px 11px",borderRadius:18,cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:11,background:diff===d?fill(AC):"rgba(255,255,255,0.05)",border:"1px solid "+(diff===d?bdr(AC):"rgba(255,255,255,0.1)"),color:diff===d?AC:"rgba(255,255,255,0.55)",textTransform:"capitalize"}}>{d}</button>
+        ))}
+        <div style={{flex:1}}/>
+        <div style={{fontFamily:FFM,fontSize:13,color:"rgba(255,255,255,0.7)"}}>💣 {minesLeft}</div>
+        <div style={{fontFamily:FFM,fontSize:13,color:"rgba(255,255,255,0.5)"}}>⏱ {elapsed}s</div>
+        <button onClick={()=>newGame(diff)} style={{padding:"5px 11px",borderRadius:7,cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:11,background:"rgba(255,255,255,0.07)",border:"1px solid rgba(255,255,255,0.12)",color:"rgba(255,255,255,0.75)"}}>↻ New</button>
+      </div>
+
+      {status==="won" && <div style={{padding:"8px 12px",background:"rgba(76,239,144,0.1)",border:"1px solid rgba(76,239,144,0.35)",borderRadius:7,fontFamily:FFB,fontWeight:600,fontSize:13,color:"#4cef90",textAlign:"center"}}>🎉 You won in {elapsed}s!</div>}
+      {status==="lost" && <div style={{padding:"8px 12px",background:"rgba(255,80,80,0.1)",border:"1px solid rgba(255,80,80,0.35)",borderRadius:7,fontFamily:FFB,fontWeight:600,fontSize:13,color:"#ff7878",textAlign:"center"}}>💥 You hit a mine — try again</div>}
+
+      <div style={{flex:1,overflow:"auto",minHeight:0,display:"flex",alignItems:"flex-start",justifyContent:"center",padding:4}}>
+        <div style={{display:"grid",gridTemplateColumns:"repeat("+cfg.cols+",1fr)",gap:2,touchAction:"none"}}>
+          {Array.from({length:cfg.rows}).map((_,r)=>Array.from({length:cfg.cols}).map((__,c)=>{
+            const key=r+","+c;
+            const isRev=revealed.has(key);
+            const isFlag=flagged.has(key);
+            const cell=board?board[r][c]:null;
+            const showMine=isRev&&cell&&cell.isMine;
+            const num=isRev&&cell&&!cell.isMine?cell.neighbors:0;
+            return(
+              <div key={key}
+                onPointerDown={()=>onCellPointerDown(r,c)}
+                onPointerUp={()=>onCellPointerUp(r,c)}
+                onPointerCancel={onCellPointerCancel}
+                onPointerLeave={onCellPointerCancel}
+                onContextMenu={e=>onCellContextMenu(e,r,c)}
+                style={{
+                  width:cellSize,height:cellSize,
+                  display:"flex",alignItems:"center",justifyContent:"center",
+                  fontFamily:FFB,fontWeight:700,fontSize:Math.floor(cellSize*0.55),
+                  borderRadius:3,cursor:"pointer",userSelect:"none",
+                  touchAction:"none",
+                  background: isRev ? (showMine ? "rgba(255,80,80,0.25)" : "rgba(255,255,255,0.04)") : "rgba(255,255,255,0.1)",
+                  border:"1px solid "+(isRev ? "rgba(255,255,255,0.05)" : "rgba(255,255,255,0.15)"),
+                  color: showMine ? "#ff7878" : num>0 ? MINE_NUM_COLOR[num] : "transparent",
+                }}>
+                {showMine ? "💣" : isFlag ? "🚩" : num>0 ? num : ""}
+              </div>
+            );
+          }))}
+        </div>
+      </div>
+      <div style={{fontSize:10,color:"rgba(255,255,255,0.3)",textAlign:"center",fontStyle:"italic"}}>Tap to reveal · Long-press (or right-click) to flag</div>
+    </div>
+  );
+}
+function WordleApp({AC,showToast}){
+  const [answer]=useState(()=>dailyWord());
+  const [guesses,setGuesses]=useState([]);            // array of {word, score}
+  const [current,setCurrent]=useState("");
+  const [status,setStatus]=useState("playing");       // playing | won | lost
+  const MAX=6;
+
+  function submitGuess(){
+    if(status!=="playing")return;
+    const g=normalizeGuess(current);
+    if(!g){showToast?.("Need 5 letters");return;}
+    const sc=scoreGuess(g,answer);
+    const next=[...guesses,{word:g,score:sc}];
+    setGuesses(next);
+    setCurrent("");
+    if(g===answer){setStatus("won");return;}
+    if(next.length>=MAX){setStatus("lost");}
+  }
+  function onKey(e){
+    if(e.key==="Enter"){submitGuess();return;}
+    if(e.key==="Backspace"){setCurrent(s=>s.slice(0,-1));return;}
+    if(/^[a-zA-Z]$/.test(e.key)&&current.length<5){
+      setCurrent(s=>(s+e.key).toUpperCase());
+    }
+  }
+  // Per-letter color used for both completed guesses AND the keyboard hint.
+  function colorFor(state){
+    if(state==="correct")return {bg:"rgba(76,239,144,0.25)",border:"rgba(76,239,144,0.6)",fg:"#4cef90"};
+    if(state==="present")return {bg:"rgba(255,200,80,0.22)",border:"rgba(255,200,80,0.55)",fg:"#ffcc44"};
+    if(state==="absent") return {bg:"rgba(255,255,255,0.04)",border:"rgba(255,255,255,0.08)",fg:"rgba(255,255,255,0.35)"};
+    return {bg:"rgba(255,255,255,0.05)",border:"rgba(255,255,255,0.12)",fg:"rgba(255,255,255,0.85)"};
+  }
+  // Build a key-state map from previous guesses so the on-screen keyboard
+  // reflects what's known about each letter (priority: correct > present > absent).
+  const keyStates={};
+  for(const g of guesses){
+    for(let i=0;i<g.word.length;i++){
+      const L=g.word[i], s=g.score[i];
+      const prev=keyStates[L];
+      const rank={correct:3,present:2,absent:1};
+      if(!prev || (rank[s]||0)>(rank[prev]||0)) keyStates[L]=s;
+    }
+  }
+  // 6 rows of 5 cells; fill in completed guesses, then current entry, then empties.
+  const rows=[];
+  for(let r=0;r<MAX;r++){
+    const guess=guesses[r];
+    const isCur=!guess && r===guesses.length && status==="playing";
+    rows.push({guess, isCur});
+  }
+
+  const KB_ROWS=["QWERTYUIOP","ASDFGHJKL","ZXCVBNM"];
+  function pressKey(k){
+    if(status!=="playing")return;
+    if(k==="ENTER"){submitGuess();return;}
+    if(k==="BACK"){setCurrent(s=>s.slice(0,-1));return;}
+    if(current.length<5)setCurrent(s=>s+k);
+  }
+
+  return(
+    <div tabIndex={0} onKeyDown={onKey} style={{display:"flex",flexDirection:"column",height:"100%",fontFamily:FF,outline:"none",alignItems:"center",gap:14,minHeight:0}}>
+      <div style={{fontFamily:FFB,fontWeight:700,fontSize:14,color:"rgba(255,255,255,0.55)",letterSpacing:1.5,textTransform:"uppercase"}}>Daily Wordle</div>
+
+      {status==="won" && <div style={{padding:"7px 14px",background:"rgba(76,239,144,0.12)",border:"1px solid rgba(76,239,144,0.4)",borderRadius:7,fontFamily:FFB,fontWeight:700,fontSize:13,color:"#4cef90"}}>🎉 Got it in {guesses.length}!</div>}
+      {status==="lost" && <div style={{padding:"7px 14px",background:"rgba(255,80,80,0.12)",border:"1px solid rgba(255,80,80,0.4)",borderRadius:7,fontFamily:FFB,fontWeight:700,fontSize:13,color:"#ff8b8b"}}>Answer: {answer}</div>}
+
+      {/* Guess grid */}
+      <div style={{display:"flex",flexDirection:"column",gap:6}}>
+        {rows.map((row,ri)=>(
+          <div key={ri} style={{display:"flex",gap:6}}>
+            {[0,1,2,3,4].map(i=>{
+              const letter = row.guess ? row.guess.word[i] : (row.isCur ? current[i] : "");
+              const state = row.guess ? row.guess.score[i] : null;
+              const col=colorFor(state);
+              return(
+                <div key={i} style={{
+                  width:48,height:48,display:"flex",alignItems:"center",justifyContent:"center",
+                  fontFamily:FFB,fontWeight:700,fontSize:22,letterSpacing:1,
+                  borderRadius:6,
+                  background:col.bg,border:"1px solid "+col.border,color:col.fg,
+                  transition:"background 0.18s, border-color 0.18s",
+                }}>{letter||""}</div>
+              );
+            })}
+          </div>
+        ))}
+      </div>
+
+      {/* On-screen keyboard */}
+      <div style={{display:"flex",flexDirection:"column",gap:4,marginTop:4,maxWidth:360,width:"100%"}}>
+        {KB_ROWS.map((row,ri)=>(
+          <div key={ri} style={{display:"flex",gap:3,justifyContent:"center"}}>
+            {ri===2 && <button onClick={()=>pressKey("ENTER")} style={{flex:"1.4 1 0",height:38,borderRadius:5,background:"rgba(255,255,255,0.1)",border:"1px solid rgba(255,255,255,0.15)",color:"rgba(255,255,255,0.85)",fontFamily:FFB,fontWeight:700,fontSize:11,cursor:"pointer",touchAction:"manipulation"}}>ENTER</button>}
+            {row.split("").map(k=>{
+              const st=keyStates[k];
+              const col=colorFor(st);
+              return(
+                <button key={k} onClick={()=>pressKey(k)} style={{
+                  flex:"1 1 0",height:38,borderRadius:5,
+                  background:col.bg,border:"1px solid "+col.border,color:col.fg,
+                  fontFamily:FFB,fontWeight:700,fontSize:13,cursor:"pointer",touchAction:"manipulation",
+                  transition:"background 0.18s, border-color 0.18s",
+                }}>{k}</button>
+              );
+            })}
+            {ri===2 && <button onClick={()=>pressKey("BACK")} style={{flex:"1.4 1 0",height:38,borderRadius:5,background:"rgba(255,255,255,0.1)",border:"1px solid rgba(255,255,255,0.15)",color:"rgba(255,255,255,0.85)",fontFamily:FFB,fontWeight:700,fontSize:14,cursor:"pointer",touchAction:"manipulation"}}>⌫</button>}
+          </div>
+        ))}
+      </div>
+
+      <div style={{fontSize:10,color:"rgba(255,255,255,0.3)",textAlign:"center",fontStyle:"italic"}}>Type letters or tap keys · Enter to submit · New word every UTC day</div>
+    </div>
+  );
+}
+function TetrisApp({AC}){
+  const [grid,setGrid]=useState(()=>tetrisEmpty());
+  const [piece,setPiece]=useState(()=>tetrisRandom());
+  const [next,setNext]=useState(()=>tetrisRandom());
+  const [score,setScore]=useState(0);
+  const [lines,setLines]=useState(0);
+  const [level,setLevel]=useState(1);
+  const [over,setOver]=useState(false);
+  const [paused,setPaused]=useState(false);
+  // Refs let the keyboard handler and the gravity tick read the latest values
+  // without becoming dependencies that re-create handlers every render.
+  const gridRef=useRef(grid);   useEffect(()=>{gridRef.current=grid;},[grid]);
+  const pieceRef=useRef(piece); useEffect(()=>{pieceRef.current=piece;},[piece]);
+
+  function newGame(){
+    setGrid(tetrisEmpty());setPiece(tetrisRandom());setNext(tetrisRandom());
+    setScore(0);setLines(0);setLevel(1);setOver(false);setPaused(false);
+  }
+
+  // Try to move/rotate; commit if the move fits. Locks the piece when downward
+  // movement is blocked, then spawns the next piece (game over if it can't fit).
+  function tryMove(dr,dc){
+    const p=pieceRef.current;
+    if(!p)return false;
+    const moved={...p,row:p.row+dr,col:p.col+dc};
+    if(tetrisFits(gridRef.current,moved)){setPiece(moved);return true;}
+    if(dr>0){lockAndSpawn();}
+    return false;
+  }
+  function rotate(){
+    const p=pieceRef.current;
+    if(!p)return;
+    const r=(p.rotation+1)%4;
+    if(tetrisFits(gridRef.current,p,p.row,p.col,r)){setPiece({...p,rotation:r});}
+    // Simple "wall kick": try shifting +/-1 column if the basic rotation didn't fit
+    else if(tetrisFits(gridRef.current,p,p.row,p.col-1,r)){setPiece({...p,rotation:r,col:p.col-1});}
+    else if(tetrisFits(gridRef.current,p,p.row,p.col+1,r)){setPiece({...p,rotation:r,col:p.col+1});}
+  }
+  function hardDrop(){
+    let p=pieceRef.current;
+    if(!p)return;
+    let dropped=0;
+    while(tetrisFits(gridRef.current,p,p.row+1,p.col)){p={...p,row:p.row+1};dropped++;}
+    setPiece(p);
+    setScore(s=>s+dropped*2);  // bonus points for hard drops
+    setTimeout(lockAndSpawn,0);
+  }
+  function lockAndSpawn(){
+    const locked=tetrisLock(gridRef.current,pieceRef.current);
+    const {grid:cleared,linesCleared}=tetrisClearLines(locked);
+    setGrid(cleared);
+    if(linesCleared>0){
+      setScore(s=>s+scoreForLines(linesCleared,level));
+      setLines(l=>{
+        const n=l+linesCleared;
+        setLevel(Math.floor(n/10)+1);
+        return n;
+      });
+    }
+    const spawned=next;
+    const newNext=tetrisRandom();
+    setNext(newNext);
+    if(!tetrisFits(cleared,spawned)){setOver(true);return;}
+    setPiece(spawned);
+  }
+
+  // Gravity tick — falls one row every interval(level). Paused/over freezes it.
+  useEffect(()=>{
+    if(over||paused)return;
+    const id=setInterval(()=>tryMove(1,0),tickInterval(level));
+    return ()=>clearInterval(id);
+  },[level,over,paused]); // eslint-disable-line
+
+  // Keyboard controls
+  useEffect(()=>{
+    function onKey(e){
+      if(over)return;
+      if(e.key==="ArrowLeft"){e.preventDefault();tryMove(0,-1);}
+      else if(e.key==="ArrowRight"){e.preventDefault();tryMove(0,1);}
+      else if(e.key==="ArrowDown"){e.preventDefault();tryMove(1,0);setScore(s=>s+1);}
+      else if(e.key==="ArrowUp"){e.preventDefault();rotate();}
+      else if(e.key===" "){e.preventDefault();hardDrop();}
+      else if(e.key==="p"||e.key==="P"){setPaused(p=>!p);}
+    }
+    window.addEventListener("keydown",onKey);
+    return ()=>window.removeEventListener("keydown",onKey);
+  },[over]); // eslint-disable-line
+
+  // Build a display grid that includes the active piece overlaid on the locked grid.
+  const display=grid.map(r=>r.slice());
+  if(!over){
+    const s=shapeOf(piece);
+    for(let r=0;r<s.length;r++)for(let c=0;c<s[r].length;c++){
+      if(s[r][c]){
+        const gr=piece.row+r, gc=piece.col+c;
+        if(gr>=0&&gr<TETRIS_H&&gc>=0&&gc<TETRIS_W) display[gr][gc]=piece.color;
+      }
+    }
+  }
+  // Render the "next" preview piece too
+  const nextShape=shapeOf(next);
+
+  const ctrlBtn=(label,onClick,opts={})=>(
+    <button onClick={onClick} style={{
+      width:opts.w||44,height:44,borderRadius:8,
+      background:opts.danger?"rgba(255,80,80,0.1)":"rgba(255,255,255,0.07)",
+      border:"1px solid "+(opts.danger?"rgba(255,80,80,0.3)":"rgba(255,255,255,0.12)"),
+      cursor:"pointer",color:opts.danger?"#ff8b8b":"rgba(255,255,255,0.85)",
+      fontFamily:FFB,fontWeight:700,fontSize:16,touchAction:"manipulation",
+    }}>{label}</button>
+  );
+
+  return(
+    <div style={{display:"flex",flexDirection:"column",gap:10,height:"100%",fontFamily:FF,minHeight:0,alignItems:"center"}}>
+      {/* Top info */}
+      <div style={{display:"flex",gap:10,width:"100%",flexShrink:0}}>
+        <div style={{flex:1,padding:"7px 10px",background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:7}}>
+          <div style={{fontSize:9,fontFamily:FFM,color:"rgba(255,255,255,0.4)",letterSpacing:1}}>SCORE</div>
+          <div style={{fontFamily:FFM,fontWeight:600,fontSize:16,color:"#fff"}}>{score}</div>
+        </div>
+        <div style={{flex:1,padding:"7px 10px",background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:7}}>
+          <div style={{fontSize:9,fontFamily:FFM,color:"rgba(255,255,255,0.4)",letterSpacing:1}}>LINES · LVL</div>
+          <div style={{fontFamily:FFM,fontWeight:600,fontSize:16,color:"#fff"}}>{lines} · {level}</div>
+        </div>
+        <div style={{padding:"5px 7px",background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:7,minWidth:48}}>
+          <div style={{fontSize:9,fontFamily:FFM,color:"rgba(255,255,255,0.4)",letterSpacing:1,textAlign:"center"}}>NEXT</div>
+          <div style={{display:"grid",gridTemplateColumns:"repeat("+nextShape[0].length+",1fr)",gap:1,marginTop:2}}>
+            {nextShape.flat().map((c,i)=><div key={i} style={{width:8,height:8,background:c?PIECE_COLORS[next.color]:"transparent",borderRadius:1}}/>)}
+          </div>
+        </div>
+      </div>
+
+      {over && <div style={{padding:"6px 12px",background:"rgba(255,80,80,0.12)",border:"1px solid rgba(255,80,80,0.4)",borderRadius:7,fontFamily:FFB,fontWeight:700,fontSize:12,color:"#ff8b8b",flexShrink:0}}>Game Over · Score: {score}</div>}
+
+      {/* Playfield */}
+      <div style={{display:"grid",gridTemplateColumns:"repeat("+TETRIS_W+",1fr)",gridAutoRows:"1fr",gap:1,background:"rgba(0,0,0,0.4)",border:"1px solid rgba(255,255,255,0.12)",borderRadius:6,padding:3,aspectRatio:TETRIS_W/TETRIS_H,maxHeight:"100%",width:"min(100%, 240px)",touchAction:"none"}}>
+        {display.flat().map((c,i)=><div key={i} style={{background:c?PIECE_COLORS[c]:"rgba(255,255,255,0.03)",borderRadius:1}}/>)}
+      </div>
+
+      {/* Touch controls (also nice on desktop) */}
+      <div style={{display:"flex",gap:6,flexShrink:0,marginTop:2}}>
+        {ctrlBtn("←",()=>tryMove(0,-1))}
+        {ctrlBtn("↻",rotate)}
+        {ctrlBtn("→",()=>tryMove(0,1))}
+        {ctrlBtn("↓",()=>{tryMove(1,0);setScore(s=>s+1);})}
+        {ctrlBtn("⤓",hardDrop,{w:60})}
+      </div>
+      <div style={{display:"flex",gap:6,flexShrink:0}}>
+        {ctrlBtn(paused?"▶":"⏸",()=>setPaused(p=>!p),{w:60})}
+        {ctrlBtn("↻ New",newGame,{w:80,danger:over})}
+      </div>
+      <div style={{fontSize:10,color:"rgba(255,255,255,0.28)",textAlign:"center",fontStyle:"italic",flexShrink:0}}>← → move · ↑ rotate · ↓ soft drop · Space hard drop · P pause</div>
+    </div>
+  );
+}
+
