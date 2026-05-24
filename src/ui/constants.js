@@ -37,6 +37,13 @@ export const DEFAULT_SIZES = {
   atmos:{w:680,h:640},
   // 5.2
   novaai:{w:760,h:640},
+  // 7.4 game additions
+  tictactoe:{w:380,h:560},
+  pong:{w:580,h:560},
+  flappy:{w:380,h:680},
+  invaders:{w:520,h:680},
+  pacman:{w:520,h:680},
+  chess:{w:740,h:680},
 };
 
 // The master app list — drives the desktop, start menu, and store icons.
@@ -65,6 +72,13 @@ export const APPS = [
   {id:"tetris",     icon:"🟪",label:"Tetris",     desc:"Falling-block classic"},
   // 5.2
   {id:"novaai",     icon:"✨",label:"Nova AI",    desc:"Chat with Claude or ChatGPT (BYOK)"},
+  // 7.4 games
+  {id:"tictactoe",  icon:"❌",label:"Tic-Tac-Toe", desc:"You vs an unbeatable AI"},
+  {id:"pong",       icon:"🏓",label:"Pong",        desc:"Classic paddle vs AI"},
+  {id:"flappy",     icon:"🐦",label:"Flappy Bird", desc:"One-tap arcade staple"},
+  {id:"invaders",   icon:"👾",label:"Space Invaders", desc:"Shoot the descending aliens"},
+  {id:"pacman",     icon:"🟡",label:"Pac-Man",     desc:"Pellets, ghosts, classic maze"},
+  {id:"chess",      icon:"♟️",label:"Chess",       desc:"Online multiplayer vs other Nova users"},
 ];
 
 // Curated catalog of external apps shown in the Store's "Official" tab.
@@ -96,7 +110,7 @@ export const STORE_CATALOG = [
 export const STORE_CATS = ["All","Games","Media","Tools","Social","News"];
 
 export const BOOT_MSGS = [
-  "NOVA OS v7.3 — Nova Systems",
+  "NOVA OS v7.4 — Nova Systems",
   "Initializing kernel... OK",
   "Loading hardware abstraction layer... OK",
   "Mounting filesystems... OK",

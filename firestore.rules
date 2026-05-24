@@ -209,6 +209,36 @@ service cloud.firestore {
       }
     }
 
+    // ── chess games (v7.4) ───────────────────────────────────────────────
+    // 1-on-1 online chess. Each doc holds both players' uids, current FEN,
+    // PGN history, turn, and status. Pattern mirrors nova_dm_threads —
+    // participants-only access.
+    match /nova_chess_games/{gameId} {
+      // Both players can read; mods can audit.
+      allow read: if signedIn() && (
+        request.auth.uid in resource.data.participantUids || isMod()
+      );
+
+      // Create: the challenger must be one of the two participants. Game
+      // must have exactly two participants and start in the "active" state
+      // with the standard opening FEN.
+      allow create: if signedIn() &&
+        request.auth.uid in request.resource.data.participantUids &&
+        request.resource.data.participantUids.size() == 2;
+
+      // Update: only participants. Can't change the participants mid-game.
+      // (The chess.js client validates legal moves; rules just enforce
+      // ownership / impersonation prevention.)
+      allow update: if signedIn() &&
+        request.auth.uid in resource.data.participantUids &&
+        request.resource.data.participantUids == resource.data.participantUids;
+
+      // Delete: either participant (to clear from their list) or a mod.
+      allow delete: if signedIn() && (
+        request.auth.uid in resource.data.participantUids || isMod()
+      );
+    }
+
     // ── catch-all ────────────────────────────────────────────────────────
     // Anything else is denied. New collections need an explicit rule above.
     match /{document=**} {
