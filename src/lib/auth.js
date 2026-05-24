@@ -96,6 +96,9 @@ export async function register(username, password, initialData) {
   const payload = { uid: cred.user.uid, value: initialData };
   await setDoc(doc(firestoreDb, COLL, legacyDataKey(u)), payload);
 
+  // v7.3: claim this username in the index so others can DM us.
+  await ensureUsernameIndex(u, cred.user.uid);
+
   return { uid: cred.user.uid, username: u };
 }
 
@@ -115,6 +118,9 @@ export async function login(username, password) {
   // Step 1: try Firebase Auth.
   try {
     const cred = await signInWithEmailAndPassword(auth, usernameToEmail(u), password);
+    // v7.3: refresh username index in case it's missing (e.g. user existed
+    // before v7.3 was deployed). Cheap, idempotent.
+    await ensureUsernameIndex(u, cred.user.uid);
     return { uid: cred.user.uid, username: u, migrated: false };
   } catch (e) {
     // Only fall through to legacy migration for "user not found". Wrong
@@ -183,11 +189,44 @@ async function tryLegacyMigration(u, password) {
   // for this account lives in Firebase Auth (hashed + salted).
   try { await deleteDoc(doc(firestoreDb, COLL, legacyPwKey(u))); } catch {}
 
+  // v7.3: legacy users get their username index entry on first migrated login
+  await ensureUsernameIndex(u, cred.user.uid);
+
   return { uid: cred.user.uid, username: u, migrated: true };
 }
 
 export async function logoutUser() {
   try { await signOut(auth); } catch {}
+}
+
+// v7.3 — Username index for DM lookups.
+//
+// The Firestore Auth uid is what rules check, but humans only know each
+// other's usernames. So we maintain a tiny lookup table at
+// `nova_username_index/<username>` mapping back to the uid. Anyone signed
+// in can read it (to start a DM); only the user themselves can write their
+// own entry (rules check `uid == request.auth.uid`).
+//
+// Called from register() and login() so the index stays current. Idempotent —
+// safe to call repeatedly; we only write if missing or stale. Failures are
+// non-fatal: if the write doesn't land for some reason, the DM feature just
+// won't find that user. The rest of the OS keeps working.
+async function ensureUsernameIndex(username, uid) {
+  if (!username || !uid) return;
+  try {
+    const ref = doc(firestoreDb, "nova_username_index", username);
+    const existing = await getDoc(ref);
+    // Only write if missing, OR if the doc is stale (someone else's uid or
+    // outdated). In practice this only matters for the first login post-7.3.
+    if (!existing.exists() || existing.data()?.uid !== uid) {
+      await setDoc(ref, { uid, username, ts: Date.now() });
+    }
+  } catch (e) {
+    // Non-fatal — DM features will just not find this user. Log it so we
+    // notice during dev, but the user can still use the rest of Nova OS.
+    // eslint-disable-next-line no-console
+    console.warn("ensureUsernameIndex failed:", e?.message || e);
+  }
 }
 
 // Reactive auth state — call cb(currentUser | null) on any auth change.

@@ -145,6 +145,70 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // ── username → uid index (v7.3) ──────────────────────────────────────
+    // Maps a username to the user's Auth uid so DMs can be started by name.
+    // Anyone signed in can read (to look up DM targets); only the user
+    // themselves can claim/maintain their own entry.
+    match /nova_username_index/{username} {
+      allow read: if signedIn();
+      // Claim/refresh: the doc's uid must match the writer's auth uid.
+      allow create, update: if signedIn() &&
+        request.resource.data.uid == request.auth.uid;
+      // Deletes are mod-only (in case of account-rename / cleanup tasks).
+      allow delete: if isMod();
+    }
+
+    // ── direct messages (v7.3) ───────────────────────────────────────────
+    // 1-on-1 DM threads. The threadId is `<sorted-uid1>_<sorted-uid2>` so a
+    // pair of users always lands on the same doc regardless of who started.
+    match /nova_dm_threads/{threadId} {
+      // Only the two participants (or a mod) can read/list a thread.
+      allow read: if signedIn() && (
+        request.auth.uid in resource.data.participantUids || isMod()
+      );
+
+      // Create: caller must be one of the two participants they're declaring,
+      // and the doc must have exactly two participants (no group chats yet).
+      allow create: if signedIn() &&
+        request.auth.uid in request.resource.data.participantUids &&
+        request.resource.data.participantUids.size() == 2;
+
+      // Update: only participants (to refresh lastMessage/lastTs), and they
+      // can't change the participants list mid-flight.
+      allow update: if signedIn() &&
+        request.auth.uid in resource.data.participantUids &&
+        request.resource.data.participantUids == resource.data.participantUids;
+
+      // Delete: participants (to leave a thread) or mod.
+      allow delete: if signedIn() && (
+        request.auth.uid in resource.data.participantUids || isMod()
+      );
+
+      // Messages live under the thread. Same participant gate, enforced by
+      // a get() into the parent thread doc.
+      match /messages/{msgId} {
+        function thread() {
+          return get(/databases/$(database)/documents/nova_dm_threads/$(threadId)).data;
+        }
+        allow read: if signedIn() && (
+          request.auth.uid in thread().participantUids || isMod()
+        );
+        // Sender must be in the thread, must stamp own uid, message length capped.
+        allow create: if signedIn() &&
+          request.auth.uid in thread().participantUids &&
+          request.resource.data.uid == request.auth.uid &&
+          request.resource.data.text is string &&
+          request.resource.data.text.size() > 0 &&
+          request.resource.data.text.size() <= 500;
+        // No edits to past messages — append-only, like global chat.
+        allow update: if false;
+        // Delete: own message or mod.
+        allow delete: if signedIn() && (
+          resource.data.uid == request.auth.uid || isMod()
+        );
+      }
+    }
+
     // ── catch-all ────────────────────────────────────────────────────────
     // Anything else is denied. New collections need an explicit rule above.
     match /{document=**} {
