@@ -3,7 +3,18 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>NOVA OS 7.0</title>
+  <title>NOVA OS 7.1</title>
+  <!-- v7.1: PWA manifest + theme color. Lets Chromebooks (and any Chromium
+       browser) "install" the web app as a standalone-window experience —
+       no install needed, runs from the browser engine that's already there. -->
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <meta name="theme-color" content="#6366f1" />
+  <meta name="description" content="A browser-based desktop OS with apps, widgets, AI integration, and cross-device sync." />
+  <link rel="icon" type="image/svg+xml" href="/nova-icon.svg" />
+  <link rel="apple-touch-icon" href="/nova-icon.png" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Nova OS" />
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     html, body, #root { width: 100%; height: 100vh; overflow: hidden; }

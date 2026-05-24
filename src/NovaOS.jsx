@@ -1,5 +1,5 @@
 
-// NOVA OS v7.0 — Nova Systems
+// NOVA OS v7.1 — Nova Systems
 // Drop this into src/NovaOS.jsx
  
 import { useState, useEffect, useRef, useCallback, lazy, Suspense } from "react";
@@ -584,7 +584,7 @@ export default function NovaOS(){
       <div style={{position:"absolute",top:"60%",left:"35%",width:520,height:520,borderRadius:"50%",background:"radial-gradient(circle,rgba(6,182,212,0.10) 0%,transparent 60%)",filter:"blur(50px)",pointerEvents:"none"}}/>
       <div style={{position:"relative",zIndex:1}}>
         <div style={{fontFamily:FFB,fontWeight:700,fontSize:"clamp(40px, 12vw, 72px)",letterSpacing:6,color:"#fff",marginBottom:6,lineHeight:1,animation:"nova-breathe 3.6s ease-in-out infinite"}}>NOVA</div>
-        <div style={{fontFamily:FF,fontSize:11,color:"rgba(255,255,255,0.32)",letterSpacing:6,marginBottom:8,fontWeight:500}}>OPERATING SYSTEM  ·  v7.0</div>
+        <div style={{fontFamily:FF,fontSize:11,color:"rgba(255,255,255,0.32)",letterSpacing:6,marginBottom:8,fontWeight:500}}>OPERATING SYSTEM  ·  v7.1</div>
         {/* Hairline accent — fades in from the version line */}
         <div style={{height:1,width:160,background:"linear-gradient(90deg,rgba(99,102,241,0.6),transparent)",marginBottom:46}}/>
         {bootLines.map((l,i) => (
@@ -631,7 +631,7 @@ export default function NovaOS(){
             animation:"shimmer 4s ease-in-out infinite",
           }}/>
           <div style={{fontFamily:FFB,fontWeight:700,fontSize:42,color:"#fff",textAlign:"center",letterSpacing:6,marginBottom:6,lineHeight:1}}>NOVA</div>
-          <div style={{fontFamily:FF,fontSize:10,color:"rgba(255,255,255,0.28)",textAlign:"center",letterSpacing:5,marginBottom:34,fontWeight:500}}>OPERATING SYSTEM  ·  v7.0</div>
+          <div style={{fontFamily:FF,fontSize:10,color:"rgba(255,255,255,0.28)",textAlign:"center",letterSpacing:5,marginBottom:34,fontWeight:500}}>OPERATING SYSTEM  ·  v7.1</div>
           <div style={{display:"flex",borderBottom:"1px solid rgba(255,255,255,0.09)",marginBottom:24}}>
             {["login","register"].map(m => (
               <button key={m} className="lt" onClick={()=>{setMode(m);setAuthErr("");}} style={{flex:1,padding:"10px 0",background:"none",border:"none",borderBottom:mode===m?"2px solid "+DEFAULT_AC:"2px solid transparent",cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:12,letterSpacing:1,color:mode===m?DEFAULT_AC:"rgba(255,255,255,0.32)",transition:"color 0.18s, border-bottom 0.18s"}}>
@@ -742,7 +742,7 @@ export default function NovaOS(){
         return(
           <WidgetShell key={id} id={id} state={s} onDragStart={onWidgetDragStart} onResizeStart={onWidgetResizeStart} onClose={()=>closeWidget(id)} touchy={touchy}>
             {id==="clock"   &&<ClockWidgetContent   state={s} tick={tick} use24h={use24h} AC={AC}/>}
-            {id==="weather" &&<WeatherWidgetContent  state={s} data={data}/>}
+            {id==="weather" &&<WeatherWidgetContent  state={s} data={data} updateSettings={updateSettings}/>}
             {id==="notesw"  &&<NotesWidgetContent    state={s} data={data}/>}
             {id==="tasksw"  &&<TasksWidgetContent    state={s} data={data} updateData={updateData}/>}
             {id==="calendar"&&<CalendarWidgetContent state={s} tick={tick} AC={AC}/>}
@@ -800,7 +800,7 @@ export default function NovaOS(){
         </div>
         <div style={{padding:"10px 16px",borderTop:"1px solid rgba(255,255,255,0.07)",display:"flex",alignItems:"center",gap:10}}>
           <div style={{width:32,height:32,borderRadius:"50%",background:fill(AC),border:"1.5px solid "+AC,display:"flex",alignItems:"center",justifyContent:"center",fontSize:15,flexShrink:0}}>👤</div>
-          <div style={{flex:1}}><div style={{fontFamily:FFB,fontWeight:600,fontSize:13,color:"#fff"}}>@{user}</div><div style={{fontFamily:FF,fontSize:10,color:"rgba(255,255,255,0.3)"}}>Nova OS v7.0</div></div>
+          <div style={{flex:1}}><div style={{fontFamily:FFB,fontWeight:600,fontSize:13,color:"#fff"}}>@{user}</div><div style={{fontFamily:FF,fontSize:10,color:"rgba(255,255,255,0.3)"}}>Nova OS v7.1</div></div>
           <button onClick={logout} style={{padding:"6px 12px",background:"rgba(200,40,40,0.12)",border:"1px solid rgba(200,40,40,0.3)",borderRadius:6,cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:11,color:"rgba(255,140,140,0.9)"}}>Logout</button>
         </div>
       </div>)}

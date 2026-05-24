@@ -7,6 +7,8 @@
 import { useState, useEffect } from "react";
 import { FF, FFB, FFM } from "../ui/styles.js";
 import { WIDGET_CONFIGS, WGT_HANDLES_MOUSE, WGT_HANDLES_TOUCH, WMO } from "../ui/constants.js";
+// v7.1: weather widget gains NWS alerts + unit toggle, mirroring Atmos
+import { alertsUrl, parseAlerts, isLikelyUS } from "../lib/weather.js";
 
 export function WidgetShell({ id, state, onDragStart, onResizeStart, onClose, children, touchy }) {
   const { x, y, w, h } = state;
@@ -42,26 +44,42 @@ export function ClockWidgetContent({ state, tick, use24h, AC }) {
   );
 }
 
-export function WeatherWidgetContent({ state, data }) {
+export function WeatherWidgetContent({ state, data, updateSettings }) {
   const [weather, setWeather] = useState(null);
   const [loc, setLoc] = useState("");
   const [status, setStatus] = useState("loading");
+  // v7.1: NWS alerts shown for US locations
+  const [alerts, setAlerts] = useState([]);
   // v6.4: if the user has pinned a location in Atmos, use that instead of
   // hitting the browser geolocation prompt. Falls back to geolocation when
   // no pinned location exists (preserves the v6.0–6.3 behavior).
   const savedLoc = data?.settings?.weatherLocation || null;
+  // v7.1: units preference shared with Atmos. Default imperial (°F) to match
+  // the Atmos default. open-meteo accepts "fahrenheit" or "celsius".
+  const units = data?.settings?.weatherUnits || "imperial";
+  const tempUnit = units === "imperial" ? "fahrenheit" : "celsius";
+  const tempSymbol = units === "imperial" ? "°F" : "°C";
   useEffect(() => {
+    setAlerts([]); // clear stale alerts when location/units change
     // Branch A: pinned location — fetch directly, no permission prompt,
     // re-runs if the pin changes (e.g. user picks a new city in Atmos).
     if (savedLoc) {
       (async () => {
         try {
-          const wR = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${savedLoc.lat}&longitude=${savedLoc.lon}&current=temperature_2m,weathercode,windspeed_10m&temperature_unit=celsius&timezone=auto`).then(r => r.json());
+          const wR = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${savedLoc.lat}&longitude=${savedLoc.lon}&current=temperature_2m,weathercode,windspeed_10m&temperature_unit=${tempUnit}&wind_speed_unit=${units==="imperial"?"mph":"kmh"}&timezone=auto`).then(r => r.json());
           if (wR?.current) setWeather(wR.current);
           // We already know the label from Atmos — no reverse-geocode needed.
           // Atmos stores e.g. "Brooklyn, New York, USA" — first segment is usually
           // the city, which is what the widget wants to show.
           setLoc((savedLoc.label || "").split(",")[0].trim());
+          // v7.1: fetch NWS alerts for US locations. Silent on failure since
+          // alerts are a bonus, not core widget functionality.
+          if (isLikelyUS(savedLoc.lat, savedLoc.lon)) {
+            try {
+              const ares = await fetch(alertsUrl(savedLoc.lat, savedLoc.lon), {headers: {Accept: "application/geo+json"}});
+              setAlerts(parseAlerts(await ares.json()));
+            } catch {}
+          }
           setStatus("ok");
         } catch { setStatus("error"); }
       })();
@@ -72,7 +90,7 @@ export function WeatherWidgetContent({ state, data }) {
     navigator.geolocation.getCurrentPosition(async ({coords:{latitude:lat, longitude:lon}}) => {
       try {
         const [wR, gR] = await Promise.allSettled([
-          fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,weathercode,windspeed_10m&temperature_unit=celsius&timezone=auto`).then(r => r.json()),
+          fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,weathercode,windspeed_10m&temperature_unit=${tempUnit}&wind_speed_unit=${units==="imperial"?"mph":"kmh"}&timezone=auto`).then(r => r.json()),
           fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&accept-language=en`).then(r => r.json()),
         ]);
         if (wR.status === "fulfilled" && wR.value?.current) setWeather(wR.value.current);
@@ -80,26 +98,67 @@ export function WeatherWidgetContent({ state, data }) {
           const a = gR.value?.address;
           setLoc(a?.city || a?.town || a?.village || a?.county || "");
         }
+        // v7.1: alerts for the geolocated point too
+        if (isLikelyUS(lat, lon)) {
+          try {
+            const ares = await fetch(alertsUrl(lat, lon), {headers: {Accept: "application/geo+json"}});
+            setAlerts(parseAlerts(await ares.json()));
+          } catch {}
+        }
         setStatus("ok");
       } catch { setStatus("error"); }
     }, () => setStatus("error"), {timeout: 8000});
-  }, [savedLoc?.lat, savedLoc?.lon]);
+  }, [savedLoc?.lat, savedLoc?.lon, tempUnit]);
+  // v7.1: toggle stays in sync with Atmos. If updateSettings isn't wired
+  // (shouldn't happen post-7.1), button silently no-ops rather than crashing.
+  function toggleUnits(e) {
+    e.stopPropagation();
+    if (updateSettings) updateSettings({ weatherUnits: units === "imperial" ? "metric" : "imperial" });
+  }
   const h = state.h - 26, w = state.w;
   const iconSize = Math.max(24, Math.min(h * 0.35, 52));
   const tempSize = Math.max(18, Math.min(h * 0.28, 44));
+  // v7.1: alert palette — picks the most severe category present so the
+  // badge color matches the urgency. Matches Atmos's color logic.
+  const mostSevere = alerts.find(a => a.severity === "Extreme")
+                  || alerts.find(a => a.severity === "Severe")
+                  || alerts.find(a => a.severity === "Moderate")
+                  || alerts[0];
+  const alertColor = !mostSevere ? null
+    : mostSevere.severity === "Extreme"  ? "#ff8080"
+    : mostSevere.severity === "Severe"   ? "#ffaa44"
+    : mostSevere.severity === "Moderate" ? "#ffd060"
+    : "#88c8ff";
   return (
-    <div style={{width:"100%",height:"100%",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"8px 14px",gap:6}}>
+    <div style={{position:"relative",width:"100%",height:"100%",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"8px 14px",gap:6}}>
+      {/* v7.1: small °F/°C toggle button — top-right corner. Stays out of
+          the way but always visible. Clicking flips the preference and
+          re-fetches in the new unit. */}
+      {updateSettings && (
+        <button onClick={toggleUnits} title={"Switch to "+(units==="imperial"?"Celsius":"Fahrenheit")}
+          style={{position:"absolute",top:4,right:6,background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.12)",borderRadius:4,cursor:"pointer",fontFamily:FFM,fontSize:9,fontWeight:600,color:"rgba(255,255,255,0.6)",padding:"1px 5px",lineHeight:1.2}}>
+          {tempSymbol}
+        </button>
+      )}
+      {/* v7.1: NWS alert badge — top-left corner. Hover shows the first
+          alert's event name. Only renders for US locations with active alerts. */}
+      {alerts.length > 0 && (
+        <div title={mostSevere.event + (alerts.length > 1 ? " (+" + (alerts.length-1) + " more)" : "")}
+          style={{position:"absolute",top:4,left:6,background:"rgba("+(alertColor==="#ff8080"?"255,80,80":alertColor==="#ffaa44"?"255,150,40":alertColor==="#ffd060"?"255,200,80":"100,200,255")+",0.18)",border:"1px solid "+alertColor,borderRadius:4,padding:"1px 5px",fontFamily:FFB,fontSize:9,fontWeight:700,color:alertColor,letterSpacing:0.5,display:"flex",alignItems:"center",gap:3,lineHeight:1.2}}>
+          ⚠ {alerts.length}
+        </div>
+      )}
       {status==="loading" && <div style={{display:"flex",alignItems:"center",gap:8}}><div style={{width:16,height:16,border:"2px solid rgba(255,255,255,0.15)",borderTopColor:"#fff",borderRadius:"50%",animation:"spin 0.8s linear infinite"}}/><span style={{fontFamily:FF,fontSize:11,color:"rgba(255,255,255,0.4)"}}>Getting weather…</span></div>}
       {status==="error" && <div style={{fontFamily:FF,fontSize:11,color:"rgba(255,255,255,0.35)",textAlign:"center"}}>🌡️ Unavailable<br/><span style={{fontSize:9,opacity:0.6}}>Allow location access</span></div>}
       {status==="ok" && weather && (<>
         <div style={{display:"flex",alignItems:"center",gap:10}}>
           <span style={{fontSize:iconSize,lineHeight:1}}>{WMO[weather.weathercode] || "🌡️"}</span>
           <div>
-            <div style={{fontFamily:FFM,fontSize:tempSize,fontWeight:400,color:"#fff",lineHeight:1}}>{Math.round(weather.temperature_2m)}°C</div>
+            <div style={{fontFamily:FFM,fontSize:tempSize,fontWeight:400,color:"#fff",lineHeight:1}}>{Math.round(weather.temperature_2m)}{tempSymbol}</div>
             {loc && w > 170 && <div style={{fontFamily:FF,fontSize:Math.max(9,tempSize*0.32),color:"rgba(255,255,255,0.42)",marginTop:3}}>{loc}</div>}
           </div>
         </div>
-        {weather.windspeed_10m != null && h > 120 && <div style={{fontFamily:FF,fontSize:9,color:"rgba(255,255,255,0.3)"}}>💨 {weather.windspeed_10m} km/h</div>}
+        {weather.windspeed_10m != null && h > 120 && <div style={{fontFamily:FF,fontSize:9,color:"rgba(255,255,255,0.3)"}}>💨 {weather.windspeed_10m} {units==="imperial"?"mph":"km/h"}</div>}
       </>)}
     </div>
   );

@@ -1,0 +1,26 @@
+{
+  "name": "Nova OS",
+  "short_name": "Nova OS",
+  "description": "A browser-based desktop OS with apps, widgets, AI integration, and cross-device sync.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#07080f",
+  "theme_color": "#6366f1",
+  "categories": ["productivity", "utilities"],
+  "icons": [
+    {
+      "src": "/nova-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/nova-icon.png",
+      "sizes": "1024x1024",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}
