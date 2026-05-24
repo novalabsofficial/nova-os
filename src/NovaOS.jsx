@@ -24,6 +24,7 @@ import { wmoIcon, wmoLabel, geocodeUrl, parseGeocode, forecastUrl, parseForecast
 import { PROVIDERS as AI_PROVIDERS, streamResponse as aiStream, deriveTitle as aiDeriveTitle } from "./lib/ai.js";
 import { playTone, speak, cancelSpeech, playSound, getSoundConfig, setSoundConfig, setSoundWallpaper } from "./lib/audio.js";
 import { db, setDbUid } from "./lib/db.js";
+import { openExternalUrl } from "./lib/openUrl.js";
 import { login as authLogin, register as authRegister, logoutUser as authLogout, normalizeUsername } from "./lib/auth.js";
 import { aiLoad, aiSave, AI_LS_KEYS, AI_LS_CONFIG, AI_LS_CHATS } from "./lib/ai-storage.js";
 // UI (shared components + visual constants)
@@ -754,7 +755,7 @@ export default function NovaOS(){
       {allDesktopIcons.map((app,idx)=>{
         const pos=iconPos[app.id]||defaultIconPos(idx);
         const isDrg=iconDrag?.id===app.id;
-        function launch(){if(app.storeApp){if(app.storeApp.newTab)window.open(app.storeApp.url,"_blank");else openApp("browser");}else openApp(app.id);}
+        function launch(){if(app.storeApp){if(app.storeApp.newTab)openExternalUrl(app.storeApp.url);else openApp("browser");}else openApp(app.id);}
         return(
           <div key={app.id} style={{position:"absolute",left:pos.x,top:pos.y,width:ICON_W,zIndex:isDrg?500:2,cursor:isDrg?"grabbing":"grab",userSelect:"none",display:"flex",flexDirection:"column",alignItems:"center",gap:4,padding:"8px 4px",borderRadius:9,background:"rgba(0,0,0,0.1)",border:"1px solid transparent",transition:isDrg?"none":"background 0.18s cubic-bezier(0.4,0,0.2,1), left 0.25s cubic-bezier(0.4,0,0.2,1), top 0.25s cubic-bezier(0.4,0,0.2,1)",boxShadow:isDrg?"0 8px 32px rgba(0,0,0,0.6)":"none"}}
             className={isDrg?"":"di"} title={app.desc}
@@ -788,7 +789,7 @@ export default function NovaOS(){
           <div style={SEC}>{menuSrch?`Results for "${menuSrch}"`:"All Apps"}</div>
           <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:4}}>
             {filteredMenu.map(app=>(
-              <div key={app.id} className="ma" onClick={()=>{if(app.storeApp){if(app.storeApp.newTab)window.open(app.storeApp.url,"_blank");else openApp("browser");}else openApp(app.id);}} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:5,padding:"12px 4px",borderRadius:9,cursor:"pointer",transition:"background 0.12s",position:"relative"}}>
+              <div key={app.id} className="ma" onClick={()=>{if(app.storeApp){if(app.storeApp.newTab)openExternalUrl(app.storeApp.url);else openApp("browser");}else openApp(app.id);}} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:5,padding:"12px 4px",borderRadius:9,cursor:"pointer",transition:"background 0.12s",position:"relative"}}>
                 {wins.some(w=>w.app===app.id)&&<div style={{position:"absolute",bottom:4,left:"50%",transform:"translateX(-50%)",width:4,height:4,borderRadius:"50%",background:AC}}/>}
                 <div style={{display:"flex",alignItems:"center",justifyContent:"center"}}><AppIconDisplay app={app} size={24}/></div>
                 <span style={{fontFamily:FF,fontWeight:600,fontSize:10,color:"rgba(255,255,255,0.8)",textAlign:"center",lineHeight:1.25}}>{app.label}</span>

@@ -4,6 +4,7 @@ import { fill, bdr, isUrl } from "../lib/format.js";
 import { BOOKMARKS } from "../ui/constants.js";
 import { BrowserNav } from "../ui/BrowserNav.jsx";
 import { rewriteForIframe, isLikelyUnframable } from "../lib/browser.js";
+import { openExternalUrl } from "../lib/openUrl.js";
 
 export function BrowserApp({AC}){
   const [bar,setBar]=useState("");
@@ -60,8 +61,8 @@ export function BrowserApp({AC}){
       {BOOKMARKS.map(b=>
         <button key={b.url} className="bp" onClick={()=>browse(b.url)} style={{padding:"4px 12px",background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:20,cursor:"pointer",fontFamily:FF,fontWeight:500,fontSize:11,color:"rgba(255,255,255,0.6)"}}>{b.label}</button>
       )}
-      <button className="bp" onClick={()=>window.open("https://www.bing.com","_blank","noopener,noreferrer")} style={{padding:"4px 12px",background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:20,cursor:"pointer",fontFamily:FF,fontWeight:500,fontSize:11,color:"rgba(255,255,255,0.6)"}}>Bing ↗</button>
-      <button className="bp" onClick={()=>window.open("https://www.google.com","_blank","noopener,noreferrer")} style={{padding:"4px 12px",background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:20,cursor:"pointer",fontFamily:FF,fontWeight:500,fontSize:11,color:"rgba(255,255,255,0.6)"}}>Google ↗</button>
+      <button className="bp" onClick={()=>openExternalUrl("https://www.bing.com")} style={{padding:"4px 12px",background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:20,cursor:"pointer",fontFamily:FF,fontWeight:500,fontSize:11,color:"rgba(255,255,255,0.6)"}}>Bing ↗</button>
+      <button className="bp" onClick={()=>openExternalUrl("https://www.google.com")} style={{padding:"4px 12px",background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:20,cursor:"pointer",fontFamily:FF,fontWeight:500,fontSize:11,color:"rgba(255,255,255,0.6)"}}>Google ↗</button>
     </div>
   );
 
@@ -101,7 +102,7 @@ export function BrowserApp({AC}){
             </div>
             <div style={{display:"flex",gap:8,marginTop:4}}>
               <button onClick={()=>setView("home")} style={{padding:"8px 16px",background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.12)",borderRadius:8,cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:12,color:"rgba(255,255,255,0.7)"}}>← Back</button>
-              <button onClick={()=>window.open(frameUrl,"_blank","noopener,noreferrer")} style={{padding:"8px 16px",background:fill(AC),border:"1px solid "+bdr(AC),borderRadius:8,cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:12,color:AC}}>Open in new tab ↗</button>
+              <button onClick={()=>openExternalUrl(frameUrl)} style={{padding:"8px 16px",background:fill(AC),border:"1px solid "+bdr(AC),borderRadius:8,cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:12,color:AC}}>Open in default browser ↗</button>
             </div>
           </div>
         ) : (

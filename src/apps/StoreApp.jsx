@@ -7,6 +7,7 @@ import { autoModerate, isAdmin, isPubliclyVisible } from "../lib/moderation.js";
 import { doc, getDoc, setDoc, updateDoc, deleteDoc, collection, addDoc, query, orderBy, limit, onSnapshot, serverTimestamp } from "firebase/firestore";
 import { firestoreDb } from "../firebase.js";
 import { getDbUid } from "../lib/db.js";
+import { openExternalUrl } from "../lib/openUrl.js";
 
 export function Stars({appId, ratings, rateApp, ac}){
   const r=ratings[appId]||{avg:0,count:0,mine:0};
@@ -64,7 +65,7 @@ export function AppCard({app, isIn, ac, ratings, rateApp, toggleInstall, current
       <div style={{fontSize:12,color:"rgba(255,255,255,0.48)",lineHeight:1.5,marginBottom:10,flex:1}}>{app.desc}</div>
       <div style={{display:"flex",gap:7}}>
         <button onClick={()=>toggleInstall(app.id)} style={{flex:1,padding:"6px",background:isIn?"rgba(255,80,80,0.1)":"rgba(255,255,255,0.06)",border:"1px solid "+(isIn?"rgba(255,80,80,0.3)":"rgba(255,255,255,0.12)"),borderRadius:6,cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:11,color:isIn?"rgba(255,130,130,0.9)":"rgba(255,255,255,0.6)"}}>{isIn?"– Remove":"+ Desktop"}</button>
-        <button onClick={()=>window.open(app.url,"_blank")} style={{flex:1,padding:"6px",background:fill(ac),border:"1px solid "+bdr(ac),borderRadius:6,cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:11,color:ac}}>Launch ↗</button>
+        <button onClick={()=>openExternalUrl(app.url)} style={{flex:1,padding:"6px",background:fill(ac),border:"1px solid "+bdr(ac),borderRadius:6,cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:11,color:ac}}>Launch ↗</button>
       </div>
     </div>
   );
