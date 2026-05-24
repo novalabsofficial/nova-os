@@ -96,7 +96,7 @@ export const STORE_CATALOG = [
 export const STORE_CATS = ["All","Games","Media","Tools","Social","News"];
 
 export const BOOT_MSGS = [
-  "NOVA OS v7.1 — Nova Systems",
+  "NOVA OS v7.2 — Nova Systems",
   "Initializing kernel... OK",
   "Loading hardware abstraction layer... OK",
   "Mounting filesystems... OK",
