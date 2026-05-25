@@ -126,7 +126,7 @@ const WALLPAPER_SEMITONES = {
   prism:  6,
   glass:  4,
   solar: -2,
-  mono:   1,
+  tide:  -2,
   velvet:-1,
   // v7.0 additions
   lumen: -1,

@@ -161,6 +161,93 @@ function CascadeBg() {
   );
 }
 
+// v8.0 — Tide: a sister wallpaper to Cascade — same Big-Sur-style flowing
+// ridges and curve geometry, but rendered entirely in blue→purple shades.
+// Designed for users who want Cascade's composition without the warm
+// pink/amber palette. Atmospheric perspective drives the color choice:
+// distant ridges are LIGHTER and bluer (haze), foreground ridges are
+// DARKER and more saturated violet.
+//
+//   Sky:     sky-blue → deep navy
+//   Ridge 1: blue-300 → blue-900   (lightest, furthest back)
+//   Ridge 2: blue-500 → blue-950
+//   Ridge 3: indigo-400 → indigo-900
+//   Ridge 4: violet-500 → purple-950 (darkest, foreground)
+function TideBg() {
+  return (
+    <svg style={{position:"absolute",inset:0,width:"100%",height:"100%"}} viewBox="0 0 1440 900" preserveAspectRatio="xMidYMid slice">
+      <defs>
+        {/* Sky — sky-blue top fading to deep navy at horizon */}
+        <linearGradient id="tide-sky" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%"   stopColor="#7dd3fc"/>
+          <stop offset="40%"  stopColor="#3b82f6"/>
+          <stop offset="100%" stopColor="#1e1b4b"/>
+        </linearGradient>
+        {/* Ridge 1 — light blue (furthest back, lightest from haze) */}
+        <linearGradient id="tide-r1" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%"   stopColor="#93c5fd"/>
+          <stop offset="40%"  stopColor="#3b82f6"/>
+          <stop offset="100%" stopColor="#1e3a8a"/>
+        </linearGradient>
+        {/* Ridge 2 — medium blue */}
+        <linearGradient id="tide-r2" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%"   stopColor="#60a5fa"/>
+          <stop offset="40%"  stopColor="#2563eb"/>
+          <stop offset="100%" stopColor="#172554"/>
+        </linearGradient>
+        {/* Ridge 3 — periwinkle / indigo */}
+        <linearGradient id="tide-r3" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%"   stopColor="#a5b4fc"/>
+          <stop offset="40%"  stopColor="#6366f1"/>
+          <stop offset="100%" stopColor="#312e81"/>
+        </linearGradient>
+        {/* Ridge 4 — deep violet (foreground, darkest and most saturated) */}
+        <linearGradient id="tide-r4" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%"   stopColor="#c4b5fd"/>
+          <stop offset="40%"  stopColor="#7c3aed"/>
+          <stop offset="100%" stopColor="#3b0764"/>
+        </linearGradient>
+        {/* Soft cool moon-glow over the horizon — opposite mood to Cascade's
+            warm sun-glow. Gives Tide a "twilight" feel rather than golden hour. */}
+        <radialGradient id="tide-glow" cx="32%" cy="38%" r="22%">
+          <stop offset="0%"   stopColor="#dbeafe" stopOpacity="0.22"/>
+          <stop offset="100%" stopColor="#dbeafe" stopOpacity="0"/>
+        </radialGradient>
+      </defs>
+
+      {/* Sky */}
+      <rect width="1440" height="900" fill="url(#tide-sky)"/>
+
+      {/* Cool moon-glow (drawn before ridges so they cast over it) */}
+      <rect width="1440" height="900" fill="url(#tide-glow)"/>
+
+      {/* Ridge 1 — light blue (furthest back) */}
+      <path d="M 0 380
+               C 240 300, 480 330, 720 360
+               S 1200 400, 1440 340
+               L 1440 900 L 0 900 Z" fill="url(#tide-r1)"/>
+
+      {/* Ridge 2 — medium blue */}
+      <path d="M 0 510
+               C 200 420, 460 480, 720 470
+               S 1180 540, 1440 470
+               L 1440 900 L 0 900 Z" fill="url(#tide-r2)"/>
+
+      {/* Ridge 3 — periwinkle */}
+      <path d="M 0 620
+               C 280 560, 540 600, 800 590
+               S 1220 670, 1440 600
+               L 1440 900 L 0 900 Z" fill="url(#tide-r3)"/>
+
+      {/* Ridge 4 — deep violet foreground peak */}
+      <path d="M 0 540
+               C 200 430, 420 360, 640 480
+               C 820 580, 1080 720, 1440 720
+               L 1440 900 L 0 900 Z" fill="url(#tide-r4)"/>
+    </svg>
+  );
+}
+
 // v8.0 — Halcyon: a mesh-grade multi-blob wallpaper designed as a warmer
 // companion to Mesh. Same restrained four-blob composition + heavy blur +
 // vignette that gives Mesh its premium feel, but a distinct color story:
@@ -301,6 +388,7 @@ export function Wallpaper({ id, customUrl }) {
   if (id === "bliss")        return <BlissBg/>;
   if (id === "halcyon")      return <HalcyonBg/>;
   if (id === "cascade")      return <CascadeBg/>;
+  if (id === "tide")         return <TideBg/>;
   if (id === "prism")        return <PrismBg/>;
   const wp = WALLPAPERS[id];
   if (wp && wp.grad) {
