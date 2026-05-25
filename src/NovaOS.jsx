@@ -13,7 +13,7 @@ import {
 } from "./lib/constants.js";
 import { hexRgb, fill, bdr, isUrl } from "./lib/format.js";
 import { toggleFullscreen } from "./lib/fullscreen.js";
-import { defaultIconPos, snapToFreeGrid, snapW } from "./lib/geometry.js";
+import { defaultIconPos, snapToFreeGrid, snapW, snapWSize } from "./lib/geometry.js";
 import { autoModerate, isAdmin, isPubliclyVisible } from "./lib/moderation.js";
 import { rewriteForIframe, isLikelyUnframable } from "./lib/browser.js";
 import { detectDevice, effectiveDeviceMode, isTouchMode } from "./lib/device.js";
@@ -260,7 +260,19 @@ export default function NovaOS(){
       });
     }
     function onUp(){
-      setWidgetState(prev=>{const s=prev[widgetResize.id];const snapped=snapW(s.x,s.y);const np={...prev,[widgetResize.id]:{...s,...snapped}};updateData(d=>({...d,settings:{...(d.settings||{}),widgetState:np}}));return np;});
+      // v8.0: also snap w/h on resize end so both edges of every widget land
+      // on the WIDGET_SNAP grid. Combined with position snapping, this means
+      // two widgets dragged near each other line up perfectly regardless of
+      // exactly how the user finished the resize.
+      setWidgetState(prev=>{
+        const s=prev[widgetResize.id];
+        const cfg=WIDGET_CONFIGS[widgetResize.id]||{minW:120,minH:80};
+        const snapXY=snapW(s.x,s.y);
+        const snapSize=snapWSize(s.w,s.h,cfg.minW,cfg.minH);
+        const np={...prev,[widgetResize.id]:{...s,...snapXY,...snapSize}};
+        updateData(d=>({...d,settings:{...(d.settings||{}),widgetState:np}}));
+        return np;
+      });
       setWidgetResize(null);
     }
     window.addEventListener("pointermove",onMove);window.addEventListener("pointerup",onUp);window.addEventListener("pointercancel",onUp);return()=>{window.removeEventListener("pointermove",onMove);window.removeEventListener("pointerup",onUp);window.removeEventListener("pointercancel",onUp);};

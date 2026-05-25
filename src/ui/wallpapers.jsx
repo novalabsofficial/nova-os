@@ -71,66 +71,60 @@ function AuroraBg() {
   );
 }
 
-// v8.0 — Bloom: a macOS-Sequoia-style abstract bloom wallpaper. Three large
-// soft glowing color shapes (pink/purple center, cyan upper-left, amber
-// lower-right) blended together on a deep dark base. Heavy gaussian blur
-// makes the colors melt into each other, creating that "stock OS" quality
-// where the wallpaper feels designed but not busy. Vignette pulls the eye
-// toward the center bloom.
-function BloomBg() {
+// v8.0 — Halcyon: a mesh-grade multi-blob wallpaper designed as a warmer
+// companion to Mesh. Same restrained four-blob composition + heavy blur +
+// vignette that gives Mesh its premium feel, but a distinct color story:
+// coral pink, indigo, mint, and amber on a deep purple-charcoal base.
+// Reads as "polished, designed, intentional" without ever shouting.
+function HalcyonBg() {
   return (
     <svg style={{position:"absolute",inset:0,width:"100%",height:"100%"}} viewBox="0 0 1440 900" preserveAspectRatio="xMidYMid slice">
       <defs>
-        {/* Center bloom — pink core fading through magenta to dark.
-            This is the "subject" of the wallpaper. */}
-        <radialGradient id="bloom-core" cx="50%" cy="55%" r="48%">
-          <stop offset="0%"   stopColor="#ff5ea8" stopOpacity="0.95"/>
-          <stop offset="22%"  stopColor="#ec4899" stopOpacity="0.85"/>
-          <stop offset="48%"  stopColor="#a855f7" stopOpacity="0.55"/>
-          <stop offset="78%"  stopColor="#3b0764" stopOpacity="0.12"/>
-          <stop offset="100%" stopColor="#0a0418" stopOpacity="0"/>
+        {/* Coral pink (upper-left) — warm anchor */}
+        <radialGradient id="halc1" cx="22%" cy="25%" r="55%">
+          <stop offset="0%"   stopColor="#fb7185" stopOpacity="0.88"/>
+          <stop offset="55%"  stopColor="#9f1239" stopOpacity="0.22"/>
+          <stop offset="100%" stopColor="#0c0a1a" stopOpacity="0"/>
         </radialGradient>
-        {/* Cool accent (upper-left) — cyan bleeding through */}
-        <radialGradient id="bloom-cool" cx="28%" cy="32%" r="42%">
-          <stop offset="0%"   stopColor="#22d3ee" stopOpacity="0.7"/>
-          <stop offset="55%"  stopColor="#0e7490" stopOpacity="0.2"/>
-          <stop offset="100%" stopColor="#0a0418" stopOpacity="0"/>
+        {/* Indigo (upper-right) — cool counterpoint */}
+        <radialGradient id="halc2" cx="78%" cy="28%" r="50%">
+          <stop offset="0%"   stopColor="#818cf8" stopOpacity="0.85"/>
+          <stop offset="55%"  stopColor="#3730a3" stopOpacity="0.22"/>
+          <stop offset="100%" stopColor="#0c0a1a" stopOpacity="0"/>
         </radialGradient>
-        {/* Warm accent (lower-right) — amber/peach */}
-        <radialGradient id="bloom-warm" cx="78%" cy="70%" r="40%">
-          <stop offset="0%"   stopColor="#fb923c" stopOpacity="0.55"/>
-          <stop offset="100%" stopColor="#fb923c" stopOpacity="0"/>
+        {/* Mint (lower-left) — fresh accent */}
+        <radialGradient id="halc3" cx="28%" cy="82%" r="50%">
+          <stop offset="0%"   stopColor="#5eead4" stopOpacity="0.78"/>
+          <stop offset="55%"  stopColor="#0f766e" stopOpacity="0.2"/>
+          <stop offset="100%" stopColor="#0c0a1a" stopOpacity="0"/>
         </radialGradient>
-        {/* Heavy blur to melt all the layers into each other */}
-        <filter id="bloom-blur"><feGaussianBlur stdDeviation="70"/></filter>
-        {/* Vignette — soft edges, draws the eye into the bloom */}
-        <radialGradient id="bloom-vign" cx="50%" cy="50%" r="80%">
-          <stop offset="55%" stopColor="#000" stopOpacity="0"/>
-          <stop offset="100%" stopColor="#000" stopOpacity="0.45"/>
+        {/* Amber (lower-right) — small warm pop */}
+        <radialGradient id="halc4" cx="78%" cy="80%" r="38%">
+          <stop offset="0%"   stopColor="#fbbf24" stopOpacity="0.42"/>
+          <stop offset="100%" stopColor="#0c0a1a" stopOpacity="0"/>
+        </radialGradient>
+        {/* Heavy blur for that signature melted-color quality */}
+        <filter id="halc-blur"><feGaussianBlur stdDeviation="80"/></filter>
+        {/* Soft vignette */}
+        <radialGradient id="halc-vign" cx="50%" cy="50%" r="78%">
+          <stop offset="60%" stopColor="#000" stopOpacity="0"/>
+          <stop offset="100%" stopColor="#000" stopOpacity="0.36"/>
         </radialGradient>
       </defs>
 
-      {/* Layer 1: deep dark base */}
-      <rect width="1440" height="900" fill="#080214"/>
+      {/* Layer 1: deep purple-charcoal base */}
+      <rect width="1440" height="900" fill="#0c0a1a"/>
 
-      {/* Layer 2: the three glowing blooms — heavily blurred so they melt */}
-      <g filter="url(#bloom-blur)">
-        <rect width="1440" height="900" fill="url(#bloom-cool)"/>
-        <rect width="1440" height="900" fill="url(#bloom-warm)"/>
-        <rect width="1440" height="900" fill="url(#bloom-core)"/>
+      {/* Layer 2: the four blobs, heavily blurred */}
+      <g filter="url(#halc-blur)">
+        <rect width="1440" height="900" fill="url(#halc1)"/>
+        <rect width="1440" height="900" fill="url(#halc2)"/>
+        <rect width="1440" height="900" fill="url(#halc3)"/>
+        <rect width="1440" height="900" fill="url(#halc4)"/>
       </g>
 
-      {/* Layer 3: a few subtle highlight specks where the bloom meets dark.
-          Helps prevent banding on lower-color-depth displays. */}
-      {[...Array(18)].map((_, i) => {
-        const x = (i*191.3+47)%1440, y = (i*113.7+29)%900;
-        const r = i%5===0 ? 1.1 : 0.5;
-        const op = 0.16 + (i%3)*0.05;
-        return <circle key={i} cx={x} cy={y} r={r} fill={"rgba(255,240,255,"+op+")"}/>;
-      })}
-
-      {/* Layer 4: vignette */}
-      <rect width="1440" height="900" fill="url(#bloom-vign)"/>
+      {/* Layer 3: vignette */}
+      <rect width="1440" height="900" fill="url(#halc-vign)"/>
     </svg>
   );
 }
@@ -215,7 +209,7 @@ export function Wallpaper({ id, customUrl }) {
   if (id === "aurora")       return <AuroraBg/>;
   if (id === "nova")         return <NovaBg/>;
   if (id === "bliss")        return <BlissBg/>;
-  if (id === "bloom")        return <BloomBg/>;
+  if (id === "halcyon")      return <HalcyonBg/>;
   if (id === "prism")        return <PrismBg/>;
   const wp = WALLPAPERS[id];
   if (wp && wp.grad) {

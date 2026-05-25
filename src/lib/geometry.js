@@ -54,3 +54,21 @@ export function snapW(x, y) {
   const g = WIDGET_SNAP;
   return { x: Math.round(x / g) * g, y: Math.round(y / g) * g };
 }
+
+/**
+ * v8.0 — Snap a widget's width and height to the same WIDGET_SNAP grid that
+ * positions snap to. Respects per-widget minimum sizes (so a snap-down can
+ * never shrink a widget below its registered minimum dimensions).
+ *
+ * With both snapW() (position) and snapWSize() (dimensions) applied at the
+ * end of every drag/resize, all four edges of a widget always land on grid
+ * lines — meaning two widgets aligned next to each other look perfectly
+ * lined up even after independent resize operations.
+ */
+export function snapWSize(w, h, minW = 0, minH = 0) {
+  const g = WIDGET_SNAP;
+  return {
+    w: Math.max(minW, Math.round(w / g) * g),
+    h: Math.max(minH, Math.round(h / g) * g),
+  };
+}
