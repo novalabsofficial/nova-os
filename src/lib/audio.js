@@ -123,11 +123,13 @@ const WALLPAPER_SEMITONES = {
   // v8.0 additions
   halcyon: 2,
   cascade: 4,
-  prism:  6,
-  glass:  4,
-  solar: -2,
-  tide:  -2,
-  velvet:-1,
+  iris:    1,
+  ember:  -1,
+  prism:   6,
+  glass:   4,
+  solar:  -2,
+  tide:   -2,
+  velvet: -1,
   // v7.0 additions
   lumen: -1,
   drift:  8,

@@ -161,6 +161,177 @@ function CascadeBg() {
   );
 }
 
+// v8.0 — Iris: a Windows-11-Bloom-style wallpaper. Six translucent
+// multi-color glass petals radiate from the canvas center on a tinted
+// indigo backdrop. Each petal is an elongated ellipse rotated 60° from
+// the previous, with its own color gradient. Heavy gaussian blur on the
+// petal group gives the glassy, refractive feel; a faint white center
+// dot sells the "light passing through prism" effect.
+function IrisBg() {
+  return (
+    <svg style={{position:"absolute",inset:0,width:"100%",height:"100%"}} viewBox="0 0 1440 900" preserveAspectRatio="xMidYMid slice">
+      <defs>
+        {/* Backdrop — radial deep-indigo to near-black so the petals pop */}
+        <radialGradient id="iris-bg" cx="50%" cy="50%" r="65%">
+          <stop offset="0%"   stopColor="#312e81"/>
+          <stop offset="55%"  stopColor="#1e1b4b"/>
+          <stop offset="100%" stopColor="#020010"/>
+        </radialGradient>
+
+        {/* Six petal gradients — each color hot at the inner tip,
+            fading to transparent at the outer edge for glass refraction */}
+        <radialGradient id="iris-p1" cx="50%" cy="100%" r="100%">
+          <stop offset="0%"   stopColor="#fbbf24" stopOpacity="0.92"/>
+          <stop offset="50%"  stopColor="#f59e0b" stopOpacity="0.55"/>
+          <stop offset="100%" stopColor="#92400e" stopOpacity="0"/>
+        </radialGradient>
+        <radialGradient id="iris-p2" cx="50%" cy="100%" r="100%">
+          <stop offset="0%"   stopColor="#f9a8d4" stopOpacity="0.92"/>
+          <stop offset="50%"  stopColor="#ec4899" stopOpacity="0.55"/>
+          <stop offset="100%" stopColor="#831843" stopOpacity="0"/>
+        </radialGradient>
+        <radialGradient id="iris-p3" cx="50%" cy="100%" r="100%">
+          <stop offset="0%"   stopColor="#f0abfc" stopOpacity="0.92"/>
+          <stop offset="50%"  stopColor="#d946ef" stopOpacity="0.55"/>
+          <stop offset="100%" stopColor="#86198f" stopOpacity="0"/>
+        </radialGradient>
+        <radialGradient id="iris-p4" cx="50%" cy="100%" r="100%">
+          <stop offset="0%"   stopColor="#c4b5fd" stopOpacity="0.92"/>
+          <stop offset="50%"  stopColor="#a855f7" stopOpacity="0.55"/>
+          <stop offset="100%" stopColor="#581c87" stopOpacity="0"/>
+        </radialGradient>
+        <radialGradient id="iris-p5" cx="50%" cy="100%" r="100%">
+          <stop offset="0%"   stopColor="#a5b4fc" stopOpacity="0.92"/>
+          <stop offset="50%"  stopColor="#6366f1" stopOpacity="0.55"/>
+          <stop offset="100%" stopColor="#312e81" stopOpacity="0"/>
+        </radialGradient>
+        <radialGradient id="iris-p6" cx="50%" cy="100%" r="100%">
+          <stop offset="0%"   stopColor="#67e8f9" stopOpacity="0.92"/>
+          <stop offset="50%"  stopColor="#06b6d4" stopOpacity="0.55"/>
+          <stop offset="100%" stopColor="#0e7490" stopOpacity="0"/>
+        </radialGradient>
+
+        {/* Gaussian blur on the petals — gives them the glassy / refractive
+            feel. Without this the petals look like solid stained glass; with
+            it, they look like light bending through a prism. */}
+        <filter id="iris-blur"><feGaussianBlur stdDeviation="18"/></filter>
+
+        {/* Soft white center highlight — light leaking out through the
+            center of the prism */}
+        <radialGradient id="iris-core" cx="50%" cy="50%" r="12%">
+          <stop offset="0%"   stopColor="white" stopOpacity="0.42"/>
+          <stop offset="100%" stopColor="white" stopOpacity="0"/>
+        </radialGradient>
+      </defs>
+
+      {/* Layer 1: backdrop */}
+      <rect width="1440" height="900" fill="url(#iris-bg)"/>
+
+      {/* Layer 2: six radiating translucent petals, blurred together */}
+      <g transform="translate(720 450)" filter="url(#iris-blur)">
+        <ellipse cx="0" cy="-230" rx="160" ry="380" fill="url(#iris-p1)" transform="rotate(0)"/>
+        <ellipse cx="0" cy="-230" rx="160" ry="380" fill="url(#iris-p2)" transform="rotate(60)"/>
+        <ellipse cx="0" cy="-230" rx="160" ry="380" fill="url(#iris-p3)" transform="rotate(120)"/>
+        <ellipse cx="0" cy="-230" rx="160" ry="380" fill="url(#iris-p4)" transform="rotate(180)"/>
+        <ellipse cx="0" cy="-230" rx="160" ry="380" fill="url(#iris-p5)" transform="rotate(240)"/>
+        <ellipse cx="0" cy="-230" rx="160" ry="380" fill="url(#iris-p6)" transform="rotate(300)"/>
+      </g>
+
+      {/* Layer 3: bright center core */}
+      <rect width="1440" height="900" fill="url(#iris-core)"/>
+    </svg>
+  );
+}
+
+// v8.0 — Ember: a Mac-Ventura-style wallpaper. Layered curved petal/flame
+// shapes flowing through a warm-to-cool palette — bright amber at the
+// top fading through orange and red into deep magenta and violet at the
+// bottom. The shapes have S-curve silhouettes (similar to Cascade's
+// ridges) but here they're shorter and overlap more like flames rather
+// than mountain ridges. Light gaussian blur softens the edges where
+// shapes meet, giving the "luxurious gradient" feel of Ventura without
+// looking pixelated.
+function EmberBg() {
+  return (
+    <svg style={{position:"absolute",inset:0,width:"100%",height:"100%"}} viewBox="0 0 1440 900" preserveAspectRatio="xMidYMid slice">
+      <defs>
+        {/* Backdrop — very dark warm undertone (almost black with a hint
+            of plum) so the layers above glow */}
+        <linearGradient id="ember-bg" x1="0" y1="0" x2="0.6" y2="1">
+          <stop offset="0%"   stopColor="#1c0a14"/>
+          <stop offset="100%" stopColor="#080208"/>
+        </linearGradient>
+
+        {/* Layer 1 — bright amber (top, the "sun" tone) */}
+        <linearGradient id="ember-l1" x1="0.5" y1="0" x2="0.5" y2="1">
+          <stop offset="0%"   stopColor="#fde68a"/>
+          <stop offset="45%"  stopColor="#f59e0b"/>
+          <stop offset="100%" stopColor="#7c2d12"/>
+        </linearGradient>
+        {/* Layer 2 — orange */}
+        <linearGradient id="ember-l2" x1="0.5" y1="0" x2="0.5" y2="1">
+          <stop offset="0%"   stopColor="#fdba74"/>
+          <stop offset="45%"  stopColor="#ea580c"/>
+          <stop offset="100%" stopColor="#7c2d12"/>
+        </linearGradient>
+        {/* Layer 3 — red */}
+        <linearGradient id="ember-l3" x1="0.5" y1="0" x2="0.5" y2="1">
+          <stop offset="0%"   stopColor="#fb7185"/>
+          <stop offset="45%"  stopColor="#dc2626"/>
+          <stop offset="100%" stopColor="#7c1d1d"/>
+        </linearGradient>
+        {/* Layer 4 — magenta */}
+        <linearGradient id="ember-l4" x1="0.5" y1="0" x2="0.5" y2="1">
+          <stop offset="0%"   stopColor="#e879f9"/>
+          <stop offset="45%"  stopColor="#a21caf"/>
+          <stop offset="100%" stopColor="#581c87"/>
+        </linearGradient>
+        {/* Layer 5 — deep violet (foreground / lower-left, the "twilight" */}
+        <linearGradient id="ember-l5" x1="0.5" y1="0" x2="0.5" y2="1">
+          <stop offset="0%"   stopColor="#a78bfa"/>
+          <stop offset="45%"  stopColor="#7c3aed"/>
+          <stop offset="100%" stopColor="#3b0764"/>
+        </linearGradient>
+
+        {/* Light blur for the soft "draped silk" edges that make Ventura
+            wallpapers feel luxurious — not too heavy or shapes lose definition */}
+        <filter id="ember-blur"><feGaussianBlur stdDeviation="8"/></filter>
+      </defs>
+
+      {/* Layer 0: backdrop */}
+      <rect width="1440" height="900" fill="url(#ember-bg)"/>
+
+      <g filter="url(#ember-blur)">
+        {/* Layer 1: amber, large petal covering most of the upper canvas.
+            Tapers down toward the lower-right as if a flame's tip. */}
+        <path d="M -100 -100 L 1100 -100 Q 1500 200 1200 700 Q 900 600 700 400 Q 500 200 -100 300 Z"
+              fill="url(#ember-l1)"/>
+
+        {/* Layer 2: orange, narrower petal rising from the mid-bottom up
+            into the upper-right. Slight S-curve silhouette. */}
+        <path d="M 200 900 L 1100 900 Q 1300 600 1100 300 Q 900 100 700 200 Q 500 400 400 700 Q 300 800 200 900 Z"
+              fill="url(#ember-l2)"/>
+
+        {/* Layer 3: red, S-curve through the middle/lower area, sweeping
+            from the right edge down to the bottom-center */}
+        <path d="M 1440 250 L 1440 900 L 350 900 Q 600 700 800 600 Q 1000 500 1100 350 Q 1200 200 1440 250 Z"
+              fill="url(#ember-l3)"/>
+
+        {/* Layer 4: magenta, a tall petal from the bottom-center reaching
+            up toward the middle */}
+        <path d="M 300 900 L 900 900 Q 800 600 700 500 Q 600 400 500 500 Q 400 700 300 900 Z"
+              fill="url(#ember-l4)"/>
+
+        {/* Layer 5: deep violet, the foreground "shadow" sweeping the
+            lower-left corner. This is what makes Ventura wallpapers feel
+            grounded — a dark cool foreground anchoring the warm light. */}
+        <path d="M -100 600 L -100 900 L 600 900 Q 500 800 400 750 Q 250 700 100 650 Z"
+              fill="url(#ember-l5)"/>
+      </g>
+    </svg>
+  );
+}
+
 // v8.0 — Tide: a sister wallpaper to Cascade — same Big-Sur-style flowing
 // ridges and curve geometry, but rendered entirely in blue→purple shades.
 // Designed for users who want Cascade's composition without the warm
@@ -389,6 +560,8 @@ export function Wallpaper({ id, customUrl }) {
   if (id === "halcyon")      return <HalcyonBg/>;
   if (id === "cascade")      return <CascadeBg/>;
   if (id === "tide")         return <TideBg/>;
+  if (id === "iris")         return <IrisBg/>;
+  if (id === "ember")        return <EmberBg/>;
   if (id === "prism")        return <PrismBg/>;
   const wp = WALLPAPERS[id];
   if (wp && wp.grad) {

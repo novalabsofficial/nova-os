@@ -173,6 +173,16 @@ export const WALLPAPERS = {
   // a deeper matching base, so the ridges feel warm and dim like Mesh,
   // not bright/pastel like the earlier attempt.
   cascade:  {name:"Cascade",   semitones: 4,  preview:"linear-gradient(180deg,#312e81 0%,#312e81 35%,#be185d 38%,#500724 48%,#0e7490 53%,#083344 63%,#7c3aed 68%,#3b0764 78%,#d97706 83%,#7c2d12 100%)"},
+  // Iris: a Windows-11-Bloom-style wallpaper — six translucent multi-color
+  // glass petals radiating from the center on a tinted indigo backdrop.
+  // Heavy blur gives the petals a glassy, refractive feel; a soft white
+  // center glow sells the "light passing through prism" effect.
+  iris:     {name:"Iris",      semitones: 1,  preview:"radial-gradient(circle at 50% 50%,#a855f7 0%,#6366f1 22%,#312e81 50%,#0c0a2b 80%,#020010 100%)"},
+  // Ember: a Mac-Ventura-style wallpaper — layered curved petal shapes
+  // flowing through amber → orange → red → magenta → purple. Captures the
+  // warm/cool "golden hour into twilight" feel without copying any single
+  // reference wallpaper directly.
+  ember:    {name:"Ember",     semitones:-1,  preview:"linear-gradient(155deg,#fde68a 0%,#f59e0b 18%,#ea580c 35%,#be185d 60%,#7c3aed 82%,#1e1b4b 100%)"},
   prism:    {name:"Prism",     semitones: 6,  preview:"linear-gradient(135deg,#ff6b9d 0%,#a855f7 25%,#3b82f6 50%,#06b6d4 75%,#4cef90 100%)"},
   glass:    {name:"Glass",     semitones: 4,  preview:"radial-gradient(ellipse at 30% 25%,rgba(173,216,255,0.7) 0%,transparent 45%),radial-gradient(ellipse at 75% 80%,rgba(125,206,232,0.55) 0%,transparent 50%),linear-gradient(135deg,#1a3450 0%,#0a1c30 100%)",  grad:"radial-gradient(ellipse at 25% 22%,rgba(180,220,255,0.32) 0%,transparent 55%),radial-gradient(ellipse at 78% 75%,rgba(120,180,220,0.28) 0%,transparent 60%),radial-gradient(ellipse at 55% 50%,rgba(200,230,250,0.14) 0%,transparent 70%),linear-gradient(140deg,#142a44 0%,#0d1f33 45%,#081424 100%)"},
   solar:    {name:"Solar",     semitones:-2,  preview:"radial-gradient(ellipse at 50% 100%,#ffd089 0%,#ff7e3f 22%,#c02948 55%,#3a0d3a 90%)", grad:"radial-gradient(ellipse at 50% 110%,#ffe4a8 0%,#ffb05c 14%,#ff7038 28%,#d63149 50%,#7a1845 72%,#2a0826 92%,#0d0314 100%)"},
