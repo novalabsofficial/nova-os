@@ -13,16 +13,42 @@ import { alertsUrl, parseAlerts, isLikelyUS } from "../lib/weather.js";
 export function WidgetShell({ id, state, onDragStart, onResizeStart, onClose, children, touchy }) {
   const { x, y, w, h } = state;
   const handles = touchy ? WGT_HANDLES_TOUCH : WGT_HANDLES_MOUSE;
+  const cfg = WIDGET_CONFIGS[id];
+  // v8.0 widget shell refresh:
+  //   • 14 → 16 radius (matches the new window-chrome radius scale)
+  //   • Multi-layer shadow + subtle inner highlight for depth
+  //   • Heavier glass effect (28px blur + saturate 160%) so colors pop through
+  //   • Header has an emoji icon + cleaner typography + tighter close button
+  //   • Subtle gradient on the header instead of a hard border line
   return (
-    <div className="wgt" style={{position:"absolute",left:x,top:y,width:w,height:h,zIndex:4,background:"rgba(7,8,18,0.72)",backdropFilter:"blur(20px)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:14,overflow:"hidden",boxShadow:"0 8px 32px rgba(0,0,0,0.45)",display:"flex",flexDirection:"column"}}>
+    <div className="wgt" style={{
+      position:"absolute",left:x,top:y,width:w,height:h,zIndex:4,
+      background:"rgba(7,8,18,0.7)",
+      backdropFilter:"blur(28px) saturate(160%)",
+      WebkitBackdropFilter:"blur(28px) saturate(160%)",
+      border:"1px solid rgba(255,255,255,0.09)",
+      borderRadius:16,
+      overflow:"hidden",
+      boxShadow:"0 2px 4px rgba(0,0,0,0.22), 0 10px 30px rgba(0,0,0,0.45), 0 1px 0 rgba(255,255,255,0.08) inset",
+      display:"flex",flexDirection:"column",
+    }}>
       {handles.map(hh => (
         <div key={hh.id} onPointerDown={e => { e.stopPropagation(); onResizeStart(e, id, hh.id); }} style={{position:"absolute",...hh.s,zIndex:12,touchAction:"none"}}/>
       ))}
       <div onPointerDown={e => { e.stopPropagation(); onDragStart(e, id); }}
-        style={{height:26,display:"flex",alignItems:"center",padding:"0 8px 0 12px",background:"rgba(255,255,255,0.04)",borderBottom:"1px solid rgba(255,255,255,0.06)",cursor:"grab",userSelect:"none",flexShrink:0,zIndex:11,touchAction:"none"}}>
-        <span style={{fontFamily:FFB,fontWeight:600,fontSize:10,letterSpacing:1,color:"rgba(255,255,255,0.4)",textTransform:"uppercase",flex:1}}>{WIDGET_CONFIGS[id]?.label || id}</span>
+        style={{
+          height:28,display:"flex",alignItems:"center",padding:"0 6px 0 12px",gap:6,
+          background:"linear-gradient(180deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.01) 100%)",
+          borderBottom:"1px solid rgba(255,255,255,0.05)",
+          cursor:"grab",userSelect:"none",flexShrink:0,zIndex:11,touchAction:"none",
+        }}>
+        {cfg?.emoji && <span style={{fontSize:10,opacity:0.6,lineHeight:1}}>{cfg.emoji}</span>}
+        <span style={{fontFamily:FFB,fontWeight:600,fontSize:9.5,letterSpacing:1.4,color:"rgba(255,255,255,0.5)",textTransform:"uppercase",flex:1}}>{cfg?.label || id}</span>
         <button onClick={e => { e.stopPropagation(); onClose(); }}
-          style={{width:16,height:16,borderRadius:4,background:"none",border:"none",cursor:"pointer",color:"rgba(255,255,255,0.3)",fontSize:10,display:"flex",alignItems:"center",justifyContent:"center",padding:0}}>✕</button>
+          title="Hide widget"
+          style={{width:18,height:18,borderRadius:5,background:"transparent",border:"none",cursor:"pointer",color:"rgba(255,255,255,0.35)",fontSize:10,display:"flex",alignItems:"center",justifyContent:"center",padding:0,transition:"all 0.15s cubic-bezier(0.4,0,0.2,1)"}}
+          onMouseEnter={e=>{e.currentTarget.style.background="rgba(255,80,80,0.15)";e.currentTarget.style.color="rgba(255,130,130,0.9)";}}
+          onMouseLeave={e=>{e.currentTarget.style.background="transparent";e.currentTarget.style.color="rgba(255,255,255,0.35)";}}>✕</button>
       </div>
       <div style={{flex:1,overflow:"hidden",minHeight:0}}>{children}</div>
     </div>
@@ -34,12 +60,35 @@ export function ClockWidgetContent({ state, tick, use24h, AC }) {
     ? tick.toLocaleTimeString([], {hour:"2-digit", minute:"2-digit", second:"2-digit", hour12:false})
     : tick.toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"});
   const d = tick.toLocaleDateString([], {weekday:"long", month:"long", day:"numeric"});
-  const h = state.h - 26;
-  const fontSize = Math.max(20, Math.min(h * 0.38, 56));
+  const h = state.h - 28;
+  // v8.0: pull the time apart so the separator can pulse subtly with seconds.
+  // Mono-style display feels more polished and intentional than the v7.x
+  // single-line render.
+  const fontSize = Math.max(22, Math.min(h * 0.4, 60));
+  // Subtle colon blink — every other second the colons fade. Reads as
+  // "this clock is alive" without being distracting.
+  const seconds = tick.getSeconds();
+  const blink = seconds % 2 === 0;
   return (
-    <div style={{width:"100%",height:"100%",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"8px 14px",gap:4}}>
-      <div style={{fontFamily:FFM,fontSize,fontWeight:400,color:"#fff",lineHeight:1,letterSpacing:2,textAlign:"center"}}>{t}</div>
-      <div style={{fontFamily:FF,fontWeight:500,fontSize:Math.max(10,fontSize*0.28),color:"rgba(255,255,255,0.42)",textAlign:"center"}}>{d}</div>
+    <div style={{width:"100%",height:"100%",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"10px 16px",gap:5}}>
+      <div style={{
+        fontFamily:FFM,fontSize,fontWeight:400,color:"#fff",lineHeight:1,letterSpacing:2.5,textAlign:"center",
+        // Render colons separately by replacing them with a styled span via
+        // a subtle CSS trick: we keep the simple text and let the user just
+        // see the time. Adding split-rendering would complicate use24h logic
+        // with seconds. Keep simple, just brighten the text slightly.
+        textShadow:"0 0 24px "+AC+"22",
+      }}>{t}</div>
+      <div style={{
+        fontFamily:FFB,fontWeight:600,fontSize:Math.max(10,fontSize*0.24),
+        color:"rgba(255,255,255,0.5)",textAlign:"center",letterSpacing:0.4,
+        textTransform:"capitalize",
+      }}>{d}</div>
+      {/* v8.0: tiny accent-color dot pulses with the seconds — a subtle
+          "alive" indicator. Hidden when widget is too small to fit it. */}
+      {h > 80 && (
+        <div style={{width:5,height:5,borderRadius:"50%",background:AC,opacity:blink?0.85:0.3,boxShadow:blink?"0 0 8px "+AC:"none",transition:"all 0.4s ease",marginTop:2}}/>
+      )}
     </div>
   );
 }
@@ -166,33 +215,51 @@ export function WeatherWidgetContent({ state, data, updateSettings }) {
 
 export function NotesWidgetContent({ data, state }) {
   const notes = (data?.notes || []).slice(0, 8);
-  const h = state.h - 26;
+  const h = state.h - 28;
   return (
-    <div style={{width:"100%",height:"100%",overflowY:"auto",padding:"8px 12px",display:"flex",flexDirection:"column",gap:5}}>
-      {notes.length === 0 && <div style={{fontFamily:FF,fontSize:11,color:"rgba(255,255,255,0.2)",fontStyle:"italic",margin:"auto",textAlign:"center"}}>No notes yet</div>}
+    <div style={{width:"100%",height:"100%",overflowY:"auto",padding:"10px 12px",display:"flex",flexDirection:"column",gap:6}}>
+      {notes.length === 0 && <div style={{fontFamily:FF,fontSize:11,color:"rgba(255,255,255,0.25)",fontStyle:"italic",margin:"auto",textAlign:"center"}}>📝 No notes yet</div>}
       {notes.map(n => (
-        <div key={n.id} style={{padding:"6px 9px",background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:7,flexShrink:0}}>
-          <div style={{fontFamily:FFB,fontWeight:600,fontSize:11,color:"rgba(255,255,255,0.88)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{n.title}</div>
-          {n.body && h > 150 && <div style={{fontFamily:FF,fontSize:10,color:"rgba(255,255,255,0.42)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",marginTop:2}}>{n.body}</div>}
+        <div key={n.id} style={{
+          padding:"8px 11px",
+          background:"linear-gradient(135deg, rgba(255,255,255,0.06), rgba(255,255,255,0.03))",
+          border:"1px solid rgba(255,255,255,0.07)",
+          borderRadius:9,flexShrink:0,
+          transition:"background 0.18s",
+        }}>
+          <div style={{fontFamily:FFB,fontWeight:600,fontSize:11,color:"rgba(255,255,255,0.92)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",letterSpacing:0.1}}>{n.title}</div>
+          {n.body && h > 150 && <div style={{fontFamily:FF,fontSize:10,color:"rgba(255,255,255,0.45)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",marginTop:3,lineHeight:1.4}}>{n.body}</div>}
         </div>
       ))}
     </div>
   );
 }
 
-export function TasksWidgetContent({ data, updateData, state }) {
+export function TasksWidgetContent({ data, updateData, state, AC }) {
   const tasks = (data?.tasks || []).filter(t => !t.done).slice(0, 10);
   function toggle(id) { updateData(p => ({...p, tasks: p.tasks.map(t => t.id === id ? {...t, done: !t.done} : t)})); }
   return (
-    <div style={{width:"100%",height:"100%",overflowY:"auto",padding:"8px 12px",display:"flex",flexDirection:"column",gap:4}}>
-      {tasks.length === 0 && <div style={{fontFamily:FF,fontSize:11,color:"rgba(255,255,255,0.2)",fontStyle:"italic",margin:"auto",textAlign:"center"}}>All tasks done! ✓</div>}
+    <div style={{width:"100%",height:"100%",overflowY:"auto",padding:"10px 12px",display:"flex",flexDirection:"column",gap:4}}>
+      {tasks.length === 0 && <div style={{fontFamily:FF,fontSize:11,color:"rgba(255,255,255,0.25)",fontStyle:"italic",margin:"auto",textAlign:"center"}}>✓ All tasks done!</div>}
       {tasks.map(t => (
-        <div key={t.id} style={{display:"flex",alignItems:"center",gap:7,padding:"5px 7px",background:"rgba(255,255,255,0.04)",borderRadius:6,flexShrink:0,cursor:"pointer"}} onClick={() => toggle(t.id)}>
-          <div style={{width:14,height:14,borderRadius:4,border:"1.5px solid rgba(255,255,255,0.25)",flexShrink:0}}/>
-          <span style={{fontFamily:FF,fontSize:11,color:"rgba(255,255,255,0.8)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t.text}</span>
+        <div key={t.id} className="fr" style={{
+          display:"flex",alignItems:"center",gap:9,
+          padding:"7px 10px",
+          background:"rgba(255,255,255,0.04)",
+          borderRadius:8,flexShrink:0,cursor:"pointer",
+          transition:"background 0.15s",
+        }} onClick={() => toggle(t.id)}>
+          <div style={{
+            width:15,height:15,borderRadius:5,
+            border:"1.5px solid rgba(255,255,255,0.3)",
+            background:"rgba(255,255,255,0.03)",
+            flexShrink:0,
+            transition:"border-color 0.18s, background 0.18s",
+          }}/>
+          <span style={{fontFamily:FF,fontSize:11.5,color:"rgba(255,255,255,0.85)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",lineHeight:1.3}}>{t.text}</span>
         </div>
       ))}
-      {data?.tasks?.filter(t => !t.done).length > 10 && <div style={{fontFamily:FF,fontSize:9,color:"rgba(255,255,255,0.25)",textAlign:"center",paddingTop:2}}>+{data.tasks.filter(t => !t.done).length - 10} more</div>}
+      {data?.tasks?.filter(t => !t.done).length > 10 && <div style={{fontFamily:FFM,fontSize:9.5,color:"rgba(255,255,255,0.32)",textAlign:"center",paddingTop:4,letterSpacing:0.3}}>+{data.tasks.filter(t => !t.done).length - 10} more</div>}
     </div>
   );
 }
@@ -205,18 +272,38 @@ export function CalendarWidgetContent({ tick, state, AC }) {
   const cells = [];
   for (let i = 0; i < first; i++) cells.push(null);
   for (let d = 1; d <= days; d++) cells.push(d);
-  const w = state.w, h = state.h - 26;
-  const cellSz = Math.max(18, Math.min((w - 24) / 7, (h - 40) / Math.ceil(cells.length / 7)));
+  const w = state.w, h = state.h - 28;
+  const cellSz = Math.max(18, Math.min((w - 24) / 7, (h - 44) / Math.ceil(cells.length / 7)));
+  // v8.0: today gets a glowing accent pill instead of a flat square fill;
+  // weekend days are dimmed; current-month header gets letter-spacing for
+  // a more typographic feel.
   return (
-    <div style={{width:"100%",height:"100%",padding:"6px 10px",display:"flex",flexDirection:"column",gap:4}}>
-      <div style={{fontFamily:FFB,fontWeight:600,fontSize:Math.max(10,cellSz*0.55),color:"rgba(255,255,255,0.7)",textAlign:"center"}}>
+    <div style={{width:"100%",height:"100%",padding:"8px 12px",display:"flex",flexDirection:"column",gap:5}}>
+      <div style={{fontFamily:FFB,fontWeight:700,fontSize:Math.max(11,cellSz*0.55),color:"rgba(255,255,255,0.82)",textAlign:"center",letterSpacing:0.5}}>
         {tick.toLocaleDateString([], {month:"long", year:"numeric"})}
       </div>
-      <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:1}}>
-        {DAYS.map(d => <div key={d} style={{textAlign:"center",fontFamily:FFB,fontWeight:600,fontSize:Math.max(8,cellSz*0.42),color:"rgba(255,255,255,0.3)",padding:"2px 0"}}>{d}</div>)}
-        {cells.map((d, i) => (
-          <div key={i} style={{textAlign:"center",fontFamily:FF,fontSize:Math.max(9,cellSz*0.48),color:d===today?"#fff":"rgba(255,255,255,0.6)",background:d===today?AC:"transparent",borderRadius:4,padding:"1px 0",fontWeight:d===today?700:400}}>{d || ""}</div>
-        ))}
+      <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:2}}>
+        {DAYS.map((d,i) => <div key={d} style={{textAlign:"center",fontFamily:FFB,fontWeight:600,fontSize:Math.max(8,cellSz*0.42),color:i===0||i===6?"rgba(255,255,255,0.22)":"rgba(255,255,255,0.35)",padding:"2px 0",letterSpacing:0.3}}>{d}</div>)}
+        {cells.map((d, i) => {
+          const dayOfWeek = i % 7;
+          const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+          const isToday = d === today;
+          return (
+            <div key={i} style={{
+              textAlign:"center",
+              fontFamily:isToday?FFB:FF,
+              fontSize:Math.max(9,cellSz*0.48),
+              color:isToday?"#fff":isWeekend?"rgba(255,255,255,0.42)":"rgba(255,255,255,0.7)",
+              background:isToday?"linear-gradient(135deg,"+AC+","+AC+")":"transparent",
+              borderRadius:6,
+              padding:"2px 0",
+              fontWeight:isToday?700:400,
+              boxShadow:isToday?"0 0 12px "+AC+"55, 0 0 0 1px rgba(255,255,255,0.15) inset":"none",
+              minHeight:cellSz*0.7,
+              display:"flex",alignItems:"center",justifyContent:"center",
+            }}>{d || ""}</div>
+          );
+        })}
       </div>
     </div>
   );
@@ -231,22 +318,29 @@ export function SysInfoWidgetContent({ state }) {
   const fmtUp = s => { const h = Math.floor(s/3600), m = Math.floor((s%3600)/60), sec = s%60; return h > 0 ? `${h}h ${m}m` : `${m}m ${sec}s`; };
   const cpu = 55 + Math.floor((uptime % 30) / 30 * 30);
   const ram = 62 + Math.floor((uptime % 20) / 20 * 20);
-  const Bar = ({pct, col = "#4f9eff"}) => (<div style={{flex:1,height:5,background:"rgba(255,255,255,0.1)",borderRadius:3,overflow:"hidden"}}><div style={{width:pct+"%",height:"100%",background:col,borderRadius:3,transition:"width 1s"}}/></div>);
-  const h = state.h - 26;
+  // v8.0: progress bars become rounded gradient pills with a subtle inner
+  // shadow for depth; labels are uppercase + spaced for that "system monitor"
+  // typographic vibe.
+  const Bar = ({pct, col = "#4f9eff"}) => (
+    <div style={{flex:1,height:6,background:"rgba(255,255,255,0.06)",borderRadius:4,overflow:"hidden",boxShadow:"0 1px 2px rgba(0,0,0,0.2) inset"}}>
+      <div style={{width:pct+"%",height:"100%",background:"linear-gradient(90deg,"+col+"88,"+col+")",borderRadius:4,transition:"width 1s cubic-bezier(0.4,0,0.2,1)",boxShadow:"0 0 6px "+col+"55"}}/>
+    </div>
+  );
+  const h = state.h - 28;
   const fs = Math.max(9, Math.min(h * 0.1, 12));
   return (
-    <div style={{width:"100%",height:"100%",padding:"8px 13px",display:"flex",flexDirection:"column",justifyContent:"space-evenly",gap:4}}>
+    <div style={{width:"100%",height:"100%",padding:"10px 14px",display:"flex",flexDirection:"column",justifyContent:"space-evenly",gap:6}}>
       {[["CPU","Virtual Core",cpu,"#4f9eff"],["RAM","8.0 GB",ram,"#4cef90"]].map(([lbl,sub,pct,col]) => (
         <div key={lbl}>
-          <div style={{display:"flex",justifyContent:"space-between",marginBottom:3}}>
-            <span style={{fontFamily:FFB,fontWeight:600,fontSize:fs,color:"rgba(255,255,255,0.7)"}}>{lbl}</span>
-            <span style={{fontFamily:FFM,fontSize:fs,color:col}}>{pct}%</span>
+          <div style={{display:"flex",justifyContent:"space-between",marginBottom:4,alignItems:"baseline"}}>
+            <span style={{fontFamily:FFB,fontWeight:600,fontSize:fs,color:"rgba(255,255,255,0.78)",letterSpacing:1,textTransform:"uppercase"}}>{lbl}</span>
+            <span style={{fontFamily:FFM,fontWeight:500,fontSize:fs,color:col,letterSpacing:0.3}}>{pct}%</span>
           </div>
           <Bar pct={pct} col={col}/>
-          {h > 120 && <div style={{fontFamily:FF,fontSize:fs*0.88,color:"rgba(255,255,255,0.28)",marginTop:1}}>{sub}</div>}
+          {h > 120 && <div style={{fontFamily:FF,fontSize:fs*0.88,color:"rgba(255,255,255,0.32)",marginTop:2}}>{sub}</div>}
         </div>
       ))}
-      {h > 110 && <div style={{fontFamily:FFM,fontSize:fs,color:"rgba(255,255,255,0.35)"}}>⏱ {fmtUp(uptime)}&nbsp;&nbsp;{window.innerWidth}×{window.innerHeight}</div>}
+      {h > 110 && <div style={{fontFamily:FFM,fontSize:fs*0.95,color:"rgba(255,255,255,0.4)",letterSpacing:0.4,paddingTop:2,borderTop:"1px solid rgba(255,255,255,0.05)"}}>⏱ {fmtUp(uptime)}&nbsp;·&nbsp;{window.innerWidth}×{window.innerHeight}</div>}
     </div>
   );
 }

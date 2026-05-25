@@ -1100,21 +1100,38 @@ export default function NovaOS(){
           {deviceMode!=="mobile"&&<div style={{fontFamily:FF,fontSize:9,color:"rgba(255,255,255,0.4)",marginTop:1,lineHeight:1.1}}>{fmtDate(tick)}</div>}
         </div>
       </div>
-      {/* Notification Center side panel */}
+      {/* Notification Center side panel — v8.0 refresh.
+          Floating panel (slight margin from screen edges, full rounded
+          corners) rather than glued to the right edge. Header gains an
+          accent-colored bell glyph. Items get a per-kind left accent stripe
+          and an unread indicator dot. */}
       {notifsOpen && (
         <>
-          {/* Click-outside scrim */}
           <div onClick={()=>setNotifsOpen(false)} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.25)",zIndex:9997}}/>
-          <div style={{position:"fixed",top:0,right:0,bottom:TASKBAR_H,width:"min(340px, 92vw)",background:"rgba(9,11,24,0.97)",backdropFilter:"blur(28px)",borderLeft:"1px solid rgba(255,255,255,0.08)",boxShadow:"-12px 0 40px rgba(0,0,0,0.45)",zIndex:9998,display:"flex",flexDirection:"column",animation:"menu-up 0.22s cubic-bezier(0.4,0,0.2,1)"}}>
-            <div style={{padding:"14px 16px",borderBottom:"1px solid rgba(255,255,255,0.07)",display:"flex",alignItems:"center",gap:8,flexShrink:0}}>
-              <div style={{flex:1,fontFamily:FFB,fontWeight:700,fontSize:14,color:"#fff"}}>🔔 Notifications</div>
-              {notifications.length>0 && <button onClick={clearAllNotifications} style={{padding:"4px 10px",background:"rgba(255,80,80,0.08)",border:"1px solid rgba(255,80,80,0.25)",borderRadius:6,cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:10,color:"rgba(255,130,130,0.85)"}}>Clear all</button>}
-              <button onClick={()=>setNotifsOpen(false)} style={{width:24,height:24,borderRadius:6,background:"none",border:"none",cursor:"pointer",color:"rgba(255,255,255,0.4)",fontSize:14}}>✕</button>
+          <div style={{
+            position:"fixed",top:10,right:10,bottom:TASKBAR_H+10,width:"min(360px, calc(100vw - 20px))",
+            background:"linear-gradient(180deg, rgba(15,17,32,0.94) 0%, rgba(10,12,24,0.96) 100%)",
+            backdropFilter:"blur(40px) saturate(180%)",
+            WebkitBackdropFilter:"blur(40px) saturate(180%)",
+            border:"1px solid rgba(255,255,255,0.1)",
+            borderRadius:16,
+            boxShadow:"0 8px 16px rgba(0,0,0,0.35), 0 30px 80px rgba(0,0,0,0.55), 0 1px 0 rgba(255,255,255,0.08) inset",
+            zIndex:9998,display:"flex",flexDirection:"column",
+            animation:"menu-up 0.26s cubic-bezier(0.16,1,0.3,1)",
+            overflow:"hidden",
+          }}>
+            <div style={{padding:"16px 18px",borderBottom:"1px solid rgba(255,255,255,0.06)",display:"flex",alignItems:"center",gap:10,flexShrink:0,background:"linear-gradient(180deg, rgba(255,255,255,0.03), transparent)"}}>
+              <span style={{fontSize:16,filter:"drop-shadow(0 0 8px "+AC+"55)"}}>🔔</span>
+              <div style={{flex:1,fontFamily:FFB,fontWeight:700,fontSize:14,color:"#fff",letterSpacing:0.2}}>Notifications</div>
+              {notifications.length>0 && <button onClick={clearAllNotifications} style={{padding:"5px 11px",background:"rgba(255,80,80,0.08)",border:"1px solid rgba(255,80,80,0.25)",borderRadius:7,cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:10,color:"rgba(255,130,130,0.9)",letterSpacing:0.3,transition:"all 0.15s"}}>Clear all</button>}
+              <button onClick={()=>setNotifsOpen(false)} title="Close" style={{width:26,height:26,borderRadius:7,background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.06)",cursor:"pointer",color:"rgba(255,255,255,0.5)",fontSize:12,display:"flex",alignItems:"center",justifyContent:"center",padding:0,transition:"all 0.15s"}}>✕</button>
             </div>
-            <div style={{flex:1,overflowY:"auto",minHeight:0,padding:"8px"}}>
+            <div style={{flex:1,overflowY:"auto",minHeight:0,padding:"10px"}}>
               {notifications.length===0 ? (
-                <div style={{textAlign:"center",padding:"40px 20px",color:"rgba(255,255,255,0.3)",fontStyle:"italic",fontSize:12,fontFamily:FF}}>
-                  No notifications yet.<br/><span style={{fontSize:10,opacity:0.65}}>NWS alerts and other important events will appear here.</span>
+                <div style={{textAlign:"center",padding:"60px 24px",color:"rgba(255,255,255,0.35)",fontFamily:FF}}>
+                  <div style={{fontSize:40,opacity:0.5,marginBottom:14,filter:"drop-shadow(0 0 16px "+AC+"33)"}}>🔕</div>
+                  <div style={{fontFamily:FFB,fontWeight:600,fontSize:13,color:"rgba(255,255,255,0.55)",marginBottom:5}}>All caught up</div>
+                  <div style={{fontSize:11,color:"rgba(255,255,255,0.35)",lineHeight:1.55,maxWidth:240,margin:"0 auto"}}>NWS alerts and other important events will appear here when they happen.</div>
                 </div>
               ) : notifications.map(n=>{
                 const kindColor = n.kind==="alert"?"#ff8b8b":n.kind==="warning"?"#ffcc66":n.kind==="success"?"#4cef90":AC;
@@ -1122,15 +1139,26 @@ export default function NovaOS(){
                 const age = Date.now()-n.ts;
                 const ageStr = age<60000?"just now":age<3600000?Math.floor(age/60000)+"m ago":age<86400000?Math.floor(age/3600000)+"h ago":new Date(n.ts).toLocaleDateString();
                 return(
-                  <div key={n.id} style={{padding:"11px 13px",marginBottom:5,background:n.read?"rgba(255,255,255,0.025)":"rgba(255,255,255,0.06)",border:"1px solid "+(n.read?"rgba(255,255,255,0.05)":"rgba(255,255,255,0.1)"),borderRadius:8,position:"relative"}}>
-                    <div style={{display:"flex",alignItems:"flex-start",gap:8}}>
-                      <span style={{color:kindColor,fontSize:13,lineHeight:1.4,flexShrink:0}}>{kindIcon}</span>
+                  <div key={n.id} style={{
+                    padding:"12px 14px 12px 14px",
+                    marginBottom:6,
+                    background:n.read?"rgba(255,255,255,0.025)":"linear-gradient(135deg, rgba(255,255,255,0.07), rgba(255,255,255,0.04))",
+                    border:"1px solid "+(n.read?"rgba(255,255,255,0.05)":"rgba(255,255,255,0.11)"),
+                    borderLeft:"3px solid "+(n.read?"rgba(255,255,255,0.1)":kindColor),
+                    borderRadius:10,
+                    position:"relative",
+                    transition:"background 0.18s",
+                  }}>
+                    <div style={{display:"flex",alignItems:"flex-start",gap:10}}>
+                      <span style={{color:kindColor,fontSize:14,lineHeight:1.4,flexShrink:0,filter:n.read?"none":"drop-shadow(0 0 6px "+kindColor+"55)"}}>{kindIcon}</span>
                       <div style={{flex:1,minWidth:0}}>
-                        <div style={{fontFamily:FFB,fontWeight:600,fontSize:12,color:n.read?"rgba(255,255,255,0.78)":"#fff",lineHeight:1.4}}>{n.title}</div>
-                        {n.body && <div style={{fontSize:11,color:"rgba(255,255,255,0.55)",marginTop:3,lineHeight:1.5,wordBreak:"break-word"}}>{n.body}</div>}
-                        <div style={{fontSize:10,fontFamily:FFM,color:"rgba(255,255,255,0.3)",marginTop:5}}>{ageStr}</div>
+                        <div style={{fontFamily:FFB,fontWeight:600,fontSize:12.5,color:n.read?"rgba(255,255,255,0.78)":"#fff",lineHeight:1.4,letterSpacing:0.1}}>{n.title}</div>
+                        {n.body && <div style={{fontSize:11,color:"rgba(255,255,255,0.6)",marginTop:4,lineHeight:1.55,wordBreak:"break-word"}}>{n.body}</div>}
+                        <div style={{fontSize:10,fontFamily:FFM,color:"rgba(255,255,255,0.32)",marginTop:6,letterSpacing:0.2}}>{ageStr}</div>
                       </div>
-                      <button onClick={()=>dismissNotification(n.id)} style={{background:"none",border:"none",cursor:"pointer",color:"rgba(255,255,255,0.3)",fontSize:11,padding:"2px 5px",lineHeight:1,flexShrink:0}}>✕</button>
+                      <button onClick={()=>dismissNotification(n.id)} title="Dismiss" style={{background:"transparent",border:"none",cursor:"pointer",color:"rgba(255,255,255,0.32)",fontSize:11,padding:"3px 6px",lineHeight:1,flexShrink:0,borderRadius:5,transition:"background 0.15s, color 0.15s"}}
+                        onMouseEnter={e=>{e.currentTarget.style.background="rgba(255,80,80,0.12)";e.currentTarget.style.color="rgba(255,130,130,0.9)";}}
+                        onMouseLeave={e=>{e.currentTarget.style.background="transparent";e.currentTarget.style.color="rgba(255,255,255,0.32)";}}>✕</button>
                     </div>
                   </div>
                 );

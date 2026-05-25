@@ -71,6 +71,45 @@ function AuroraBg() {
   );
 }
 
+// v8.0 — Prism: holographic shimmer. Soft rainbow gradient swept across the
+// canvas with overlapping blurry color blobs to mimic the look of light
+// refracting through cut glass. Designed for the new v8.0 chrome — feels
+// fresh and modern without overwhelming the foreground.
+function PrismBg() {
+  return (
+    <svg style={{position:"absolute",inset:0,width:"100%",height:"100%"}} viewBox="0 0 1440 900" preserveAspectRatio="xMidYMid slice">
+      <defs>
+        {/* Base sweep — pink → violet → cyan → green diagonal */}
+        <linearGradient id="prismSweep" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%"   stopColor="#ff7eb6"/>
+          <stop offset="22%"  stopColor="#c084fc"/>
+          <stop offset="45%"  stopColor="#7c83fd"/>
+          <stop offset="65%"  stopColor="#3ec5ff"/>
+          <stop offset="85%"  stopColor="#5fe3c4"/>
+          <stop offset="100%" stopColor="#d4ff80"/>
+        </linearGradient>
+        <radialGradient id="prismBlob1" cx="20%" cy="20%" r="55%"><stop offset="0%" stopColor="#ff5e93" stopOpacity="0.75"/><stop offset="100%" stopColor="#ff5e93" stopOpacity="0"/></radialGradient>
+        <radialGradient id="prismBlob2" cx="80%" cy="30%" r="50%"><stop offset="0%" stopColor="#7b3eff" stopOpacity="0.55"/><stop offset="100%" stopColor="#7b3eff" stopOpacity="0"/></radialGradient>
+        <radialGradient id="prismBlob3" cx="65%" cy="85%" r="55%"><stop offset="0%" stopColor="#22d3ee" stopOpacity="0.6"/><stop offset="100%" stopColor="#22d3ee" stopOpacity="0"/></radialGradient>
+        <radialGradient id="prismBlob4" cx="15%" cy="80%" r="40%"><stop offset="0%" stopColor="#4cef90" stopOpacity="0.45"/><stop offset="100%" stopColor="#4cef90" stopOpacity="0"/></radialGradient>
+        {/* Heavy blur on the blob layer creates the soft holographic look */}
+        <filter id="prismBlur"><feGaussianBlur stdDeviation="70"/></filter>
+        {/* Final vignette for depth */}
+        <radialGradient id="prismVign" cx="50%" cy="50%" r="80%"><stop offset="55%" stopColor="#000" stopOpacity="0"/><stop offset="100%" stopColor="#000" stopOpacity="0.4"/></radialGradient>
+      </defs>
+      <rect width="1440" height="900" fill="#1a0a2a"/>
+      <rect width="1440" height="900" fill="url(#prismSweep)" opacity="0.55"/>
+      <g filter="url(#prismBlur)">
+        <rect width="1440" height="900" fill="url(#prismBlob1)"/>
+        <rect width="1440" height="900" fill="url(#prismBlob2)"/>
+        <rect width="1440" height="900" fill="url(#prismBlob3)"/>
+        <rect width="1440" height="900" fill="url(#prismBlob4)"/>
+      </g>
+      <rect width="1440" height="900" fill="url(#prismVign)"/>
+    </svg>
+  );
+}
+
 // Mesh: clean, modern multi-blob gradient. Designed to feel like the
 // landing-page wallpapers of Linear/Vercel/Stripe — minimal, premium,
 // large soft color fields without busy texture. Added in 5.2, default in 5.2+.
@@ -112,6 +151,7 @@ export function Wallpaper({ id, customUrl }) {
   if (id === "aurora")       return <AuroraBg/>;
   if (id === "nova")         return <NovaBg/>;
   if (id === "bliss")        return <BlissBg/>;
+  if (id === "prism")        return <PrismBg/>;
   const wp = WALLPAPERS[id];
   if (wp && wp.grad) {
     return <div style={{position:"absolute",inset:0,background:wp.grad}}/>;

@@ -120,6 +120,12 @@ const SOUND_WALLPAPER_LS_KEY = "nova-sound-wallpaper";
 // this module stays a pure leaf with no circular import risk.
 const WALLPAPER_SEMITONES = {
   mesh:   0,
+  // v8.0 additions
+  prism:  6,
+  glass:  4,
+  solar: -2,
+  mono:   1,
+  velvet:-1,
   // v7.0 additions
   lumen: -1,
   drift:  8,
@@ -301,6 +307,56 @@ const SOUND_RECIPES = {
   // Tiny click for buttons/menus — very short, very quiet
   click: (ctx, t, v, r) => {
     _scheduleNote(ctx, 1567.98 * r, t + 0.00, 30, 0.06 * v, "triangle");
+  },
+
+  // ── v8.0 sound additions ──────────────────────────────────────────────
+  // Designed to plug into existing UI moments — success/error existed but
+  // are tied to specific message kinds; these give us more granular voicing
+  // for chat messages, focus mode, attention pulls, and triumphant moments.
+
+  // "success" — bright affirmative chord (C major triad + octave sparkle).
+  // Used by completed-action moments (file saved, settings applied, etc.).
+  // Longer/richer than `login` so it carries more weight as a "done!" cue.
+  success: (ctx, t, v, r) => {
+    _bell(ctx, t + 0.00, 523.25 * r, 320, 0.16 * v);  // C5
+    _bell(ctx, t + 0.06, 659.25 * r, 340, 0.16 * v);  // E5
+    _bell(ctx, t + 0.12, 783.99 * r, 380, 0.18 * v);  // G5
+    _bell(ctx, t + 0.20, 1046.50 * r, 480, 0.14 * v); // C6 — sparkle on top
+  },
+
+  // "message" — soft two-note pop for chat / DM arrivals. E5 → A5 minor third
+  // step has a friendly, attention-without-alarm character.
+  message: (ctx, t, v, r) => {
+    _shimmer(ctx, t + 0.00, 659.25 * r, 220, 0.13 * v); // E5
+    _shimmer(ctx, t + 0.07, 880.00 * r, 280, 0.14 * v); // A5
+  },
+
+  // "focus" — calm tone for entering fullscreen / focus mode. Single low
+  // shimmer with a fifth above it; settles the listener rather than
+  // exciting them. Sounds "ready to concentrate."
+  focus: (ctx, t, v, r) => {
+    _scheduleNote(ctx, 196.00 * r, t + 0.00, 700, 0.09 * v, "triangle"); // G3 body
+    _shimmer(ctx, t + 0.05, 392.00 * r, 520, 0.10 * v);                  // G4
+    _shimmer(ctx, t + 0.15, 587.33 * r, 480, 0.08 * v);                  // D5 fifth
+  },
+
+  // "alert" — attention pull that's NOT an error. Used for important
+  // notifications (e.g. NWS alerts, mod actions). Two short bells with a
+  // slight pitch rise — feels purposeful, not alarming.
+  alert: (ctx, t, v, r) => {
+    _bell(ctx, t + 0.00, 440.00 * r, 280, 0.18 * v); // A4
+    _bell(ctx, t + 0.18, 554.37 * r, 320, 0.20 * v); // C#5 — minor third up
+  },
+
+  // "achievement" — triumphant 4-note rising arpeggio. Reserved for
+  // milestone moments (high-score beat, level-up in games, etc.) — long
+  // and clearly celebratory so it feels earned rather than routine.
+  achievement: (ctx, t, v, r) => {
+    _bell(ctx, t + 0.00, 392.00 * r, 320, 0.15 * v);  // G4
+    _bell(ctx, t + 0.10, 523.25 * r, 320, 0.16 * v);  // C5
+    _bell(ctx, t + 0.20, 659.25 * r, 380, 0.18 * v);  // E5
+    _bell(ctx, t + 0.32, 783.99 * r, 560, 0.20 * v);  // G5 — held final
+    _shimmer(ctx, t + 0.40, 1567.98 * r, 320, 0.08 * v); // G6 sparkle
   },
 };
 

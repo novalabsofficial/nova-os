@@ -21,25 +21,29 @@ export function ContextMenu({ x, y, items, onClose, AC }) {
     };
   }, [onClose]);
 
-  const W = 200;
-  // Each item ~36px + dividers/padding. Conservative for edge-clamping.
-  const H = items.reduce((acc, i) => acc + (i.type === "divider" ? 9 : 36), 12);
+  // v8.0 — slightly wider for tidier item layout, richer glass effect,
+  // multi-layer shadow, larger border radius (matches the new chrome).
+  const W = 210;
+  const H = items.reduce((acc, i) => acc + (i.type === "divider" ? 9 : 36), 14);
   const ax = Math.max(8, Math.min(x, window.innerWidth - W - 8));
   const ay = Math.max(8, Math.min(y, window.innerHeight - H - 8));
 
   return (
     <div ref={ref} style={{
       position: "fixed", left: ax, top: ay, width: W, zIndex: 99999,
-      background: "rgba(9,11,24,0.97)", backdropFilter: "blur(24px)",
-      border: "1px solid rgba(255,255,255,0.1)", borderRadius: 9,
-      boxShadow: "0 18px 50px rgba(0,0,0,0.5)",
-      padding: "5px 4px",
-      animation: "menu-up 0.18s cubic-bezier(0.4,0,0.2,1)",
+      background: "linear-gradient(180deg, rgba(15,17,32,0.96) 0%, rgba(10,12,24,0.96) 100%)",
+      backdropFilter: "blur(32px) saturate(180%)",
+      WebkitBackdropFilter: "blur(32px) saturate(180%)",
+      border: "1px solid rgba(255,255,255,0.1)",
+      borderRadius: 11,
+      boxShadow: "0 4px 8px rgba(0,0,0,0.3), 0 22px 60px rgba(0,0,0,0.55), 0 1px 0 rgba(255,255,255,0.08) inset",
+      padding: "6px 5px",
+      animation: "menu-up 0.2s cubic-bezier(0.16,1,0.3,1)",
       fontFamily: FF,
     }}>
       {items.map((it, i) => {
         if (it.type === "divider") {
-          return <div key={i} style={{height: 1, background: "rgba(255,255,255,0.07)", margin: "4px 6px"}}/>;
+          return <div key={i} style={{height: 1, background: "rgba(255,255,255,0.07)", margin: "5px 8px"}}/>;
         }
         const danger = !!it.danger;
         const disabled = !!it.disabled;
@@ -47,19 +51,42 @@ export function ContextMenu({ x, y, items, onClose, AC }) {
           <div key={i}
             onClick={disabled ? undefined : () => { try { it.onClick(); } catch {} onClose(); }}
             style={{
-              padding: "7px 11px", borderRadius: 6, cursor: disabled ? "default" : "pointer",
-              fontSize: 12, color: disabled ? "rgba(255,255,255,0.3)" : danger ? "rgba(255,130,130,0.9)" : "rgba(255,255,255,0.85)",
-              display: "flex", alignItems: "center", gap: 9, opacity: disabled ? 0.5 : 1,
-              transition: "background 0.12s",
+              padding: "8px 12px", borderRadius: 7, cursor: disabled ? "default" : "pointer",
+              fontSize: 12, fontWeight: 500,
+              color: disabled ? "rgba(255,255,255,0.3)" : danger ? "rgba(255,130,130,0.92)" : "rgba(255,255,255,0.88)",
+              display: "flex", alignItems: "center", gap: 10, opacity: disabled ? 0.5 : 1,
+              transition: "background 0.15s, color 0.15s",
+              letterSpacing: 0.1,
             }}
-            onPointerEnter={e => { if (!disabled) e.currentTarget.style.background = danger ? "rgba(255,80,80,0.12)" : "rgba(255,255,255,0.07)"; }}
-            onPointerLeave={e => { e.currentTarget.style.background = "transparent"; }}>
-            {it.icon && <span style={{width: 16, textAlign: "center", fontSize: 13, opacity: 0.85}}>{it.icon}</span>}
+            onPointerEnter={e => {
+              if (disabled) return;
+              e.currentTarget.style.background = danger ? "rgba(255,80,80,0.14)" : "rgba("+hexAccent(AC)+",0.18)";
+              if (!danger) e.currentTarget.style.color = AC || "#fff";
+            }}
+            onPointerLeave={e => {
+              e.currentTarget.style.background = "transparent";
+              e.currentTarget.style.color = danger ? "rgba(255,130,130,0.92)" : "rgba(255,255,255,0.88)";
+            }}>
+            {it.icon && <span style={{width: 18, textAlign: "center", fontSize: 13, opacity: 0.9, flexShrink: 0}}>{it.icon}</span>}
             <span style={{flex: 1}}>{it.label}</span>
-            {it.shortcut && <span style={{fontSize: 10, fontFamily: FFM, color: "rgba(255,255,255,0.3)"}}>{it.shortcut}</span>}
+            {it.shortcut && <span style={{fontSize: 10, fontFamily: FFM, color: "rgba(255,255,255,0.3)", letterSpacing: 0.2}}>{it.shortcut}</span>}
           </div>
         );
       })}
     </div>
   );
+}
+
+// Tiny inline hex → rgb so context menu items can tint with the current
+// accent color on hover without importing format.js (keeps this module
+// self-contained — it was already a leaf).
+function hexAccent(hex) {
+  if (typeof hex !== "string") return "255,255,255";
+  const h = hex.replace("#", "");
+  if (h.length !== 6) return "255,255,255";
+  const r = parseInt(h.slice(0,2), 16);
+  const g = parseInt(h.slice(2,4), 16);
+  const b = parseInt(h.slice(4,6), 16);
+  if ([r,g,b].some(n => Number.isNaN(n))) return "255,255,255";
+  return r + "," + g + "," + b;
 }

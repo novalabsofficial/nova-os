@@ -91,7 +91,7 @@ export function SettingsApp({user,data,updateSettings,showToast,AC,onCustomWallp
         <span style={{fontSize:11,fontFamily:FFM,color:"rgba(255,255,255,0.4)",width:32}}>{Math.round(soundCfg.volume*100)}%</span>
       </div>
       <div style={{display:"flex",flexWrap:"wrap",gap:5,marginBottom:22,opacity:soundCfg.enabled?1:0.4}}>
-        {["startup","login","logout","notification","appLaunch","windowOpen","windowClose","toast","error"].map(s=>(
+        {["startup","login","logout","notification","appLaunch","windowOpen","windowClose","toast","error","success","message","focus","alert","achievement","click"].map(s=>(
           <button key={s} onClick={()=>playSound(s)} style={{padding:"4px 10px",background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:6,cursor:"pointer",fontFamily:FFM,fontWeight:500,fontSize:10,color:"rgba(255,255,255,0.55)"}}>▶ {s}</button>
         ))}
       </div>
