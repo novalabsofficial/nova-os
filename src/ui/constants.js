@@ -51,6 +51,8 @@ export const DEFAULT_SIZES = {
   invaders:{w:520,h:680},
   pacman:{w:520,h:680},
   chess:{w:740,h:680},
+  // v8.0 round-3
+  photos:{w:760,h:600},
 };
 
 // The master app list — drives the desktop, start menu, and store icons.
@@ -86,6 +88,8 @@ export const APPS = [
   {id:"invaders",   icon:"👾",label:"Space Invaders", desc:"Shoot the descending aliens"},
   {id:"pacman",     icon:"🟡",label:"Pac-Man",     desc:"Pellets, ghosts, classic maze"},
   {id:"chess",      icon:"♟️",label:"Chess",       desc:"Online multiplayer vs other Nova users"},
+  // v8.0
+  {id:"photos",     icon:"📷",label:"Photos",      desc:"Browse photos from your device"},
 ];
 
 // Curated catalog of external apps shown in the Store's "Official" tab.
@@ -155,6 +159,11 @@ export const WALLPAPERS = {
   // Prism is SVG-backed (renders the holographic shimmer cleanly at any size);
   // the others are pure CSS gradients so they're zero-cost to render. Each
   // got a hand-picked `semitones` transpose so the system chime fits the mood.
+  //
+  // Azure (sixth) added in the round-3 pass: a clean photo-real-feeling blue
+  // designed to feel like a "stock OS" wallpaper. Could pass for a default
+  // shipped with Windows 11 or macOS Monterey.
+  azure:    {name:"Azure",     semitones: 0,  preview:"radial-gradient(ellipse at 22% 28%,#5da7ff 0%,transparent 50%),radial-gradient(ellipse at 78% 80%,#1e4a8a 0%,transparent 55%),linear-gradient(155deg,#0a1f3a 0%,#0e2e5c 35%,#1656a8 75%,#2178d8 100%)"},
   prism:    {name:"Prism",     semitones: 6,  preview:"linear-gradient(135deg,#ff6b9d 0%,#a855f7 25%,#3b82f6 50%,#06b6d4 75%,#4cef90 100%)"},
   glass:    {name:"Glass",     semitones: 4,  preview:"radial-gradient(ellipse at 30% 25%,rgba(173,216,255,0.7) 0%,transparent 45%),radial-gradient(ellipse at 75% 80%,rgba(125,206,232,0.55) 0%,transparent 50%),linear-gradient(135deg,#1a3450 0%,#0a1c30 100%)",  grad:"radial-gradient(ellipse at 25% 22%,rgba(180,220,255,0.32) 0%,transparent 55%),radial-gradient(ellipse at 78% 75%,rgba(120,180,220,0.28) 0%,transparent 60%),radial-gradient(ellipse at 55% 50%,rgba(200,230,250,0.14) 0%,transparent 70%),linear-gradient(140deg,#142a44 0%,#0d1f33 45%,#081424 100%)"},
   solar:    {name:"Solar",     semitones:-2,  preview:"radial-gradient(ellipse at 50% 100%,#ffd089 0%,#ff7e3f 22%,#c02948 55%,#3a0d3a 90%)", grad:"radial-gradient(ellipse at 50% 110%,#ffe4a8 0%,#ffb05c 14%,#ff7038 28%,#d63149 50%,#7a1845 72%,#2a0826 92%,#0d0314 100%)"},
@@ -192,6 +201,8 @@ export const HAS_SVG_ICON = new Set([
   "minesweeper","wordle","tetris",
   // 5.2
   "novaai",
+  // v8.0 round-3: icons for the v7.4 games + new Photos app
+  "tictactoe","pong","flappy","invaders","pacman","chess","photos",
 ]);
 
 // Window resize handle definitions (thin for mouse, fat for touch).

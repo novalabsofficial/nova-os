@@ -71,6 +71,87 @@ function AuroraBg() {
   );
 }
 
+// v8.0 — Azure: a clean blue wallpaper designed to feel like the kind that
+// ships preinstalled with Windows 11 or macOS Monterey. Layered abstraction:
+//   • Deep navy base + gradient sweep
+//   • Two large soft light blobs (top-left bright, bottom-right deep)
+//   • Curved aurora-like ribbon flowing across the canvas — gives it the
+//     "designer wallpaper" quality without ever leaving cool blue territory
+//   • Subtle starfield for depth (no rainbow speckles — kept restrained)
+function AzureBg() {
+  return (
+    <svg style={{position:"absolute",inset:0,width:"100%",height:"100%"}} viewBox="0 0 1440 900" preserveAspectRatio="xMidYMid slice">
+      <defs>
+        {/* Base gradient — deep navy at top fading to a brighter blue */}
+        <linearGradient id="azBase" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%"   stopColor="#0a1c38"/>
+          <stop offset="40%"  stopColor="#0e2e5c"/>
+          <stop offset="80%"  stopColor="#1656a8"/>
+          <stop offset="100%" stopColor="#1f6dcc"/>
+        </linearGradient>
+        {/* Top-left brightening — like a high-key sun */}
+        <radialGradient id="azBlob1" cx="22%" cy="28%" r="55%">
+          <stop offset="0%"   stopColor="#8ec3ff" stopOpacity="0.55"/>
+          <stop offset="60%"  stopColor="#4d8bd9" stopOpacity="0.18"/>
+          <stop offset="100%" stopColor="#0a1c38" stopOpacity="0"/>
+        </radialGradient>
+        {/* Bottom-right cool deepening */}
+        <radialGradient id="azBlob2" cx="80%" cy="82%" r="55%">
+          <stop offset="0%"   stopColor="#1e4a8a" stopOpacity="0.7"/>
+          <stop offset="100%" stopColor="#0a1c38" stopOpacity="0"/>
+        </radialGradient>
+        {/* Subtle aurora ribbon */}
+        <linearGradient id="azRibbon" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%"   stopColor="#7ec0ff" stopOpacity="0"/>
+          <stop offset="50%"  stopColor="#a8d3ff" stopOpacity="0.32"/>
+          <stop offset="100%" stopColor="#7ec0ff" stopOpacity="0"/>
+        </linearGradient>
+        <filter id="azBlur"><feGaussianBlur stdDeviation="50"/></filter>
+        <filter id="azBlurLight"><feGaussianBlur stdDeviation="22"/></filter>
+        {/* Slight vignette — pulls the eye toward the center */}
+        <radialGradient id="azVign" cx="50%" cy="50%" r="80%">
+          <stop offset="55%" stopColor="#000" stopOpacity="0"/>
+          <stop offset="100%" stopColor="#000" stopOpacity="0.32"/>
+        </radialGradient>
+      </defs>
+
+      {/* Layer 1: base gradient */}
+      <rect width="1440" height="900" fill="url(#azBase)"/>
+
+      {/* Layer 2: soft light/dark blobs */}
+      <g filter="url(#azBlur)">
+        <rect width="1440" height="900" fill="url(#azBlob1)"/>
+        <rect width="1440" height="900" fill="url(#azBlob2)"/>
+      </g>
+
+      {/* Layer 3: aurora ribbon flowing diagonally — gives the wallpaper its
+          signature curved-light feel without being too busy. Two passes so the
+          ribbon has both a wide soft glow and a tighter bright core. */}
+      <g filter="url(#azBlur)">
+        <path d="M -100 620 Q 360 420 720 540 Q 1080 660 1540 460 L 1540 720 Q 1080 880 720 760 Q 360 640 -100 820 Z"
+              fill="url(#azRibbon)" opacity="0.85"/>
+      </g>
+      <g filter="url(#azBlurLight)">
+        <path d="M -50 600 Q 360 460 720 560 Q 1080 660 1490 480 L 1490 600 Q 1080 760 720 660 Q 360 580 -50 720 Z"
+              fill="url(#azRibbon)" opacity="0.5"/>
+      </g>
+
+      {/* Layer 4: subtle restrained starfield. Only a few, only small — this
+          isn't a "space" wallpaper, just adds the slightest texture to dark
+          regions so the background doesn't look like dead vinyl. */}
+      {[...Array(28)].map((_, i) => {
+        const x = (i*167.3+71)%1440, y = (i*89.7+23)%480;  // top half only
+        const r = i%5===0 ? 1.2 : 0.6;
+        const op = 0.22 + (i%3)*0.08;
+        return <circle key={i} cx={x} cy={y} r={r} fill={"rgba(220,240,255,"+op+")"}/>;
+      })}
+
+      {/* Layer 5: vignette */}
+      <rect width="1440" height="900" fill="url(#azVign)"/>
+    </svg>
+  );
+}
+
 // v8.0 — Prism: holographic shimmer. Soft rainbow gradient swept across the
 // canvas with overlapping blurry color blobs to mimic the look of light
 // refracting through cut glass. Designed for the new v8.0 chrome — feels
@@ -151,6 +232,7 @@ export function Wallpaper({ id, customUrl }) {
   if (id === "aurora")       return <AuroraBg/>;
   if (id === "nova")         return <NovaBg/>;
   if (id === "bliss")        return <BlissBg/>;
+  if (id === "azure")        return <AzureBg/>;
   if (id === "prism")        return <PrismBg/>;
   const wp = WALLPAPERS[id];
   if (wp && wp.grad) {

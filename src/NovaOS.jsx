@@ -36,7 +36,7 @@ import {
   WALLPAPERS, WMO, HAS_SVG_ICON, NOVA_VERSION,
 } from "./ui/constants.js";
 import { Wallpaper, NovaBg, BlissBg, AuroraBg, MeshBg } from "./ui/wallpapers.jsx";
-import { NovaSvgIcon, StoreIcon, AppIconDisplay, NovaLogo } from "./ui/icons.jsx";
+import { NovaSvgIcon, StoreIcon, AppIconDisplay, NovaLogo, WindowControlIcon } from "./ui/icons.jsx";
 import { Toggle } from "./ui/Toggle.jsx";
 import { BrowserNav } from "./ui/BrowserNav.jsx";
 import { ResizeHandles } from "./ui/ResizeHandles.jsx";
@@ -82,6 +82,8 @@ const FlappyBirdApp   = lazy(() => import("./apps/FlappyBirdApp.jsx").then(m   =
 const SpaceInvadersApp= lazy(() => import("./apps/SpaceInvadersApp.jsx").then(m=> ({default: m.SpaceInvadersApp})));
 const PacManApp       = lazy(() => import("./apps/PacManApp.jsx").then(m       => ({default: m.PacManApp})));
 const ChessApp        = lazy(() => import("./apps/ChessApp.jsx").then(m        => ({default: m.ChessApp})));
+// v8.0 round-3
+const PhotosApp       = lazy(() => import("./apps/PhotosApp.jsx").then(m       => ({default: m.PhotosApp})));
 
  
 // ─── ROOT ─────────────────────────────────────────────────────────────────────
@@ -936,13 +938,20 @@ export default function NovaOS(){
             <div onPointerDown={e=>!isMax&&startDrag(e,win.id)} style={{height:40,display:"flex",alignItems:"center",padding:"0 6px 0 14px",gap:10,background:"linear-gradient(180deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.02) 100%)",borderBottom:"1px solid rgba(255,255,255,0.06)",borderRadius:isMax?"0":winRadius+"px "+winRadius+"px 0 0",cursor:isMax?"default":isDrg?"grabbing":"grab",userSelect:"none",flexShrink:0,touchAction:"none"}}>
               <div style={{display:"flex",alignItems:"center",justifyContent:"center"}}><AppIconDisplay app={{id:win.app,icon:app?.icon||"📦"}} size={18}/></div>
               <span style={{flex:1,fontFamily:FFB,fontWeight:600,fontSize:13,color:"rgba(255,255,255,0.92)",letterSpacing:0.2}}>{app?.label}</span>
-              {/* v8.0 — window controls grouped into a soft cluster. Hover
-                  effects are CSS-driven via the .wn/.wm/.wx classes; the
-                  close button gets a red bg, others a subtle lift. */}
+              {/* v8.0 round 3 — proper SVG window controls. Unicode glyphs
+                  rendered inconsistently across platforms and weren't pixel-
+                  aligned within their hit boxes. Now stroke-based icons that
+                  inherit the button color via currentColor. */}
               <div style={{display:"flex",alignItems:"center",gap:2,padding:2,borderRadius:9}}>
-                <button className="wn" onPointerDown={e=>e.stopPropagation()} onClick={e=>{e.stopPropagation();minimizeWin(win.id);}} title="Minimize" style={{width:26,height:26,borderRadius:7,background:"transparent",border:"1px solid transparent",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,color:"rgba(255,255,255,0.55)",flexShrink:0,padding:0,lineHeight:1}}>—</button>
-                <button className="wm" onPointerDown={e=>e.stopPropagation()} onClick={e=>{e.stopPropagation();maximizeWin(win.id);}} title={isMax?"Restore":"Maximize"} style={{width:26,height:26,borderRadius:7,background:"transparent",border:"1px solid transparent",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,color:"rgba(255,255,255,0.55)",flexShrink:0,padding:0}}>{isMax?"❐":"⬜"}</button>
-                <button className="wx" onPointerDown={e=>e.stopPropagation()} onClick={e=>{e.stopPropagation();closeWin(win.id);}} title="Close" style={{width:26,height:26,borderRadius:7,background:"transparent",border:"1px solid transparent",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,color:"rgba(255,255,255,0.55)",flexShrink:0,padding:0}}>✕</button>
+                <button className="wn" onPointerDown={e=>e.stopPropagation()} onClick={e=>{e.stopPropagation();minimizeWin(win.id);}} title="Minimize" style={{width:28,height:28,borderRadius:7,background:"transparent",border:"1px solid transparent",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",color:"rgba(255,255,255,0.62)",flexShrink:0,padding:0}}>
+                  <WindowControlIcon type="minimize" size={11}/>
+                </button>
+                <button className="wm" onPointerDown={e=>e.stopPropagation()} onClick={e=>{e.stopPropagation();maximizeWin(win.id);}} title={isMax?"Restore":"Maximize"} style={{width:28,height:28,borderRadius:7,background:"transparent",border:"1px solid transparent",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",color:"rgba(255,255,255,0.62)",flexShrink:0,padding:0}}>
+                  <WindowControlIcon type={isMax?"restore":"maximize"} size={11}/>
+                </button>
+                <button className="wx" onPointerDown={e=>e.stopPropagation()} onClick={e=>{e.stopPropagation();closeWin(win.id);}} title="Close" style={{width:28,height:28,borderRadius:7,background:"transparent",border:"1px solid transparent",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",color:"rgba(255,255,255,0.62)",flexShrink:0,padding:0}}>
+                  <WindowControlIcon type="close" size={11}/>
+                </button>
               </div>
             </div>
             <div style={{flex:1,overflowY:"auto",overflowX:"hidden",padding:20,minWidth:0}}>
@@ -985,6 +994,8 @@ export default function NovaOS(){
                 {win.app==="invaders"   &&<SpaceInvadersApp AC={AC} data={data} updateSettings={updateSettings}/>}
                 {win.app==="pacman"     &&<PacManApp AC={AC} data={data} updateSettings={updateSettings}/>}
                 {win.app==="chess"      &&<ChessApp user={user} AC={AC}/>}
+                {/* v8.0 round-3 */}
+                {win.app==="photos"     &&<PhotosApp AC={AC} showToast={showToast}/>}
               </Suspense>
             </div>
           </div>
