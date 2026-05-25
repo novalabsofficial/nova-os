@@ -166,6 +166,12 @@ export const WALLPAPERS = {
   // four soft color fields, heavy blur, vignette — but a clearly distinct
   // mood. Designed as a "premium dark" companion to Mesh's "vibrant dark".
   halcyon:  {name:"Halcyon",   semitones: 2,  preview:"radial-gradient(ellipse at 22% 25%,#fb7185 0%,transparent 50%),radial-gradient(ellipse at 78% 28%,#818cf8 0%,transparent 50%),radial-gradient(ellipse at 30% 82%,#5eead4 0%,transparent 50%),radial-gradient(ellipse at 75% 80%,#fbbf24 0%,transparent 45%),linear-gradient(135deg,#0c0a1a,#08071a)"},
+  // Cascade: a macOS-Big-Sur-style wallpaper made of flowing curved ridges
+  // stacked over a sky, recolored to Mesh's exact palette in Mesh's exact
+  // order — indigo sky, pink/cyan/purple/amber ridges from back to front.
+  // Each layer is a vertical gradient (lighter at the top crest, darker
+  // toward the base) so the ridges have real depth.
+  cascade:  {name:"Cascade",   semitones: 4,  preview:"linear-gradient(180deg,#6366f1 0%,#6366f1 35%,#ec4899 38%,#ec4899 50%,#06b6d4 53%,#06b6d4 65%,#a855f7 68%,#a855f7 80%,#f59e0b 83%,#f59e0b 100%)"},
   prism:    {name:"Prism",     semitones: 6,  preview:"linear-gradient(135deg,#ff6b9d 0%,#a855f7 25%,#3b82f6 50%,#06b6d4 75%,#4cef90 100%)"},
   glass:    {name:"Glass",     semitones: 4,  preview:"radial-gradient(ellipse at 30% 25%,rgba(173,216,255,0.7) 0%,transparent 45%),radial-gradient(ellipse at 75% 80%,rgba(125,206,232,0.55) 0%,transparent 50%),linear-gradient(135deg,#1a3450 0%,#0a1c30 100%)",  grad:"radial-gradient(ellipse at 25% 22%,rgba(180,220,255,0.32) 0%,transparent 55%),radial-gradient(ellipse at 78% 75%,rgba(120,180,220,0.28) 0%,transparent 60%),radial-gradient(ellipse at 55% 50%,rgba(200,230,250,0.14) 0%,transparent 70%),linear-gradient(140deg,#142a44 0%,#0d1f33 45%,#081424 100%)"},
   solar:    {name:"Solar",     semitones:-2,  preview:"radial-gradient(ellipse at 50% 100%,#ffd089 0%,#ff7e3f 22%,#c02948 55%,#3a0d3a 90%)", grad:"radial-gradient(ellipse at 50% 110%,#ffe4a8 0%,#ffb05c 14%,#ff7038 28%,#d63149 50%,#7a1845 72%,#2a0826 92%,#0d0314 100%)"},

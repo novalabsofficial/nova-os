@@ -122,6 +122,7 @@ const WALLPAPER_SEMITONES = {
   mesh:   0,
   // v8.0 additions
   halcyon: 2,
+  cascade: 4,
   prism:  6,
   glass:  4,
   solar: -2,

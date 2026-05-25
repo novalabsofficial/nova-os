@@ -71,6 +71,99 @@ function AuroraBg() {
   );
 }
 
+// v8.0 — Cascade: macOS-Big-Sur-style flowing ridges layered over a sky,
+// colored in Mesh's exact palette and order. Each ridge is a wavy curved
+// path filled with a vertical gradient (lighter at the crest, darker at
+// the base) so the layers have depth like real Big Sur mountains. Curves
+// are smooth cubic beziers rather than the simpler quadratics so the
+// ridges flow with natural variation.
+//
+// Mesh color order (back to front):
+//   1. Indigo  #6366f1  — sky
+//   2. Pink    #ec4899  — distant ridge
+//   3. Cyan    #06b6d4  — mid ridge
+//   4. Purple  #a855f7  — closer ridge
+//   5. Amber   #f59e0b  — foreground mountain
+function CascadeBg() {
+  return (
+    <svg style={{position:"absolute",inset:0,width:"100%",height:"100%"}} viewBox="0 0 1440 900" preserveAspectRatio="xMidYMid slice">
+      <defs>
+        {/* Sky — indigo, slightly lighter at top, deeper at horizon */}
+        <linearGradient id="cas-sky" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%"   stopColor="#a5b4fc"/>
+          <stop offset="40%"  stopColor="#818cf8"/>
+          <stop offset="100%" stopColor="#4f46e5"/>
+        </linearGradient>
+        {/* Ridge 1 — pink. Each ridge uses a top-to-bottom gradient where the
+            crest catches the light (lighter shade of the color) and the base
+            recedes into shadow (darker shade). */}
+        <linearGradient id="cas-r1" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%"   stopColor="#fbcfe8"/>
+          <stop offset="25%"  stopColor="#f9a8d4"/>
+          <stop offset="100%" stopColor="#be185d"/>
+        </linearGradient>
+        {/* Ridge 2 — cyan */}
+        <linearGradient id="cas-r2" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%"   stopColor="#a5f3fc"/>
+          <stop offset="25%"  stopColor="#67e8f9"/>
+          <stop offset="100%" stopColor="#0e7490"/>
+        </linearGradient>
+        {/* Ridge 3 — purple */}
+        <linearGradient id="cas-r3" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%"   stopColor="#ddd6fe"/>
+          <stop offset="25%"  stopColor="#c4b5fd"/>
+          <stop offset="100%" stopColor="#6b21a8"/>
+        </linearGradient>
+        {/* Ridge 4 — amber, the foreground "Big Sur" mountain */}
+        <linearGradient id="cas-r4" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%"   stopColor="#fde68a"/>
+          <stop offset="25%"  stopColor="#fbbf24"/>
+          <stop offset="100%" stopColor="#92400e"/>
+        </linearGradient>
+        {/* Sun-glow over the horizon — soft warm light bleeding through */}
+        <radialGradient id="cas-sun" cx="68%" cy="38%" r="22%">
+          <stop offset="0%"   stopColor="#fef3c7" stopOpacity="0.55"/>
+          <stop offset="100%" stopColor="#fef3c7" stopOpacity="0"/>
+        </radialGradient>
+      </defs>
+
+      {/* Sky */}
+      <rect width="1440" height="900" fill="url(#cas-sky)"/>
+
+      {/* Warm sun glow before the ridges so they cast over it */}
+      <rect width="1440" height="900" fill="url(#cas-sun)"/>
+
+      {/* Ridge 1 — pink. Furthest back, lowest crest variation. Uses cubic
+          bezier (C/S) curves so the silhouette flows organically rather
+          than the more obvious arc-y feel of quadratic curves. */}
+      <path d="M 0 380
+               C 240 300, 480 330, 720 360
+               S 1200 400, 1440 340
+               L 1440 900 L 0 900 Z" fill="url(#cas-r1)"/>
+
+      {/* Ridge 2 — cyan. Slightly more dramatic curve, a peak left of center. */}
+      <path d="M 0 510
+               C 200 420, 460 480, 720 470
+               S 1180 540, 1440 470
+               L 1440 900 L 0 900 Z" fill="url(#cas-r2)"/>
+
+      {/* Ridge 3 — purple. Steeper rise on the right, more atmospheric. */}
+      <path d="M 0 620
+               C 280 560, 540 600, 800 590
+               S 1220 670, 1440 600
+               L 1440 900 L 0 900 Z" fill="url(#cas-r3)"/>
+
+      {/* Ridge 4 — amber, the foreground "Big Sur" peak. Tallest crest,
+          dipping low on the right so the eye reads it as the closest
+          mountain rising up dramatically on the left. */}
+      <path d="M 0 540
+               C 200 430, 420 360, 640 480
+               C 820 580, 1080 720, 1440 720
+               L 1440 900 L 0 900 Z" fill="url(#cas-r4)"/>
+    </svg>
+  );
+}
+
 // v8.0 — Halcyon: a mesh-grade multi-blob wallpaper designed as a warmer
 // companion to Mesh. Same restrained four-blob composition + heavy blur +
 // vignette that gives Mesh its premium feel, but a distinct color story:
@@ -210,6 +303,7 @@ export function Wallpaper({ id, customUrl }) {
   if (id === "nova")         return <NovaBg/>;
   if (id === "bliss")        return <BlissBg/>;
   if (id === "halcyon")      return <HalcyonBg/>;
+  if (id === "cascade")      return <CascadeBg/>;
   if (id === "prism")        return <PrismBg/>;
   const wp = WALLPAPERS[id];
   if (wp && wp.grad) {
