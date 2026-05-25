@@ -231,6 +231,55 @@ function _shimmer(ctx, t, freq, durationMs, peakGain) {
   _scheduleNote(ctx, freq * 2,    t, durationMs * 0.50, peakGain * 0.20, "sine");
 }
 
+// ── v8.0 smooth-sound helpers ──────────────────────────────────────────
+// Designed for the "Windows 11 but better" target. Two key changes vs the
+// percussive _scheduleNote/_bell pair above:
+//   1. Softer attack (~45ms vs 12ms) — sounds emerge gently rather than
+//      pop in. Reads as "smooth", "modern", "polished".
+//   2. Longer trailing decay — notes ring out into atmospheric tails,
+//      mimicking the reverb-like quality of OS sounds without needing
+//      actual convolution reverb.
+//
+// Plus a slight detune layer on _smoothBell creates a chorus effect that
+// gives the tone organic depth — the difference between a synthesized
+// chime and one recorded in a small room.
+
+// Smooth single-tone scheduler. Optional attackMs lets a recipe slow the
+// onset further for swell-style notes (used by `startup`).
+function _smoothNote(ctx, freq, startTime, durationMs, peakGain, type = "sine", attackMs = 45) {
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  const dur = durationMs / 1000;
+  osc.type = type;
+  osc.frequency.value = freq;
+  const attack = Math.min(attackMs / 1000, dur * 0.4);
+  gain.gain.setValueAtTime(0, startTime);
+  gain.gain.linearRampToValueAtTime(peakGain, startTime + attack);
+  gain.gain.exponentialRampToValueAtTime(0.0001, startTime + dur);
+  osc.connect(gain).connect(ctx.destination);
+  osc.start(startTime);
+  osc.stop(startTime + dur);
+}
+
+// Smooth bell — like _bell but with longer tail, soft attack, and a
+// slight chorus from a detuned twin fundamental. Sounds like a clean
+// glassy chime with body, not a struck triangle.
+function _smoothBell(ctx, t, freq, durationMs, peakGain) {
+  _smoothNote(ctx, freq,           t, durationMs * 1.4, peakGain,          "sine");
+  _smoothNote(ctx, freq * 1.0035,  t, durationMs * 1.4, peakGain * 0.55,   "sine");   // chorus detune
+  _smoothNote(ctx, freq * 2.005,   t, durationMs * 0.85, peakGain * 0.32,  "sine");   // octave shimmer
+  _smoothNote(ctx, freq * 3.01,    t, durationMs * 0.50, peakGain * 0.12,  "sine");   // upper sparkle
+}
+
+// Atmospheric pad — long slow swell for backgrounds. Used by startup to
+// build mood under the bell arpeggio. The slow attack means it builds
+// in like a synthesizer's filter sweep without any actual filter.
+function _pad(ctx, t, freq, durationMs, peakGain, attackMs = 200) {
+  _smoothNote(ctx, freq,         t, durationMs,         peakGain,         "sine", attackMs);
+  _smoothNote(ctx, freq * 1.499, t, durationMs * 0.92,  peakGain * 0.55,  "sine", attackMs);  // perfect 5th
+  _smoothNote(ctx, freq * 0.5,   t, durationMs * 1.10,  peakGain * 0.70,  "sine", attackMs);  // sub octave
+}
+
 // v7.0 sound design: modern, organic, less "ping" more "chime." Every
 // recipe routes through _bell or _shimmer (defined above) which add slightly-
 // inharmonic upper partials for richness — the difference between a pure
@@ -244,47 +293,62 @@ function _shimmer(ctx, t, freq, durationMs, peakGain) {
 //   C4=261.63  E4=329.63  G4=392.00  C5=523.25  E5=659.25  G5=783.99
 //   A4=440.00  D5=587.33  A5=880.00  C6=1046.50  E6=1318.51  G6=1568
 const SOUND_RECIPES = {
-  // Soft two-note bell chime — fifth interval (D5 → A5) feels open + friendly
+  // v8.0 — smooth notification. A bell pair with a major 9th lift (D5 → E6
+  // an octave up) instead of the v7 perfect fifth. Major 9 voicings sound
+  // "modern atmospheric" rather than "classical fanfare". Long decay tails
+  // make the two bells overlap into a single shimmering moment. A soft
+  // sub-octave body sustains underneath for warmth.
   notification: (ctx, t, v, r) => {
-    _bell(ctx, t + 0.00, 587.33 * r, 420, 0.20 * v);
-    _bell(ctx, t + 0.09, 880.00 * r, 540, 0.22 * v);
+    _smoothNote(ctx, 146.83 * r, t + 0.00, 1100, 0.05 * v, "sine", 80);  // D3 body
+    _smoothBell(ctx, t + 0.00, 587.33 * r, 1100, 0.15 * v);              // D5
+    _smoothBell(ctx, t + 0.13, 1318.51 * r, 1300, 0.13 * v);             // E6 — major 9 lift
   },
 
-  // Cinematic startup — low octave drone provides body, mid-bells stack up
-  // to a C major triad. Slower, more spacious than the old arpeggio.
+  // v8.0 — cinematic startup. A slow pad swell sets the mood (4 seconds!),
+  // then a 5-note ascending C-major-add9 arpeggio resolves into a final
+  // upper-octave shimmer. Designed to feel like a real OS boot sound where
+  // you sense atmosphere first, then notes emerge from it.
   startup: (ctx, t, v, r) => {
-    // Low body — long, soft, sets the mood
-    _scheduleNote(ctx, 130.81 * r, t + 0.00, 1300, 0.09 * v, "triangle");
-    // Bells climb a major triad
-    _bell(ctx, t + 0.00, 261.63 * r, 760,  0.13 * v);  // C4
-    _bell(ctx, t + 0.22, 392.00 * r, 800,  0.14 * v);  // G4
-    _bell(ctx, t + 0.44, 523.25 * r, 900,  0.16 * v);  // C5
-    _bell(ctx, t + 0.66, 783.99 * r, 1100, 0.14 * v);  // G5 — sparkle on top
+    // Slow pad swell — sets the room before any bells ring
+    _pad(ctx, t + 0.00, 130.81 * r, 2200, 0.07 * v, 350);                 // C3 pad
+    // Bell arpeggio rising through C major add9 (C, E, G, D, G higher)
+    _smoothBell(ctx, t + 0.35, 261.63 * r, 950,  0.11 * v);               // C4
+    _smoothBell(ctx, t + 0.62, 392.00 * r, 950,  0.12 * v);               // G4
+    _smoothBell(ctx, t + 0.89, 523.25 * r, 1050, 0.13 * v);               // C5
+    _smoothBell(ctx, t + 1.16, 587.33 * r, 1150, 0.13 * v);               // D5
+    _smoothBell(ctx, t + 1.50, 1046.50 * r, 1400, 0.12 * v);              // C6 — final sparkle
   },
 
-  // Bright welcome chime — C major arpeggio with bell richness
+  // v8.0 — smooth login. Three rising bells in a major 6th voicing (C, E,
+  // A — the C6 chord; richer than a plain triad). Slower spacing and
+  // longer tails so the chord rings together for a beat at the end.
   login: (ctx, t, v, r) => {
-    _bell(ctx, t + 0.00, 523.25 * r, 380, 0.18 * v);  // C5
-    _bell(ctx, t + 0.08, 659.25 * r, 380, 0.18 * v);  // E5
-    _bell(ctx, t + 0.16, 783.99 * r, 480, 0.20 * v);  // G5
+    _smoothNote(ctx, 261.63 * r, t + 0.00, 1200, 0.05 * v, "sine", 120);  // C4 body
+    _smoothBell(ctx, t + 0.00, 523.25 * r, 900,  0.14 * v);               // C5
+    _smoothBell(ctx, t + 0.16, 659.25 * r, 950,  0.14 * v);               // E5
+    _smoothBell(ctx, t + 0.32, 880.00 * r, 1100, 0.16 * v);               // A5 — major 6th lift
   },
 
-  // Gentle descending farewell — three soft bells walking down
+  // v8.0 — smooth logout. A slow descending fade — A5 → E5 → C5 → C4
+  // — that gives the sense of "winding down" without being mournful.
+  // The final low C is held longest, like the last echo of the session.
   logout: (ctx, t, v, r) => {
-    _bell(ctx, t + 0.00, 523.25 * r, 360, 0.16 * v);  // C5
-    _bell(ctx, t + 0.13, 392.00 * r, 460, 0.16 * v);  // G4
-    _bell(ctx, t + 0.26, 261.63 * r, 620, 0.14 * v);  // C4
+    _smoothBell(ctx, t + 0.00, 880.00 * r, 700,  0.13 * v);               // A5
+    _smoothBell(ctx, t + 0.18, 659.25 * r, 800,  0.13 * v);               // E5
+    _smoothBell(ctx, t + 0.36, 523.25 * r, 950,  0.13 * v);               // C5
+    _smoothBell(ctx, t + 0.58, 261.63 * r, 1500, 0.14 * v);               // C4 — final settle
   },
 
   // Soft low "bonk" instead of the old sawtooth buzz. Serious but not harsh.
   // Errors cap their transpose at 1.0 so they never get cheerfully bright.
+  // v8.0 — slightly softer attack so it doesn't startle.
   error: (ctx, t, v, r) => {
     const er = Math.min(1, r);
-    _scheduleNote(ctx, 174.61 * er, t + 0.00, 280, 0.26 * v, "triangle");  // F3
-    _scheduleNote(ctx, 116.54 * er, t + 0.00, 340, 0.18 * v, "triangle");  // Bb2 octave-down body
+    _smoothNote(ctx, 174.61 * er, t + 0.00, 380, 0.24 * v, "sine", 30);  // F3
+    _smoothNote(ctx, 116.54 * er, t + 0.00, 440, 0.16 * v, "sine", 30);  // Bb2 octave-down body
   },
 
-  // Crisp "pop" with a touch of sparkle on top
+  // Quick window-open swell — kept short for low-latency feel.
   windowOpen: (ctx, t, v, r) => {
     _shimmer(ctx, t, 880 * r, 90, 0.10 * v);
   },
@@ -300,10 +364,11 @@ const SOUND_RECIPES = {
     _shimmer(ctx, t, 1046.50 * r, 100, 0.10 * v);
   },
 
-  // Subtle chime with a hint of high sparkle — plays often, stays light
+  // Subtle chime with a hint of high sparkle — plays often, stays light.
+  // v8.0 — slightly longer tail so toasts feel less abrupt.
   toast: (ctx, t, v, r) => {
-    _scheduleNote(ctx, 1046.50 * r, t + 0.00, 140, 0.10 * v, "triangle");  // C6
-    _scheduleNote(ctx, 2093.00 * r, t + 0.00, 90,  0.04 * v, "sine");      // C7 air
+    _smoothNote(ctx, 1046.50 * r, t + 0.00, 220, 0.09 * v, "sine", 20);  // C6
+    _smoothNote(ctx, 2093.00 * r, t + 0.00, 140, 0.04 * v, "sine", 20);  // C7 air
   },
 
   // Tiny click for buttons/menus — very short, very quiet
@@ -316,49 +381,49 @@ const SOUND_RECIPES = {
   // are tied to specific message kinds; these give us more granular voicing
   // for chat messages, focus mode, attention pulls, and triumphant moments.
 
-  // "success" — bright affirmative chord (C major triad + octave sparkle).
-  // Used by completed-action moments (file saved, settings applied, etc.).
-  // Longer/richer than `login` so it carries more weight as a "done!" cue.
+  // v8.0 — smooth success. Two-note rise to a major 6th (C5 → A5) with a
+  // sub-octave body for warmth. Shorter than `login` since it's used in
+  // routine moments (saved, applied, etc.) but still smooth.
   success: (ctx, t, v, r) => {
-    _bell(ctx, t + 0.00, 523.25 * r, 320, 0.16 * v);  // C5
-    _bell(ctx, t + 0.06, 659.25 * r, 340, 0.16 * v);  // E5
-    _bell(ctx, t + 0.12, 783.99 * r, 380, 0.18 * v);  // G5
-    _bell(ctx, t + 0.20, 1046.50 * r, 480, 0.14 * v); // C6 — sparkle on top
+    _smoothNote(ctx, 261.63 * r, t + 0.00, 700, 0.04 * v, "sine", 60);   // C4 body
+    _smoothBell(ctx, t + 0.00, 523.25 * r, 700, 0.13 * v);               // C5
+    _smoothBell(ctx, t + 0.11, 880.00 * r, 850, 0.14 * v);               // A5 — major 6 lift
   },
 
-  // "message" — soft two-note pop for chat / DM arrivals. E5 → A5 minor third
-  // step has a friendly, attention-without-alarm character.
+  // v8.0 — smooth message ping. Single soft bell with a quick high-sparkle
+  // overtone. Designed to feel like a "drop" rather than a chord — appropriate
+  // for the frequent-but-light chat / DM moment.
   message: (ctx, t, v, r) => {
-    _shimmer(ctx, t + 0.00, 659.25 * r, 220, 0.13 * v); // E5
-    _shimmer(ctx, t + 0.07, 880.00 * r, 280, 0.14 * v); // A5
+    _smoothBell(ctx, t + 0.00, 880.00 * r, 600, 0.12 * v); // A5
+    _smoothNote(ctx, 1760.00 * r, t + 0.05, 280, 0.05 * v, "sine", 25);  // A6 sparkle
   },
 
-  // "focus" — calm tone for entering fullscreen / focus mode. Single low
-  // shimmer with a fifth above it; settles the listener rather than
-  // exciting them. Sounds "ready to concentrate."
+  // v8.0 — smooth focus. Slow swelling pad on G3 with a fifth above,
+  // then a single mid bell. Reads as "settling in", longer attack so it
+  // doesn't punch you — perfect for entering fullscreen / focus mode.
   focus: (ctx, t, v, r) => {
-    _scheduleNote(ctx, 196.00 * r, t + 0.00, 700, 0.09 * v, "triangle"); // G3 body
-    _shimmer(ctx, t + 0.05, 392.00 * r, 520, 0.10 * v);                  // G4
-    _shimmer(ctx, t + 0.15, 587.33 * r, 480, 0.08 * v);                  // D5 fifth
+    _pad(ctx, t + 0.00, 196.00 * r, 1500, 0.07 * v, 280);                // G3 pad
+    _smoothBell(ctx, t + 0.20, 587.33 * r, 1000, 0.10 * v);              // D5 mid bell
   },
 
-  // "alert" — attention pull that's NOT an error. Used for important
-  // notifications (e.g. NWS alerts, mod actions). Two short bells with a
-  // slight pitch rise — feels purposeful, not alarming.
+  // v8.0 — smooth alert. Two bells with a minor-third rise (A4 → C#5).
+  // Purposeful attention pull, but with the new long tails it lingers in
+  // a way that says "look at this" rather than "stop the presses".
   alert: (ctx, t, v, r) => {
-    _bell(ctx, t + 0.00, 440.00 * r, 280, 0.18 * v); // A4
-    _bell(ctx, t + 0.18, 554.37 * r, 320, 0.20 * v); // C#5 — minor third up
+    _smoothBell(ctx, t + 0.00, 440.00 * r, 700, 0.16 * v);               // A4
+    _smoothBell(ctx, t + 0.18, 554.37 * r, 900, 0.18 * v);               // C#5
   },
 
-  // "achievement" — triumphant 4-note rising arpeggio. Reserved for
-  // milestone moments (high-score beat, level-up in games, etc.) — long
-  // and clearly celebratory so it feels earned rather than routine.
+  // v8.0 — smooth achievement. 4-note rising arpeggio + held G6 sparkle.
+  // Triumphant but graceful — the longer tails make the chord ring out
+  // for a beat after the final note, like a proper "you did it" moment.
   achievement: (ctx, t, v, r) => {
-    _bell(ctx, t + 0.00, 392.00 * r, 320, 0.15 * v);  // G4
-    _bell(ctx, t + 0.10, 523.25 * r, 320, 0.16 * v);  // C5
-    _bell(ctx, t + 0.20, 659.25 * r, 380, 0.18 * v);  // E5
-    _bell(ctx, t + 0.32, 783.99 * r, 560, 0.20 * v);  // G5 — held final
-    _shimmer(ctx, t + 0.40, 1567.98 * r, 320, 0.08 * v); // G6 sparkle
+    _smoothNote(ctx, 196.00 * r, t + 0.00, 1500, 0.05 * v, "sine", 100); // G3 body
+    _smoothBell(ctx, t + 0.00, 392.00 * r, 700, 0.13 * v);               // G4
+    _smoothBell(ctx, t + 0.13, 523.25 * r, 750, 0.14 * v);               // C5
+    _smoothBell(ctx, t + 0.26, 659.25 * r, 850, 0.15 * v);               // E5
+    _smoothBell(ctx, t + 0.42, 783.99 * r, 1200, 0.17 * v);              // G5 — held
+    _smoothBell(ctx, t + 0.55, 1567.98 * r, 900, 0.10 * v);              // G6 — final sparkle
   },
 };
 
@@ -390,6 +455,10 @@ export function playSound(name) {
     recipe(ctx, ctx.currentTime, cfg.volume, pitchRatio);
   } catch {}
   // Tear the context down a bit after the longest possible sound finishes.
-  // Startup is ~870ms; everything else is shorter. 1500ms is comfortable.
-  setTimeout(() => { try { ctx.close(); } catch {} }, 1500);
+  // v8.0: extended to 4000ms because the new smooth recipes have much
+  // longer atmospheric tails (startup is ~3000ms total, achievement +
+  // notification can ring out for 2+ seconds). Closing too early would
+  // chop off the trailing reverb-like decays and reintroduce the abrupt
+  // feel the smoothness pass was meant to eliminate.
+  setTimeout(() => { try { ctx.close(); } catch {} }, 4000);
 }
