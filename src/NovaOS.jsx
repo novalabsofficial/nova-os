@@ -1,5 +1,5 @@
 
-// NOVA OS v7.6 — Nova Systems
+// NOVA OS v7.7 — Nova Systems
 // Drop this into src/NovaOS.jsx
  
 import { useState, useEffect, useRef, useCallback, lazy, Suspense } from "react";
@@ -35,7 +35,7 @@ import {
   WALLPAPERS, WMO, HAS_SVG_ICON, NOVA_VERSION,
 } from "./ui/constants.js";
 import { Wallpaper, NovaBg, BlissBg, AuroraBg, MeshBg } from "./ui/wallpapers.jsx";
-import { NovaSvgIcon, StoreIcon, AppIconDisplay } from "./ui/icons.jsx";
+import { NovaSvgIcon, StoreIcon, AppIconDisplay, NovaLogo } from "./ui/icons.jsx";
 import { Toggle } from "./ui/Toggle.jsx";
 import { BrowserNav } from "./ui/BrowserNav.jsx";
 import { ResizeHandles } from "./ui/ResizeHandles.jsx";
@@ -574,8 +574,29 @@ export default function NovaOS(){
   const fmtDate=d=>d.toLocaleDateString([],{weekday:"short",month:"short",day:"numeric"});
   const installedApps=data?.installedApps||[];
   const storeIcons=STORE_CATALOG.filter(a=>installedApps.includes(a.id)).map(a=>({id:"store_"+a.id,icon:a.icon,label:a.name,desc:a.desc,storeApp:a}));
-  const allDesktopIcons=[...APPS,...storeIcons];
-  const filteredMenu=allDesktopIcons.filter(a=>a.label.toLowerCase().includes(menuSrch.toLowerCase())||a.desc?.toLowerCase().includes(menuSrch.toLowerCase()));
+  // allApps = every app launcher entry that should appear in the start menu —
+  // always the full list, regardless of what's pinned to the desktop.
+  const allApps=[...APPS,...storeIcons];
+  // v7.7 — Desktop pinning (blacklist model). Users can hide apps from the
+  // desktop via right-click; they're still launchable from the start menu and
+  // taskbar. Default is empty array → every app shows on the desktop, so
+  // existing users see no change to their workspace.
+  const hiddenFromDesktop=data?.hiddenFromDesktop||[];
+  const hiddenSet=new Set(hiddenFromDesktop);
+  const allDesktopIcons=allApps.filter(a=>!hiddenSet.has(a.id));
+  function hideAppFromDesktop(appId){
+    if(hiddenSet.has(appId))return;
+    const next=[...hiddenFromDesktop,appId];
+    updateData(p=>({...p,hiddenFromDesktop:next}));
+    showToast("Removed from desktop");
+  }
+  function addAppToDesktop(appId){
+    if(!hiddenSet.has(appId))return;
+    const next=hiddenFromDesktop.filter(id=>id!==appId);
+    updateData(p=>({...p,hiddenFromDesktop:next}));
+    showToast("Added to desktop");
+  }
+  const filteredMenu=allApps.filter(a=>a.label.toLowerCase().includes(menuSrch.toLowerCase())||a.desc?.toLowerCase().includes(menuSrch.toLowerCase()));
   const isAnyDrag=drag||iconDrag||widgetDrag||widgetResize;
   const dragCursor=drag?(drag.type==="move"?"grabbing":drag.edge+"-resize"):widgetResize?(widgetResize.edge+"-resize"):isAnyDrag?"grabbing":"default";
  
@@ -770,12 +791,19 @@ export default function NovaOS(){
             onDoubleClick={launch}
             onContextMenu={e=>openContextMenu(e, [
               {icon:"▶", label:"Open", onClick:launch},
+              // v7.7: "Remove from desktop" hides the app from the desktop
+              // without uninstalling it. It still shows in the start menu /
+              // taskbar; users can add it back via right-click there.
+              {icon:"–", label:"Remove from desktop", danger:true, onClick:()=>hideAppFromDesktop(app.id)},
+              // For store-installed apps, also offer full uninstall as a
+              // separate action — this removes them from `installedApps`
+              // entirely (so they vanish from the start menu too).
               ...(app.storeApp ? [{
-                icon:"–", label:"Remove from desktop", danger:true,
+                icon:"🗑", label:"Uninstall app", danger:true,
                 onClick:()=>{
                   const cur=data?.installedApps||[];
-                  updateData(p=>({...p,installedApps:cur.filter(id=>id!==app.id)}));
-                  showToast("Removed from desktop");
+                  updateData(p=>({...p,installedApps:cur.filter(id=>id!==app.storeApp.id)}));
+                  showToast("Uninstalled");
                 },
               }] : []),
               {type:"divider"},
@@ -795,13 +823,25 @@ export default function NovaOS(){
         <div style={{padding:"0 14px 14px",flex:1,overflowY:"auto"}}>
           <div style={SEC}>{menuSrch?`Results for "${menuSrch}"`:"All Apps"}</div>
           <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:4}}>
-            {filteredMenu.map(app=>(
-              <div key={app.id} className="ma" onClick={()=>{if(app.storeApp){if(app.storeApp.newTab)openExternalUrl(app.storeApp.url);else openApp("browser");}else openApp(app.id);}} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:5,padding:"12px 4px",borderRadius:9,cursor:"pointer",transition:"background 0.12s",position:"relative"}}>
+            {filteredMenu.map(app=>{
+              const isHidden=hiddenSet.has(app.id);
+              return(
+              <div key={app.id} className="ma"
+                onClick={()=>{setMenuOpen(false);if(app.storeApp){if(app.storeApp.newTab)openExternalUrl(app.storeApp.url);else openApp("browser");}else openApp(app.id);}}
+                // v7.7: right-click in start menu lets you pin/unpin to desktop.
+                onContextMenu={e=>{setMenuOpen(false);openContextMenu(e,[
+                  {icon:"▶",label:"Open",onClick:()=>{if(app.storeApp){if(app.storeApp.newTab)openExternalUrl(app.storeApp.url);else openApp("browser");}else openApp(app.id);}},
+                  isHidden
+                    ? {icon:"+",label:"Add to desktop",onClick:()=>addAppToDesktop(app.id)}
+                    : {icon:"–",label:"Remove from desktop",danger:true,onClick:()=>hideAppFromDesktop(app.id)},
+                ]);}}
+                style={{display:"flex",flexDirection:"column",alignItems:"center",gap:5,padding:"12px 4px",borderRadius:9,cursor:"pointer",transition:"background 0.12s",position:"relative"}}>
                 {wins.some(w=>w.app===app.id)&&<div style={{position:"absolute",bottom:4,left:"50%",transform:"translateX(-50%)",width:4,height:4,borderRadius:"50%",background:AC}}/>}
-                <div style={{display:"flex",alignItems:"center",justifyContent:"center"}}><AppIconDisplay app={app} size={24}/></div>
-                <span style={{fontFamily:FF,fontWeight:600,fontSize:10,color:"rgba(255,255,255,0.8)",textAlign:"center",lineHeight:1.25}}>{app.label}</span>
+                <div style={{display:"flex",alignItems:"center",justifyContent:"center",opacity:isHidden?0.55:1}}><AppIconDisplay app={app} size={24}/></div>
+                <span style={{fontFamily:FF,fontWeight:600,fontSize:10,color:isHidden?"rgba(255,255,255,0.5)":"rgba(255,255,255,0.8)",textAlign:"center",lineHeight:1.25}}>{app.label}</span>
               </div>
-            ))}
+              );
+            })}
             {filteredMenu.length===0&&<div style={{gridColumn:"span 4",color:"rgba(255,255,255,0.2)",fontFamily:FF,fontStyle:"italic",fontSize:12,textAlign:"center",padding:"18px 0"}}>No apps found</div>}
           </div>
         </div>
@@ -878,25 +918,113 @@ export default function NovaOS(){
         );
       })}
  
-      {/* Taskbar */}
-      <div style={{position:"fixed",bottom:0,left:0,right:0,height:TASKBAR_H,background:"rgba(9,11,24,0.92)",backdropFilter:"blur(20px)",borderTop:"1px solid rgba(255,255,255,0.07)",display:"flex",alignItems:"center",padding:"0 10px",gap:5,zIndex:9999}}>
-        <button className="sb" onClick={()=>{setMenuOpen(o=>!o);setMenuSrch("");}} style={{width:38,height:38,borderRadius:10,background:menuOpen?fill(AC):"rgba(255,255,255,0.07)",border:menuOpen?"1px solid "+bdr(AC):"1px solid rgba(255,255,255,0.09)",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,transition:"all 0.15s",fontSize:17,color:menuOpen?AC:"rgba(255,255,255,0.7)"}}>◈</button>
-        <div style={{width:1,height:24,background:"rgba(255,255,255,0.09)",margin:"0 3px"}}/>
-        {wins.map(win=>{const app=APPS.find(a=>a.id===win.app);const isMin=win.state==="minimized";const isTop=wins.length>0&&win.z===Math.max(...wins.map(w=>w.z));return(<button key={win.id} className="tb" onClick={()=>{if(isMin){setWins(ws=>ws.map(w=>w.id===win.id?{...w,state:"normal"}:w));focusWin(win.id);}else if(isTop){setWins(ws=>ws.map(w=>w.id===win.id?{...w,state:"minimized"}:w));}else focusWin(win.id);}} onContextMenu={e=>openContextMenu(e,[{icon:"▶",label:isMin?"Restore":"Focus",onClick:()=>{setWins(ws=>ws.map(w=>w.id===win.id?{...w,state:"normal"}:w));focusWin(win.id);}},{icon:"—",label:"Minimize",onClick:()=>setWins(ws=>ws.map(w=>w.id===win.id?{...w,state:"minimized"}:w)),disabled:isMin},{icon:"⬜",label:win.state==="maximized"?"Restore size":"Maximize",onClick:()=>maximizeWin(win.id)},{type:"divider"},{icon:"✕",label:"Close",danger:true,onClick:()=>closeWin(win.id)}])} style={{height:36,padding:"0 10px",background:isTop&&!isMin?"rgba(255,255,255,0.12)":"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.09)",borderRadius:7,cursor:"pointer",fontFamily:FF,fontSize:12,fontWeight:600,color:isMin?"rgba(255,255,255,0.45)":"rgba(255,255,255,0.82)",whiteSpace:"nowrap",transition:"all 0.12s",display:"flex",alignItems:"center",gap:6,position:"relative"}}><div style={{pointerEvents:"none",display:"flex",alignItems:"center"}}><AppIconDisplay app={{id:win.app,icon:app?.icon||"📦"}} size={14}/></div>{deviceMode!=="mobile"&&<span>{app?.label}</span>}{!isMin&&<div style={{position:"absolute",bottom:1,left:"50%",transform:"translateX(-50%)",width:isTop?18:6,height:2,borderRadius:2,background:AC,transition:"width 0.2s"}}/>}</button>);})}
-        <div style={{flex:1}}/>
-        {/* Username chip + divider hidden on mobile to save horizontal space — */}
-        {/* profile is still reachable via the menu, so this only loses a shortcut. */}
-        {deviceMode!=="mobile"&&<div style={{fontFamily:FFB,fontWeight:600,fontSize:12,color:AC,cursor:"pointer"}} onClick={()=>openApp("profile")}>@{user}</div>}
-        {deviceMode!=="mobile"&&<div style={{width:1,height:20,background:"rgba(255,255,255,0.09)"}}/>}
-        {/* Notification bell — badge shows unread count, click toggles the panel */}
-        <button className="sb" onClick={()=>setNotifsOpen(o=>!o)} title={unreadCount>0?unreadCount+" unread":"Notifications"} style={{position:"relative",width:30,height:30,borderRadius:7,background:notifsOpen?fill(AC):"none",border:notifsOpen?"1px solid "+bdr(AC):"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,color:notifsOpen?AC:"rgba(255,255,255,0.5)"}}>
-          🔔
-          {unreadCount>0 && <span style={{position:"absolute",top:1,right:1,minWidth:14,height:14,padding:"0 3px",borderRadius:7,background:"#ff5555",color:"#fff",fontFamily:FFB,fontWeight:700,fontSize:9,display:"flex",alignItems:"center",justifyContent:"center",lineHeight:1}}>{unreadCount>9?"9+":unreadCount}</span>}
+      {/* Taskbar — v7.7 visual overhaul.
+          Frosted-glass background with a subtle top-edge highlight, slightly
+          taller for breathing room, and an inset shadow that gives the bar a
+          floating feel without actually detaching it from the screen edge.
+          Saturate(160%) makes the wallpaper's colors bleed through the glass
+          a little, like macOS Big Sur's dock. */}
+      <div style={{
+        position:"fixed",bottom:0,left:0,right:0,height:TASKBAR_H,
+        background:"linear-gradient(180deg, rgba(14,16,30,0.78) 0%, rgba(10,12,24,0.86) 100%)",
+        backdropFilter:"blur(28px) saturate(160%)",
+        WebkitBackdropFilter:"blur(28px) saturate(160%)",
+        borderTop:"1px solid rgba(255,255,255,0.09)",
+        boxShadow:"0 -1px 0 rgba(255,255,255,0.04) inset, 0 -20px 50px -20px rgba(0,0,0,0.5)",
+        display:"flex",alignItems:"center",padding:"0 14px",gap:6,zIndex:9999,
+      }}>
+        {/* v7.7: Start menu button — now shows the Nova OS brand mark (gradient
+            N) instead of the generic "◈" glyph. The button background lights
+            up with the accent color when the menu is open so the affordance
+            is still obvious despite the busier icon. */}
+        <button className="sb" onClick={()=>{setMenuOpen(o=>!o);setMenuSrch("");}} title="Nova OS" style={{
+          width:42,height:42,borderRadius:12,
+          background:menuOpen?fill(AC):"rgba(255,255,255,0.06)",
+          border:"1px solid "+(menuOpen?bdr(AC):"rgba(255,255,255,0.09)"),
+          boxShadow:menuOpen?"0 0 16px "+fill(AC)+", 0 2px 8px rgba(0,0,0,0.3) inset":"none",
+          cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,
+          transition:"all 0.2s cubic-bezier(0.4,0,0.2,1)",
+          padding:0,
+        }}>
+          <NovaLogo size={26}/>
         </button>
-        <button className="sb" onClick={()=>openApp("settings")} style={{width:30,height:30,borderRadius:7,background:"none",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,color:"rgba(255,255,255,0.45)",transition:"background 0.12s"}}>⚙️</button>
-        <div style={{textAlign:"right",cursor:"default"}}>
-          <div style={{fontFamily:FFM,fontWeight:500,fontSize:12,color:"rgba(255,255,255,0.78)"}}>{fmtTime(tick)}</div>
-          {deviceMode!=="mobile"&&<div style={{fontFamily:FF,fontSize:9,color:"rgba(255,255,255,0.35)"}}>{fmtDate(tick)}</div>}
+        <div style={{width:1,height:26,background:"linear-gradient(180deg, transparent, rgba(255,255,255,0.12) 50%, transparent)",margin:"0 5px"}}/>
+        {wins.map(win=>{
+  const app=APPS.find(a=>a.id===win.app);
+  const isMin=win.state==="minimized";
+  const isTop=wins.length>0&&win.z===Math.max(...wins.map(w=>w.z));
+  const isHidden=hiddenSet.has(win.app);
+  return(
+    <button key={win.id} className="tb"
+      onClick={()=>{if(isMin){setWins(ws=>ws.map(w=>w.id===win.id?{...w,state:"normal"}:w));focusWin(win.id);}else if(isTop){setWins(ws=>ws.map(w=>w.id===win.id?{...w,state:"minimized"}:w));}else focusWin(win.id);}}
+      onContextMenu={e=>openContextMenu(e,[
+        {icon:"▶",label:isMin?"Restore":"Focus",onClick:()=>{setWins(ws=>ws.map(w=>w.id===win.id?{...w,state:"normal"}:w));focusWin(win.id);}},
+        {icon:"—",label:"Minimize",onClick:()=>setWins(ws=>ws.map(w=>w.id===win.id?{...w,state:"minimized"}:w)),disabled:isMin},
+        {icon:"⬜",label:win.state==="maximized"?"Restore size":"Maximize",onClick:()=>maximizeWin(win.id)},
+        // v7.7: pin/unpin from the running-window taskbar entry. Only relevant
+        // for built-in apps (storeApp icons can't have a "running window" since
+        // they always open in the browser app or a new tab).
+        ...(isHidden ? [{icon:"+",label:"Add to desktop",onClick:()=>addAppToDesktop(win.app)}] : []),
+        {type:"divider"},
+        {icon:"✕",label:"Close",danger:true,onClick:()=>closeWin(win.id)},
+      ])}
+      style={{height:40,padding:"0 12px",background:isTop&&!isMin?"rgba(255,255,255,0.14)":"rgba(255,255,255,0.05)",border:"1px solid "+(isTop&&!isMin?"rgba(255,255,255,0.14)":"rgba(255,255,255,0.07)"),borderRadius:10,cursor:"pointer",fontFamily:FF,fontSize:12,fontWeight:600,color:isMin?"rgba(255,255,255,0.45)":"rgba(255,255,255,0.88)",whiteSpace:"nowrap",transition:"all 0.18s cubic-bezier(0.4,0,0.2,1)",display:"flex",alignItems:"center",gap:7,position:"relative"}}>
+      <div style={{pointerEvents:"none",display:"flex",alignItems:"center"}}><AppIconDisplay app={{id:win.app,icon:app?.icon||"📦"}} size={16}/></div>
+      {deviceMode!=="mobile"&&<span>{app?.label}</span>}
+      {!isMin&&<div style={{position:"absolute",bottom:-1,left:"50%",transform:"translateX(-50%)",width:isTop?22:8,height:3,borderRadius:3,background:AC,boxShadow:isTop?"0 0 10px "+AC+", 0 0 4px "+AC:"none",transition:"width 0.25s cubic-bezier(0.4,0,0.2,1), box-shadow 0.25s cubic-bezier(0.4,0,0.2,1)"}}/>}
+    </button>
+  );
+})}
+        <div style={{flex:1}}/>
+        {/* v7.7: right-side cluster — every pill is locked to height:40 so
+            they sit on the same baseline. Internal layout uses flex centering
+            so multi-line content (the clock's time+date stack) stays vertically
+            balanced without resizing the chip. */}
+        {deviceMode!=="mobile"&&
+          <button className="sb" onClick={()=>openApp("profile")} title="Profile" style={{
+            height:40,display:"flex",alignItems:"center",gap:8,
+            padding:"0 14px 0 8px",borderRadius:10,
+            background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.07)",
+            cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:12,color:AC,
+            transition:"all 0.18s cubic-bezier(0.4,0,0.2,1)",
+          }}>
+            <span style={{width:22,height:22,borderRadius:"50%",background:fill(AC),border:"1px solid "+bdr(AC),display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,color:AC,fontWeight:700}}>{user.charAt(0).toUpperCase()}</span>
+            @{user}
+          </button>
+        }
+        <div style={{
+          height:40,display:"flex",alignItems:"center",gap:2,padding:"0 3px",
+          background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.06)",borderRadius:11,
+        }}>
+          {/* Notification bell — badge shows unread count, click toggles the panel */}
+          <button className="sb" onClick={()=>setNotifsOpen(o=>!o)} title={unreadCount>0?unreadCount+" unread":"Notifications"} style={{
+            position:"relative",width:32,height:32,borderRadius:8,
+            background:notifsOpen?fill(AC):"transparent",
+            border:notifsOpen?"1px solid "+bdr(AC):"1px solid transparent",
+            cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",
+            fontSize:14,color:notifsOpen?AC:"rgba(255,255,255,0.6)",
+            transition:"all 0.18s cubic-bezier(0.4,0,0.2,1)",
+          }}>
+            🔔
+            {unreadCount>0 && <span style={{position:"absolute",top:2,right:2,minWidth:14,height:14,padding:"0 3px",borderRadius:7,background:"#ff5555",color:"#fff",fontFamily:FFB,fontWeight:700,fontSize:9,display:"flex",alignItems:"center",justifyContent:"center",lineHeight:1,boxShadow:"0 0 8px rgba(255,85,85,0.5)"}}>{unreadCount>9?"9+":unreadCount}</span>}
+          </button>
+          <button className="sb" onClick={()=>openApp("settings")} title="Settings" style={{
+            width:32,height:32,borderRadius:8,
+            background:"transparent",border:"1px solid transparent",
+            cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",
+            fontSize:14,color:"rgba(255,255,255,0.55)",
+            transition:"all 0.18s cubic-bezier(0.4,0,0.2,1)",
+          }}>⚙️</button>
+        </div>
+        <div style={{
+          height:40,display:"flex",flexDirection:"column",justifyContent:"center",
+          textAlign:"right",cursor:"default",
+          padding:"0 14px",borderRadius:10,
+          background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.06)",
+          minWidth:64,
+        }}>
+          <div style={{fontFamily:FFM,fontWeight:500,fontSize:13,color:"rgba(255,255,255,0.88)",letterSpacing:0.3,lineHeight:1.1}}>{fmtTime(tick)}</div>
+          {deviceMode!=="mobile"&&<div style={{fontFamily:FF,fontSize:9,color:"rgba(255,255,255,0.4)",marginTop:1,lineHeight:1.1}}>{fmtDate(tick)}</div>}
         </div>
       </div>
       {/* Notification Center side panel */}

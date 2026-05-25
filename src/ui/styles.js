@@ -57,13 +57,18 @@ export const CSS = `
   @keyframes float{0%,100%{transform:translateY(0) translateX(0);}50%{transform:translateY(-12px) translateX(6px);}}
   /* Hover transitions standardized on cubic-bezier(0.4,0,0.2,1) — Material's "standard" curve */
   .di{transition:background 0.18s cubic-bezier(0.4,0,0.2,1),transform 0.18s cubic-bezier(0.4,0,0.2,1);}.di:hover{background:rgba(255,255,255,0.14)!important;}
-  .tb{transition:background 0.18s cubic-bezier(0.4,0,0.2,1);}.tb:hover{background:rgba(255,255,255,0.1)!important;}
+  /* v7.7 — taskbar window chip: subtle hover lift + accent-tinged glow */
+  .tb{transition:all 0.18s cubic-bezier(0.4,0,0.2,1);}
+  .tb:hover{background:rgba(255,255,255,0.12)!important;border-color:rgba(255,255,255,0.18)!important;transform:translateY(-1px);}
   .wx{transition:background 0.18s cubic-bezier(0.4,0,0.2,1),color 0.18s cubic-bezier(0.4,0,0.2,1);}.wx:hover{background:#c42b1c!important;color:#fff!important;}
   .wm,.wn{transition:background 0.18s cubic-bezier(0.4,0,0.2,1);}.wm:hover,.wn:hover{background:rgba(255,255,255,0.1)!important;}
   .ma{transition:background 0.18s cubic-bezier(0.4,0,0.2,1);}.ma:hover{background:rgba(255,255,255,0.08)!important;}
   .ls{transition:opacity 0.18s cubic-bezier(0.4,0,0.2,1);}.ls:hover:not(:disabled){opacity:0.82!important;}
   .lt{transition:color 0.18s cubic-bezier(0.4,0,0.2,1);}.lt:hover{color:rgba(160,210,255,0.9)!important;}
-  .sb{transition:background 0.18s cubic-bezier(0.4,0,0.2,1);}.sb:hover{background:rgba(255,255,255,0.1)!important;}
+  /* v7.7 — system buttons (taskbar start, bell, settings cog, user chip).
+     Slightly brighter hover than v7.6 to pop against the new frosted bar. */
+  .sb{transition:all 0.18s cubic-bezier(0.4,0,0.2,1);}
+  .sb:hover{background:rgba(255,255,255,0.12)!important;border-color:rgba(255,255,255,0.16)!important;}
   .dl{transition:color 0.18s cubic-bezier(0.4,0,0.2,1);}.dl:hover{color:rgba(255,80,80,0.9)!important;}
   .ps{transition:transform 0.2s cubic-bezier(0.4,0,0.2,1);}.ps:hover{transform:scale(1.2);z-index:2;}
   .fr{transition:background 0.18s cubic-bezier(0.4,0,0.2,1);}.fr:hover{background:rgba(255,255,255,0.07)!important;}

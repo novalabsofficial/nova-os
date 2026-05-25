@@ -61,6 +61,12 @@ export function StoreIcon({ domain, fallback, size = 26 }) {
 
 // Unified icon display — picks SVG for built-in, Clearbit for store apps,
 // emoji for everything else (new apps without custom SVGs yet).
+//
+// v7.7: emoji fallbacks now render inside a sized rounded box that matches
+// the SVG icons' footprint exactly. Previously emoji rendered as a bare
+// glyph at 85% of `size`, making apps like the v7.4 games (Tic-Tac-Toe,
+// Pac-Man, Chess, etc.) look visually smaller than the SVG-icon apps on
+// the desktop. Now every app fills the same WxH box regardless of source.
 export function AppIconDisplay({ app, size = 26 }) {
   if (app.storeApp) {
     return <StoreIcon domain={app.storeApp.domain} fallback={app.storeApp.icon} size={size}/>;
@@ -68,5 +74,38 @@ export function AppIconDisplay({ app, size = 26 }) {
   if (HAS_SVG_ICON.has(app.id)) {
     return <NovaSvgIcon id={app.id} size={size}/>;
   }
-  return <span style={{fontSize: size*0.85, lineHeight: 1, display: "block"}}>{app.icon || "📦"}</span>;
+  // Emoji-fallback: wrap in a same-sized box so layout matches SVG/Store icons.
+  return (
+    <div style={{
+      width: size, height: size,
+      borderRadius: Math.round(size * 0.22),
+      background: "rgba(255,255,255,0.07)",
+      border: "1px solid rgba(255,255,255,0.08)",
+      display: "flex", alignItems: "center", justifyContent: "center",
+      fontSize: size * 0.65, lineHeight: 1,
+    }}>{app.icon || "📦"}</div>
+  );
+}
+
+// v7.7 — Nova OS brand mark. Used in the taskbar start menu button (replaces
+// the previous "◈" glyph) and re-usable for any future "Nova OS logo here"
+// surface. Self-contained SVG so it scales cleanly at any size without
+// pulling in the heavier filtered version from /public/nova-icon.svg.
+export function NovaLogo({ size = 22 }) {
+  const gradId = "novaLogoBg-" + size; // unique per render so multiple instances don't share id
+  return (
+    <svg width={size} height={size} viewBox="0 0 1024 1024" style={{display: "block"}}>
+      <defs>
+        <linearGradient id={gradId} x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%"   stopColor="#6366f1"/>
+          <stop offset="50%"  stopColor="#a855f7"/>
+          <stop offset="100%" stopColor="#06b6d4"/>
+        </linearGradient>
+      </defs>
+      <rect width="1024" height="1024" rx="200" fill={"url(#" + gradId + ")"}/>
+      <text x="512" y="720" textAnchor="middle"
+            fontFamily="Space Grotesk, Helvetica, sans-serif"
+            fontSize="640" fontWeight="700" fill="white">N</text>
+    </svg>
+  );
 }
