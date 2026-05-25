@@ -7,6 +7,8 @@
   ],
   "permissions": [
     "core:default",
+    "core:window:allow-set-fullscreen",
+    "core:window:allow-is-fullscreen",
     {
       "identifier": "shell:allow-open",
       "allow": [{ "url": "https://**" }, { "url": "http://**" }, { "url": "mailto:**" }]

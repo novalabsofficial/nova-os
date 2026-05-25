@@ -1,5 +1,5 @@
 
-// NOVA OS v7.7 — Nova Systems
+// NOVA OS v7.8 — Nova Systems
 // Drop this into src/NovaOS.jsx
  
 import { useState, useEffect, useRef, useCallback, lazy, Suspense } from "react";
@@ -12,6 +12,7 @@ import {
   WIDGET_SNAP,
 } from "./lib/constants.js";
 import { hexRgb, fill, bdr, isUrl } from "./lib/format.js";
+import { toggleFullscreen } from "./lib/fullscreen.js";
 import { defaultIconPos, snapToFreeGrid, snapW } from "./lib/geometry.js";
 import { autoModerate, isAdmin, isPubliclyVisible } from "./lib/moderation.js";
 import { rewriteForIframe, isLikelyUnframable } from "./lib/browser.js";
@@ -437,6 +438,15 @@ export default function NovaOS(){
         e.preventDefault();
         const top = [...(winsRef.current || [])].filter(w => w.state !== "minimized").sort((a,b) => (b.z||0) - (a.z||0))[0];
         if(top) h.minimizeWin(top.id);
+        return;
+      }
+      // v7.8: F11 — toggle fullscreen (universal "fullscreen" key across OSes
+      // and browsers). preventDefault keeps the browser from doing its own
+      // F11 behavior on web — we want the Fullscreen API path instead so
+      // PWA installs get consistent behavior with browser tabs.
+      if(e.key === "F11" && !isTyping){
+        e.preventDefault();
+        toggleFullscreen();
         return;
       }
     }

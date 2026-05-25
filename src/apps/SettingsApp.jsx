@@ -5,8 +5,17 @@ import { WALLPAPERS, ACCENT_PRESETS, WIDGET_CONFIGS } from "../ui/constants.js";
 import { Toggle } from "../ui/Toggle.jsx";
 import { getSoundConfig, setSoundConfig, playSound, setSoundWallpaper } from "../lib/audio.js";
 import { db } from "../lib/db.js";
+import { isFullscreen, toggleFullscreen, onFullscreenChange } from "../lib/fullscreen.js";
 
 export function SettingsApp({user,data,updateSettings,showToast,AC,onCustomWallpaper,onLogout}){
+  // v7.8: live fullscreen state. Subscribes to fullscreenchange events so
+  // the toggle stays in sync even when the user exits via Esc or F11
+  // outside of this Settings UI.
+  const [fs, setFs] = useState(()=>isFullscreen());
+  useEffect(()=>{
+    setFs(isFullscreen());
+    return onFullscreenChange(setFs);
+  },[]);
   // Sound preferences live in localStorage (read inside playSound on each call)
   // so they take effect instantly without a Firestore round-trip. We mirror
   // them into local state here purely so the slider/toggle re-render.
@@ -40,6 +49,12 @@ export function SettingsApp({user,data,updateSettings,showToast,AC,onCustomWallp
       <div style={{...SEC,marginTop:20}}>Window Blur</div>
       <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:20}}><input type="range" min={0} max={30} value={settings.winBlur??18} onChange={e=>updateSettings({winBlur:+e.target.value})} style={{flex:1,accentColor:AC}}/><span style={{fontSize:11,fontFamily:FFM,color:"rgba(255,255,255,0.4)",width:32}}>{settings.winBlur??18}px</span></div>
       <div style={SEC}>Display</div>
+      {/* v7.8: Fullscreen toggle. Tauri desktop calls native window setFullscreen
+          (hides title bar + OS chrome). Web/PWA uses the HTML Fullscreen API.
+          Either way the underlying state is live-mirrored back into `fs` so
+          the toggle position stays correct if the user exits via Esc/F11. */}
+      <Toggle label="Fullscreen Mode" value={fs} onChange={()=>{toggleFullscreen();}} ac={AC}/>
+      <div style={{fontSize:10,color:"rgba(255,255,255,0.32)",marginBottom:10,fontStyle:"italic",marginTop:-4}}>Tip: press <strong style={{color:"rgba(255,255,255,0.55)"}}>F11</strong> any time to toggle.</div>
       <Toggle label="24-Hour Clock" value={!!settings.clock24h}  onChange={v=>updateSettings({clock24h:v})}  ac={AC}/>
       <Toggle label="Large Text"    value={!!settings.largeFont} onChange={v=>updateSettings({largeFont:v})} ac={AC}/>
       {/* v6.4: when on, the OS saves which apps are open + their positions
@@ -91,6 +106,7 @@ export function SettingsApp({user,data,updateSettings,showToast,AC,onCustomWallp
           ["Esc",              "Close start menu / dialogs"],
           ["Alt + W",          "Close active window"],
           ["Alt + M",          "Minimize active window"],
+          ["F11",              "Toggle fullscreen"],
         ].map(([combo, action])=>(
           <div key={combo} style={{display:"flex",alignItems:"center",gap:10,fontSize:12,color:"rgba(255,255,255,0.78)"}}>
             <span style={{fontFamily:FFM,fontSize:11,padding:"2px 7px",background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.12)",borderRadius:4,color:"rgba(255,255,255,0.88)",minWidth:120,textAlign:"center"}}>{combo}</span>
