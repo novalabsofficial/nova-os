@@ -71,83 +71,66 @@ function AuroraBg() {
   );
 }
 
-// v8.0 — Azure: a clean blue wallpaper designed to feel like the kind that
-// ships preinstalled with Windows 11 or macOS Monterey. Layered abstraction:
-//   • Deep navy base + gradient sweep
-//   • Two large soft light blobs (top-left bright, bottom-right deep)
-//   • Curved aurora-like ribbon flowing across the canvas — gives it the
-//     "designer wallpaper" quality without ever leaving cool blue territory
-//   • Subtle starfield for depth (no rainbow speckles — kept restrained)
-function AzureBg() {
+// v8.0 — Bloom: a macOS-Sequoia-style abstract bloom wallpaper. Three large
+// soft glowing color shapes (pink/purple center, cyan upper-left, amber
+// lower-right) blended together on a deep dark base. Heavy gaussian blur
+// makes the colors melt into each other, creating that "stock OS" quality
+// where the wallpaper feels designed but not busy. Vignette pulls the eye
+// toward the center bloom.
+function BloomBg() {
   return (
     <svg style={{position:"absolute",inset:0,width:"100%",height:"100%"}} viewBox="0 0 1440 900" preserveAspectRatio="xMidYMid slice">
       <defs>
-        {/* Base gradient — deep navy at top fading to a brighter blue */}
-        <linearGradient id="azBase" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%"   stopColor="#0a1c38"/>
-          <stop offset="40%"  stopColor="#0e2e5c"/>
-          <stop offset="80%"  stopColor="#1656a8"/>
-          <stop offset="100%" stopColor="#1f6dcc"/>
-        </linearGradient>
-        {/* Top-left brightening — like a high-key sun */}
-        <radialGradient id="azBlob1" cx="22%" cy="28%" r="55%">
-          <stop offset="0%"   stopColor="#8ec3ff" stopOpacity="0.55"/>
-          <stop offset="60%"  stopColor="#4d8bd9" stopOpacity="0.18"/>
-          <stop offset="100%" stopColor="#0a1c38" stopOpacity="0"/>
+        {/* Center bloom — pink core fading through magenta to dark.
+            This is the "subject" of the wallpaper. */}
+        <radialGradient id="bloom-core" cx="50%" cy="55%" r="48%">
+          <stop offset="0%"   stopColor="#ff5ea8" stopOpacity="0.95"/>
+          <stop offset="22%"  stopColor="#ec4899" stopOpacity="0.85"/>
+          <stop offset="48%"  stopColor="#a855f7" stopOpacity="0.55"/>
+          <stop offset="78%"  stopColor="#3b0764" stopOpacity="0.12"/>
+          <stop offset="100%" stopColor="#0a0418" stopOpacity="0"/>
         </radialGradient>
-        {/* Bottom-right cool deepening */}
-        <radialGradient id="azBlob2" cx="80%" cy="82%" r="55%">
-          <stop offset="0%"   stopColor="#1e4a8a" stopOpacity="0.7"/>
-          <stop offset="100%" stopColor="#0a1c38" stopOpacity="0"/>
+        {/* Cool accent (upper-left) — cyan bleeding through */}
+        <radialGradient id="bloom-cool" cx="28%" cy="32%" r="42%">
+          <stop offset="0%"   stopColor="#22d3ee" stopOpacity="0.7"/>
+          <stop offset="55%"  stopColor="#0e7490" stopOpacity="0.2"/>
+          <stop offset="100%" stopColor="#0a0418" stopOpacity="0"/>
         </radialGradient>
-        {/* Subtle aurora ribbon */}
-        <linearGradient id="azRibbon" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0%"   stopColor="#7ec0ff" stopOpacity="0"/>
-          <stop offset="50%"  stopColor="#a8d3ff" stopOpacity="0.32"/>
-          <stop offset="100%" stopColor="#7ec0ff" stopOpacity="0"/>
-        </linearGradient>
-        <filter id="azBlur"><feGaussianBlur stdDeviation="50"/></filter>
-        <filter id="azBlurLight"><feGaussianBlur stdDeviation="22"/></filter>
-        {/* Slight vignette — pulls the eye toward the center */}
-        <radialGradient id="azVign" cx="50%" cy="50%" r="80%">
+        {/* Warm accent (lower-right) — amber/peach */}
+        <radialGradient id="bloom-warm" cx="78%" cy="70%" r="40%">
+          <stop offset="0%"   stopColor="#fb923c" stopOpacity="0.55"/>
+          <stop offset="100%" stopColor="#fb923c" stopOpacity="0"/>
+        </radialGradient>
+        {/* Heavy blur to melt all the layers into each other */}
+        <filter id="bloom-blur"><feGaussianBlur stdDeviation="70"/></filter>
+        {/* Vignette — soft edges, draws the eye into the bloom */}
+        <radialGradient id="bloom-vign" cx="50%" cy="50%" r="80%">
           <stop offset="55%" stopColor="#000" stopOpacity="0"/>
-          <stop offset="100%" stopColor="#000" stopOpacity="0.32"/>
+          <stop offset="100%" stopColor="#000" stopOpacity="0.45"/>
         </radialGradient>
       </defs>
 
-      {/* Layer 1: base gradient */}
-      <rect width="1440" height="900" fill="url(#azBase)"/>
+      {/* Layer 1: deep dark base */}
+      <rect width="1440" height="900" fill="#080214"/>
 
-      {/* Layer 2: soft light/dark blobs */}
-      <g filter="url(#azBlur)">
-        <rect width="1440" height="900" fill="url(#azBlob1)"/>
-        <rect width="1440" height="900" fill="url(#azBlob2)"/>
+      {/* Layer 2: the three glowing blooms — heavily blurred so they melt */}
+      <g filter="url(#bloom-blur)">
+        <rect width="1440" height="900" fill="url(#bloom-cool)"/>
+        <rect width="1440" height="900" fill="url(#bloom-warm)"/>
+        <rect width="1440" height="900" fill="url(#bloom-core)"/>
       </g>
 
-      {/* Layer 3: aurora ribbon flowing diagonally — gives the wallpaper its
-          signature curved-light feel without being too busy. Two passes so the
-          ribbon has both a wide soft glow and a tighter bright core. */}
-      <g filter="url(#azBlur)">
-        <path d="M -100 620 Q 360 420 720 540 Q 1080 660 1540 460 L 1540 720 Q 1080 880 720 760 Q 360 640 -100 820 Z"
-              fill="url(#azRibbon)" opacity="0.85"/>
-      </g>
-      <g filter="url(#azBlurLight)">
-        <path d="M -50 600 Q 360 460 720 560 Q 1080 660 1490 480 L 1490 600 Q 1080 760 720 660 Q 360 580 -50 720 Z"
-              fill="url(#azRibbon)" opacity="0.5"/>
-      </g>
-
-      {/* Layer 4: subtle restrained starfield. Only a few, only small — this
-          isn't a "space" wallpaper, just adds the slightest texture to dark
-          regions so the background doesn't look like dead vinyl. */}
-      {[...Array(28)].map((_, i) => {
-        const x = (i*167.3+71)%1440, y = (i*89.7+23)%480;  // top half only
-        const r = i%5===0 ? 1.2 : 0.6;
-        const op = 0.22 + (i%3)*0.08;
-        return <circle key={i} cx={x} cy={y} r={r} fill={"rgba(220,240,255,"+op+")"}/>;
+      {/* Layer 3: a few subtle highlight specks where the bloom meets dark.
+          Helps prevent banding on lower-color-depth displays. */}
+      {[...Array(18)].map((_, i) => {
+        const x = (i*191.3+47)%1440, y = (i*113.7+29)%900;
+        const r = i%5===0 ? 1.1 : 0.5;
+        const op = 0.16 + (i%3)*0.05;
+        return <circle key={i} cx={x} cy={y} r={r} fill={"rgba(255,240,255,"+op+")"}/>;
       })}
 
-      {/* Layer 5: vignette */}
-      <rect width="1440" height="900" fill="url(#azVign)"/>
+      {/* Layer 4: vignette */}
+      <rect width="1440" height="900" fill="url(#bloom-vign)"/>
     </svg>
   );
 }
@@ -232,7 +215,7 @@ export function Wallpaper({ id, customUrl }) {
   if (id === "aurora")       return <AuroraBg/>;
   if (id === "nova")         return <NovaBg/>;
   if (id === "bliss")        return <BlissBg/>;
-  if (id === "azure")        return <AzureBg/>;
+  if (id === "bloom")        return <BloomBg/>;
   if (id === "prism")        return <PrismBg/>;
   const wp = WALLPAPERS[id];
   if (wp && wp.grad) {

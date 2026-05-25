@@ -121,7 +121,7 @@ const SOUND_WALLPAPER_LS_KEY = "nova-sound-wallpaper";
 const WALLPAPER_SEMITONES = {
   mesh:   0,
   // v8.0 additions
-  azure:  0,
+  bloom:  3,
   prism:  6,
   glass:  4,
   solar: -2,
