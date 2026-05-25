@@ -8,7 +8,7 @@ export const COLL = "nova_storage";
 // header. Update this when you do a version sweep — package.json /
 // tauri.conf.json still need their own bumps but at least *display* text
 // won't drift again. Format: "<major>.<minor>".
-export const NOVA_VERSION = "7.8";
+export const NOVA_VERSION = "8.0";
 
 // Widget metadata: label/emoji + minimum size constraints used by WidgetShell.
 export const WIDGET_CONFIGS = {

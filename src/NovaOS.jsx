@@ -1,5 +1,5 @@
 
-// NOVA OS v7.8 — Nova Systems
+// NOVA OS v8.0 — Nova Systems (UI refresh branch)
 // Drop this into src/NovaOS.jsx
  
 import { useState, useEffect, useRef, useCallback, lazy, Suspense } from "react";
@@ -795,7 +795,22 @@ export default function NovaOS(){
         const isDrg=iconDrag?.id===app.id;
         function launch(){if(app.storeApp){if(app.storeApp.newTab)openExternalUrl(app.storeApp.url);else openApp("browser");}else openApp(app.id);}
         return(
-          <div key={app.id} style={{position:"absolute",left:pos.x,top:pos.y,width:ICON_W,zIndex:isDrg?500:2,cursor:isDrg?"grabbing":"grab",userSelect:"none",display:"flex",flexDirection:"column",alignItems:"center",gap:4,padding:"8px 4px",borderRadius:9,background:"rgba(0,0,0,0.1)",border:"1px solid transparent",transition:isDrg?"none":"background 0.18s cubic-bezier(0.4,0,0.2,1), left 0.25s cubic-bezier(0.4,0,0.2,1), top 0.25s cubic-bezier(0.4,0,0.2,1)",boxShadow:isDrg?"0 8px 32px rgba(0,0,0,0.6)":"none"}}
+          <div key={app.id} style={{
+            position:"absolute",left:pos.x,top:pos.y,width:ICON_W,
+            zIndex:isDrg?500:2,
+            cursor:isDrg?"grabbing":"grab",userSelect:"none",
+            display:"flex",flexDirection:"column",alignItems:"center",gap:6,
+            padding:"10px 4px 8px",
+            borderRadius:11,
+            // v8.0: lighter resting background, accent-tinged shadow during
+            // drag for a more lifted feel. The .di hover class adds a brighter
+            // background + soft outline ring (see styles.js).
+            background:isDrg?"rgba(20,22,40,0.5)":"rgba(0,0,0,0.08)",
+            border:"1px solid "+(isDrg?"rgba(255,255,255,0.16)":"transparent"),
+            backdropFilter:isDrg?"blur(8px)":"none",
+            transition:isDrg?"none":"background 0.22s cubic-bezier(0.4,0,0.2,1), border-color 0.22s cubic-bezier(0.4,0,0.2,1), left 0.28s cubic-bezier(0.4,0,0.2,1), top 0.28s cubic-bezier(0.4,0,0.2,1)",
+            boxShadow:isDrg?"0 10px 30px rgba(0,0,0,0.5), 0 1px 0 rgba(255,255,255,0.08) inset":"none",
+          }}
             className={isDrg?"":"di"} title={app.desc}
             onPointerDown={e=>onIconMouseDown(e,app.id,allDesktopIcons)}
             onDoubleClick={launch}
@@ -819,46 +834,75 @@ export default function NovaOS(){
               {type:"divider"},
               {icon:"📋", label:"Copy app name", onClick:()=>{try{navigator.clipboard?.writeText(app.label);showToast("Copied");}catch{}}},
             ])}>
-            <div style={{pointerEvents:"none",display:"flex",alignItems:"center",justifyContent:"center",filter:"drop-shadow(0 2px 6px rgba(0,0,0,0.7))"}}>
-              <AppIconDisplay app={app} size={28}/>
+            <div style={{pointerEvents:"none",display:"flex",alignItems:"center",justifyContent:"center",filter:"drop-shadow(0 3px 8px rgba(0,0,0,0.55))"}}>
+              <AppIconDisplay app={app} size={32}/>
             </div>
-            <span style={{fontFamily:FF,fontWeight:600,fontSize:10,color:"#fff",textAlign:"center",lineHeight:1.2,textShadow:"0 1px 4px #000",pointerEvents:"none"}}>{app.label}</span>
+            <span style={{fontFamily:FFB,fontWeight:600,fontSize:10.5,color:"#fff",textAlign:"center",lineHeight:1.25,textShadow:"0 1px 3px rgba(0,0,0,0.9), 0 0 8px rgba(0,0,0,0.5)",pointerEvents:"none",letterSpacing:0.15}}>{app.label}</span>
           </div>
         );
       })}
  
-      {/* Start menu */}
-      {menuOpen&&(<div ref={menuRef} style={{position:"fixed",bottom:TASKBAR_H,left:0,width:360,background:"rgba(9,11,24,0.97)",backdropFilter:"blur(30px)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:"0 14px 0 0",boxShadow:"6px -6px 48px rgba(0,0,0,0.65)",zIndex:9998,display:"flex",flexDirection:"column",animation:"menu-up 0.22s cubic-bezier(0.4,0,0.2,1)",overflow:"hidden"}}>
-        <div style={{padding:"16px 16px 10px"}}><div style={{display:"flex",alignItems:"center",gap:9,background:"rgba(255,255,255,0.08)",border:"1px solid rgba(255,255,255,0.12)",borderRadius:9,padding:"9px 14px"}}><span style={{fontSize:13,opacity:0.5}}>🔍</span><input value={menuSrch} onChange={e=>setMenuSrch(e.target.value)} placeholder="Search apps…" autoFocus style={{flex:1,background:"none",border:"none",outline:"none",color:"rgba(255,255,255,0.92)",fontFamily:FF,fontSize:14}}/>{menuSrch&&<button onClick={()=>setMenuSrch("")} style={{background:"none",border:"none",color:"rgba(255,255,255,0.3)",cursor:"pointer",fontSize:13}}>✕</button>}</div></div>
-        <div style={{padding:"0 14px 14px",flex:1,overflowY:"auto"}}>
+      {/* Start menu — v8.0 refresh.
+          Wider (420 vs 360), more breathing room around the search bar, app
+          grid spaced more generously, footer user-card gains a subtle accent
+          highlight. Backdrop now blurs heavier with a slight saturation boost,
+          and corners are uniformly rounded on the top instead of squared at
+          the left edge — the menu looks like a floating panel, not glued to
+          the screen edge. */}
+      {menuOpen&&(<div ref={menuRef} style={{
+        position:"fixed",bottom:TASKBAR_H+8,left:8,width:420,maxHeight:"70vh",
+        background:"linear-gradient(180deg, rgba(15,17,32,0.94) 0%, rgba(10,12,24,0.96) 100%)",
+        backdropFilter:"blur(40px) saturate(180%)",
+        WebkitBackdropFilter:"blur(40px) saturate(180%)",
+        border:"1px solid rgba(255,255,255,0.1)",
+        borderRadius:16,
+        boxShadow:"0 8px 16px rgba(0,0,0,0.35), 0 30px 80px rgba(0,0,0,0.55), 0 1px 0 rgba(255,255,255,0.08) inset",
+        zIndex:9998,display:"flex",flexDirection:"column",
+        animation:"menu-up 0.26s cubic-bezier(0.16,1,0.3,1)",
+        overflow:"hidden",
+      }}>
+        {/* Search bar — gains an accent-tinged border on focus via CSS focus-visible */}
+        <div style={{padding:"18px 18px 12px",flexShrink:0}}>
+          <div style={{display:"flex",alignItems:"center",gap:10,background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:11,padding:"11px 16px",transition:"border-color 0.2s, background 0.2s"}}>
+            <span style={{fontSize:14,opacity:0.55}}>🔍</span>
+            <input value={menuSrch} onChange={e=>setMenuSrch(e.target.value)} placeholder="Search apps…" autoFocus style={{flex:1,background:"none",border:"none",outline:"none",color:"rgba(255,255,255,0.95)",fontFamily:FF,fontSize:14}}/>
+            {menuSrch&&<button onClick={()=>setMenuSrch("")} style={{background:"rgba(255,255,255,0.08)",border:"none",color:"rgba(255,255,255,0.5)",cursor:"pointer",fontSize:11,width:20,height:20,borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center"}}>✕</button>}
+          </div>
+        </div>
+        <div style={{padding:"0 16px 18px",flex:1,overflowY:"auto",minHeight:0}}>
           <div style={SEC}>{menuSrch?`Results for "${menuSrch}"`:"All Apps"}</div>
-          <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:4}}>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:6}}>
             {filteredMenu.map(app=>{
               const isHidden=hiddenSet.has(app.id);
+              const isRunning=wins.some(w=>w.app===app.id);
               return(
               <div key={app.id} className="ma"
                 onClick={()=>{setMenuOpen(false);if(app.storeApp){if(app.storeApp.newTab)openExternalUrl(app.storeApp.url);else openApp("browser");}else openApp(app.id);}}
-                // v7.7: right-click in start menu lets you pin/unpin to desktop.
                 onContextMenu={e=>{setMenuOpen(false);openContextMenu(e,[
                   {icon:"▶",label:"Open",onClick:()=>{if(app.storeApp){if(app.storeApp.newTab)openExternalUrl(app.storeApp.url);else openApp("browser");}else openApp(app.id);}},
                   isHidden
                     ? {icon:"+",label:"Add to desktop",onClick:()=>addAppToDesktop(app.id)}
                     : {icon:"–",label:"Remove from desktop",danger:true,onClick:()=>hideAppFromDesktop(app.id)},
                 ]);}}
-                style={{display:"flex",flexDirection:"column",alignItems:"center",gap:5,padding:"12px 4px",borderRadius:9,cursor:"pointer",transition:"background 0.12s",position:"relative"}}>
-                {wins.some(w=>w.app===app.id)&&<div style={{position:"absolute",bottom:4,left:"50%",transform:"translateX(-50%)",width:4,height:4,borderRadius:"50%",background:AC}}/>}
-                <div style={{display:"flex",alignItems:"center",justifyContent:"center",opacity:isHidden?0.55:1}}><AppIconDisplay app={app} size={24}/></div>
-                <span style={{fontFamily:FF,fontWeight:600,fontSize:10,color:isHidden?"rgba(255,255,255,0.5)":"rgba(255,255,255,0.8)",textAlign:"center",lineHeight:1.25}}>{app.label}</span>
+                style={{display:"flex",flexDirection:"column",alignItems:"center",gap:7,padding:"14px 6px 12px",borderRadius:11,cursor:"pointer",position:"relative"}}>
+                {isRunning&&<div style={{position:"absolute",bottom:5,left:"50%",transform:"translateX(-50%)",width:5,height:5,borderRadius:"50%",background:AC,boxShadow:"0 0 6px "+AC}}/>}
+                <div style={{display:"flex",alignItems:"center",justifyContent:"center",opacity:isHidden?0.5:1}}><AppIconDisplay app={app} size={28}/></div>
+                <span style={{fontFamily:FF,fontWeight:600,fontSize:10.5,color:isHidden?"rgba(255,255,255,0.45)":"rgba(255,255,255,0.85)",textAlign:"center",lineHeight:1.3,letterSpacing:0.1}}>{app.label}</span>
               </div>
               );
             })}
-            {filteredMenu.length===0&&<div style={{gridColumn:"span 4",color:"rgba(255,255,255,0.2)",fontFamily:FF,fontStyle:"italic",fontSize:12,textAlign:"center",padding:"18px 0"}}>No apps found</div>}
+            {filteredMenu.length===0&&<div style={{gridColumn:"span 4",color:"rgba(255,255,255,0.25)",fontFamily:FF,fontStyle:"italic",fontSize:12,textAlign:"center",padding:"24px 0"}}>No apps found</div>}
           </div>
         </div>
-        <div style={{padding:"10px 16px",borderTop:"1px solid rgba(255,255,255,0.07)",display:"flex",alignItems:"center",gap:10}}>
-          <div style={{width:32,height:32,borderRadius:"50%",background:fill(AC),border:"1.5px solid "+AC,display:"flex",alignItems:"center",justifyContent:"center",fontSize:15,flexShrink:0}}>👤</div>
-          <div style={{flex:1}}><div style={{fontFamily:FFB,fontWeight:600,fontSize:13,color:"#fff"}}>@{user}</div><div style={{fontFamily:FF,fontSize:10,color:"rgba(255,255,255,0.3)"}}>Nova OS v{NOVA_VERSION}</div></div>
-          <button onClick={logout} style={{padding:"6px 12px",background:"rgba(200,40,40,0.12)",border:"1px solid rgba(200,40,40,0.3)",borderRadius:6,cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:11,color:"rgba(255,140,140,0.9)"}}>Logout</button>
+        {/* User card — accent-tinged background for a subtle highlight,
+            larger avatar pulled to match the rest of the cluster. */}
+        <div style={{padding:"14px 18px",borderTop:"1px solid rgba(255,255,255,0.07)",display:"flex",alignItems:"center",gap:12,background:"linear-gradient(180deg, transparent, rgba(255,255,255,0.02))",flexShrink:0}}>
+          <div style={{width:38,height:38,borderRadius:"50%",background:"linear-gradient(135deg,"+fill(AC)+","+fill(AC)+")",border:"1.5px solid "+AC,display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,flexShrink:0,fontFamily:FFB,fontWeight:700,color:AC,boxShadow:"0 0 12px "+fill(AC)}}>{user.charAt(0).toUpperCase()}</div>
+          <div style={{flex:1,minWidth:0}}>
+            <div style={{fontFamily:FFB,fontWeight:600,fontSize:13.5,color:"#fff",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>@{user}</div>
+            <div style={{fontFamily:FFM,fontSize:10,color:"rgba(255,255,255,0.35)",marginTop:1,letterSpacing:0.3}}>Nova OS v{NOVA_VERSION}</div>
+          </div>
+          <button onClick={logout} title="Sign out" style={{padding:"7px 13px",background:"rgba(255,80,80,0.1)",border:"1px solid rgba(255,80,80,0.28)",borderRadius:8,cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:11,color:"rgba(255,140,140,0.95)",transition:"all 0.18s cubic-bezier(0.4,0,0.2,1)"}}>Logout</button>
         </div>
       </div>)}
  
@@ -870,19 +914,38 @@ export default function NovaOS(){
         // playback / long-lived state survives. Previously we returned null,
         // which unmounted the entire app subtree — Music in particular would
         // stop playback the instant you minimized it.
-        const winStyle=isMax?{position:"fixed",top:0,left:0,right:0,bottom:TASKBAR_H+"px",zIndex:win.z,borderRadius:0}:{position:"absolute",left:win.x,top:win.y,width:win.width,height:win.height,zIndex:win.z,borderRadius:12};
+        //
+        // v8.0 chrome refresh:
+        //   • Border radius 12 → 14 (softer, more modern feel)
+        //   • Multi-layer shadow: ambient + key + inner highlight (was single
+        //     box-shadow). Picks up properly during drag (deeper key shadow
+        //     while moving) for a more physical sense of lift.
+        //   • Title bar gains a soft gradient so it visually separates from
+        //     the app surface without needing a hard border line.
+        //   • Window controls grouped into a subtle pill at the right end of
+        //     the title bar — same hit targets, more cohesive look.
+        const winRadius = 14;
+        const winShadow = isDrg
+          ? "0 14px 28px rgba(0,0,0,0.45), 0 40px 100px rgba(0,0,0,0.7), 0 1px 0 rgba(255,255,255,0.1) inset"
+          : "0 4px 8px rgba(0,0,0,0.25), 0 18px 60px rgba(0,0,0,0.5), 0 1px 0 rgba(255,255,255,0.08) inset";
+        const winStyle=isMax?{position:"fixed",top:0,left:0,right:0,bottom:TASKBAR_H+"px",zIndex:win.z,borderRadius:0}:{position:"absolute",left:win.x,top:win.y,width:win.width,height:win.height,zIndex:win.z,borderRadius:winRadius};
         const minimizedStyle=isMin?{display:"none"}:{};
         return(
-          <div key={win.id} onClick={()=>focusWin(win.id)} style={{...winStyle,...minimizedStyle,background:"rgba(10,12,26,0.93)",border:"1px solid rgba(255,255,255,0.1)",boxShadow:"0 "+(isDrg?30:15)+"px "+(isDrg?90:50)+"px rgba(0,0,0,"+(isDrg?0.8:0.6)+")",display:isMin?"none":"flex",flexDirection:"column",animation:"win-in 0.24s cubic-bezier(0.16,1,0.3,1)",backdropFilter:"blur("+winBlur+"px)",transition:isDrg?"box-shadow 0.18s cubic-bezier(0.4,0,0.2,1)":"box-shadow 0.18s cubic-bezier(0.4,0,0.2,1), left 0.28s cubic-bezier(0.4,0,0.2,1), top 0.28s cubic-bezier(0.4,0,0.2,1), width 0.28s cubic-bezier(0.4,0,0.2,1), height 0.28s cubic-bezier(0.4,0,0.2,1)",overflow:"hidden"}}>
+          <div key={win.id} onClick={()=>focusWin(win.id)} style={{...winStyle,...minimizedStyle,background:"rgba(10,12,24,0.92)",border:"1px solid rgba(255,255,255,0.09)",boxShadow:winShadow,display:isMin?"none":"flex",flexDirection:"column",animation:"win-in 0.28s cubic-bezier(0.16,1,0.3,1)",backdropFilter:"blur("+winBlur+"px) saturate(160%)",WebkitBackdropFilter:"blur("+winBlur+"px) saturate(160%)",transition:isDrg?"box-shadow 0.18s cubic-bezier(0.4,0,0.2,1)":"box-shadow 0.22s cubic-bezier(0.4,0,0.2,1), left 0.28s cubic-bezier(0.4,0,0.2,1), top 0.28s cubic-bezier(0.4,0,0.2,1), width 0.28s cubic-bezier(0.4,0,0.2,1), height 0.28s cubic-bezier(0.4,0,0.2,1)",overflow:"hidden"}}>
             {!isMax&&<ResizeHandles winId={win.id} onStartResize={startResize} touchy={touchy}/>}
-            <div onPointerDown={e=>!isMax&&startDrag(e,win.id)} style={{height:38,display:"flex",alignItems:"center",padding:"0 8px 0 12px",gap:9,background:"rgba(255,255,255,0.04)",borderBottom:"1px solid rgba(255,255,255,0.07)",borderRadius:isMax?"0":"12px 12px 0 0",cursor:isMax?"default":isDrg?"grabbing":"grab",userSelect:"none",flexShrink:0,touchAction:"none"}}>
-              <div style={{display:"flex",alignItems:"center",justifyContent:"center"}}><AppIconDisplay app={{id:win.app,icon:app?.icon||"📦"}} size={16}/></div>
-              <span style={{flex:1,fontFamily:FFB,fontWeight:600,fontSize:13,color:"rgba(255,255,255,0.88)"}}>{app?.label}</span>
-              <button className="wn" onPointerDown={e=>e.stopPropagation()} onClick={e=>{e.stopPropagation();minimizeWin(win.id);}} style={{width:26,height:26,borderRadius:6,background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.09)",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,color:"rgba(255,255,255,0.5)",transition:"background 0.12s",flexShrink:0}}>–</button>
-              <button className="wm" onPointerDown={e=>e.stopPropagation()} onClick={e=>{e.stopPropagation();maximizeWin(win.id);}} style={{width:26,height:26,borderRadius:6,background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.09)",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,color:"rgba(255,255,255,0.5)",transition:"background 0.12s",flexShrink:0}}>{isMax?"❐":"⬜"}</button>
-              <button className="wx" onPointerDown={e=>e.stopPropagation()} onClick={e=>{e.stopPropagation();closeWin(win.id);}} style={{width:26,height:26,borderRadius:6,background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.09)",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,color:"rgba(255,255,255,0.5)",transition:"background 0.12s, color 0.12s",flexShrink:0}}>✕</button>
+            <div onPointerDown={e=>!isMax&&startDrag(e,win.id)} style={{height:40,display:"flex",alignItems:"center",padding:"0 6px 0 14px",gap:10,background:"linear-gradient(180deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.02) 100%)",borderBottom:"1px solid rgba(255,255,255,0.06)",borderRadius:isMax?"0":winRadius+"px "+winRadius+"px 0 0",cursor:isMax?"default":isDrg?"grabbing":"grab",userSelect:"none",flexShrink:0,touchAction:"none"}}>
+              <div style={{display:"flex",alignItems:"center",justifyContent:"center"}}><AppIconDisplay app={{id:win.app,icon:app?.icon||"📦"}} size={18}/></div>
+              <span style={{flex:1,fontFamily:FFB,fontWeight:600,fontSize:13,color:"rgba(255,255,255,0.92)",letterSpacing:0.2}}>{app?.label}</span>
+              {/* v8.0 — window controls grouped into a soft cluster. Hover
+                  effects are CSS-driven via the .wn/.wm/.wx classes; the
+                  close button gets a red bg, others a subtle lift. */}
+              <div style={{display:"flex",alignItems:"center",gap:2,padding:2,borderRadius:9}}>
+                <button className="wn" onPointerDown={e=>e.stopPropagation()} onClick={e=>{e.stopPropagation();minimizeWin(win.id);}} title="Minimize" style={{width:26,height:26,borderRadius:7,background:"transparent",border:"1px solid transparent",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,color:"rgba(255,255,255,0.55)",flexShrink:0,padding:0,lineHeight:1}}>—</button>
+                <button className="wm" onPointerDown={e=>e.stopPropagation()} onClick={e=>{e.stopPropagation();maximizeWin(win.id);}} title={isMax?"Restore":"Maximize"} style={{width:26,height:26,borderRadius:7,background:"transparent",border:"1px solid transparent",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,color:"rgba(255,255,255,0.55)",flexShrink:0,padding:0}}>{isMax?"❐":"⬜"}</button>
+                <button className="wx" onPointerDown={e=>e.stopPropagation()} onClick={e=>{e.stopPropagation();closeWin(win.id);}} title="Close" style={{width:26,height:26,borderRadius:7,background:"transparent",border:"1px solid transparent",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,color:"rgba(255,255,255,0.55)",flexShrink:0,padding:0}}>✕</button>
+              </div>
             </div>
-            <div style={{flex:1,overflowY:"auto",overflowX:"hidden",padding:18,minWidth:0}}>
+            <div style={{flex:1,overflowY:"auto",overflowX:"hidden",padding:20,minWidth:0}}>
               {/* Each app is lazy-loaded — Suspense shows the spinner while the
                   chunk is downloading. Once cached, reopens are instant.
                   Per-window Suspense means opening Tetris doesn't blank out
