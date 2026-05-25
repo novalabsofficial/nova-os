@@ -92,8 +92,19 @@ export async function openDmByUsername(otherUsername, myUid, myUsername) {
   }
   const threadId = threadIdFor(myUid, other.uid);
   const threadRef = doc(firestoreDb, "nova_dm_threads", threadId);
-  const snap = await getDoc(threadRef);
-  if (!snap.exists()) {
+  // v7.5: getDoc may throw permission-denied on a non-existent thread doc
+  // under older rules (pre-7.5 read rule didn't allow `resource == null`).
+  // Treat any read failure as "thread doesn't exist yet" — the subsequent
+  // setDoc has its own create rule that gates against impersonation, so this
+  // never grants access we shouldn't have.
+  let exists = false;
+  try {
+    const snap = await getDoc(threadRef);
+    exists = snap.exists();
+  } catch {
+    exists = false;
+  }
+  if (!exists) {
     // First message between this pair — create the thread doc. Note that
     // both rules and sort ordering depend on participantUids being sorted.
     await setDoc(threadRef, {

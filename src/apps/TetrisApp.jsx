@@ -14,11 +14,19 @@ export function TetrisApp({AC}){
   const [paused,setPaused]=useState(false);
   // Refs let the keyboard handler and the gravity tick read the latest values
   // without becoming dependencies that re-create handlers every render.
+  //
+  // v7.5 fix: `next` needs a ref too. The gravity interval and key handler
+  // both bake `lockAndSpawn` into closures that re-attach only on level/over/paused
+  // changes — without a ref, every spawn re-uses the same stale `next` and
+  // the game appears to lock you to a single piece forever.
   const gridRef=useRef(grid);   useEffect(()=>{gridRef.current=grid;},[grid]);
   const pieceRef=useRef(piece); useEffect(()=>{pieceRef.current=piece;},[piece]);
+  const nextRef=useRef(next);   useEffect(()=>{nextRef.current=next;},[next]);
 
   function newGame(){
-    setGrid(tetrisEmpty());setPiece(tetrisRandom());setNext(tetrisRandom());
+    const startPiece=tetrisRandom(), startNext=tetrisRandom();
+    setGrid(tetrisEmpty());setPiece(startPiece);setNext(startNext);
+    pieceRef.current=startPiece;nextRef.current=startNext;
     setScore(0);setLines(0);setLevel(1);setOver(false);setPaused(false);
   }
 
@@ -62,10 +70,14 @@ export function TetrisApp({AC}){
         return n;
       });
     }
-    const spawned=next;
+    // Read the latest next-piece from the ref, not the closure (which stays
+    // stale because the gravity interval / key handler don't re-bind every render).
+    const spawned=nextRef.current;
     const newNext=tetrisRandom();
+    nextRef.current=newNext;
     setNext(newNext);
     if(!tetrisFits(cleared,spawned)){setOver(true);return;}
+    pieceRef.current=spawned;
     setPiece(spawned);
   }
 

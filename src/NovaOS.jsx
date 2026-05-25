@@ -1,5 +1,5 @@
 
-// NOVA OS v7.4 — Nova Systems
+// NOVA OS v7.5 — Nova Systems
 // Drop this into src/NovaOS.jsx
  
 import { useState, useEffect, useRef, useCallback, lazy, Suspense } from "react";
@@ -591,7 +591,7 @@ export default function NovaOS(){
       <div style={{position:"absolute",top:"60%",left:"35%",width:520,height:520,borderRadius:"50%",background:"radial-gradient(circle,rgba(6,182,212,0.10) 0%,transparent 60%)",filter:"blur(50px)",pointerEvents:"none"}}/>
       <div style={{position:"relative",zIndex:1}}>
         <div style={{fontFamily:FFB,fontWeight:700,fontSize:"clamp(40px, 12vw, 72px)",letterSpacing:6,color:"#fff",marginBottom:6,lineHeight:1,animation:"nova-breathe 3.6s ease-in-out infinite"}}>NOVA</div>
-        <div style={{fontFamily:FF,fontSize:11,color:"rgba(255,255,255,0.32)",letterSpacing:6,marginBottom:8,fontWeight:500}}>OPERATING SYSTEM  ·  v7.4</div>
+        <div style={{fontFamily:FF,fontSize:11,color:"rgba(255,255,255,0.32)",letterSpacing:6,marginBottom:8,fontWeight:500}}>OPERATING SYSTEM  ·  v7.5</div>
         {/* Hairline accent — fades in from the version line */}
         <div style={{height:1,width:160,background:"linear-gradient(90deg,rgba(99,102,241,0.6),transparent)",marginBottom:46}}/>
         {bootLines.map((l,i) => (
@@ -638,7 +638,7 @@ export default function NovaOS(){
             animation:"shimmer 4s ease-in-out infinite",
           }}/>
           <div style={{fontFamily:FFB,fontWeight:700,fontSize:42,color:"#fff",textAlign:"center",letterSpacing:6,marginBottom:6,lineHeight:1}}>NOVA</div>
-          <div style={{fontFamily:FF,fontSize:10,color:"rgba(255,255,255,0.28)",textAlign:"center",letterSpacing:5,marginBottom:34,fontWeight:500}}>OPERATING SYSTEM  ·  v7.4</div>
+          <div style={{fontFamily:FF,fontSize:10,color:"rgba(255,255,255,0.28)",textAlign:"center",letterSpacing:5,marginBottom:34,fontWeight:500}}>OPERATING SYSTEM  ·  v7.5</div>
           <div style={{display:"flex",borderBottom:"1px solid rgba(255,255,255,0.09)",marginBottom:24}}>
             {["login","register"].map(m => (
               <button key={m} className="lt" onClick={()=>{setMode(m);setAuthErr("");}} style={{flex:1,padding:"10px 0",background:"none",border:"none",borderBottom:mode===m?"2px solid "+DEFAULT_AC:"2px solid transparent",cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:12,letterSpacing:1,color:mode===m?DEFAULT_AC:"rgba(255,255,255,0.32)",transition:"color 0.18s, border-bottom 0.18s"}}>
@@ -807,7 +807,7 @@ export default function NovaOS(){
         </div>
         <div style={{padding:"10px 16px",borderTop:"1px solid rgba(255,255,255,0.07)",display:"flex",alignItems:"center",gap:10}}>
           <div style={{width:32,height:32,borderRadius:"50%",background:fill(AC),border:"1.5px solid "+AC,display:"flex",alignItems:"center",justifyContent:"center",fontSize:15,flexShrink:0}}>👤</div>
-          <div style={{flex:1}}><div style={{fontFamily:FFB,fontWeight:600,fontSize:13,color:"#fff"}}>@{user}</div><div style={{fontFamily:FF,fontSize:10,color:"rgba(255,255,255,0.3)"}}>Nova OS v7.4</div></div>
+          <div style={{flex:1}}><div style={{fontFamily:FFB,fontWeight:600,fontSize:13,color:"#fff"}}>@{user}</div><div style={{fontFamily:FF,fontSize:10,color:"rgba(255,255,255,0.3)"}}>Nova OS v7.5</div></div>
           <button onClick={logout} style={{padding:"6px 12px",background:"rgba(200,40,40,0.12)",border:"1px solid rgba(200,40,40,0.3)",borderRadius:6,cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:11,color:"rgba(255,140,140,0.9)"}}>Logout</button>
         </div>
       </div>)}
@@ -816,10 +816,14 @@ export default function NovaOS(){
       {wins.map(win=>{
         const app=APPS.find(a=>a.id===win.app);
         const isMax=win.state==="maximized",isMin=win.state==="minimized",isDrg=drag&&drag.winId===win.id;
-        if(isMin)return null;
+        // v7.5: keep minimized windows mounted (display:none) so background
+        // playback / long-lived state survives. Previously we returned null,
+        // which unmounted the entire app subtree — Music in particular would
+        // stop playback the instant you minimized it.
         const winStyle=isMax?{position:"fixed",top:0,left:0,right:0,bottom:TASKBAR_H+"px",zIndex:win.z,borderRadius:0}:{position:"absolute",left:win.x,top:win.y,width:win.width,height:win.height,zIndex:win.z,borderRadius:12};
+        const minimizedStyle=isMin?{display:"none"}:{};
         return(
-          <div key={win.id} onClick={()=>focusWin(win.id)} style={{...winStyle,background:"rgba(10,12,26,0.93)",border:"1px solid rgba(255,255,255,0.1)",boxShadow:"0 "+(isDrg?30:15)+"px "+(isDrg?90:50)+"px rgba(0,0,0,"+(isDrg?0.8:0.6)+")",display:"flex",flexDirection:"column",animation:"win-in 0.24s cubic-bezier(0.16,1,0.3,1)",backdropFilter:"blur("+winBlur+"px)",transition:isDrg?"box-shadow 0.18s cubic-bezier(0.4,0,0.2,1)":"box-shadow 0.18s cubic-bezier(0.4,0,0.2,1), left 0.28s cubic-bezier(0.4,0,0.2,1), top 0.28s cubic-bezier(0.4,0,0.2,1), width 0.28s cubic-bezier(0.4,0,0.2,1), height 0.28s cubic-bezier(0.4,0,0.2,1)",overflow:"hidden"}}>
+          <div key={win.id} onClick={()=>focusWin(win.id)} style={{...winStyle,...minimizedStyle,background:"rgba(10,12,26,0.93)",border:"1px solid rgba(255,255,255,0.1)",boxShadow:"0 "+(isDrg?30:15)+"px "+(isDrg?90:50)+"px rgba(0,0,0,"+(isDrg?0.8:0.6)+")",display:isMin?"none":"flex",flexDirection:"column",animation:"win-in 0.24s cubic-bezier(0.16,1,0.3,1)",backdropFilter:"blur("+winBlur+"px)",transition:isDrg?"box-shadow 0.18s cubic-bezier(0.4,0,0.2,1)":"box-shadow 0.18s cubic-bezier(0.4,0,0.2,1), left 0.28s cubic-bezier(0.4,0,0.2,1), top 0.28s cubic-bezier(0.4,0,0.2,1), width 0.28s cubic-bezier(0.4,0,0.2,1), height 0.28s cubic-bezier(0.4,0,0.2,1)",overflow:"hidden"}}>
             {!isMax&&<ResizeHandles winId={win.id} onStartResize={startResize} touchy={touchy}/>}
             <div onPointerDown={e=>!isMax&&startDrag(e,win.id)} style={{height:38,display:"flex",alignItems:"center",padding:"0 8px 0 12px",gap:9,background:"rgba(255,255,255,0.04)",borderBottom:"1px solid rgba(255,255,255,0.07)",borderRadius:isMax?"0":"12px 12px 0 0",cursor:isMax?"default":isDrg?"grabbing":"grab",userSelect:"none",flexShrink:0,touchAction:"none"}}>
               <div style={{display:"flex",alignItems:"center",justifyContent:"center"}}><AppIconDisplay app={{id:win.app,icon:app?.icon||"📦"}} size={16}/></div>

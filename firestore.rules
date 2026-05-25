@@ -163,7 +163,16 @@ service cloud.firestore {
     // pair of users always lands on the same doc regardless of who started.
     match /nova_dm_threads/{threadId} {
       // Only the two participants (or a mod) can read/list a thread.
+      //
+      // v7.5: `resource == null` clause allows a get() on a thread doc that
+      // doesn't exist yet to return "not found" rather than "permission
+      // denied". Without this, opening a fresh DM between two users fails
+      // because openDmByUsername() does a getDoc → setDoc dance and the
+      // existence check trips the rule. (Returning "not found" is the same
+      // information the unauth user gets via any failed lookup, so this
+      // doesn't leak anything new.)
       allow read: if signedIn() && (
+        resource == null ||
         request.auth.uid in resource.data.participantUids || isMod()
       );
 
@@ -214,8 +223,12 @@ service cloud.firestore {
     // PGN history, turn, and status. Pattern mirrors nova_dm_threads —
     // participants-only access.
     match /nova_chess_games/{gameId} {
-      // Both players can read; mods can audit.
+      // Both players can read; mods can audit. `resource == null` clause
+      // mirrors the DM rule — a get() on a non-existent game doc returns
+      // "not found" rather than throwing a permissions error (so the watcher
+      // doesn't surface a misleading error if a game is deleted out from under it).
       allow read: if signedIn() && (
+        resource == null ||
         request.auth.uid in resource.data.participantUids || isMod()
       );
 
