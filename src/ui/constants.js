@@ -3,6 +3,13 @@
 
 export const COLL = "nova_storage";
 
+// v7.6: single source of truth for the human-readable version string. Used
+// by the boot screen, login footer, terminal version command, and the Store
+// header. Update this when you do a version sweep — package.json /
+// tauri.conf.json still need their own bumps but at least *display* text
+// won't drift again. Format: "<major>.<minor>".
+export const NOVA_VERSION = "7.6";
+
 // Widget metadata: label/emoji + minimum size constraints used by WidgetShell.
 export const WIDGET_CONFIGS = {
   clock:    { label:"Clock",        emoji:"🕐", minW:180, minH:80  },
@@ -110,7 +117,7 @@ export const STORE_CATALOG = [
 export const STORE_CATS = ["All","Games","Media","Tools","Social","News"];
 
 export const BOOT_MSGS = [
-  "NOVA OS v7.5 — Nova Systems",
+  "NOVA OS v" + NOVA_VERSION + " — Nova Systems",
   "Initializing kernel... OK",
   "Loading hardware abstraction layer... OK",
   "Mounting filesystems... OK",

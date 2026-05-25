@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { FF, FFB, FFM, INP, SEC, DEFAULT_AC } from "../ui/styles.js";
 import { fill, bdr, hexRgb } from "../lib/format.js";
-import { APPS, STORE_CATALOG, STORE_CATS } from "../ui/constants.js";
+import { APPS, STORE_CATALOG, STORE_CATS, NOVA_VERSION } from "../ui/constants.js";
 import { AppIconDisplay, StoreIcon } from "../ui/icons.jsx";
 import { autoModerate, isAdmin, isPubliclyVisible } from "../lib/moderation.js";
 import { doc, getDoc, setDoc, updateDoc, deleteDoc, collection, addDoc, query, orderBy, limit, onSnapshot, serverTimestamp } from "firebase/firestore";
@@ -210,7 +210,7 @@ export function StoreApp({user,data,updateData,showToast,AC}){
     <div style={{width:"100%",fontFamily:FF}}>
       {/* Header + search */}
       <div style={{marginBottom:12}}>
-        <div style={{fontFamily:FFB,fontWeight:700,fontSize:20,color:"#fff",marginBottom:8}}>🏪 Nova Store 6.1</div>
+        <div style={{fontFamily:FFB,fontWeight:700,fontSize:20,color:"#fff",marginBottom:8}}>🏪 Nova Store {NOVA_VERSION}</div>
         <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search all apps…" style={INP}/>
       </div>
  

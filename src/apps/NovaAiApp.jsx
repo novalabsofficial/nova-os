@@ -6,8 +6,20 @@ import { aiLoad, aiSave, AI_LS_KEYS, AI_LS_CONFIG, AI_LS_CHATS } from "../lib/ai
 
 export function NovaAiApp({AC, showToast}){
   // Persistent state — loaded from localStorage at first render.
-  const [keys, setKeys]       = useState(()=>aiLoad(AI_LS_KEYS, {claude:"", openai:""}));
-  const [config, setConfig]   = useState(()=>aiLoad(AI_LS_CONFIG, {provider:"claude", model:{claude:AI_PROVIDERS.claude.defaultModel, openai:AI_PROVIDERS.openai.defaultModel}}));
+  // v7.6: existing users have {claude, openai} keys saved; the spread merges
+  // a blank gemini slot so the settings UI picks it up without a re-key event.
+  const [keys, setKeys]       = useState(()=>({claude:"", openai:"", gemini:"", ...aiLoad(AI_LS_KEYS, {})}));
+  const [config, setConfig]   = useState(()=>{
+    const loaded = aiLoad(AI_LS_CONFIG, null);
+    const defaultModels = {
+      claude: AI_PROVIDERS.claude.defaultModel,
+      openai: AI_PROVIDERS.openai.defaultModel,
+      gemini: AI_PROVIDERS.gemini.defaultModel,
+    };
+    if (!loaded) return { provider: "claude", model: defaultModels };
+    // Merge in any new provider defaults so upgrading users gain the gemini slot.
+    return { provider: loaded.provider || "claude", model: { ...defaultModels, ...(loaded.model || {}) } };
+  });
   const [chats, setChats]     = useState(()=>aiLoad(AI_LS_CHATS, []));
   const [activeId, setActiveId] = useState(()=>chats[0]?.id || null);
   const [input, setInput]     = useState("");
@@ -110,7 +122,7 @@ export function NovaAiApp({AC, showToast}){
           <div style={{fontSize:46,filter:"drop-shadow(0 0 18px rgba(168,85,247,0.4))"}}>✨</div>
           <div style={{fontFamily:FFB,fontWeight:700,fontSize:20,color:"rgba(255,255,255,0.85)"}}>Nova AI</div>
           <div style={{fontSize:12,color:"rgba(255,255,255,0.4)",maxWidth:380,lineHeight:1.7}}>
-            Chat with <strong>{AI_PROVIDERS.claude.label}</strong> or <strong>{AI_PROVIDERS.openai.label}</strong> using your own API key.<br/>
+            Chat with <strong>{AI_PROVIDERS.claude.label}</strong>, <strong>{AI_PROVIDERS.openai.label}</strong>, or <strong>{AI_PROVIDERS.gemini.label}</strong> using your own API key.<br/>
             <span style={{color:"rgba(255,255,255,0.3)"}}>All requests go from your browser straight to the provider — Nova OS never sees your key or your messages.</span>
           </div>
           {!hasKey && (
@@ -190,7 +202,7 @@ export function NovaAiApp({AC, showToast}){
         <div style={SEC}>About</div>
         <div style={{fontSize:11,color:"rgba(255,255,255,0.45)",lineHeight:1.65,padding:"10px 12px",background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.06)",borderRadius:7}}>
           Nova AI runs entirely in your browser — your API key, model choice, and chat history live in <code style={{fontFamily:FFM,color:"#fff"}}>localStorage</code> on this device only.<br/><br/>
-          Every API call goes directly from your browser to {AI_PROVIDERS.claude.label} or {AI_PROVIDERS.openai.label}. Nova OS and its operator pay nothing for your usage; you pay your provider's normal per-token rates.
+          Every API call goes directly from your browser to {AI_PROVIDERS.claude.label}, {AI_PROVIDERS.openai.label}, or {AI_PROVIDERS.gemini.label}. Nova OS and its operator pay nothing for your usage; you pay your provider's normal per-token rates.
         </div>
 
         <button onClick={()=>setView("chat")} style={{marginTop:18,width:"100%",padding:"10px 14px",background:fill(AC),border:"1px solid "+bdr(AC),borderRadius:8,cursor:"pointer",fontFamily:FFB,fontWeight:700,fontSize:13,color:AC}}>← Back to chat</button>

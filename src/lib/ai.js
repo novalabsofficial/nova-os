@@ -1,9 +1,10 @@
 // Nova AI provider abstraction.
 //
-// Both Claude (Anthropic) and ChatGPT (OpenAI) speak roughly the same chat-
-// completion shape, so we keep one set of helpers that build the right URL,
-// headers, and payload per provider. The component layer just hands us
-// (provider, model, apiKey, messages) and we return a request spec.
+// Claude (Anthropic), ChatGPT (OpenAI), and Gemini (Google) each speak a
+// slightly different chat-completion shape, but all three support
+// browser-direct API calls with the user's own key. The component layer
+// just hands us (provider, model, apiKey, messages) and we return a request
+// spec tailored to whichever provider is selected.
 //
 // All API calls go *directly* from the user's browser to the provider — there
 // is no Nova-side proxy. The user's API key never touches Firebase or any
@@ -39,6 +40,25 @@ export const PROVIDERS = {
       "gpt-4o-mini",
       "gpt-4-turbo",
       "gpt-3.5-turbo",
+    ],
+  },
+  // v7.6 — Google Gemini via the public Generative Language API. The
+  // endpoint embeds the model in the URL path. We use the streaming variant
+  // with `alt=sse` so the response format matches Claude/OpenAI's
+  // line-delimited "data: {...}" shape — that way the same SSE reader works.
+  gemini: {
+    label: "Gemini",
+    // URL template — model is interpolated by buildRequest.
+    url: "https://generativelanguage.googleapis.com/v1beta/models/{model}:streamGenerateContent?alt=sse",
+    keyHint: "starts with AIza",
+    keyDocsUrl: "https://aistudio.google.com/app/apikey",
+    defaultModel: "gemini-2.5-flash",
+    presetModels: [
+      "gemini-2.5-pro",
+      "gemini-2.5-flash",
+      "gemini-2.5-flash-lite",
+      "gemini-2.0-flash",
+      "gemini-1.5-pro",
     ],
   },
 };
@@ -96,6 +116,32 @@ export function buildRequest(provider, model, apiKey, messages, opts = {}) {
     return { url: PROVIDERS.openai.url, headers, body };
   }
 
+  if (provider === "gemini") {
+    // Gemini uses a different schema: "contents" array, with each message
+    // having a "role" of "user" | "model" (not "assistant") and a "parts"
+    // array of {text} objects. System instructions go in a separate
+    // "systemInstruction" field at the top level.
+    const url = PROVIDERS.gemini.url.replace("{model}", encodeURIComponent(model));
+    const headers = {
+      "Content-Type": "application/json",
+      // x-goog-api-key keeps the key out of the URL (where it would otherwise
+      // appear in `?key=...` and end up in server access logs / referrers).
+      "x-goog-api-key": apiKey,
+    };
+    const body = {
+      contents: messages
+        .filter(m => m.role !== "system")
+        .map(m => ({
+          role: m.role === "assistant" ? "model" : "user",
+          parts: [{ text: m.content }],
+        })),
+    };
+    if (opts.system) {
+      body.systemInstruction = { parts: [{ text: opts.system }] };
+    }
+    return { url, headers, body };
+  }
+
   throw new Error("unknown provider: " + provider);
 }
 
@@ -131,6 +177,18 @@ export function parseStreamLine(provider, line) {
     const choice = json.choices && json.choices[0];
     if (choice && choice.delta && typeof choice.delta.content === "string") {
       return choice.delta.content;
+    }
+    return null;
+  }
+  if (provider === "gemini") {
+    // Gemini streams candidates[0].content.parts[*].text. Each SSE event
+    // may contain multiple text parts; we concatenate them so the caller
+    // gets a single coherent delta per event.
+    const cand = json.candidates && json.candidates[0];
+    const parts = cand?.content?.parts;
+    if (Array.isArray(parts)) {
+      const text = parts.map(p => (typeof p.text === "string" ? p.text : "")).join("");
+      return text || null;
     }
     return null;
   }

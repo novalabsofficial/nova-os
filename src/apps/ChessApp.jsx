@@ -171,7 +171,12 @@ export function ChessApp({ user, AC }) {
     return (
       <div style={{
         display: "grid",
+        // v7.6: explicitly size both axes to 8 equal tracks. Without
+        // gridTemplateRows, empty squares collapsed to ~0 height while
+        // occupied squares stretched to fit their piece, making the board
+        // look ragged. Now every cell is a true square = boardSize / 8.
         gridTemplateColumns: "repeat(8, 1fr)",
+        gridTemplateRows: "repeat(8, 1fr)",
         width: "min(440px, 80vmin)",
         aspectRatio: "1/1",
         border: "2px solid #2a2a3a",
