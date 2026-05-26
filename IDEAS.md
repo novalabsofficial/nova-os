@@ -133,6 +133,155 @@ some things better.
 
 ---
 
+## 7. Window snap layouts
+
+Drag a window to a screen edge → it snaps to half the screen. Drag to
+a corner → snaps to a quarter. Keyboard: `Win+←/→/↑/↓` and equivalents
+on Mac. Plus **Windows 11-style snap groups** — save a window arrangement
+as a named "workspace" and restore it with one click.
+
+**Considerations**
+- Edge-snap is straightforward — already track drag in NovaOS.jsx via
+  `drag` state; just compare `e.clientX/Y` to screen edges on `pointerUp`
+  and snap if within a threshold (e.g., 20px).
+- The "saved workspace" feature needs storage: `data.savedWorkspaces[]`
+  with each entry containing app id + position/size for every window
+  in the group.
+- Visual feedback during edge-snap: show a translucent "ghost" overlay
+  where the window will land, like Windows 11 does.
+- Quarter snaps need a slight pause-on-corner gesture so casual edge
+  drags don't trigger them by accident.
+
+---
+
+## 8. Screenshot tool with annotation
+
+Capture region / single window / full screen → opens an annotation
+overlay where you can draw arrows, highlight rectangles, add text, blur
+sensitive areas. Saves directly to the Photos app gallery.
+
+**Considerations**
+- Browser-only screen capture: `navigator.mediaDevices.getDisplayMedia()`
+  for the full screen; regions and per-window need custom logic
+  (overlay a transparent canvas, let the user drag-select, then
+  composite from the captured frame).
+- Annotation reuses the canvas drawing patterns from PaintApp — same
+  pointer-based stroke handler, plus shape tools (arrow, rect, text)
+  and a one-shot Gaussian blur via filter.
+- Keyboard shortcut: `Shift+Win+S` (Windows convention) or
+  `Cmd+Shift+4` (macOS convention). Detect the platform and bind both.
+- Tauri build can use a more direct OS API; web build uses the
+  Display Media path (user has to grant permission each time).
+
+---
+
+## 9. Wallpaper from your Photos
+
+Pick any photo from the Photos app and use it as your desktop wallpaper.
+Cross-pollinates two existing apps in a really natural way.
+
+**Considerations**
+- The "custom wallpaper" plumbing already exists from v6.2 — accepts a
+  base64 data URL. Just need a "Set as wallpaper" button in the Photos
+  full-size viewer that runs the photo through the same downsample
+  pipeline (max 900px, JPEG quality 0.72) the SettingsApp upload uses
+  and writes to the user-data wallpaper field.
+- The Photos app stores photos as blob URLs (session-only) — for the
+  "set as wallpaper" flow we'd actually need to bake the photo into the
+  user's wallpaper data, so it survives a refresh. The downsampled
+  base64 lives in Firestore on the user data doc; same shape as
+  current custom wallpapers.
+
+---
+
+## 10. Notification badges on app icons
+
+Chat icon shows unread DM count. Atmos icon shows active NWS-alert
+count. Store shows new-app count. Small numeric badge on both the
+desktop icon **and** the taskbar chip.
+
+**Considerations**
+- Need a small per-app badge-count system in NovaOS.jsx — probably a
+  `useState` map keyed by app id, populated by each app's
+  notification logic (Chat watches DM unread counts via the existing
+  Firestore subscription, Atmos counts active alerts, etc.).
+- Render: small red circle with white number in the top-right corner
+  of the icon (similar to the notification bell's existing badge in
+  the taskbar). Capped at 9+ for high counts.
+- Auto-clear when the user opens the app (chat marks DMs as read,
+  Atmos opens the alerts list, etc.). Each app gets a `clearBadge`
+  callback in its props.
+
+---
+
+## 11. Battery widget
+
+Small widget showing current battery percentage + charging state +
+estimated time remaining (when available). Only visible/relevant on
+laptops in the PWA install or Tauri desktop on a battery-powered device.
+
+**Considerations**
+- API: `navigator.getBattery()` returns a `BatteryManager` with
+  `level` (0-1), `charging` (bool), `dischargingTime`, `chargingTime`.
+  Listen for change events to update the UI.
+- Chromium-only — Firefox / Safari deprecated this API. Need a
+  graceful fallback (hide the widget) on browsers without it.
+- Desktops without a battery report `level=1` and `charging=true`
+  perpetually — detect that case and hide the widget rather than show
+  a useless "100% plugged in" forever.
+- Visual: small horizontal battery glyph with fill level, optional
+  lightning bolt icon when charging.
+
+---
+
+## 12. Drag-and-drop between apps
+
+Drag a photo from Photos → drop onto Chat → it gets attached/embedded
+in the message. Drag selected text from Notes → drop into a DM. Drag a
+file from Files → into Chat. Etc.
+
+**Considerations**
+- Native HTML5 drag-and-drop API works across browser windows but is
+  awkward within a single page (which is what Nova OS is). Custom
+  pointer-based drag is more flexible — we already have the muscle
+  memory from icon drag, window drag, widget drag.
+- Need a generic "dragged item" registry — a `useState` for what's
+  currently being dragged, with type (`photo`, `text`, `file`) and
+  payload. Drop targets register handlers that accept certain types.
+- Cross-app data shape: standardize the payload. E.g., dragging a
+  photo passes `{type:"photo", url, name, w, h}`; receiving Chat
+  embeds it as a message attachment.
+- Discoverability: subtle visual hint when a drag is active (drop
+  targets highlight in accent color).
+
+---
+
+## 13. Dynamic wallpapers
+
+Three flavors, picked per wallpaper or globally:
+- **Time-of-day swap:** Lumen during day, Ember at sunset, Halcyon at
+  dusk, Night/Tide at night. Auto-switches based on local time.
+- **Animated parallax:** subtle continuous motion — Mesh's blobs drift
+  slowly, Aurora's curtains shimmer, Prism's colors rotate. A few
+  pixels of motion at low FPS so it's noticeable but never distracting.
+- **Reactive:** wallpaper subtly responds to system state — pulses
+  faster when CPU is high (when we implement real sys info), shifts
+  hue with the accent color, etc.
+
+**Considerations**
+- Time-of-day: easy — pick a time bucket from `new Date().getHours()`
+  and map to a wallpaper id, re-check every 15 minutes. Per-bucket
+  override stored in settings.
+- Parallax: implement via CSS animations on the SVG layers. Mesh,
+  Aurora, and Cascade are SVG-based so we can animate filter offsets,
+  gradient transforms, etc. The Bliss / static-gradient wallpapers
+  would need to stay non-animated.
+- Performance: cap animation at ~30fps and pause when the window is
+  not focused (`visibilitychange` event) so it doesn't drain battery.
+- Reactive ties in with the System Info Tauri integration (#5).
+
+---
+
 ## How to add to this
 
 Edit this file directly, or just mention an idea in conversation and ask
