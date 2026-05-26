@@ -114,6 +114,16 @@ export default function NovaOS(){
   const [widgetState,setWidgetState]= useState(DEFAULT_WIDGET_STATE);
   const [widgetDrag, setWidgetDrag] = useState(null);
   const [widgetResize,setWidgetResize]=useState(null);
+  // v8.0 — Taskbar drag-to-reorder. tbDrag holds the in-flight drag's
+  // {appId, dx} for visual feedback (the dragged chip translates with the
+  // pointer). The actual array reorder only happens on pointerUp so we
+  // don't write to Firestore on every mousemove. justDragged guards against
+  // the click event that browsers fire after pointerup — if a drag
+  // happened, the chip's onClick should bail rather than launch the app.
+  const [tbDrag, setTbDrag] = useState(null);
+  const tbDragRef = useRef(null);
+  const justDraggedRef = useRef(false);
+  const pinChipRefs = useRef({});
   // Detected device mode — re-detect on window resize so rotating a tablet
   // or resizing the browser shifts the layout. The user's saved preference
   // (data.settings.displayMode) is layered on top via effectiveDeviceMode.
@@ -234,6 +244,59 @@ export default function NovaOS(){
     function onUp(){const allPos={};(iconDrag.allIcons||[]).forEach((app,idx)=>{allPos[app.id]=iconPosRef.current[app.id]||defaultIconPos(idx);});const raw=iconPosRef.current[iconDrag.id]||allPos[iconDrag.id];const snapped=raw?snapToFreeGrid(iconDrag.id,raw.x,raw.y,allPos):null;const fp=snapped?{...iconPosRef.current,[iconDrag.id]:snapped}:iconPosRef.current;setIconPos(fp);db.set("user:"+iconDrag.user+":iconpos",fp).catch(()=>{});setIconDrag(null);}
     window.addEventListener("pointermove",onMove);window.addEventListener("pointerup",onUp);window.addEventListener("pointercancel",onUp);return()=>{window.removeEventListener("pointermove",onMove);window.removeEventListener("pointerup",onUp);window.removeEventListener("pointercancel",onUp);};
   },[iconDrag]);
+
+  // v8.0 — Taskbar drag-to-reorder. Lives at the document level so the
+  // drag continues even if the pointer leaves the taskbar (e.g., briefly
+  // wanders up over a window). We only commit the new pinned order to
+  // Firestore on pointerUp — during the drag the chip just visually
+  // translates with the pointer via the `tbDrag` state. Reorder math uses
+  // each pinned chip's actual bounding rect (captured via pinChipRefs)
+  // so the drop slot is pixel-accurate regardless of chip widths
+  // (compact icon-only chips vs full chips with labels).
+  useEffect(()=>{
+    function onMove(e){
+      const d=tbDragRef.current;
+      if(!d)return;
+      const dx=e.clientX-d.startX;
+      if(!d.moved&&Math.abs(dx)>8){d.moved=true;}
+      if(d.moved){setTbDrag({appId:d.appId,dx});}
+    }
+    function onUp(e){
+      const d=tbDragRef.current;
+      if(!d){return;}
+      if(d.moved){
+        // Compute insertion index relative to the pinned list excluding self.
+        const cur=data?.pinnedToTaskbar||[];
+        const filtered=cur.filter(id=>id!==d.appId);
+        let dropIdx=0;
+        filtered.forEach((appId,i)=>{
+          const el=pinChipRefs.current[appId];
+          if(!el)return;
+          const rect=el.getBoundingClientRect();
+          const midX=rect.left+rect.width/2;
+          if(e.clientX>midX)dropIdx=i+1;
+        });
+        const next=[...filtered];
+        next.splice(dropIdx,0,d.appId);
+        if(JSON.stringify(next)!==JSON.stringify(cur)){
+          updateData(p=>({...p,pinnedToTaskbar:next}));
+        }
+        // Suppress the click that browsers fire right after a drag's pointerup
+        justDraggedRef.current=true;
+        setTimeout(()=>{justDraggedRef.current=false;},60);
+      }
+      tbDragRef.current=null;
+      setTbDrag(null);
+    }
+    window.addEventListener("pointermove",onMove);
+    window.addEventListener("pointerup",onUp);
+    window.addEventListener("pointercancel",onUp);
+    return()=>{
+      window.removeEventListener("pointermove",onMove);
+      window.removeEventListener("pointerup",onUp);
+      window.removeEventListener("pointercancel",onUp);
+    };
+  },[data?.pinnedToTaskbar,updateData]);
 
   // Widget drag — free move, snap to 20px grid on release
   useEffect(()=>{
@@ -1052,10 +1115,18 @@ export default function NovaOS(){
           taller for breathing room, and an inset shadow that gives the bar a
           floating feel without actually detaching it from the screen edge.
           Saturate(160%) makes the wallpaper's colors bleed through the glass
-          a little, like macOS Big Sur's dock. */}
+          a little, like macOS Big Sur's dock.
+          v8.0: background tint is now user-controllable via
+          settings.taskbarColor. Falls back to the v8.0 default gradient. */}
+      {(()=>{
+        const tbColor=settings.taskbarColor;
+        const tbBg=tbColor
+          ?"linear-gradient(180deg, rgba("+hexRgb(tbColor)+",0.78) 0%, rgba("+hexRgb(tbColor)+",0.86) 100%)"
+          :"linear-gradient(180deg, rgba(14,16,30,0.78) 0%, rgba(10,12,24,0.86) 100%)";
+        return(
       <div style={{
         position:"fixed",bottom:0,left:0,right:0,height:TASKBAR_H,
-        background:"linear-gradient(180deg, rgba(14,16,30,0.78) 0%, rgba(10,12,24,0.86) 100%)",
+        background:tbBg,
         backdropFilter:"blur(28px) saturate(160%)",
         WebkitBackdropFilter:"blur(28px) saturate(160%)",
         borderTop:"1px solid rgba(255,255,255,0.09)",
@@ -1145,21 +1216,43 @@ export default function NovaOS(){
               return items;
             };
 
+            // v8.0 — Drag-to-reorder. Only pinned chips are draggable (the
+            // non-pinned running chips don't have a stable position to
+            // reorder into). When mid-drag, this chip translates with the
+            // pointer and goes semi-transparent.
+            const isDragging=tbDrag?.appId===slot.appId;
+            const dragStyle=isDragging
+              ?{transform:`translateX(${tbDrag.dx}px)`,opacity:0.78,zIndex:50,transition:"none"}
+              :{};
+            const wrappedClick=()=>{
+              // Suppress click that fires immediately after a drag's pointerup
+              if(justDraggedRef.current)return;
+              handleClick();
+            };
+            const dragProps=slot.pinned?{
+              ref:el=>{if(el)pinChipRefs.current[slot.appId]=el;else delete pinChipRefs.current[slot.appId];},
+              onPointerDown:e=>{
+                if(e.button!==0)return;
+                tbDragRef.current={appId:slot.appId,startX:e.clientX,moved:false};
+              },
+            }:{};
+
             // Compact pinned-only chip — icon only, fixed 40x40 square.
             if(slot.pinned&&!hasRunning){
               return(
-                <button key={slot.key} className="tb"
-                  onClick={handleClick}
+                <button {...dragProps} key={slot.key} className="tb"
+                  onClick={wrappedClick}
                   onContextMenu={e=>openContextMenu(e,buildMenu())}
                   title={app.label}
                   style={{
                     width:40,height:40,padding:0,
                     background:"rgba(255,255,255,0.05)",
                     border:"1px solid rgba(255,255,255,0.07)",
-                    borderRadius:10,cursor:"pointer",
+                    borderRadius:10,cursor:isDragging?"grabbing":"pointer",
                     display:"flex",alignItems:"center",justifyContent:"center",
                     transition:"all 0.18s cubic-bezier(0.4,0,0.2,1)",
                     flexShrink:0,
+                    ...dragStyle,
                   }}>
                   <AppIconDisplay app={{id:app.id,icon:app.icon}} size={20}/>
                 </button>
@@ -1169,20 +1262,21 @@ export default function NovaOS(){
             // Full chip — running (whether pinned or not). Icon + label
             // (on non-mobile) + glowing accent underline when focused.
             return(
-              <button key={slot.key} className="tb"
-                onClick={handleClick}
+              <button {...dragProps} key={slot.key} className="tb"
+                onClick={wrappedClick}
                 onContextMenu={e=>openContextMenu(e,buildMenu())}
                 style={{
                   height:40,padding:"0 12px",
                   background:isTop?"rgba(255,255,255,0.14)":"rgba(255,255,255,0.05)",
                   border:"1px solid "+(isTop?"rgba(255,255,255,0.14)":"rgba(255,255,255,0.07)"),
-                  borderRadius:10,cursor:"pointer",
+                  borderRadius:10,cursor:isDragging?"grabbing":"pointer",
                   fontFamily:FF,fontSize:12,fontWeight:600,
                   color:allMin?"rgba(255,255,255,0.45)":"rgba(255,255,255,0.88)",
                   whiteSpace:"nowrap",
                   transition:"all 0.22s cubic-bezier(0.4,0,0.2,1)",
                   display:"flex",alignItems:"center",gap:7,position:"relative",
                   flexShrink:0,
+                  ...dragStyle,
                 }}>
                 <div style={{pointerEvents:"none",display:"flex",alignItems:"center"}}><AppIconDisplay app={{id:app.id,icon:app.icon}} size={16}/></div>
                 {deviceMode!=="mobile"&&<span>{app.label}</span>}
@@ -1243,6 +1337,8 @@ export default function NovaOS(){
           {deviceMode!=="mobile"&&<div style={{fontFamily:FF,fontSize:9,color:"rgba(255,255,255,0.4)",marginTop:1,lineHeight:1.1}}>{fmtDate(tick)}</div>}
         </div>
       </div>
+        );
+      })()}
       {/* Notification Center side panel — v8.0 refresh.
           Floating panel (slight margin from screen edges, full rounded
           corners) rather than glued to the right edge. Header gains an

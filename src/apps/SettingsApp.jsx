@@ -46,7 +46,41 @@ export function SettingsApp({user,data,updateSettings,showToast,AC,onCustomWallp
         <Toggle key={id} label={cfg.emoji+"  "+cfg.label} value={!!widgets[id]} onChange={v=>setWidget(id,v)} ac={AC}/>
       ))}
       {widgets.weather&&<div style={{fontSize:11,color:"rgba(255,200,80,0.7)",fontFamily:FF,padding:"7px 10px",background:"rgba(255,200,0,0.06)",border:"1px solid rgba(255,200,0,0.15)",borderRadius:6,marginBottom:6,marginTop:2}}>⚠ Weather needs location access — allow it in your browser when prompted.</div>}
-      <div style={{...SEC,marginTop:20}}>Window Blur</div>
+      {/* v8.0 — Taskbar color. The default value is null/undefined which
+          falls through to the v8.0 default dark blue-purple gradient.
+          Each preset stores a flat hex; the taskbar derives a translucent
+          gradient from it so the backdrop blur still works on top of
+          whatever color the user picks. */}
+      <div style={{...SEC,marginTop:20}}>Taskbar Color</div>
+      <div style={{display:"flex",gap:7,marginBottom:6,flexWrap:"wrap"}}>
+        {[
+          {id:"default", color:null,        preview:"linear-gradient(180deg,#0e1018,#0a0c18)"},
+          {id:"black",   color:"#000000",   preview:"#000000"},
+          {id:"navy",    color:"#0a1428",   preview:"#0a1428"},
+          {id:"slate",   color:"#1e293b",   preview:"#1e293b"},
+          {id:"indigo",  color:"#1e1b4b",   preview:"#1e1b4b"},
+          {id:"plum",    color:"#2a0a2a",   preview:"#2a0a2a"},
+          {id:"forest",  color:"#0a2a18",   preview:"#0a2a18"},
+        ].map(c => {
+          const active = (settings.taskbarColor || null) === c.color;
+          return (
+            <div key={c.id} className="ad"
+              onClick={()=>{updateSettings({taskbarColor:c.color});showToast("Taskbar color set ✓");}}
+              title={c.id}
+              style={{width:28,height:28,borderRadius:7,background:c.preview,cursor:"pointer",border:active?"2.5px solid #fff":"2.5px solid transparent",transition:"transform 0.12s,border 0.12s",boxSizing:"border-box"}}/>
+          );
+        })}
+        <input type="color"
+          value={typeof settings.taskbarColor==="string" ? settings.taskbarColor : "#0a0a14"}
+          onChange={e=>updateSettings({taskbarColor:e.target.value})}
+          style={{width:28,height:28,borderRadius:7,border:"1px solid rgba(255,255,255,0.15)",cursor:"pointer",background:"none"}}
+          title="Custom color"/>
+      </div>
+      <div style={{fontSize:10,color:"rgba(255,255,255,0.22)",marginBottom:20,fontFamily:FFM}}>
+        {settings.taskbarColor ? "Current: " + settings.taskbarColor : "System default"}
+      </div>
+
+      <div style={{...SEC,marginTop:6}}>Window Blur</div>
       <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:20}}><input type="range" min={0} max={30} value={settings.winBlur??18} onChange={e=>updateSettings({winBlur:+e.target.value})} style={{flex:1,accentColor:AC}}/><span style={{fontSize:11,fontFamily:FFM,color:"rgba(255,255,255,0.4)",width:32}}>{settings.winBlur??18}px</span></div>
       <div style={SEC}>Display</div>
       {/* v7.8: Fullscreen toggle. Tauri desktop calls native window setFullscreen
