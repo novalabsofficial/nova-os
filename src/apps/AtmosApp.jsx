@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { FF, FFB, FFM, INP, SEC } from "../ui/styles.js";
-import { fill, bdr } from "../lib/format.js";
+import { fill, bdr, hexRgb } from "../lib/format.js";
 import { WMO } from "../ui/constants.js";
 import { AiAssist } from "../ui/AiAssist.jsx";
 import { wmoIcon, wmoLabel, geocodeUrl, parseGeocode, forecastUrl, parseForecast, alertsUrl, parseAlerts, isLikelyUS } from "../lib/weather.js";
@@ -153,58 +153,113 @@ export function AtmosApp({AC,showToast,pushNotification,openNovaAi,data,updateSe
     catch{return iso;}
   }
 
-  return(
-    <div style={{display:"flex",flexDirection:"column",gap:14,height:"100%",fontFamily:FF,minHeight:0}}>
-      {/* Header / search */}
-      <div style={{display:"flex",gap:8,alignItems:"center",flexShrink:0,position:"relative"}}>
-        <div style={{flex:1,position:"relative"}}>
-          <input
-            value={query}
-            onChange={e=>setQuery(e.target.value)}
-            onFocus={()=>suggestions.length>0&&setOpenSuggest(true)}
-            placeholder="Search for a city, town, ZIP code…"
-            style={{...INP,fontSize:13,fontFamily:FF,paddingLeft:34}}
-          />
-          <span style={{position:"absolute",left:11,top:"50%",transform:"translateY(-50%)",fontSize:14,opacity:0.5,pointerEvents:"none"}}>🔍</span>
-          {/* Autocomplete dropdown */}
-          {openSuggest && (loadingSuggest||suggestions.length>0) && (
-            <div style={{position:"absolute",top:"100%",left:0,right:0,marginTop:5,background:"rgba(15,18,32,0.97)",backdropFilter:"blur(16px)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:9,boxShadow:"0 20px 60px rgba(0,0,0,0.5)",maxHeight:220,overflowY:"auto",zIndex:10}}>
-              {loadingSuggest && <div style={{padding:"10px 13px",fontSize:11,color:"rgba(255,255,255,0.4)",fontStyle:"italic"}}>Searching…</div>}
-              {!loadingSuggest && suggestions.length===0 && <div style={{padding:"10px 13px",fontSize:11,color:"rgba(255,255,255,0.4)",fontStyle:"italic"}}>No matches</div>}
-              {!loadingSuggest && suggestions.map((s,i)=>(
-                <div key={i} className="sr" onClick={()=>pickLocation(s)} style={{padding:"9px 13px",cursor:"pointer",fontSize:13,color:"rgba(255,255,255,0.85)",borderBottom:i<suggestions.length-1?"1px solid rgba(255,255,255,0.05)":"none"}}>
-                  📍 {s.label}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-        <button onClick={()=>setUnits(u=>{
-          const next = u==="imperial"?"metric":"imperial";
-          // v6.4: persist so the toggle survives reloads and syncs across devices
-          if(updateSettings) updateSettings({weatherUnits:next});
-          return next;
-        })} style={{padding:"8px 12px",background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:8,cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:11,color:"rgba(255,255,255,0.7)"}}>{units==="imperial"?"°F":"°C"}</button>
-      </div>
+  // v8.2: ref for the search+recents container so the click-outside handler
+  // can scope itself to "outside this region" cleanly.
+  const searchRegionRef = useRef(null);
 
-      {/* v6.4: recent-locations chips. Only render when we have any, so the
-          empty state isn't cluttered. The chip for the currently-loaded
-          location is highlighted; clicking any chip re-loads (and re-pins). */}
-      {recentLocations.length > 0 && (
-        <div style={{display:"flex",gap:6,flexWrap:"wrap",flexShrink:0,marginTop:-6}}>
-          <span style={{fontSize:10,fontFamily:FFM,color:"rgba(255,255,255,0.32)",letterSpacing:1,alignSelf:"center",marginRight:2}}>RECENT</span>
-          {recentLocations.map((r, i) => {
-            const isActive = loc && loc.lat===r.lat && loc.lon===r.lon;
-            const shortLabel = (r.label || "").split(",")[0].trim();
-            return (
-              <button key={r.lat+","+r.lon+","+i} onClick={()=>pickLocation(r)} title={r.label}
-                style={{padding:"4px 10px",background:isActive?fill(AC):"rgba(255,255,255,0.05)",border:"1px solid "+(isActive?bdr(AC):"rgba(255,255,255,0.1)"),borderRadius:14,cursor:"pointer",fontFamily:FF,fontSize:11,color:isActive?AC:"rgba(255,255,255,0.7)",whiteSpace:"nowrap",maxWidth:140,overflow:"hidden",textOverflow:"ellipsis"}}>
-                📍 {shortLabel}
-              </button>
-            );
-          })}
+  // v8.2: click-outside + Escape to dismiss the autocomplete dropdown.
+  // Previously the dropdown had no dismiss-on-outside, AND the input's
+  // onFocus auto-reopened it the moment the user touched the area again
+  // — which is why the user reported "I close it, click a recent chip,
+  // it pops back up". Now the dropdown closes cleanly on outside-click
+  // and Escape, and the auto-reopen-on-focus is removed entirely.
+  useEffect(()=>{
+    if(!openSuggest) return;
+    function onPointerDown(e){
+      if(searchRegionRef.current && !searchRegionRef.current.contains(e.target)){
+        setOpenSuggest(false);
+      }
+    }
+    function onKey(e){ if(e.key==="Escape") setOpenSuggest(false); }
+    // Delay so the click that opened the dropdown doesn't immediately close it
+    const t=setTimeout(()=>document.addEventListener("pointerdown",onPointerDown),0);
+    document.addEventListener("keydown",onKey);
+    return ()=>{
+      clearTimeout(t);
+      document.removeEventListener("pointerdown",onPointerDown);
+      document.removeEventListener("keydown",onKey);
+    };
+  },[openSuggest]);
+
+  // v8.2: pick a weather-themed accent for the current conditions card based
+  // on the WMO code. Sunny → warm gold, cloudy → cool slate, rainy → blue,
+  // snow → icy, storm → dark. Just a tint shift, no full theming.
+  function weatherAccent(code) {
+    if (code == null) return AC;
+    // 0-3: clear/partly cloudy. 4x-5x: fog/drizzle. 6x: rain. 7x: snow. 80-82: showers. 95-99: storm.
+    if (code === 0)                  return "#f59e0b";    // clear sky
+    if (code === 1 || code === 2)    return "#fbbf24";    // mostly clear
+    if (code === 3)                  return "#94a3b8";    // overcast
+    if (code >= 45 && code <= 48)    return "#9ca3af";    // fog
+    if (code >= 51 && code <= 67)    return "#60a5fa";    // drizzle/rain
+    if (code >= 71 && code <= 77)    return "#bae6fd";    // snow
+    if (code >= 80 && code <= 82)    return "#3b82f6";    // showers
+    if (code >= 85 && code <= 86)    return "#c4b5fd";    // snow showers
+    if (code >= 95)                  return "#a855f7";    // thunderstorm
+    return AC;
+  }
+
+  return(
+    <div style={{display:"flex",flexDirection:"column",gap:12,height:"100%",fontFamily:FF,minHeight:0}}>
+      {/* v8.2: wrap search + recents + dropdown in one positioned container
+          so the dropdown can `top:100%` and float below the recents row
+          rather than on top of it. Click-outside listener (scoped to this
+          ref) handles dismissal. */}
+      <div ref={searchRegionRef} style={{flexShrink:0,position:"relative",display:"flex",flexDirection:"column",gap:8}}>
+        {/* Search row */}
+        <div style={{display:"flex",gap:8,alignItems:"center"}}>
+          <div style={{flex:1,position:"relative"}}>
+            <input
+              value={query}
+              onChange={e=>{setQuery(e.target.value); if(e.target.value.trim()) setOpenSuggest(true);}}
+              placeholder="Search for a city, town, ZIP code…"
+              style={{...INP,fontSize:13,fontFamily:FF,paddingLeft:34}}
+            />
+            <span style={{position:"absolute",left:11,top:"50%",transform:"translateY(-50%)",fontSize:14,opacity:0.5,pointerEvents:"none"}}>🔍</span>
+            {query && (
+              <button onClick={()=>{setQuery("");setSuggestions([]);setOpenSuggest(false);}} title="Clear" style={{position:"absolute",right:8,top:"50%",transform:"translateY(-50%)",width:22,height:22,borderRadius:6,background:"rgba(255,255,255,0.08)",border:"none",cursor:"pointer",color:"rgba(255,255,255,0.55)",fontSize:11,padding:0,display:"flex",alignItems:"center",justifyContent:"center"}}>✕</button>
+            )}
+          </div>
+          <button onClick={()=>setUnits(u=>{
+            const next = u==="imperial"?"metric":"imperial";
+            if(updateSettings) updateSettings({weatherUnits:next});
+            return next;
+          })} style={{padding:"8px 12px",background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:8,cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:11,color:"rgba(255,255,255,0.7)"}}>{units==="imperial"?"°F":"°C"}</button>
         </div>
-      )}
+
+        {/* Recents row — now inside the same container as search. Dropdown
+            floats below this whole region instead of covering it. */}
+        {recentLocations.length > 0 && (
+          <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+            <span style={{fontSize:10,fontFamily:FFM,color:"rgba(255,255,255,0.32)",letterSpacing:1,alignSelf:"center",marginRight:2}}>RECENT</span>
+            {recentLocations.map((r, i) => {
+              const isActive = loc && loc.lat===r.lat && loc.lon===r.lon;
+              const shortLabel = (r.label || "").split(",")[0].trim();
+              return (
+                <button key={r.lat+","+r.lon+","+i} onClick={()=>pickLocation(r)} title={r.label}
+                  style={{padding:"4px 10px",background:isActive?fill(AC):"rgba(255,255,255,0.05)",border:"1px solid "+(isActive?bdr(AC):"rgba(255,255,255,0.1)"),borderRadius:14,cursor:"pointer",fontFamily:FF,fontSize:11,color:isActive?AC:"rgba(255,255,255,0.7)",whiteSpace:"nowrap",maxWidth:140,overflow:"hidden",textOverflow:"ellipsis",transition:"all 0.15s"}}>
+                  📍 {shortLabel}
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        {/* v8.2: autocomplete dropdown — now positioned absolute relative to
+            the WHOLE search region (input + recents), so it appears BELOW
+            both rather than covering recents. */}
+        {openSuggest && (loadingSuggest||suggestions.length>0) && (
+          <div style={{position:"absolute",top:"calc(100% + 5px)",left:0,right:0,background:"rgba(15,18,32,0.97)",backdropFilter:"blur(16px)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:9,boxShadow:"0 20px 60px rgba(0,0,0,0.5)",maxHeight:220,overflowY:"auto",zIndex:20}}>
+            {loadingSuggest && <div style={{padding:"10px 13px",fontSize:11,color:"rgba(255,255,255,0.4)",fontStyle:"italic"}}>Searching…</div>}
+            {!loadingSuggest && suggestions.length===0 && <div style={{padding:"10px 13px",fontSize:11,color:"rgba(255,255,255,0.4)",fontStyle:"italic"}}>No matches</div>}
+            {!loadingSuggest && suggestions.map((s,i)=>(
+              <div key={i} className="sr" onClick={()=>pickLocation(s)} style={{padding:"9px 13px",cursor:"pointer",fontSize:13,color:"rgba(255,255,255,0.85)",borderBottom:i<suggestions.length-1?"1px solid rgba(255,255,255,0.05)":"none"}}>
+                📍 {s.label}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
 
       {/* Body */}
       <div style={{flex:1,overflowY:"auto",minHeight:0,display:"flex",flexDirection:"column",gap:12}}>
@@ -223,21 +278,38 @@ export function AtmosApp({AC,showToast,pushNotification,openNovaAi,data,updateSe
           </div>
         )}
 
-        {!loadingForecast && forecast && (
+        {!loadingForecast && forecast && (() => {
+          // v8.2: derive a weather-themed accent for the current-conditions
+          // card. This is what makes the card feel less "monochrome utility"
+          // and more "iOS Weather-ish" — sunny days warm, rainy days blue, etc.
+          const wAccent = weatherAccent(forecast.current.code);
+          const wRgb = hexRgb(wAccent);
+          return (
           <>
-            {/* Current conditions */}
-            <div style={{padding:"16px 18px",background:"linear-gradient(135deg,"+fill(AC)+",rgba(255,255,255,0.03))",border:"1px solid "+bdr(AC),borderRadius:12}}>
+            {/* Current conditions — v8.2: weather-themed gradient card */}
+            <div style={{
+              padding:"18px 20px",
+              background:"linear-gradient(135deg, rgba("+wRgb+",0.22) 0%, rgba("+wRgb+",0.08) 50%, rgba(255,255,255,0.02) 100%)",
+              border:"1px solid rgba("+wRgb+",0.4)",
+              borderRadius:14,
+              boxShadow:"0 0 24px rgba("+wRgb+",0.15)",
+            }}>
               <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:4}}>
-                <div style={{flex:1,fontSize:11,fontFamily:FFM,color:"rgba(255,255,255,0.55)",letterSpacing:1,display:"flex",alignItems:"center",gap:6}}>
-                  {/* v6.4: 📌 indicates this is the user's saved default location
-                      (drives the Weather widget too). Showing it everywhere
-                      where loc.label appears would be noisy, so just here. */}
+                <div style={{flex:1,fontSize:11,fontFamily:FFM,color:"rgba(255,255,255,0.6)",letterSpacing:1,display:"flex",alignItems:"center",gap:6}}>
                   {savedLoc && loc && savedLoc.lat===loc.lat && savedLoc.lon===loc.lon && (
                     <span title="Pinned — also shown by the Weather widget" style={{fontSize:13,opacity:0.85}}>📌</span>
                   )}
                   <span>CURRENT · {loc.label}</span>
                   {savedLoc && loc && savedLoc.lat===loc.lat && savedLoc.lon===loc.lon && updateSettings && (
                     <button onClick={()=>{updateSettings({weatherLocation:null});showToast?.("Pinned location cleared");}} title="Clear pinned location" style={{background:"none",border:"none",cursor:"pointer",color:"rgba(255,255,255,0.4)",fontSize:11,padding:"0 4px"}}>✕</button>
+                  )}
+                  {/* v8.2: "Pin location" affordance when current loc isn't already pinned */}
+                  {(!savedLoc || (savedLoc && loc && (savedLoc.lat!==loc.lat || savedLoc.lon!==loc.lon))) && updateSettings && (
+                    <button onClick={()=>{
+                      const slim={label:loc.label,lat:loc.lat,lon:loc.lon,countryCode:loc.countryCode||null};
+                      updateSettings({weatherLocation:slim});
+                      showToast?.("Location pinned ✓");
+                    }} title="Pin this location" style={{background:"none",border:"none",cursor:"pointer",color:"rgba(255,255,255,0.4)",fontSize:11,padding:"0 4px"}}>📌</button>
                   )}
                 </div>
                 <AiAssist AC={AC} openNovaAi={openNovaAi} actions={[
@@ -249,26 +321,35 @@ export function AtmosApp({AC,showToast,pushNotification,openNovaAi,data,updateSe
                   return `Location: ${loc.label}\nCurrent: ${Math.round(c.temp)}${forecast.units.temp}, ${wmoLabel(c.code)}\nFeels like: ${Math.round(c.feelsLike)}${forecast.units.temp}\nHumidity: ${c.humidity}%\nWind: ${Math.round(c.wind)} ${forecast.units.wind}\n\n7-day forecast highs/lows: ${forecast.days.map(d=>Math.round(d.high)+"/"+Math.round(d.low)).join(", ")}`;
                 }}/>
               </div>
-              <div style={{display:"flex",alignItems:"center",gap:14,marginTop:4}}>
-                <div style={{fontSize:62,lineHeight:1}}>{wmoIcon(forecast.current.code)}</div>
-                <div style={{flex:1}}>
-                  <div style={{fontFamily:FFM,fontWeight:300,fontSize:48,color:"#fff",lineHeight:1}}>{Math.round(forecast.current.temp)}<span style={{fontSize:24,opacity:0.7}}>{forecast.units.temp}</span></div>
-                  <div style={{fontSize:14,color:"rgba(255,255,255,0.7)",marginTop:2}}>{wmoLabel(forecast.current.code)}</div>
+              <div style={{display:"flex",alignItems:"center",gap:16,marginTop:6}}>
+                <div style={{fontSize:72,lineHeight:1,filter:"drop-shadow(0 2px 14px rgba("+wRgb+",0.45))"}}>{wmoIcon(forecast.current.code)}</div>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontFamily:FFM,fontWeight:200,fontSize:56,color:"#fff",lineHeight:1,letterSpacing:-1}}>{Math.round(forecast.current.temp)}<span style={{fontSize:28,opacity:0.7,letterSpacing:0}}>{forecast.units.temp}</span></div>
+                  <div style={{fontSize:14,color:"rgba(255,255,255,0.78)",marginTop:4,fontFamily:FFB,fontWeight:500,letterSpacing:0.3}}>{wmoLabel(forecast.current.code)}</div>
                 </div>
               </div>
-              <div style={{display:"flex",gap:14,marginTop:14,flexWrap:"wrap"}}>
-                <div style={{fontSize:11,color:"rgba(255,255,255,0.55)"}}>Feels like <span style={{color:"#fff",fontFamily:FFM}}>{Math.round(forecast.current.feelsLike)}{forecast.units.temp}</span></div>
-                <div style={{fontSize:11,color:"rgba(255,255,255,0.55)"}}>Humidity <span style={{color:"#fff",fontFamily:FFM}}>{forecast.current.humidity}%</span></div>
-                <div style={{fontSize:11,color:"rgba(255,255,255,0.55)"}}>Wind <span style={{color:"#fff",fontFamily:FFM}}>{Math.round(forecast.current.wind)} {forecast.units.wind}</span></div>
+              {/* Metric chips with subtle backdrop for legibility on bright wallpapers */}
+              <div style={{display:"flex",gap:8,marginTop:16,flexWrap:"wrap"}}>
+                {[
+                  ["Feels like", Math.round(forecast.current.feelsLike) + forecast.units.temp],
+                  ["Humidity",   forecast.current.humidity + "%"],
+                  ["Wind",       Math.round(forecast.current.wind) + " " + forecast.units.wind],
+                ].map(([label, value]) => (
+                  <div key={label} style={{padding:"6px 11px",background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.07)",borderRadius:8,fontSize:11,color:"rgba(255,255,255,0.6)"}}>
+                    {label} <span style={{color:"#fff",fontFamily:FFM,fontWeight:500,marginLeft:4}}>{value}</span>
+                  </div>
+                ))}
               </div>
             </div>
 
-            {/* Live Radar — Windy's official embed. Free, no API key, and Windy */}
-            {/* explicitly supports embedding (their site has an "Embed widget" wizard). */}
-            {/* We center the map on the location's lat/lon with radar overlay enabled. */}
+            {/* Live Radar — Windy's official embed. v8.2: fixed height with
+                a max-height cap so a wide window doesn't make the radar
+                dominate the entire viewport (the iframe captures wheel
+                events; if it fills the screen the user can't scroll past
+                it to see the rest of the forecast). */}
             <div>
               <div style={SEC}>Live Radar</div>
-              <div style={{position:"relative",borderRadius:10,overflow:"hidden",border:"1px solid rgba(255,255,255,0.08)",aspectRatio:"16 / 10",background:"#000"}}>
+              <div style={{position:"relative",borderRadius:10,overflow:"hidden",border:"1px solid rgba(255,255,255,0.08)",height:360,maxHeight:"45vh",background:"#000"}}>
                 <iframe
                   key={loc.lat+","+loc.lon}
                   src={"https://embed.windy.com/embed2.html?lat="+loc.lat+"&lon="+loc.lon+"&detailLat="+loc.lat+"&detailLon="+loc.lon+"&zoom=7&level=surface&overlay=radar&product=radar&menu=&message=true&marker=true&calendar=&pressure=&type=map&location=coordinates&detail=&metricWind=default&metricTemp=default&radarRange=-1"}
@@ -277,6 +358,10 @@ export function AtmosApp({AC,showToast,pushNotification,openNovaAi,data,updateSe
                   style={{position:"absolute",inset:0,width:"100%",height:"100%",border:0}}
                 />
               </div>
+              {/* Hint that the radar captures wheel events — encourages users
+                  to scroll past it via the side margin or use the page scroll
+                  bar rather than getting "stuck" zooming the map. */}
+              <div style={{fontSize:9,color:"rgba(255,255,255,0.3)",marginTop:4,fontStyle:"italic",textAlign:"center"}}>Scroll alongside the radar to continue past it</div>
             </div>
 
             {/* NWS alerts */}
@@ -323,22 +408,41 @@ export function AtmosApp({AC,showToast,pushNotification,openNovaAi,data,updateSe
               </div>
             )}
 
-            {/* 7-day */}
+            {/* 7-day — v8.2: temp-range bars give a visual sense of the
+                week at a glance. The bar spans from the week's overall
+                low to its overall high, and each day's bar segment
+                represents that day's individual high→low range. */}
             <div>
               <div style={SEC}>7-Day Forecast</div>
-              {forecast.days.map((d,i)=>(
-                <div key={d.date} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 12px",marginBottom:4,background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.06)",borderRadius:7}}>
-                  <div style={{width:60,fontFamily:FFB,fontWeight:600,fontSize:12,color:"rgba(255,255,255,0.85)"}}>{i===0?"Today":fmtDay(d.date)}</div>
-                  <div style={{fontSize:22,width:34,textAlign:"center"}}>{wmoIcon(d.code)}</div>
-                  <div style={{flex:1,fontSize:11,color:"rgba(255,255,255,0.55)"}}>{wmoLabel(d.code)}</div>
-                  <div style={{fontFamily:FFM,fontSize:13,color:"#fff",minWidth:62,textAlign:"right"}}>
-                    {Math.round(d.high)}° <span style={{color:"rgba(255,255,255,0.4)"}}>/ {Math.round(d.low)}°</span>
-                  </div>
-                </div>
-              ))}
+              {(() => {
+                // Compute the global high/low across the week so each day's
+                // bar can be positioned proportionally inside the range.
+                const allHighs = forecast.days.map(d => d.high);
+                const allLows  = forecast.days.map(d => d.low);
+                const weekHi   = Math.max(...allHighs);
+                const weekLo   = Math.min(...allLows);
+                const span     = Math.max(1, weekHi - weekLo);
+                return forecast.days.map((d,i)=>{
+                  const dayLoPct = ((d.low - weekLo) / span) * 100;
+                  const dayHiPct = ((d.high - weekLo) / span) * 100;
+                  // Color gradient from cool (low) to warm (high)
+                  return (
+                    <div key={d.date} style={{display:"flex",alignItems:"center",gap:10,padding:"9px 12px",marginBottom:4,background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.06)",borderRadius:8}}>
+                      <div style={{width:54,fontFamily:FFB,fontWeight:600,fontSize:12,color:"rgba(255,255,255,0.88)"}}>{i===0?"Today":fmtDay(d.date)}</div>
+                      <div style={{fontSize:22,width:34,textAlign:"center",filter:"drop-shadow(0 2px 4px rgba(0,0,0,0.4))"}}>{wmoIcon(d.code)}</div>
+                      <div style={{fontFamily:FFM,fontSize:12,color:"rgba(255,255,255,0.45)",minWidth:32,textAlign:"right"}}>{Math.round(d.low)}°</div>
+                      <div style={{flex:1,position:"relative",height:6,background:"rgba(255,255,255,0.06)",borderRadius:3,overflow:"hidden"}}>
+                        <div style={{position:"absolute",left:dayLoPct+"%",width:Math.max(8,dayHiPct-dayLoPct)+"%",top:0,bottom:0,background:"linear-gradient(90deg, #60a5fa, #fbbf24, #f87171)",borderRadius:3}}/>
+                      </div>
+                      <div style={{fontFamily:FFM,fontSize:13,color:"#fff",minWidth:32,fontWeight:500}}>{Math.round(d.high)}°</div>
+                    </div>
+                  );
+                });
+              })()}
             </div>
           </>
-        )}
+          );
+        })()}
 
         {/* Attribution — required by Nominatim's usage policy */}
         <div style={{textAlign:"center",fontSize:10,color:"rgba(255,255,255,0.25)",paddingTop:10,borderTop:"1px solid rgba(255,255,255,0.05)",marginTop:"auto"}}>
