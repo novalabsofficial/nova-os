@@ -5,93 +5,83 @@ not committed to. Living document — add to it freely.
 
 ---
 
-# 🗺️ v8.3 — next up (playtester feedback)
+# ✅ v8.3 — shipped (playtester feedback)
 
-Scheduled batch. Mix of bug fixes and small features surfaced by playtesters.
-Bug fixes first (they're the priority), then the smaller features.
+Scheduled batch of bug fixes + small features surfaced by playtesters.
+Six of the seven items shipped; the screensaver (originally F3) was deferred
+and now lives in the Unscheduled backlog below.
 
 ## Bug fixes
 
-### B1. Space Invaders stops shooting after stage 1
-After clearing the first wave, the player can no longer shoot on the next
-stage. Almost certainly the wave-transition logic doesn't reset/re-enable
-the player-bullet state (or leaves a "can't fire" flag set, or never clears
-the previous wave's bullet array so the cap is hit forever).
-- **Where:** `src/apps/SpaceInvadersApp.jsx` — the wave-advance code.
-- **Approach:** trace what state gates firing (a `canShoot` flag, a bullets
-  array length cap, etc.) and make sure the new-wave handler resets all of it.
+### ✅ B1. Space Invaders stops shooting after stage 1 — FIXED
+After clearing the first wave the player could no longer shoot. Root cause:
+`lastFire` lived in the persistent `keysRef` while the per-stage `tick`
+counter reset to 0 on wave advance, so the `tick - lastFire > cooldown`
+gate was permanently false (lastFire from the previous stage was a larger
+number than the new stage's tick).
+- **Where:** `src/apps/SpaceInvadersApp.jsx`.
+- **Fix:** moved `lastFire` into the game state object (`initState` returns
+  `lastFire: 0`), so it resets with the rest of the stage state. Fire check
+  is now `if (k.fire && s.tick - s.lastFire > 18) { …; s.lastFire = s.tick; }`
+  and `keysRef` is back to just `{ left, right, fire }`.
 
-### B2. Chess never sends a challenge to the other user
-Challenging a user by name appears to do nothing on the recipient's side.
-Playtester suspects a PWA-vs-Chrome difference (could be an auth/uid
-mismatch between the two session types, or the recipient's `watchMyGames`
-query not matching the created doc).
-- **Where:** `src/lib/chess-game.js` (`challengeUserByName`, `watchMyGames`),
-  `firestore.rules` (`nova_chess_games` block), and the auth/uid layer.
-- **Approach:** verify the created game doc's `participantUids` includes BOTH
-  the challenger's and the recipient's Auth uid (resolved via the username
-  index), confirm the Firestore rule allows the recipient to read it, and
-  check whether the PWA session has a valid `getDbUid()` (the suspected
-  PWA-vs-Chrome difference). Likely the recipient uid isn't being resolved
-  correctly, OR the recipient's `array-contains` query needs the rule to
-  permit listing.
+### ✅ B2. Chess never sends a challenge to the other user — FIXED
+Challenging by name silently did nothing on the recipient's side. Root cause:
+`watchMyGames` used `where(array-contains) + orderBy("lastMoveAt","desc")`,
+which Firestore requires a **composite index** for. That index didn't exist,
+so the query errored silently and the recipient's listener never fired — not
+a PWA-vs-Chrome difference after all.
+- **Where:** `src/lib/chess-game.js` (`watchMyGames`).
+- **Fix:** dropped the server-side `orderBy` (and its import), sort
+  client-side instead — `games.sort((a,b)=>(b.lastMoveAt||0)-(a.lastMoveAt||0))`
+  — and added a `console.warn` error handler on the snapshot listener so a
+  future silent failure is at least visible.
 
-### B3. "Large Text" setting doesn't change text size
-The Settings → Display → Large Text toggle flips `settings.largeFont` but
-the change isn't visibly applied across the OS / apps.
-- **Where:** `src/NovaOS.jsx` reads `largeFnt` and applies `fontSize` only on
-  the root desktop container — it doesn't cascade into windows/apps (which
-  set their own explicit font sizes everywhere).
-- **Approach:** rather than chasing every hardcoded fontSize, apply a root
-  `font-size` bump + use `rem`-relative sizing, OR apply a CSS zoom/scale on
-  the app content area when largeFont is on. Simplest robust fix: set a CSS
-  custom property / root font-size and have a global rule scale things.
-  (Note: lots of inline styles use px, so a true fix may mean a zoom
-  transform on the window content area.)
+### ✅ B3. "Large Text" setting doesn't change text size — FIXED
+The Settings → Display → Large Text toggle flipped `settings.largeFont` but
+nothing visibly changed, because apps set their own explicit px font sizes
+everywhere and a root `fontSize` bump didn't cascade.
+- **Where:** `src/NovaOS.jsx` window content area.
+- **Fix:** apply CSS `zoom: largeFnt ? 1.18 : 1` on the app content wrapper.
+  `zoom` scales the whole rendered subtree (text + layout) without the
+  overflow problems a `transform: scale()` would cause.
 
 ## Features
 
-### F1. Drag the title bar to un-maximize (Windows-style)
-When a window is maximized (or app-fullscreen), grabbing the title bar and
-dragging should restore it to normal size and let you move it — exactly like
-Windows. Currently the title-bar drag is disabled while maximized
-(`onPointerDown={e=>!isMax&&startDrag(...)}`).
-- **Where:** `src/NovaOS.jsx` window title-bar `onPointerDown` + `startDrag`.
-- **Approach:** allow the drag to start when maximized; on first movement,
-  flip the window to "normal" state, position it centered under the cursor
-  (preserving the grab offset proportionally), then continue the normal
-  move-drag. This is the standard "tear off from maximized" gesture.
+### ✅ F1. Drag the title bar to un-maximize (Windows-style) — SHIPPED
+Grabbing the title bar of a maximized window now restores it to normal size
+and lets you move it, positioned proportionally under the cursor — the
+standard Windows "tear off from maximized" gesture.
+- **Where:** `src/NovaOS.jsx` `startDrag` + title-bar `onPointerDown`.
+- **Fix:** `startDrag` detects `state==="maximized"`, computes a restore
+  size (from `prevBounds` or `DEFAULT_SIZES`), positions the restored window
+  under the cursor (`frac = clientX/innerWidth`), flips it to `normal`, then
+  continues a normal move-drag. Title-bar `onPointerDown` no longer guards
+  on `!isMax`; cursor is always grab/grabbing.
 
-### F2. Hide the top bar in fullscreen
-When in fullscreen (the v7.8 OS-level fullscreen), the top info/title bar
-shouldn't show. The only ways out should be the fullscreen toggle (F11 /
-Settings) or a dedicated button in the start menu.
-- **Where:** `src/NovaOS.jsx` — gate the relevant top bar on `isFullscreen()`
-  state, and add an "Exit fullscreen" item to the start menu footer.
-- **Approach:** subscribe to `onFullscreenChange` (from lib/fullscreen.js) at
-  the NovaOS level, hide the bar when fullscreen is active, and surface an
-  exit affordance in the start menu so the user is never trapped.
+### ✅ F2. Hide the top bar in fullscreen — SHIPPED
+In OS-level fullscreen the top bar is hidden; the taskbar slides off-screen
+and reveals on a bottom-edge hover, and the start menu has an "Exit
+Fullscreen" button so the user is never trapped.
+- **Where:** `src/NovaOS.jsx` (subscribes to `onFullscreenChange`), start menu footer.
+- **Fix:** `isFs` state tracks fullscreen; taskbar gets
+  `transform: translateY(110%)` when fullscreen and not peeking; a
+  bottom-edge pointer tracker (`tbPeek`) reveals it within 6px and hides it
+  past `TASKBAR_H + 20`; start menu footer toggles fullscreen.
 
-### F3. AFK screensaver
-After ~1 minute of no input (no key, no mouse move/click), fade in a
-screensaver: blur the entire desktop and show a large clock (reuse the
-ClockWidget styling). Dismiss on any key press or mouse movement.
-- **Where:** new component in `src/NovaOS.jsx` or a small `Screensaver.jsx`.
-- **Approach:** an idle timer reset on `keydown`/`pointermove`/`pointerdown`;
-  when it fires, render a fixed full-screen overlay with `backdrop-filter:
-  blur()` + a centered live clock. Any input clears the overlay and resets
-  the timer. Make the timeout a Setting (default 60s, "off" option).
+### ✅ F4. Hold backspace to continue deleting — SHIPPED
+The Calculator was button-only (one delete per click). Added full keyboard
+support so holding Backspace deletes continuously via native key-repeat.
+- **Where:** `src/apps/CalculatorApp.jsx`.
+- **Fix:** focusable wrapper (`tabIndex=0` + autofocus `wrapRef`) with an
+  `onKeyDown` handler wiring digits, `.`, operators, Enter/`=`, Escape/clear,
+  `%`, and Backspace. Each native Backspace key-repeat calls `pressBackspace`,
+  giving continuous deletion. `preventDefault` on handled keys stops
+  browser back-nav and double-firing of focused buttons.
 
-### F4. Hold backspace to continue deleting
-Holding the Backspace key should continuously delete, like every OS text
-field. Native inputs already do this, so the broken case is likely a
-custom input somewhere (Terminal command line? a canvas-based field?).
-- **Where:** find the input(s) that swallow key-repeat — check Terminal
-  (`src/apps/TerminalApp.jsx`) and any custom `onKeyDown` handlers that
-  `preventDefault()` on Backspace.
-- **Approach:** make sure custom key handlers don't block the browser's
-  native key-repeat, or implement an explicit repeat timer for fields that
-  manage their own value outside a native `<input>`.
+### ⏸️ F3. AFK screensaver — DEFERRED (see Unscheduled backlog #14)
+Moved out of v8.3 at the user's request to keep the release tight. Full
+write-up is in the backlog below.
 
 ---
 
@@ -373,6 +363,24 @@ Three flavors, picked per wallpaper or globally:
 - Performance: cap animation at ~30fps and pause when the window is
   not focused (`visibilitychange` event) so it doesn't drain battery.
 - Reactive ties in with the System Info Tauri integration (#5).
+
+---
+
+## 14. AFK screensaver (deferred from v8.3)
+
+After ~1 minute of no input (no key, no mouse move/click), fade in a
+screensaver: blur the entire desktop and show a large clock (reuse the
+ClockWidget styling). Dismiss on any key press or mouse movement.
+
+**Considerations**
+- An idle timer reset on `keydown` / `pointermove` / `pointerdown`; when it
+  fires, render a fixed full-screen overlay with `backdrop-filter: blur()`
+  + a centered live clock. Any input clears the overlay and resets the timer.
+- Make the timeout a Setting (default 60s, with an "off" option).
+- New component — either inline in `src/NovaOS.jsx` or a small
+  `Screensaver.jsx`.
+- Deferred out of v8.3 to keep that release focused on the bug fixes; pick
+  it up in a later batch.
 
 ---
 

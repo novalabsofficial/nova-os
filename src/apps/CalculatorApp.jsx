@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { FF, FFB, FFM } from "../ui/styles.js";
 import { fill, bdr } from "../lib/format.js";
 import { applyOp, formatDisplay, toggleSign, appendKey } from "../lib/calc.js";
@@ -9,6 +9,15 @@ export function CalculatorApp({AC}){
   const [display,setDisplay]=useState("0");
   const [pending,setPending]=useState(null);
   const [justEvaluated,setJustEvaluated]=useState(false);
+
+  // v8.3 F4: keyboard support. The calculator was button-only, so there was
+  // no way to "hold backspace to keep deleting" — clicking the ⌫ button
+  // deletes one digit per click. With a focusable wrapper + onKeyDown,
+  // holding Backspace fires keydown repeatedly (browser key-repeat) and
+  // each repeat calls pressBackspace, giving continuous deletion. Also
+  // wires up digits, operators, Enter/=, Escape/clear, and %.
+  const wrapRef = useRef(null);
+  useEffect(()=>{ wrapRef.current?.focus(); }, []);
 
   function pressDigit(d){
     if(justEvaluated){setDisplay(d==="."?"0.":d);setJustEvaluated(false);return;}
@@ -44,6 +53,23 @@ export function CalculatorApp({AC}){
     });
   }
 
+  // Keyboard handler. preventDefault on handled keys so (a) Backspace
+  // doesn't trigger browser back-nav, and (b) Enter/Space don't re-activate
+  // a focused button (avoids double-firing).
+  function onKeyDown(e){
+    const k = e.key;
+    if(/^[0-9]$/.test(k)){ e.preventDefault(); pressDigit(k); return; }
+    if(k==="."){ e.preventDefault(); pressDigit("."); return; }
+    if(k==="+"){ e.preventDefault(); pressOp("+"); return; }
+    if(k==="-"){ e.preventDefault(); pressOp("-"); return; }
+    if(k==="*"){ e.preventDefault(); pressOp("×"); return; }
+    if(k==="/"){ e.preventDefault(); pressOp("÷"); return; }
+    if(k==="Enter" || k==="="){ e.preventDefault(); pressEquals(); return; }
+    if(k==="Backspace"){ e.preventDefault(); pressBackspace(); return; }   // repeats on hold
+    if(k==="Escape"){ e.preventDefault(); pressClear(); return; }
+    if(k==="%"){ e.preventDefault(); pressPercent(); return; }
+  }
+
   // Layout: 5 rows × 4 cols. The "0" key spans two cols on the bottom row.
   const btn=(label,onClick,style={})=>(
     <button onClick={onClick} style={{
@@ -63,7 +89,7 @@ export function CalculatorApp({AC}){
   const opStyle={background:"rgba(255,255,255,0.1)",border:"1px solid rgba(255,255,255,0.13)",color:"#fff"};
 
   return(
-    <div style={{display:"flex",flexDirection:"column",gap:10,fontFamily:FF,height:"100%",minHeight:0}}>
+    <div ref={wrapRef} tabIndex={0} onKeyDown={onKeyDown} style={{display:"flex",flexDirection:"column",gap:10,fontFamily:FF,height:"100%",minHeight:0,outline:"none"}}>
       {/* Display */}
       <div style={{flexShrink:0,padding:"22px 14px 18px",background:"rgba(0,0,0,0.25)",borderRadius:14,border:"1px solid rgba(255,255,255,0.05)",textAlign:"right",minHeight:80,display:"flex",flexDirection:"column",justifyContent:"flex-end",overflow:"hidden"}}>
         {pending && <div style={{fontFamily:FFM,fontSize:11,color:"rgba(255,255,255,0.4)",marginBottom:4}}>{formatDisplay(pending.prev)} {pending.op}</div>}

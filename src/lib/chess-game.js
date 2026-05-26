@@ -21,7 +21,7 @@
 
 import {
   collection, doc, getDoc, setDoc, updateDoc, deleteDoc,
-  query, where, orderBy, limit, onSnapshot, addDoc,
+  query, where, limit, onSnapshot, addDoc,
 } from "firebase/firestore";
 import { firestoreDb } from "../firebase.js";
 import { resolveUsername } from "./dms.js";
@@ -35,15 +35,37 @@ export const STARTING_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq 
  */
 export function watchMyGames(myUid, cb) {
   if (!myUid) return () => {};
+  // v8.3 B2 fix: removed `orderBy("lastMoveAt","desc")` from the query.
+  //
+  // Combining `array-contains` with an `orderBy` on a DIFFERENT field
+  // requires a composite Firestore index — which was never created for the
+  // nova_chess_games collection. With the index missing, this listener
+  // silently errored and the error handler returned []. The CHALLENGER
+  // still saw their game (they navigate straight to it via watchGame(), a
+  // single-doc listen that needs no index), which masked the bug — but the
+  // RECIPIENT relies entirely on this list query, so the challenge never
+  // appeared for them. That's the "chess doesn't send a request" report.
+  //
+  // Dropping the orderBy means the query uses only a single-field
+  // array-contains filter (auto-indexed by Firestore, no composite index
+  // needed). We sort by lastMoveAt client-side instead — the result set is
+  // capped at 50 games so sorting in JS is trivial.
   const q = query(
     collection(firestoreDb, "nova_chess_games"),
     where("participantUids", "array-contains", myUid),
-    orderBy("lastMoveAt", "desc"),
     limit(50),
   );
   return onSnapshot(q,
-    snap => cb(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
-    () => cb([]),
+    snap => {
+      const games = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      games.sort((a, b) => (b.lastMoveAt || 0) - (a.lastMoveAt || 0));
+      cb(games);
+    },
+    (err) => {
+      // eslint-disable-next-line no-console
+      console.warn("[chess] watchMyGames listener error:", err?.message || err);
+      cb([]);
+    },
   );
 }
 

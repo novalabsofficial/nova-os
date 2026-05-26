@@ -19,7 +19,7 @@ const ALIEN_OFFSET_X = 40, ALIEN_OFFSET_Y = 60;
 export function SpaceInvadersApp({ AC, data, updateSettings }) {
   const canvasRef = useRef(null);
   const stateRef  = useRef(null);
-  const keysRef   = useRef({ left: false, right: false, fire: false, lastFire: 0 });
+  const keysRef   = useRef({ left: false, right: false, fire: false });
   const [phase, setPhase] = useState("title");   // "title" | "playing" | "gameover"
   const [score, setScore] = useState(0);
   const [lives, setLives] = useState(3);
@@ -52,6 +52,14 @@ export function SpaceInvadersApp({ AC, data, updateSettings }) {
       alienStepDownPending: false,
       tick: 0,
       bombTimer: 0,
+      // v8.3 B1 fix: lastFire lives in the game state (not keysRef) so it
+      // resets to 0 alongside `tick` on every new wave. Previously it sat
+      // in the persistent keysRef — after a wave cleared, tick reset to 0
+      // but lastFire stayed at its old (large) value, so the fire check
+      // `tick - lastFire > 18` evaluated negative and blocked all shooting
+      // until tick slowly climbed back past the stale lastFire. That's the
+      // "stops shooting after stage 1" bug.
+      lastFire: 0,
     };
   }
 
@@ -94,10 +102,12 @@ export function SpaceInvadersApp({ AC, data, updateSettings }) {
       if (k.right) s.playerX += 5;
       s.playerX = Math.max(0, Math.min(CW - PLAYER_W, s.playerX));
 
-      // Fire bullet (rate-limited so holding space doesn't spam)
-      if (k.fire && s.tick - k.lastFire > 18) {
+      // Fire bullet (rate-limited so holding space doesn't spam).
+      // v8.3 B1: cooldown now tracked on the game state (s.lastFire) so it
+      // resets with the per-wave tick reset.
+      if (k.fire && s.tick - s.lastFire > 18) {
         s.bullets.push({ x: s.playerX + PLAYER_W / 2, y: CH - 40, vy: -8 });
-        k.lastFire = s.tick;
+        s.lastFire = s.tick;
       }
 
       // Update bullets

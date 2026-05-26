@@ -12,7 +12,7 @@ import {
   WIDGET_SNAP,
 } from "./lib/constants.js";
 import { hexRgb, fill, bdr, isUrl } from "./lib/format.js";
-import { toggleFullscreen } from "./lib/fullscreen.js";
+import { toggleFullscreen, isFullscreen, onFullscreenChange, exitFullscreen } from "./lib/fullscreen.js";
 import { defaultIconPos, snapToFreeGrid, snapW, snapWSize } from "./lib/geometry.js";
 import { autoModerate, isAdmin, isPubliclyVisible } from "./lib/moderation.js";
 import { rewriteForIframe, isLikelyUnframable } from "./lib/browser.js";
@@ -126,6 +126,12 @@ export default function NovaOS(){
   const tbDragRef = useRef(null);
   const justDraggedRef = useRef(false);
   const pinChipRefs = useRef({});
+  // v8.3 F2: fullscreen state + taskbar auto-hide. In OS fullscreen the
+  // taskbar slides off-screen for an immersive view; moving the pointer to
+  // the bottom edge of the screen reveals it (standard OS auto-hide). The
+  // start menu also gains an explicit "Exit Fullscreen" button.
+  const [isFs, setIsFs] = useState(()=>isFullscreen());
+  const [tbPeek, setTbPeek] = useState(false);
   // Detected device mode — re-detect on window resize so rotating a tablet
   // or resizing the browser shifts the layout. The user's saved preference
   // (data.settings.displayMode) is layered on top via effectiveDeviceMode.
@@ -306,6 +312,28 @@ export default function NovaOS(){
     // anyway. Same pattern as the widget drag useEffect below.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   },[data?.pinnedToTaskbar]);
+
+  // v8.3 F2: track OS fullscreen state. Subscribe to the unified
+  // fullscreen change stream (covers F11, Settings toggle, and Esc/exit).
+  useEffect(()=>{
+    setIsFs(isFullscreen());
+    return onFullscreenChange(setIsFs);
+  },[]);
+
+  // v8.3 F2: taskbar auto-hide reveal. Only active while in fullscreen.
+  // When the pointer drops within 6px of the bottom edge, peek the
+  // taskbar back up; hide it again once the pointer moves away (with a
+  // little hysteresis so it doesn't flicker right at the boundary).
+  useEffect(()=>{
+    if(!isFs){ setTbPeek(false); return; }
+    function onMove(e){
+      const fromBottom = window.innerHeight - e.clientY;
+      if(fromBottom <= 6) setTbPeek(true);
+      else if(fromBottom > TASKBAR_H + 20) setTbPeek(false);
+    }
+    window.addEventListener("pointermove", onMove);
+    return ()=>window.removeEventListener("pointermove", onMove);
+  },[isFs]);
 
   // Widget drag — free move, snap to 20px grid on release
   useEffect(()=>{
@@ -530,7 +558,30 @@ export default function NovaOS(){
       return nz;
     });
   },[deviceMode,markAppNotificationsRead]);
-  function startDrag(e,winId){if(e.button!==0)return;e.preventDefault();const w=winsRef.current.find(w=>w.id===winId);if(w){setDrag({type:"move",winId,ox:e.clientX-w.x,oy:e.clientY-w.y});focusWin(winId);}}
+  function startDrag(e,winId){
+    if(e.button!==0)return;
+    e.preventDefault();
+    const w=winsRef.current.find(w=>w.id===winId);
+    if(!w)return;
+    // v8.3 F1: "tear off from maximized" — dragging a maximized window's
+    // title bar restores it to normal size and starts moving it (Windows
+    // behavior). The restored window is repositioned so the grab point
+    // stays at the same horizontal fraction across the (now narrower)
+    // title bar, which feels natural.
+    if(w.state==="maximized"){
+      const restoreW=(w.prevBounds&&w.prevBounds.width)||(DEFAULT_SIZES[w.app]&&DEFAULT_SIZES[w.app].w)||520;
+      const restoreH=(w.prevBounds&&w.prevBounds.height)||(DEFAULT_SIZES[w.app]&&DEFAULT_SIZES[w.app].h)||480;
+      const frac=window.innerWidth>0?e.clientX/window.innerWidth:0.5;
+      const newX=Math.max(0,Math.min(e.clientX-frac*restoreW,window.innerWidth-restoreW));
+      const newY=0; // grab lands on the title bar at the top of the screen
+      setWins(ws=>ws.map(x=>x.id===winId?{...x,state:"normal",x:newX,y:newY,width:restoreW,height:restoreH,prevBounds:null}:x));
+      setDrag({type:"move",winId,ox:e.clientX-newX,oy:e.clientY-newY});
+      focusWin(winId);
+      return;
+    }
+    setDrag({type:"move",winId,ox:e.clientX-w.x,oy:e.clientY-w.y});
+    focusWin(winId);
+  }
   function startResize(e,winId,edge){if(e.button!==0)return;e.preventDefault();const w=winsRef.current.find(w=>w.id===winId);if(w){setDrag({type:"resize",winId,edge,sx:e.clientX,sy:e.clientY,wx:w.x,wy:w.y,ww:w.width,wh:w.height});focusWin(winId);}}
   function closeWin(id){playSound("windowClose");setWins(ws=>ws.filter(w=>w.id!==id));}
   function minimizeWin(id){setWins(ws=>ws.map(w=>w.id===id?{...w,state:w.state==="minimized"?"normal":"minimized"}:w));}
@@ -1099,6 +1150,12 @@ export default function NovaOS(){
             <div style={{fontFamily:FFB,fontWeight:600,fontSize:13.5,color:"#fff",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>@{user}</div>
             <div style={{fontFamily:FFM,fontSize:10,color:"rgba(255,255,255,0.35)",marginTop:1,letterSpacing:0.3}}>Nova OS v{NOVA_VERSION}</div>
           </div>
+          {/* v8.3 F2: explicit fullscreen toggle in the start menu so users
+              who don't know F11 can always get in/out of fullscreen. Since
+              the taskbar auto-hides in fullscreen, the start menu (reachable
+              via Cmd/Ctrl+K or the bottom-edge peek) is the discoverable
+              exit point. */}
+          <button onClick={()=>{setMenuOpen(false);toggleFullscreen();}} title={isFs?"Exit fullscreen (F11)":"Enter fullscreen (F11)"} style={{width:34,height:34,borderRadius:8,background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.1)",cursor:"pointer",fontSize:13,color:"rgba(255,255,255,0.7)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,transition:"all 0.15s"}}>{isFs?"🗗":"⛶"}</button>
           <button onClick={logout} title="Sign out" style={{padding:"7px 13px",background:"rgba(255,80,80,0.1)",border:"1px solid rgba(255,80,80,0.28)",borderRadius:8,cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:11,color:"rgba(255,140,140,0.95)",transition:"all 0.18s cubic-bezier(0.4,0,0.2,1)"}}>Logout</button>
         </div>
       </div>)}
@@ -1130,7 +1187,10 @@ export default function NovaOS(){
         return(
           <div key={win.id} onClick={()=>focusWin(win.id)} style={{...winStyle,...minimizedStyle,background:"rgba(10,12,24,0.92)",border:"1px solid rgba(255,255,255,0.09)",boxShadow:winShadow,display:isMin?"none":"flex",flexDirection:"column",animation:"win-in 0.28s cubic-bezier(0.16,1,0.3,1)",backdropFilter:"blur("+winBlur+"px) saturate(160%)",WebkitBackdropFilter:"blur("+winBlur+"px) saturate(160%)",transition:isDrg?"box-shadow 0.18s cubic-bezier(0.4,0,0.2,1)":"box-shadow 0.22s cubic-bezier(0.4,0,0.2,1), left 0.28s cubic-bezier(0.4,0,0.2,1), top 0.28s cubic-bezier(0.4,0,0.2,1), width 0.28s cubic-bezier(0.4,0,0.2,1), height 0.28s cubic-bezier(0.4,0,0.2,1)",overflow:"hidden"}}>
             {!isMax&&<ResizeHandles winId={win.id} onStartResize={startResize} touchy={touchy}/>}
-            <div onPointerDown={e=>!isMax&&startDrag(e,win.id)} style={{height:40,display:"flex",alignItems:"center",padding:"0 6px 0 14px",gap:10,background:"linear-gradient(180deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.02) 100%)",borderBottom:"1px solid rgba(255,255,255,0.06)",borderRadius:isMax?"0":winRadius+"px "+winRadius+"px 0 0",cursor:isMax?"default":isDrg?"grabbing":"grab",userSelect:"none",flexShrink:0,touchAction:"none"}}>
+            {/* v8.3 F1: title bar is now draggable even when maximized —
+                dragging restores the window and tears it off (Windows-style),
+                so the cursor is always grab/grabbing rather than default. */}
+            <div onPointerDown={e=>startDrag(e,win.id)} style={{height:40,display:"flex",alignItems:"center",padding:"0 6px 0 14px",gap:10,background:"linear-gradient(180deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.02) 100%)",borderBottom:"1px solid rgba(255,255,255,0.06)",borderRadius:isMax?"0":winRadius+"px "+winRadius+"px 0 0",cursor:isDrg?"grabbing":"grab",userSelect:"none",flexShrink:0,touchAction:"none"}}>
               <div style={{display:"flex",alignItems:"center",justifyContent:"center"}}><AppIconDisplay app={{id:win.app,icon:app?.icon||"📦"}} size={18}/></div>
               <span style={{flex:1,fontFamily:FFB,fontWeight:600,fontSize:13,color:"rgba(255,255,255,0.92)",letterSpacing:0.2}}>{app?.label}</span>
               {/* v8.0 round 3 — proper SVG window controls. Unicode glyphs
@@ -1149,7 +1209,14 @@ export default function NovaOS(){
                 </button>
               </div>
             </div>
-            <div style={{flex:1,overflowY:"auto",overflowX:"hidden",padding:20,minWidth:0}}>
+            {/* v8.3 B3: "Large Text" applies a CSS zoom to the app content
+                area. The setting previously only bumped the root container's
+                fontSize, which did nothing because every app sets explicit px
+                sizes that don't inherit. `zoom` scales the rendered content
+                (text + layout) and reflows correctly — unlike transform:scale
+                which would overflow. Applied to the content area (not the
+                window frame) so the title bar / controls stay a fixed size. */}
+            <div style={{flex:1,overflowY:"auto",overflowX:"hidden",padding:20,minWidth:0,zoom:largeFnt?1.18:1}}>
               {/* Each app is lazy-loaded — Suspense shows the spinner while the
                   chunk is downloading. Once cached, reopens are instant.
                   Per-window Suspense means opening Tetris doesn't blank out
@@ -1210,6 +1277,11 @@ export default function NovaOS(){
         const tbBg=tbColor
           ?"linear-gradient(180deg, rgba("+hexRgb(tbColor)+",0.78) 0%, rgba("+hexRgb(tbColor)+",0.86) 100%)"
           :"linear-gradient(180deg, rgba(14,16,30,0.78) 0%, rgba(10,12,24,0.86) 100%)";
+        // v8.3 F2: in fullscreen, the taskbar auto-hides (slides off the
+        // bottom edge) for an immersive view. Moving the pointer to the
+        // bottom edge sets tbPeek=true and slides it back up. When not in
+        // fullscreen it's always visible.
+        const tbHidden = isFs && !tbPeek;
         return(
       <div style={{
         position:"fixed",bottom:0,left:0,right:0,height:TASKBAR_H,
@@ -1219,6 +1291,8 @@ export default function NovaOS(){
         borderTop:"1px solid rgba(255,255,255,0.09)",
         boxShadow:"0 -1px 0 rgba(255,255,255,0.04) inset, 0 -20px 50px -20px rgba(0,0,0,0.5)",
         display:"flex",alignItems:"center",padding:"0 14px",gap:6,zIndex:9999,
+        transform: tbHidden ? "translateY(110%)" : "translateY(0)",
+        transition: "transform 0.28s cubic-bezier(0.4,0,0.2,1)",
       }}>
         {/* v7.7: Start menu button — now shows the Nova OS brand mark (gradient
             N) instead of the generic "◈" glyph. The button background lights
