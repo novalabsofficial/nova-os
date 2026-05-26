@@ -243,91 +243,93 @@ function IrisBg() {
   );
 }
 
-// v8.0 — Ember: a Mac-Ventura-style wallpaper. Layered curved petal/flame
-// shapes flowing through a warm-to-cool palette — bright amber at the
-// top fading through orange and red into deep magenta and violet at the
-// bottom. The shapes have S-curve silhouettes (similar to Cascade's
-// ridges) but here they're shorter and overlap more like flames rather
-// than mountain ridges. Light gaussian blur softens the edges where
-// shapes meet, giving the "luxurious gradient" feel of Ventura without
-// looking pixelated.
+// v8.0 — Ember: a Mac-Ventura-style wallpaper, redesigned. The earlier
+// polygon-path approach made harsh edges visible at all but the smallest
+// preview sizes. This version follows Mesh's proven design pattern —
+// large radial-gradient blobs heavily gaussian-blurred — but applied
+// to a warm/cool palette that lands in Ventura territory:
+//   • Bright amber center-top (the "sun")
+//   • Orange and red flanking blobs
+//   • Magenta blob centered lower
+//   • Deep violet blob anchoring the bottom-left
+//   • Subtle indigo blob in the upper-right corner
+// Heavy blur (stdDeviation=85) melts all five into a single flowing
+// atmosphere where you can't see any single shape — exactly the
+// "luxurious gradient" feel of a real Ventura wallpaper.
 function EmberBg() {
   return (
     <svg style={{position:"absolute",inset:0,width:"100%",height:"100%"}} viewBox="0 0 1440 900" preserveAspectRatio="xMidYMid slice">
       <defs>
-        {/* Backdrop — very dark warm undertone (almost black with a hint
-            of plum) so the layers above glow */}
-        <linearGradient id="ember-bg" x1="0" y1="0" x2="0.6" y2="1">
+        {/* Backdrop — very dark warm undertone (deep plum-black) so the
+            blobs glow against it like a fire on a dark wall */}
+        <linearGradient id="ember-bg" x1="0" y1="0" x2="0.5" y2="1">
           <stop offset="0%"   stopColor="#1c0a14"/>
-          <stop offset="100%" stopColor="#080208"/>
+          <stop offset="100%" stopColor="#0a0210"/>
         </linearGradient>
 
-        {/* Layer 1 — bright amber (top, the "sun" tone) */}
-        <linearGradient id="ember-l1" x1="0.5" y1="0" x2="0.5" y2="1">
-          <stop offset="0%"   stopColor="#fde68a"/>
-          <stop offset="45%"  stopColor="#f59e0b"/>
-          <stop offset="100%" stopColor="#7c2d12"/>
-        </linearGradient>
-        {/* Layer 2 — orange */}
-        <linearGradient id="ember-l2" x1="0.5" y1="0" x2="0.5" y2="1">
-          <stop offset="0%"   stopColor="#fdba74"/>
-          <stop offset="45%"  stopColor="#ea580c"/>
-          <stop offset="100%" stopColor="#7c2d12"/>
-        </linearGradient>
-        {/* Layer 3 — red */}
-        <linearGradient id="ember-l3" x1="0.5" y1="0" x2="0.5" y2="1">
-          <stop offset="0%"   stopColor="#fb7185"/>
-          <stop offset="45%"  stopColor="#dc2626"/>
-          <stop offset="100%" stopColor="#7c1d1d"/>
-        </linearGradient>
-        {/* Layer 4 — magenta */}
-        <linearGradient id="ember-l4" x1="0.5" y1="0" x2="0.5" y2="1">
-          <stop offset="0%"   stopColor="#e879f9"/>
-          <stop offset="45%"  stopColor="#a21caf"/>
-          <stop offset="100%" stopColor="#581c87"/>
-        </linearGradient>
-        {/* Layer 5 — deep violet (foreground / lower-left, the "twilight" */}
-        <linearGradient id="ember-l5" x1="0.5" y1="0" x2="0.5" y2="1">
-          <stop offset="0%"   stopColor="#a78bfa"/>
-          <stop offset="45%"  stopColor="#7c3aed"/>
-          <stop offset="100%" stopColor="#3b0764"/>
-        </linearGradient>
+        {/* Amber: the "sun" — bright warm center near the top */}
+        <radialGradient id="ember-1" cx="52%" cy="22%" r="58%">
+          <stop offset="0%"   stopColor="#fde68a" stopOpacity="0.92"/>
+          <stop offset="30%"  stopColor="#f59e0b" stopOpacity="0.65"/>
+          <stop offset="65%"  stopColor="#92400e" stopOpacity="0.18"/>
+          <stop offset="100%" stopColor="#0a0210" stopOpacity="0"/>
+        </radialGradient>
+        {/* Orange: right side, slightly lower than the amber */}
+        <radialGradient id="ember-2" cx="80%" cy="50%" r="48%">
+          <stop offset="0%"   stopColor="#fb923c" stopOpacity="0.85"/>
+          <stop offset="35%"  stopColor="#ea580c" stopOpacity="0.55"/>
+          <stop offset="100%" stopColor="#7c2d12" stopOpacity="0"/>
+        </radialGradient>
+        {/* Red: lower-right, transitions warm into the magenta */}
+        <radialGradient id="ember-3" cx="68%" cy="78%" r="46%">
+          <stop offset="0%"   stopColor="#ef4444" stopOpacity="0.85"/>
+          <stop offset="40%"  stopColor="#be185d" stopOpacity="0.5"/>
+          <stop offset="100%" stopColor="#500724" stopOpacity="0"/>
+        </radialGradient>
+        {/* Magenta: lower-center, the warm-to-cool pivot */}
+        <radialGradient id="ember-4" cx="36%" cy="82%" r="48%">
+          <stop offset="0%"   stopColor="#a21caf" stopOpacity="0.82"/>
+          <stop offset="50%"  stopColor="#7c3aed" stopOpacity="0.42"/>
+          <stop offset="100%" stopColor="#3b0764" stopOpacity="0"/>
+        </radialGradient>
+        {/* Violet: bottom-left, the deep "twilight" foreground */}
+        <radialGradient id="ember-5" cx="14%" cy="70%" r="42%">
+          <stop offset="0%"   stopColor="#7c3aed" stopOpacity="0.78"/>
+          <stop offset="50%"  stopColor="#4c1d95" stopOpacity="0.38"/>
+          <stop offset="100%" stopColor="#1e1b4b" stopOpacity="0"/>
+        </radialGradient>
+        {/* Indigo accent: upper-left, balances the composition */}
+        <radialGradient id="ember-6" cx="14%" cy="22%" r="36%">
+          <stop offset="0%"   stopColor="#fb923c" stopOpacity="0.55"/>
+          <stop offset="100%" stopColor="#7c2d12" stopOpacity="0"/>
+        </radialGradient>
 
-        {/* Light blur for the soft "draped silk" edges that make Ventura
-            wallpapers feel luxurious — not too heavy or shapes lose definition */}
-        <filter id="ember-blur"><feGaussianBlur stdDeviation="8"/></filter>
+        {/* Heavy blur to melt every blob into one smooth atmosphere.
+            This is the secret to Mesh's quality — and now Ember's too. */}
+        <filter id="ember-blur"><feGaussianBlur stdDeviation="85"/></filter>
+
+        {/* Soft vignette for depth */}
+        <radialGradient id="ember-vign" cx="50%" cy="50%" r="80%">
+          <stop offset="55%" stopColor="#000" stopOpacity="0"/>
+          <stop offset="100%" stopColor="#000" stopOpacity="0.35"/>
+        </radialGradient>
       </defs>
 
       {/* Layer 0: backdrop */}
       <rect width="1440" height="900" fill="url(#ember-bg)"/>
 
+      {/* Layer 1: all six blobs, heavily blurred into a single flowing field */}
       <g filter="url(#ember-blur)">
-        {/* Layer 1: amber, large petal covering most of the upper canvas.
-            Tapers down toward the lower-right as if a flame's tip. */}
-        <path d="M -100 -100 L 1100 -100 Q 1500 200 1200 700 Q 900 600 700 400 Q 500 200 -100 300 Z"
-              fill="url(#ember-l1)"/>
-
-        {/* Layer 2: orange, narrower petal rising from the mid-bottom up
-            into the upper-right. Slight S-curve silhouette. */}
-        <path d="M 200 900 L 1100 900 Q 1300 600 1100 300 Q 900 100 700 200 Q 500 400 400 700 Q 300 800 200 900 Z"
-              fill="url(#ember-l2)"/>
-
-        {/* Layer 3: red, S-curve through the middle/lower area, sweeping
-            from the right edge down to the bottom-center */}
-        <path d="M 1440 250 L 1440 900 L 350 900 Q 600 700 800 600 Q 1000 500 1100 350 Q 1200 200 1440 250 Z"
-              fill="url(#ember-l3)"/>
-
-        {/* Layer 4: magenta, a tall petal from the bottom-center reaching
-            up toward the middle */}
-        <path d="M 300 900 L 900 900 Q 800 600 700 500 Q 600 400 500 500 Q 400 700 300 900 Z"
-              fill="url(#ember-l4)"/>
-
-        {/* Layer 5: deep violet, the foreground "shadow" sweeping the
-            lower-left corner. This is what makes Ventura wallpapers feel
-            grounded — a dark cool foreground anchoring the warm light. */}
-        <path d="M -100 600 L -100 900 L 600 900 Q 500 800 400 750 Q 250 700 100 650 Z"
-              fill="url(#ember-l5)"/>
+        <rect width="1440" height="900" fill="url(#ember-1)"/>
+        <rect width="1440" height="900" fill="url(#ember-2)"/>
+        <rect width="1440" height="900" fill="url(#ember-3)"/>
+        <rect width="1440" height="900" fill="url(#ember-4)"/>
+        <rect width="1440" height="900" fill="url(#ember-5)"/>
+        <rect width="1440" height="900" fill="url(#ember-6)"/>
       </g>
+
+      {/* Layer 2: vignette */}
+      <rect width="1440" height="900" fill="url(#ember-vign)"/>
     </svg>
   );
 }

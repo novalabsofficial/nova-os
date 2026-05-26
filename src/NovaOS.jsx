@@ -517,7 +517,7 @@ export default function NovaOS(){
 
     // v6.3: auth goes through Firebase Auth. The new auth.js handles both
     // greenfield accounts and silent migration of pre-6.3 plaintext accounts.
-    const initData={notes:[],tasks:[],wallpaper:"mesh",bio:"",joined:Date.now(),settings:{},installedApps:[],folders:[],migratedTo41:true,migratedTo52:true};
+    const initData={notes:[],tasks:[],wallpaper:"mesh",bio:"",joined:Date.now(),settings:{},installedApps:[],folders:[],hiddenFromDesktop:[],pinnedToTaskbar:[],migratedTo41:true,migratedTo52:true};
 
     if(mode==="register"){
       try {
@@ -619,6 +619,27 @@ export default function NovaOS(){
     const next=hiddenFromDesktop.filter(id=>id!==appId);
     updateData(p=>({...p,hiddenFromDesktop:next}));
     showToast("Added to desktop");
+  }
+  // v8.0 — Taskbar pinning. Users can pin apps to the taskbar so they
+  // appear as compact icon-only chips even when no window is open. When
+  // a pinned app IS running, its chip expands to show icon + label +
+  // accent indicator like a normal running-window chip. Storage shape
+  // mirrors hiddenFromDesktop: `data.pinnedToTaskbar` is an ordered array
+  // of app ids, default empty. Storage lives on the user data doc, so
+  // pins sync across devices.
+  const pinnedToTaskbar=data?.pinnedToTaskbar||[];
+  const pinnedSet=new Set(pinnedToTaskbar);
+  function pinAppToTaskbar(appId){
+    if(pinnedSet.has(appId))return;
+    const next=[...pinnedToTaskbar,appId];
+    updateData(p=>({...p,pinnedToTaskbar:next}));
+    showToast("Pinned to taskbar");
+  }
+  function unpinAppFromTaskbar(appId){
+    if(!pinnedSet.has(appId))return;
+    const next=pinnedToTaskbar.filter(id=>id!==appId);
+    updateData(p=>({...p,pinnedToTaskbar:next}));
+    showToast("Unpinned from taskbar");
   }
   const filteredMenu=allApps.filter(a=>a.label.toLowerCase().includes(menuSrch.toLowerCase())||a.desc?.toLowerCase().includes(menuSrch.toLowerCase()));
   const isAnyDrag=drag||iconDrag||widgetDrag||widgetResize;
@@ -830,6 +851,12 @@ export default function NovaOS(){
             onDoubleClick={launch}
             onContextMenu={e=>openContextMenu(e, [
               {icon:"▶", label:"Open", onClick:launch},
+              // v8.0: pin/unpin to taskbar. Pinned apps appear as compact
+              // icon-only chips on the taskbar even when not running.
+              ...(app.storeApp ? [] : [pinnedSet.has(app.id)
+                ? {icon:"📌", label:"Unpin from taskbar", onClick:()=>unpinAppFromTaskbar(app.id)}
+                : {icon:"📌", label:"Pin to taskbar", onClick:()=>pinAppToTaskbar(app.id)}
+              ]),
               // v7.7: "Remove from desktop" hides the app from the desktop
               // without uninstalling it. It still shows in the start menu /
               // taskbar; users can add it back via right-click there.
@@ -894,6 +921,12 @@ export default function NovaOS(){
                 onClick={()=>{setMenuOpen(false);if(app.storeApp){if(app.storeApp.newTab)openExternalUrl(app.storeApp.url);else openApp("browser");}else openApp(app.id);}}
                 onContextMenu={e=>{setMenuOpen(false);openContextMenu(e,[
                   {icon:"▶",label:"Open",onClick:()=>{if(app.storeApp){if(app.storeApp.newTab)openExternalUrl(app.storeApp.url);else openApp("browser");}else openApp(app.id);}},
+                  // v8.0: pin/unpin to taskbar (storeApps can't be pinned —
+                  // they don't have a stable launch target on the taskbar).
+                  ...(app.storeApp ? [] : [pinnedSet.has(app.id)
+                    ? {icon:"📌", label:"Unpin from taskbar", onClick:()=>unpinAppFromTaskbar(app.id)}
+                    : {icon:"📌", label:"Pin to taskbar", onClick:()=>pinAppToTaskbar(app.id)}
+                  ]),
                   isHidden
                     ? {icon:"+",label:"Add to desktop",onClick:()=>addAppToDesktop(app.id)}
                     : {icon:"–",label:"Remove from desktop",danger:true,onClick:()=>hideAppFromDesktop(app.id)},
@@ -1045,32 +1078,119 @@ export default function NovaOS(){
           <NovaLogo size={26}/>
         </button>
         <div style={{width:1,height:26,background:"linear-gradient(180deg, transparent, rgba(255,255,255,0.12) 50%, transparent)",margin:"0 5px"}}/>
-        {wins.map(win=>{
-  const app=APPS.find(a=>a.id===win.app);
-  const isMin=win.state==="minimized";
-  const isTop=wins.length>0&&win.z===Math.max(...wins.map(w=>w.z));
-  const isHidden=hiddenSet.has(win.app);
-  return(
-    <button key={win.id} className="tb"
-      onClick={()=>{if(isMin){setWins(ws=>ws.map(w=>w.id===win.id?{...w,state:"normal"}:w));focusWin(win.id);}else if(isTop){setWins(ws=>ws.map(w=>w.id===win.id?{...w,state:"minimized"}:w));}else focusWin(win.id);}}
-      onContextMenu={e=>openContextMenu(e,[
-        {icon:"▶",label:isMin?"Restore":"Focus",onClick:()=>{setWins(ws=>ws.map(w=>w.id===win.id?{...w,state:"normal"}:w));focusWin(win.id);}},
-        {icon:"—",label:"Minimize",onClick:()=>setWins(ws=>ws.map(w=>w.id===win.id?{...w,state:"minimized"}:w)),disabled:isMin},
-        {icon:"⬜",label:win.state==="maximized"?"Restore size":"Maximize",onClick:()=>maximizeWin(win.id)},
-        // v7.7: pin/unpin from the running-window taskbar entry. Only relevant
-        // for built-in apps (storeApp icons can't have a "running window" since
-        // they always open in the browser app or a new tab).
-        ...(isHidden ? [{icon:"+",label:"Add to desktop",onClick:()=>addAppToDesktop(win.app)}] : []),
-        {type:"divider"},
-        {icon:"✕",label:"Close",danger:true,onClick:()=>closeWin(win.id)},
-      ])}
-      style={{height:40,padding:"0 12px",background:isTop&&!isMin?"rgba(255,255,255,0.14)":"rgba(255,255,255,0.05)",border:"1px solid "+(isTop&&!isMin?"rgba(255,255,255,0.14)":"rgba(255,255,255,0.07)"),borderRadius:10,cursor:"pointer",fontFamily:FF,fontSize:12,fontWeight:600,color:isMin?"rgba(255,255,255,0.45)":"rgba(255,255,255,0.88)",whiteSpace:"nowrap",transition:"all 0.18s cubic-bezier(0.4,0,0.2,1)",display:"flex",alignItems:"center",gap:7,position:"relative"}}>
-      <div style={{pointerEvents:"none",display:"flex",alignItems:"center"}}><AppIconDisplay app={{id:win.app,icon:app?.icon||"📦"}} size={16}/></div>
-      {deviceMode!=="mobile"&&<span>{app?.label}</span>}
-      {!isMin&&<div style={{position:"absolute",bottom:-1,left:"50%",transform:"translateX(-50%)",width:isTop?22:8,height:3,borderRadius:3,background:AC,boxShadow:isTop?"0 0 10px "+AC+", 0 0 4px "+AC:"none",transition:"width 0.25s cubic-bezier(0.4,0,0.2,1), box-shadow 0.25s cubic-bezier(0.4,0,0.2,1)"}}/>}
-    </button>
-  );
-})}
+        {/* v8.0 — Taskbar: pinned apps + running windows.
+            Pinned apps with NO running windows render as compact icon-only
+            "launcher" chips (40x40, no label). Pinned apps WITH running
+            windows expand to full chips (icon + label + glowing accent
+            underline). Running apps that aren't pinned render as before
+            (one full chip per window). */}
+        {(()=>{
+          const slots=[];
+          const seenApp=new Set();
+          // Pinned slots first, in pin order. Each pinned slot represents
+          // ALL running windows of that app aggregated into one chip.
+          pinnedToTaskbar.forEach(appId=>{
+            if(seenApp.has(appId))return;
+            seenApp.add(appId);
+            const running=wins.filter(w=>w.app===appId);
+            slots.push({key:"pin-"+appId,appId,running,pinned:true});
+          });
+          // Then any running windows that aren't in the pinned list, one
+          // chip per window so multiple windows of an app show separately.
+          wins.forEach(win=>{
+            if(pinnedSet.has(win.app))return;
+            slots.push({key:"win-"+win.id,appId:win.app,running:[win],pinned:false});
+          });
+          // Determine global top-z so we can highlight the focused chip.
+          const topZ=wins.length>0?Math.max(...wins.map(w=>w.z)):-Infinity;
+          return slots.map(slot=>{
+            const app=APPS.find(a=>a.id===slot.appId);
+            if(!app)return null;
+            const hasRunning=slot.running.length>0;
+            const topWin=hasRunning?[...slot.running].sort((a,b)=>(b.z||0)-(a.z||0))[0]:null;
+            const allMin=hasRunning&&slot.running.every(w=>w.state==="minimized");
+            const isTop=hasRunning&&topWin.z===topZ&&!allMin;
+            const isHidden=hiddenSet.has(slot.appId);
+
+            // Click: launch if not running, focus/minimize topmost if running.
+            const handleClick=()=>{
+              if(!hasRunning){openApp(slot.appId);return;}
+              if(allMin){
+                setWins(ws=>ws.map(w=>w.id===topWin.id?{...w,state:"normal"}:w));
+                focusWin(topWin.id);
+              }else if(isTop){
+                setWins(ws=>ws.map(w=>w.id===topWin.id?{...w,state:"minimized"}:w));
+              }else{
+                focusWin(topWin.id);
+              }
+            };
+
+            const buildMenu=()=>{
+              const items=[];
+              if(hasRunning){
+                items.push({icon:"▶",label:allMin?"Restore":"Focus",onClick:()=>{setWins(ws=>ws.map(w=>w.id===topWin.id?{...w,state:"normal"}:w));focusWin(topWin.id);}});
+                items.push({icon:"—",label:"Minimize",onClick:()=>setWins(ws=>ws.map(w=>w.id===topWin.id?{...w,state:"minimized"}:w)),disabled:allMin});
+                items.push({icon:"⬜",label:topWin.state==="maximized"?"Restore size":"Maximize",onClick:()=>maximizeWin(topWin.id)});
+              }else{
+                items.push({icon:"▶",label:"Open",onClick:()=>openApp(slot.appId)});
+              }
+              items.push(slot.pinned
+                ?{icon:"📌",label:"Unpin from taskbar",onClick:()=>unpinAppFromTaskbar(slot.appId)}
+                :{icon:"📌",label:"Pin to taskbar",onClick:()=>pinAppToTaskbar(slot.appId)});
+              if(isHidden)items.push({icon:"+",label:"Add to desktop",onClick:()=>addAppToDesktop(slot.appId)});
+              if(hasRunning){
+                items.push({type:"divider"});
+                items.push({icon:"✕",label:"Close",danger:true,onClick:()=>closeWin(topWin.id)});
+              }
+              return items;
+            };
+
+            // Compact pinned-only chip — icon only, fixed 40x40 square.
+            if(slot.pinned&&!hasRunning){
+              return(
+                <button key={slot.key} className="tb"
+                  onClick={handleClick}
+                  onContextMenu={e=>openContextMenu(e,buildMenu())}
+                  title={app.label}
+                  style={{
+                    width:40,height:40,padding:0,
+                    background:"rgba(255,255,255,0.05)",
+                    border:"1px solid rgba(255,255,255,0.07)",
+                    borderRadius:10,cursor:"pointer",
+                    display:"flex",alignItems:"center",justifyContent:"center",
+                    transition:"all 0.18s cubic-bezier(0.4,0,0.2,1)",
+                    flexShrink:0,
+                  }}>
+                  <AppIconDisplay app={{id:app.id,icon:app.icon}} size={20}/>
+                </button>
+              );
+            }
+
+            // Full chip — running (whether pinned or not). Icon + label
+            // (on non-mobile) + glowing accent underline when focused.
+            return(
+              <button key={slot.key} className="tb"
+                onClick={handleClick}
+                onContextMenu={e=>openContextMenu(e,buildMenu())}
+                style={{
+                  height:40,padding:"0 12px",
+                  background:isTop?"rgba(255,255,255,0.14)":"rgba(255,255,255,0.05)",
+                  border:"1px solid "+(isTop?"rgba(255,255,255,0.14)":"rgba(255,255,255,0.07)"),
+                  borderRadius:10,cursor:"pointer",
+                  fontFamily:FF,fontSize:12,fontWeight:600,
+                  color:allMin?"rgba(255,255,255,0.45)":"rgba(255,255,255,0.88)",
+                  whiteSpace:"nowrap",
+                  transition:"all 0.22s cubic-bezier(0.4,0,0.2,1)",
+                  display:"flex",alignItems:"center",gap:7,position:"relative",
+                  flexShrink:0,
+                }}>
+                <div style={{pointerEvents:"none",display:"flex",alignItems:"center"}}><AppIconDisplay app={{id:app.id,icon:app.icon}} size={16}/></div>
+                {deviceMode!=="mobile"&&<span>{app.label}</span>}
+                {hasRunning&&!allMin&&<div style={{position:"absolute",bottom:-1,left:"50%",transform:"translateX(-50%)",width:isTop?22:8,height:3,borderRadius:3,background:AC,boxShadow:isTop?"0 0 10px "+AC+", 0 0 4px "+AC:"none",transition:"width 0.25s cubic-bezier(0.4,0,0.2,1), box-shadow 0.25s cubic-bezier(0.4,0,0.2,1)"}}/>}
+              </button>
+            );
+          });
+        })()}
         <div style={{flex:1}}/>
         {/* v7.7: right-side cluster — every pill is locked to height:40 so
             they sit on the same baseline. Internal layout uses flex centering
