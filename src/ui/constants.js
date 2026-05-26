@@ -8,7 +8,7 @@ export const COLL = "nova_storage";
 // header. Update this when you do a version sweep — package.json /
 // tauri.conf.json still need their own bumps but at least *display* text
 // won't drift again. Format: "<major>.<minor>".
-export const NOVA_VERSION = "8.3";
+export const NOVA_VERSION = "8.4";
 
 // Widget metadata: label/emoji + minimum size constraints used by WidgetShell.
 export const WIDGET_CONFIGS = {
@@ -124,6 +124,40 @@ export const STORE_CATALOG = [
 ];
 
 export const STORE_CATS = ["All","Games","Media","Tools","Social","News"];
+
+// v8.4 Store revamp: per-app presentation metadata that powers the new
+// "real app store" UI — a brand accent color (drives the icon monogram
+// tile + the detail-page hero gradient), the publisher/developer name, and
+// a short marketing tagline shown under the app name. Keyed by catalog id.
+// Apps without a custom-drawn brand SVG (see StoreBrandIcon) fall back to a
+// monogram tile tinted with `accent`.
+export const STORE_META = {
+  roblox:    { developer:"Roblox Corporation",    tagline:"Reimagine the way people play together", accent:"#e2231a" },
+  xbox:      { developer:"Microsoft",             tagline:"Stream Xbox Game Pass in your browser",   accent:"#107c10" },
+  steam:     { developer:"Valve",                 tagline:"The ultimate destination for PC games",   accent:"#1b2838" },
+  ps:        { developer:"Sony Interactive",      tagline:"Play PlayStation in the cloud",           accent:"#0070d1" },
+  itchio:    { developer:"itch corp",             tagline:"Indie games & creative tools",            accent:"#fa5c5c" },
+  poki:      { developer:"Poki",                  tagline:"Play free games, instantly",              accent:"#6c4cf1" },
+  crazygames:{ developer:"CrazyGames",            tagline:"Hundreds of free browser games",          accent:"#7c3aed" },
+  youtube:   { developer:"Google",                tagline:"Watch, share and create videos",          accent:"#ff0000" },
+  spotify:   { developer:"Spotify AB",            tagline:"Music and podcasts for everyone",         accent:"#1db954" },
+  twitch:    { developer:"Amazon",                tagline:"Live streaming for gamers",               accent:"#9146ff" },
+  soundcloud:{ developer:"SoundCloud",            tagline:"Hear the world's sounds",                 accent:"#ff5500" },
+  github:    { developer:"Microsoft",             tagline:"Where the world builds software",         accent:"#1f2328" },
+  figma:     { developer:"Figma, Inc.",           tagline:"Design and prototype, together",          accent:"#2c2c2c" },
+  notion:    { developer:"Notion Labs",           tagline:"Your connected workspace",                accent:"#2f3437" },
+  codepen:   { developer:"CodePen",               tagline:"Build, test and discover front-end code", accent:"#1e1f26" },
+  discord:   { developer:"Discord Inc.",          tagline:"Talk, chat, and hang out",                accent:"#5865f2" },
+  reddit:    { developer:"Reddit Inc.",           tagline:"Dive into anything",                      accent:"#ff4500" },
+  twitter:   { developer:"X Corp.",               tagline:"What's happening, right now",             accent:"#0f1419" },
+  hn:        { developer:"Y Combinator",          tagline:"News for hackers and founders",           accent:"#ff6600" },
+  wiki:      { developer:"Wikimedia Foundation",  tagline:"The free encyclopedia",                   accent:"#101418" },
+  arxiv:     { developer:"Cornell University",    tagline:"Open-access scientific research",         accent:"#b31b1b" },
+};
+
+// Hand-picked apps for the Store home "Featured" hero carousel. Order matters
+// — these render left-to-right as large banner cards at the top of Home.
+export const STORE_FEATURED = ["roblox","spotify","youtube","figma","discord"];
 
 export const BOOT_MSGS = [
   "NOVA OS v" + NOVA_VERSION + " — Nova Systems",

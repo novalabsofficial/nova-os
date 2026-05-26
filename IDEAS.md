@@ -5,6 +5,46 @@ not committed to. Living document — add to it freely.
 
 ---
 
+# ✅ v8.4 — shipped (Store revamp)
+
+A full rebuild of the Nova Store into a real, professional app-store
+experience — plus written reviews and a cohesive custom icon set.
+
+### ✅ Professional Store UI — SHIPPED
+The old flat tabbed card-grid (which read like "something out of Roblox")
+was rebuilt borrowing the Google Play / App Store structure.
+- **Home** with a Featured hero carousel + horizontal category "shelves"
+  (Top Games, Essential Apps, Social & News, From the Community).
+- **Games / Apps** browse views (Apps has Media/Tools/Social/News sub-chips).
+- **Unified search** across the curated catalog and community apps.
+- **App detail pages** — gradient hero tinted with the brand accent, big
+  icon, developer + tagline, rating summary with a 5-bar histogram, and
+  Open / Add-to-Desktop actions.
+- Community / Submit / Moderation kept and restyled to match.
+- **Where:** `src/apps/StoreApp.jsx` (full rewrite), `src/ui/constants.js`
+  (`STORE_META`, `STORE_FEATURED`).
+
+### ✅ Written reviews — SHIPPED
+Users can write a text review alongside their star rating (optional).
+- One doc per user per app in `nova_ratings` now carries an optional `text`
+  field; a star-picker + textarea composer posts/edits it, and the detail
+  page shows a feed of everyone's reviews (avatar, @user, stars, relative
+  time). Quick re-rating uses `merge:true` so it never wipes the written
+  review.
+- **Where:** `src/apps/StoreApp.jsx`, `firestore.rules` (ratings block now
+  allows an optional `text` ≤ 1000 chars).
+
+### ✅ Revamped Store app icons (backlog #4) — SHIPPED
+Replaced the inconsistent Clearbit logo PNGs with a unified, hand-drawn
+brand-icon set in the Nova aesthetic. Recognizable brands (Roblox, YouTube,
+Spotify, Discord, Reddit, X, Twitch, GitHub, Steam, Xbox, PlayStation,
+Figma, Notion) get custom glyphs; the rest get clean monogram tiles tinted
+with the brand accent. Used in the Store *and* on the desktop / taskbar.
+- **Where:** `src/ui/icons.jsx` (`StoreBrandIcon`, `storeBrandSvg`),
+  `AppIconDisplay` now routes store apps through it.
+
+---
+
 # ✅ v8.3 — shipped (playtester feedback)
 
 Scheduled batch of bug fixes + small features surfaced by playtesters.
@@ -141,7 +181,12 @@ circle, save as the user's avatar.
 
 ---
 
-## 4. Redo Store app icons (especially Roblox)
+## 4. Redo Store app icons (especially Roblox) — ✅ SHIPPED in v8.4
+
+> Done: replaced Clearbit logos with the hand-drawn `StoreBrandIcon` set
+> (custom glyphs for the big brands incl. Roblox, monogram tiles for the
+> rest). Original notes kept below for reference.
+
 
 The Store currently uses Clearbit's logo API for external apps
 (`StoreIcon` component in `src/ui/icons.jsx`). For brands like Roblox,

@@ -37,7 +37,7 @@ import {
   WALLPAPERS, WMO, HAS_SVG_ICON, NOVA_VERSION,
 } from "./ui/constants.js";
 import { Wallpaper, NovaBg, BlissBg, AuroraBg, MeshBg } from "./ui/wallpapers.jsx";
-import { NovaSvgIcon, StoreIcon, AppIconDisplay, NovaLogo, WindowControlIcon } from "./ui/icons.jsx";
+import { NovaSvgIcon, AppIconDisplay, NovaLogo, WindowControlIcon } from "./ui/icons.jsx";
 import { Toggle } from "./ui/Toggle.jsx";
 import { BrowserNav } from "./ui/BrowserNav.jsx";
 import { ResizeHandles } from "./ui/ResizeHandles.jsx";

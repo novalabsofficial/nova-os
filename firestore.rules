@@ -122,15 +122,24 @@ service cloud.firestore {
         isMod();
     }
 
-    // ── ratings ──────────────────────────────────────────────────────────
-    // Doc id pattern: `<appId>_<username>` (legacy) — we don't gate on the
-    // doc id, we gate on the `uid` field inside the doc.
+    // ── ratings & reviews ────────────────────────────────────────────────
+    // Doc id pattern: `<appId>_<username>` — one doc per user per app, so a
+    // user's star rating and their (optional) written review live together
+    // and editing either just overwrites/merges the same doc.
+    // We don't gate on the doc id, we gate on the `uid` field inside the doc.
+    //
+    // v8.4: an optional `text` field carries a written review (≤ 1000 chars).
+    // It's optional so a quick star-only rating (no review) still validates.
     match /nova_ratings/{ratingId} {
       allow read: if signedIn();
       allow create, update: if willOwnUid('uid') &&
         request.resource.data.rating is number &&
         request.resource.data.rating >= 1 &&
-        request.resource.data.rating <= 5;
+        request.resource.data.rating <= 5 &&
+        (
+          !('text' in request.resource.data) ||
+          (request.resource.data.text is string && request.resource.data.text.size() <= 1000)
+        );
       allow delete: if
         (signedIn() && resource.data.uid == request.auth.uid) ||
         isMod();

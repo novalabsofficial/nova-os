@@ -7,7 +7,7 @@
 // Anything else falls back to the app's emoji icon.
 
 import { useState } from "react";
-import { HAS_SVG_ICON } from "./constants.js";
+import { HAS_SVG_ICON, STORE_META } from "./constants.js";
 
 // Built-in app SVG icons. All use a 32x32 viewBox with rounded-rect background.
 //
@@ -130,6 +130,133 @@ export function StoreIcon({ domain, fallback, size = 26 }) {
   );
 }
 
+// ── v8.4 Store revamp: cohesive hand-drawn brand icons ──────────────────────
+// The old Store leaned on Clearbit logo PNGs — different sizes, paddings, and
+// design eras crammed together, which read as amateur. StoreBrandIcon replaces
+// that with a unified rounded-square set in the Nova aesthetic: recognizable
+// brands get a custom-drawn glyph; the rest get a clean monogram tile tinted
+// with the brand accent (STORE_META[id].accent). Community apps (no catalog
+// id) fall back to their chosen emoji on a neutral tile.
+//
+// Each branded glyph is authored in a 0–32 coordinate space and clipped to the
+// rounded-rect background, so it composites cleanly at any size.
+function storeBrandSvg(id, r) {
+  switch (id) {
+    case "roblox": return (<>
+      <rect width="32" height="32" rx={r} fill="#e2231a"/>
+      <g transform="rotate(-13 16 16)">
+        <rect x="10" y="10" width="12" height="12" rx="1.6" fill="#fff"/>
+        <rect x="13.7" y="13.7" width="4.6" height="4.6" rx="0.6" fill="#e2231a"/>
+      </g>
+    </>);
+    case "youtube": return (<>
+      <rect width="32" height="32" rx={r} fill="#ff0000"/>
+      <path d="M13.2 10.4 L22.6 16 L13.2 21.6 Z" fill="#fff"/>
+    </>);
+    case "spotify": return (<>
+      <rect width="32" height="32" rx={r} fill="#1db954"/>
+      <path d="M8.8 13.4 Q16 11.2 23.6 14.6" stroke="#fff" strokeWidth="2.4" fill="none" strokeLinecap="round"/>
+      <path d="M10 17.4 Q16 15.6 22 18.4" stroke="#fff" strokeWidth="2.1" fill="none" strokeLinecap="round"/>
+      <path d="M11 21 Q16 19.5 20.6 21.8" stroke="#fff" strokeWidth="1.8" fill="none" strokeLinecap="round"/>
+    </>);
+    case "steam": return (<>
+      <rect width="32" height="32" rx={r} fill="#1b2838"/>
+      <circle cx="13.2" cy="19.2" r="5.4" fill="none" stroke="#66c0f4" strokeWidth="2"/>
+      <circle cx="13.2" cy="19.2" r="1.7" fill="#66c0f4"/>
+      <line x1="17" y1="15.4" x2="20.4" y2="11.6" stroke="#66c0f4" strokeWidth="1.5"/>
+      <circle cx="21.4" cy="10.6" r="3.3" fill="#66c0f4"/>
+    </>);
+    case "ps": return (<>
+      <rect width="32" height="32" rx={r} fill="#0070d1"/>
+      <text x="16" y="21.6" textAnchor="middle" fontFamily="'Space Grotesk',sans-serif" fontWeight="800" fontStyle="italic" fontSize="13" fill="#fff">PS</text>
+    </>);
+    case "xbox": return (<>
+      <rect width="32" height="32" rx={r} fill="#107c10"/>
+      <circle cx="16" cy="16" r="9" fill="none" stroke="#fff" strokeWidth="2"/>
+      <line x1="10.6" y1="10.6" x2="21.4" y2="21.4" stroke="#fff" strokeWidth="2" strokeLinecap="round"/>
+      <line x1="21.4" y1="10.6" x2="10.6" y2="21.4" stroke="#fff" strokeWidth="2" strokeLinecap="round"/>
+    </>);
+    case "twitch": return (<>
+      <rect width="32" height="32" rx={r} fill="#9146ff"/>
+      <path d="M10 7 L24 7 L24 18 L20 22 L16.4 22 L13.4 25 L13.4 22 L10 22 Z" fill="#fff"/>
+      <rect x="14.4" y="11" width="1.8" height="5" fill="#9146ff"/>
+      <rect x="18.6" y="11" width="1.8" height="5" fill="#9146ff"/>
+    </>);
+    case "github": return (<>
+      <rect width="32" height="32" rx={r} fill="#1f2328"/>
+      <path d="M11 9 L9.4 5.4 L13.6 8 Z" fill="#fff"/>
+      <path d="M21 9 L22.6 5.4 L18.4 8 Z" fill="#fff"/>
+      <circle cx="16" cy="15.2" r="7.4" fill="#fff"/>
+      <circle cx="13" cy="14.6" r="1.4" fill="#1f2328"/>
+      <circle cx="19" cy="14.6" r="1.4" fill="#1f2328"/>
+      <path d="M22.6 18 Q26.8 20 23.8 24.2" stroke="#fff" strokeWidth="2.2" fill="none" strokeLinecap="round"/>
+    </>);
+    case "discord": return (<>
+      <rect width="32" height="32" rx={r} fill="#5865f2"/>
+      <path d="M11.4 10 Q16 8.4 20.6 10 Q24 14 23 22 Q20.6 24 18.4 22.4 L18 21.4 Q16 22.1 14 21.4 L13.6 22.4 Q11.4 24 8.8 22 Q7.8 14 11.4 10 Z" fill="#fff"/>
+      <ellipse cx="13.4" cy="16" rx="1.5" ry="2.1" fill="#5865f2"/>
+      <ellipse cx="18.6" cy="16" rx="1.5" ry="2.1" fill="#5865f2"/>
+    </>);
+    case "reddit": return (<>
+      <rect width="32" height="32" rx={r} fill="#ff4500"/>
+      <line x1="18" y1="9.5" x2="20.2" y2="6" stroke="#fff" strokeWidth="1.4" strokeLinecap="round"/>
+      <circle cx="20.4" cy="5.6" r="1.5" fill="#fff"/>
+      <ellipse cx="16" cy="18" rx="9" ry="6.4" fill="#fff"/>
+      <circle cx="7.6" cy="16.6" r="2.4" fill="#fff"/>
+      <circle cx="24.4" cy="16.6" r="2.4" fill="#fff"/>
+      <circle cx="13" cy="17.4" r="1.5" fill="#ff4500"/>
+      <circle cx="19" cy="17.4" r="1.5" fill="#ff4500"/>
+      <path d="M12.8 21 Q16 23.2 19.2 21" stroke="#ff4500" strokeWidth="1.3" fill="none" strokeLinecap="round"/>
+    </>);
+    case "twitter": return (<>
+      <rect width="32" height="32" rx={r} fill="#0f1419"/>
+      <line x1="10.8" y1="9.5" x2="20.8" y2="22.5" stroke="#fff" strokeWidth="2.6" strokeLinecap="round"/>
+      <line x1="21" y1="9.5" x2="11" y2="22.5" stroke="#fff" strokeWidth="2.6" strokeLinecap="round"/>
+    </>);
+    case "figma": return (<>
+      <rect width="32" height="32" rx={r} fill="#2c2c2c"/>
+      <rect x="9.6" y="7" width="6.6" height="6" rx="3" fill="#f24e1e"/>
+      <rect x="9.6" y="13" width="6.6" height="6" rx="3" fill="#a259ff"/>
+      <rect x="9.6" y="19" width="6.6" height="6" rx="3" fill="#0acf83"/>
+      <rect x="16.2" y="7" width="6.6" height="6" rx="3" fill="#ff7262"/>
+      <circle cx="19.5" cy="16" r="3.3" fill="#1abcfe"/>
+    </>);
+    case "notion": return (<>
+      <rect width="32" height="32" rx={r} fill="#fff"/>
+      <rect x="0.6" y="0.6" width="30.8" height="30.8" rx={r} fill="none" stroke="rgba(0,0,0,0.12)"/>
+      <text x="16" y="22.4" textAnchor="middle" fontFamily="'Space Grotesk',sans-serif" fontWeight="700" fontSize="17" fill="#191919">N</text>
+    </>);
+    default: return null; // no custom glyph — caller renders a monogram tile
+  }
+}
+
+export function StoreBrandIcon({ app, size = 44 }) {
+  const id = app?.id;
+  const r = Math.round(size * 0.22);
+  const glyph = id ? storeBrandSvg(id, r) : null;
+  if (glyph) {
+    return (
+      <svg width={size} height={size} viewBox="0 0 32 32" style={{display:"block",borderRadius:r,boxShadow:"inset 0 1px 0 rgba(255,255,255,0.15)"}}>
+        {glyph}
+      </svg>
+    );
+  }
+  const accent = id && STORE_META[id] ? STORE_META[id].accent : null;
+  if (accent) {
+    // Monogram tile — first letter of the app name on the brand accent.
+    const letter = (app.name || "?").replace(/[^A-Za-z0-9]/g, "").charAt(0).toUpperCase() || "?";
+    return (
+      <div style={{width:size,height:size,borderRadius:r,background:accent,display:"flex",alignItems:"center",justifyContent:"center",overflow:"hidden",boxShadow:"inset 0 1px 0 rgba(255,255,255,0.18)"}}>
+        <span style={{fontFamily:"'Space Grotesk',sans-serif",fontWeight:700,fontSize:size*0.46,color:"#fff",lineHeight:1}}>{letter}</span>
+      </div>
+    );
+  }
+  // Community / unknown app — emoji on a neutral tile.
+  return (
+    <div style={{width:size,height:size,borderRadius:r,background:"rgba(255,255,255,0.08)",border:"1px solid rgba(255,255,255,0.1)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:size*0.55,lineHeight:1}}>{app?.icon || "📦"}</div>
+  );
+}
+
 // Unified icon display — picks SVG for built-in, Clearbit for store apps,
 // emoji for everything else (new apps without custom SVGs yet).
 //
@@ -140,7 +267,8 @@ export function StoreIcon({ domain, fallback, size = 26 }) {
 // the desktop. Now every app fills the same WxH box regardless of source.
 export function AppIconDisplay({ app, size = 26 }) {
   if (app.storeApp) {
-    return <StoreIcon domain={app.storeApp.domain} fallback={app.storeApp.icon} size={size}/>;
+    // v8.4: route store apps through the unified brand-icon set (was Clearbit).
+    return <StoreBrandIcon app={app.storeApp} size={size}/>;
   }
   if (HAS_SVG_ICON.has(app.id)) {
     return <NovaSvgIcon id={app.id} size={size}/>;
