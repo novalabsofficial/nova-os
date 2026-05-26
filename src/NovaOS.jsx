@@ -296,7 +296,14 @@ export default function NovaOS(){
       window.removeEventListener("pointerup",onUp);
       window.removeEventListener("pointercancel",onUp);
     };
-  },[data?.pinnedToTaskbar,updateData]);
+    // Note: updateData is referenced in the body but intentionally omitted
+    // from deps — it's declared later in this component via useCallback, so
+    // putting it in deps trips a temporal-dead-zone ReferenceError at first
+    // render. Closures inside the effect resolve updateData fine when they
+    // actually fire (after mount), and updateData's identity is stable
+    // anyway. Same pattern as the widget drag useEffect below.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[data?.pinnedToTaskbar]);
 
   // Widget drag — free move, snap to 20px grid on release
   useEffect(()=>{
