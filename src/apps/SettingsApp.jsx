@@ -39,7 +39,11 @@ export function SettingsApp({user,data,updateSettings,showToast,AC,onCustomWallp
       <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8,marginBottom:10}}>{Object.entries(WALLPAPERS).filter(([k])=>k!=="custom").map(([k,w])=>(<div key={k} className="ws" onClick={()=>{updateSettings({wallpaper:k});setSoundWallpaper(k);playSound("notification");showToast("Wallpaper: "+w.name+" ✓");}} style={{height:52,borderRadius:8,background:w.preview,cursor:"pointer",border:wpId===k?"2.5px solid #fff":"2px solid transparent",transition:"border 0.14s",boxSizing:"border-box",display:"flex",alignItems:"flex-end",padding:"5px 7px"}}><span style={{fontSize:9,fontFamily:FFB,fontWeight:600,color:"rgba(255,255,255,0.85)",textShadow:"0 1px 4px rgba(0,0,0,0.9)"}}>{w.name}</span></div>))}</div>
       <div style={{fontSize:10,color:"rgba(255,255,255,0.32)",fontStyle:"italic",marginBottom:10,fontFamily:FF}}>✨ v6.2: each wallpaper tunes the system sounds to a matching musical key. Pick one and listen to the chime.</div>
       <input ref={fileRef} type="file" accept="image/*" onChange={handleUpload} style={{display:"none"}}/>
-      <button onClick={()=>fileRef.current.click()} style={{width:"100%",padding:"10px",background:wpId==="custom"?fill(AC):"rgba(255,255,255,0.06)",border:"1px solid "+(wpId==="custom"?bdr(AC):"rgba(255,255,255,0.12)"),borderRadius:8,cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:12,color:wpId==="custom"?AC:"rgba(255,255,255,0.6)",marginBottom:22}}>{wpId==="custom"?"✓ Custom Wallpaper Active — Click to Change":"📁 Upload Custom Wallpaper"}</button>
+      <button onClick={()=>fileRef.current.click()} style={{width:"100%",padding:"10px",background:wpId==="custom"?fill(AC):"rgba(255,255,255,0.06)",border:"1px solid "+(wpId==="custom"?bdr(AC):"rgba(255,255,255,0.12)"),borderRadius:8,cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:12,color:wpId==="custom"?AC:"rgba(255,255,255,0.6)",marginBottom:10}}>{wpId==="custom"?"✓ Custom Wallpaper Active — Click to Change":"📁 Upload Custom Wallpaper"}</button>
+      {/* v8.5 dynamic wallpapers: the "Auto" swatch above swaps by time of day;
+          this toggle adds a slow, subtle drift to whatever wallpaper is active. */}
+      <Toggle label="Animate wallpaper" value={!!settings.wallpaperAnimated} onChange={v=>updateSettings({wallpaperAnimated:v})} ac={AC}/>
+      <div style={{fontSize:10,color:"rgba(255,255,255,0.32)",fontStyle:"italic",marginBottom:22,marginTop:2}}>“Auto” changes the wallpaper through the day · “Animate” adds gentle motion.</div>
       <div style={SEC}>Desktop Widgets</div>
       <div style={{fontSize:11,color:"rgba(255,255,255,0.3)",marginBottom:10}}>Drag header to move · Drag edges/corners to resize · Snaps to 20px grid on release.</div>
       {Object.entries(WIDGET_CONFIGS).map(([id,cfg])=>(
@@ -140,6 +144,8 @@ export function SettingsApp({user,data,updateSettings,showToast,AC,onCustomWallp
           ["Esc",              "Close start menu / dialogs"],
           ["Alt + W",          "Close active window"],
           ["Alt + M",          "Minimize active window"],
+          ["Alt + ←/→",        "Snap window left / right"],
+          ["Alt + ↑/↓",        "Maximize / restore window"],
           ["F11",              "Toggle fullscreen"],
         ].map(([combo, action])=>(
           <div key={combo} style={{display:"flex",alignItems:"center",gap:10,fontSize:12,color:"rgba(255,255,255,0.78)"}}>

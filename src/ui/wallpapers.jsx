@@ -4,6 +4,7 @@
 //
 // 5.2 made Mesh the system default; Aurora and the others remain selectable.
 
+import { useState, useEffect } from "react";
 import { WALLPAPERS } from "./constants.js";
 
 function NovaBg() {
@@ -547,11 +548,11 @@ function MeshBg() {
 }
 
 /**
- * Picks the right background component for the user's wallpaper choice.
+ * Resolve the concrete background element for a wallpaper id.
  * "custom" requires a customUrl (the user-uploaded base64 image).
  * Empty / unknown id falls through to Mesh — the system default since 5.2.
  */
-export function Wallpaper({ id, customUrl }) {
+function renderBg(id, customUrl) {
   if (id === "custom" && customUrl) {
     return <div style={{position:"absolute",inset:0,background:'url("'+customUrl+'") center/cover no-repeat'}}/>;
   }
@@ -570,6 +571,44 @@ export function Wallpaper({ id, customUrl }) {
     return <div style={{position:"absolute",inset:0,background:wp.grad}}/>;
   }
   return <MeshBg/>;
+}
+
+// v8.5 dynamic wallpapers — "Auto" maps the time of day to a fitting
+// wallpaper. Re-checked every few minutes so it transitions through the day.
+export function autoWallpaperId(d = new Date()) {
+  const h = d.getHours();
+  if (h < 5)  return "nova";     // deep night — starfield
+  if (h < 8)  return "halcyon";  // dawn — warm coral glow
+  if (h < 11) return "cascade";  // morning — sunrise ridges
+  if (h < 16) return "mesh";     // midday — bright & vibrant
+  if (h < 19) return "ember";    // sunset — golden hour
+  if (h < 21) return "tide";     // dusk — cool twilight
+  return "nova";                 // night
+}
+
+/**
+ * Wallpaper renderer.
+ *  • id "auto"  → resolves to a time-of-day wallpaper (re-checked every 5 min).
+ *  • animate    → wraps the backdrop in a slow, subtle drift (CSS wp-drift).
+ *    A constant ≥8% overscan on the inner layer keeps the edges covered while
+ *    it pans, so you never see the wallpaper's border.
+ */
+export function Wallpaper({ id, customUrl, animate }) {
+  const [autoId, setAutoId] = useState(() => autoWallpaperId());
+  useEffect(() => {
+    if (id !== "auto") return;
+    setAutoId(autoWallpaperId());
+    const t = setInterval(() => setAutoId(autoWallpaperId()), 5 * 60 * 1000);
+    return () => clearInterval(t);
+  }, [id]);
+  const realId = id === "auto" ? autoId : id;
+  const bg = renderBg(realId, customUrl);
+  if (!animate) return bg;
+  return (
+    <div style={{position:"absolute",inset:0,overflow:"hidden"}}>
+      <div style={{position:"absolute",inset:0,transformOrigin:"center",animation:"wp-drift 42s ease-in-out infinite",willChange:"transform"}}>{bg}</div>
+    </div>
+  );
 }
 
 // Also export the individual backgrounds — the login screen uses MeshBg directly.

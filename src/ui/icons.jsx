@@ -8,6 +8,35 @@
 
 import { useState } from "react";
 import { HAS_SVG_ICON, STORE_META } from "./constants.js";
+import { fill, bdr } from "../lib/format.js";
+
+// v8.5 — shared user avatar. Renders the user's saved profile picture
+// (a base64 data URL in `img`) when present, otherwise the classic
+// first-letter-on-accent circle. `ring` adds the glowing accent border used
+// on the prominent user chip; pass ring={false} for the quieter menu chip.
+export function UserAvatar({ name, img, ac = "#4f9eff", size = 38, ring = true }) {
+  if (img) {
+    return (
+      <div style={{
+        width: size, height: size, borderRadius: "50%", flexShrink: 0,
+        backgroundImage: `url("${img}")`, backgroundSize: "cover", backgroundPosition: "center",
+        border: ring ? "1.5px solid " + ac : "1px solid " + bdr(ac),
+        boxShadow: ring ? "0 0 12px " + fill(ac) : "none",
+      }}/>
+    );
+  }
+  const letter = (name || "?").charAt(0).toUpperCase();
+  return (
+    <div style={{
+      width: size, height: size, borderRadius: "50%", flexShrink: 0,
+      background: fill(ac), border: (ring ? "1.5px" : "1px") + " solid " + (ring ? ac : bdr(ac)),
+      display: "flex", alignItems: "center", justifyContent: "center",
+      fontFamily: "'Space Grotesk',sans-serif", fontWeight: 700, color: ac,
+      fontSize: Math.round(size * 0.42), lineHeight: 1,
+      boxShadow: ring ? "0 0 12px " + fill(ac) : "none",
+    }}>{letter}</div>
+  );
+}
 
 // Built-in app SVG icons. All use a 32x32 viewBox with rounded-rect background.
 //

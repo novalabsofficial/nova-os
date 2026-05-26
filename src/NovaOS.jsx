@@ -37,7 +37,7 @@ import {
   WALLPAPERS, WMO, HAS_SVG_ICON, NOVA_VERSION,
 } from "./ui/constants.js";
 import { Wallpaper, NovaBg, BlissBg, AuroraBg, MeshBg } from "./ui/wallpapers.jsx";
-import { NovaSvgIcon, AppIconDisplay, NovaLogo, WindowControlIcon } from "./ui/icons.jsx";
+import { NovaSvgIcon, AppIconDisplay, NovaLogo, WindowControlIcon, UserAvatar } from "./ui/icons.jsx";
 import { Toggle } from "./ui/Toggle.jsx";
 import { BrowserNav } from "./ui/BrowserNav.jsx";
 import { ResizeHandles } from "./ui/ResizeHandles.jsx";
@@ -109,6 +109,11 @@ export default function NovaOS(){
   const [tick,       setTick]       = useState(new Date());
   const [toast,      setToast]      = useState(null);
   const [drag,       setDrag]       = useState(null);
+  // v8.5 window snap layouts — `snap` is the live snap zone during a move drag
+  // (drives the ghost preview); snapRef mirrors it so the pointerup handler can
+  // read the final zone without being re-bound on every zone change.
+  const [snap,       setSnap]       = useState(null);
+  const snapRef = useRef(null);
   const [menuOpen,   setMenuOpen]   = useState(false);
   const [menuSrch,   setMenuSrch]   = useState("");
   const [iconPos,    setIconPos]    = useState({});
@@ -240,10 +245,15 @@ export default function NovaOS(){
 
   // Window drag/resize
   useEffect(()=>{
-    function onMove(e){if(!drag)return;if(drag.type==="move"){setWins(ws=>ws.map(w=>{if(w.id!==drag.winId)return w;return{...w,x:Math.max(0,e.clientX-drag.ox),y:Math.max(0,Math.min(e.clientY-drag.oy,window.innerHeight-80))};}));}else if(drag.type==="resize"){const dx=e.clientX-drag.sx,dy=e.clientY-drag.sy;setWins(ws=>ws.map(w=>{if(w.id!==drag.winId)return w;let nx=drag.wx,ny=drag.wy,nw=drag.ww,nh=drag.wh;if(drag.edge.includes("e"))nw=Math.max(MIN_W,drag.ww+dx);if(drag.edge.includes("s"))nh=Math.max(MIN_H,drag.wh+dy);if(drag.edge.includes("w")){nw=Math.max(MIN_W,drag.ww-dx);nx=drag.wx+drag.ww-nw;}if(drag.edge.includes("n")){nh=Math.max(MIN_H,drag.wh-dy);ny=drag.wy+drag.wh-nh;}return{...w,x:nx,y:ny,width:nw,height:nh};}));}}
-    function onUp(){setDrag(null);}
+    function onMove(e){if(!drag)return;if(drag.type==="move"){setWins(ws=>ws.map(w=>{if(w.id!==drag.winId)return w;return{...w,x:Math.max(0,e.clientX-drag.ox),y:Math.max(0,Math.min(e.clientY-drag.oy,window.innerHeight-80))};}));
+      // v8.5: live snap-zone detection while dragging (desktop only). Update
+      // the ghost only when the zone actually changes to avoid extra renders.
+      if(deviceMode==="desktop"){const z=computeSnapZone(e.clientX,e.clientY);if(snapRef.current!==z){snapRef.current=z;setSnap(z);}}
+    }else if(drag.type==="resize"){const dx=e.clientX-drag.sx,dy=e.clientY-drag.sy;setWins(ws=>ws.map(w=>{if(w.id!==drag.winId)return w;let nx=drag.wx,ny=drag.wy,nw=drag.ww,nh=drag.wh;if(drag.edge.includes("e"))nw=Math.max(MIN_W,drag.ww+dx);if(drag.edge.includes("s"))nh=Math.max(MIN_H,drag.wh+dy);if(drag.edge.includes("w")){nw=Math.max(MIN_W,drag.ww-dx);nx=drag.wx+drag.ww-nw;}if(drag.edge.includes("n")){nh=Math.max(MIN_H,drag.wh-dy);ny=drag.wy+drag.wh-nh;}return{...w,x:nx,y:ny,width:nw,height:nh};}));}}
+    function onUp(){if(drag&&drag.type==="move"&&snapRef.current)applySnap(drag.winId,snapRef.current);snapRef.current=null;setSnap(null);setDrag(null);}
     window.addEventListener("pointermove",onMove);window.addEventListener("pointerup",onUp);window.addEventListener("pointercancel",onUp);return()=>{window.removeEventListener("pointermove",onMove);window.removeEventListener("pointerup",onUp);window.removeEventListener("pointercancel",onUp);};
-  },[drag]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[drag,deviceMode]);
 
   // Icon drag — free move, snap-to-free-grid on release
   useEffect(()=>{
@@ -587,6 +597,60 @@ export default function NovaOS(){
   function minimizeWin(id){setWins(ws=>ws.map(w=>w.id===id?{...w,state:w.state==="minimized"?"normal":"minimized"}:w));}
   function maximizeWin(id){setWins(ws=>ws.map(w=>{if(w.id!==id)return w;if(w.state==="maximized")return{...w,state:"normal",...(w.prevBounds||{}),prevBounds:null};return{...w,state:"maximized",prevBounds:{x:w.x,y:w.y,width:w.width,height:w.height}};}));}
 
+  // ── v8.5 window snap layouts ───────────────────────────────────────────
+  // The desktop area is the full viewport minus the taskbar. Each snap zone
+  // maps to a rectangle in that area; dragging a window to an edge/corner
+  // previews the zone (ghost overlay) and commits it on release. Keyboard
+  // Alt+Arrow snaps the active window the same way.
+  function snapZoneRect(zone){
+    const W=window.innerWidth, AH=window.innerHeight-TASKBAR_H;
+    const hw=Math.round(W/2), hh=Math.round(AH/2);
+    switch(zone){
+      case "max":   return {x:0,y:0,width:W,height:AH};
+      case "left":  return {x:0,y:0,width:hw,height:AH};
+      case "right": return {x:W-hw,y:0,width:hw,height:AH};
+      case "tl":    return {x:0,y:0,width:hw,height:hh};
+      case "tr":    return {x:W-hw,y:0,width:hw,height:hh};
+      case "bl":    return {x:0,y:AH-hh,width:hw,height:hh};
+      case "br":    return {x:W-hw,y:AH-hh,width:hw,height:hh};
+      default:      return null;
+    }
+  }
+  function computeSnapZone(cx,cy){
+    const W=window.innerWidth, AH=window.innerHeight-TASKBAR_H;
+    const E=24;                       // edge sensitivity (px)
+    const cornerX=W*0.16, cornerY=AH*0.22;
+    const nearL=cx<=E, nearR=cx>=W-E, nearT=cy<=E, nearB=cy>=AH-E;
+    if(nearT && cx<cornerX)   return "tl";
+    if(nearT && cx>W-cornerX) return "tr";
+    if(nearT)                 return "max";
+    if(nearB && cx<cornerX)   return "bl";
+    if(nearB && cx>W-cornerX) return "br";
+    if(nearL && cy<cornerY)   return "tl";
+    if(nearL && cy>AH-cornerY)return "bl";
+    if(nearL)                 return "left";
+    if(nearR && cy<cornerY)   return "tr";
+    if(nearR && cy>AH-cornerY)return "br";
+    if(nearR)                 return "right";
+    return null;
+  }
+  function applySnap(winId,zone){
+    if(zone==="max"){
+      setWins(ws=>ws.map(w=>w.id===winId?(w.state==="maximized"?w:{...w,state:"maximized",prevBounds:w.prevBounds||{x:w.x,y:w.y,width:w.width,height:w.height}}):w));
+      focusWin(winId);
+      return;
+    }
+    const r=snapZoneRect(zone); if(!r)return;
+    setWins(ws=>ws.map(w=>w.id===winId?{...w,state:"normal",x:r.x,y:r.y,width:r.width,height:r.height,prevBounds:w.prevBounds||{x:w.x,y:w.y,width:w.width,height:w.height}}:w));
+    focusWin(winId);
+  }
+  // Alt+Down: un-maximize if maximized, otherwise minimize.
+  function snapDown(winId){
+    const w=winsRef.current.find(x=>x.id===winId); if(!w)return;
+    if(w.state==="maximized") setWins(ws=>ws.map(x=>x.id===winId?{...x,state:"normal",...(x.prevBounds||{}),prevBounds:null}:x));
+    else minimizeWin(winId);
+  }
+
   // v6.4: Global keyboard shortcuts.
   //   Cmd/Ctrl + K    → toggle start menu (search auto-focused)
   //   Cmd/Ctrl + ,    → open Settings
@@ -606,7 +670,7 @@ export default function NovaOS(){
   // still reading the latest handler functions. Re-binding the listener
   // on every render would work too, just slightly noisier.
   const kbHandlersRef = useRef(null);
-  kbHandlersRef.current = { openApp, closeWin, minimizeWin, setMenuOpen, screen };
+  kbHandlersRef.current = { openApp, closeWin, minimizeWin, setMenuOpen, screen, applySnap, snapDown };
   useEffect(()=>{
     function onKey(e){
       const h = kbHandlersRef.current;
@@ -654,6 +718,20 @@ export default function NovaOS(){
       if(e.key === "F11" && !isTyping){
         e.preventDefault();
         toggleFullscreen();
+        return;
+      }
+      // v8.5 — Alt + Arrow snaps the active window (the web-safe stand-in for
+      // Win+Arrow, which the OS itself intercepts). Left/Right → halves,
+      // Up → maximize, Down → un-maximize or minimize. preventDefault stops
+      // Alt+Left/Right from triggering browser back/forward navigation.
+      if(e.altKey && !isTyping && (e.key==="ArrowLeft"||e.key==="ArrowRight"||e.key==="ArrowUp"||e.key==="ArrowDown")){
+        e.preventDefault();
+        const top=[...(winsRef.current||[])].filter(w=>w.state!=="minimized").sort((a,b)=>(b.z||0)-(a.z||0))[0];
+        if(!top)return;
+        if(e.key==="ArrowLeft")      h.applySnap(top.id,"left");
+        else if(e.key==="ArrowRight")h.applySnap(top.id,"right");
+        else if(e.key==="ArrowUp")   h.applySnap(top.id,"max");
+        else                         h.snapDown(top.id);
         return;
       }
     }
@@ -948,7 +1026,11 @@ export default function NovaOS(){
         ]);
       }}>
       <style>{CSS}</style>
-      <Wallpaper id={wpId} customUrl={customWp}/>
+      <Wallpaper id={wpId} customUrl={customWp} animate={!!settings.wallpaperAnimated}/>
+      {/* v8.5 snap-layout preview ghost — shows where a dragged window will land */}
+      {snap && drag && drag.type==="move" && (()=>{ const r=snapZoneRect(snap); if(!r) return null; return (
+        <div style={{position:"fixed",left:r.x,top:r.y,width:r.width,height:r.height,borderRadius:12,background:fill(AC),border:"2px solid "+AC,boxShadow:"0 10px 40px rgba(0,0,0,0.35)",pointerEvents:"none",zIndex:9990,transition:"left 0.12s ease,top 0.12s ease,width 0.12s ease,height 0.12s ease"}}/>
+      ); })()}
       {/* v7.0 toast refresh: glass surface, leading accent bar, status icon
           inferred from message text. Floats top-center (more visible than
           the old top-right corner). Animates in from above with a soft scale. */}
@@ -1145,7 +1227,7 @@ export default function NovaOS(){
         {/* User card — accent-tinged background for a subtle highlight,
             larger avatar pulled to match the rest of the cluster. */}
         <div style={{padding:"14px 18px",borderTop:"1px solid rgba(255,255,255,0.07)",display:"flex",alignItems:"center",gap:12,background:"linear-gradient(180deg, transparent, rgba(255,255,255,0.02))",flexShrink:0}}>
-          <div style={{width:38,height:38,borderRadius:"50%",background:"linear-gradient(135deg,"+fill(AC)+","+fill(AC)+")",border:"1.5px solid "+AC,display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,flexShrink:0,fontFamily:FFB,fontWeight:700,color:AC,boxShadow:"0 0 12px "+fill(AC)}}>{user.charAt(0).toUpperCase()}</div>
+          <UserAvatar name={user} img={data?.avatar} ac={AC} size={38}/>
           <div style={{flex:1,minWidth:0}}>
             <div style={{fontFamily:FFB,fontWeight:600,fontSize:13.5,color:"#fff",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>@{user}</div>
             <div style={{fontFamily:FFM,fontSize:10,color:"rgba(255,255,255,0.35)",marginTop:1,letterSpacing:0.3}}>Nova OS v{NOVA_VERSION}</div>
@@ -1472,7 +1554,7 @@ export default function NovaOS(){
             cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:12,color:AC,
             transition:"all 0.18s cubic-bezier(0.4,0,0.2,1)",
           }}>
-            <span style={{width:22,height:22,borderRadius:"50%",background:fill(AC),border:"1px solid "+bdr(AC),display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,color:AC,fontWeight:700}}>{user.charAt(0).toUpperCase()}</span>
+            <UserAvatar name={user} img={data?.avatar} ac={AC} size={22} ring={false}/>
             @{user}
           </button>
         }

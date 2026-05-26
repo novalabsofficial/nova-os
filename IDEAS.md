@@ -5,6 +5,44 @@ not committed to. Living document — add to it freely.
 
 ---
 
+# ✅ v8.5 — shipped (desktop-feel batch)
+
+Three backlog items knocked out together — all make Nova feel more like a
+real OS.
+
+### ✅ Window snap layouts (backlog #7) — SHIPPED
+Drag a window to a screen edge/corner and a ghost preview shows where it'll
+land; release to snap. Edges → halves, corners → quarters, top → maximize.
+Keyboard: **Alt + ←/→** (halves), **Alt + ↑** (maximize), **Alt + ↓**
+(un-maximize / minimize) — the web-safe stand-in for Win+Arrow, which the OS
+itself intercepts.
+- **Where:** `src/NovaOS.jsx` — `computeSnapZone` / `snapZoneRect` / `applySnap`
+  / `snapDown`, the move-drag effect (live ghost), the keyboard handler, and
+  the snap-preview overlay. Desktop-mode only.
+- **Deferred:** saved "workspaces" (named window arrangements) — future.
+
+### ✅ Profile picture editor (backlog #3) — SHIPPED
+Upload a photo, pan + zoom to frame it in a circular crop, save a downsampled
+256² JPEG to `data.avatar`. The new shared `<UserAvatar>` renders it on the
+Profile app, the top-right user chip, and the start-menu user card (falls
+back to the letter circle when none is set).
+- **Where:** `src/ui/icons.jsx` (`UserAvatar`), `src/apps/ProfileApp.jsx`
+  (cropper), `src/NovaOS.jsx` (two chip sites).
+- **Deferred:** showing *other* users' avatars in Chat / DMs / reviews needs a
+  public avatar registry — future.
+
+### ✅ Dynamic wallpapers (backlog #13) — SHIPPED
+Two flavors: an **"Auto"** wallpaper that swaps by time of day (night →
+dawn → morning → midday → sunset → dusk, re-checked every 5 min), and an
+**"Animate wallpaper"** toggle that adds a slow, subtle drift to whatever
+wallpaper is active.
+- **Where:** `src/ui/wallpapers.jsx` (`autoWallpaperId`, `Wallpaper` rework),
+  `src/ui/styles.js` (`wp-drift` keyframes), `src/ui/constants.js` (`auto`
+  swatch), `src/apps/SettingsApp.jsx` (toggle).
+- **Deferred:** CPU-reactive wallpapers — ties to real System Info (#5).
+
+---
+
 # ✅ v8.4 — shipped (Store revamp)
 
 A full rebuild of the Nova Store into a real, professional app-store
@@ -163,7 +201,11 @@ appear in the Windows / macOS quick settings panel.
 
 ---
 
-## 3. Profile picture editor
+## 3. Profile picture editor — ✅ SHIPPED in v8.5
+
+> Done: upload → pan/zoom circular crop → 256² JPEG saved to `data.avatar`,
+> rendered via the shared `<UserAvatar>` on the profile, user chip, and start
+> menu. Cross-user avatars (chat/DMs) deferred. Original notes below.
 
 Currently the profile avatar is the first letter of the username on a
 colored circle. Add a real avatar editor: upload an image, crop it to a
@@ -262,7 +304,10 @@ some things better.
 
 ---
 
-## 7. Window snap layouts
+## 7. Window snap layouts — ✅ SHIPPED in v8.5
+
+> Done: edge/corner drag-snap with a ghost preview + Alt+Arrow keyboard
+> snapping. The "saved workspaces" part is still open (see below).
 
 Drag a window to a screen edge → it snaps to half the screen. Drag to
 a corner → snaps to a quarter. Keyboard: `Win+←/→/↑/↓` and equivalents
@@ -385,7 +430,11 @@ file from Files → into Chat. Etc.
 
 ---
 
-## 13. Dynamic wallpapers
+## 13. Dynamic wallpapers — ✅ SHIPPED in v8.5 (reactive flavor deferred)
+
+> Done: time-of-day "Auto" wallpaper + an "Animate wallpaper" drift toggle.
+> The reactive (system-state) flavor is deferred — it depends on real System
+> Info (#5). Original notes below.
 
 Three flavors, picked per wallpaper or globally:
 - **Time-of-day swap:** Lumen during day, Ember at sunset, Halcyon at

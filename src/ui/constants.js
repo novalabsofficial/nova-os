@@ -8,7 +8,7 @@ export const COLL = "nova_storage";
 // header. Update this when you do a version sweep — package.json /
 // tauri.conf.json still need their own bumps but at least *display* text
 // won't drift again. Format: "<major>.<minor>".
-export const NOVA_VERSION = "8.4";
+export const NOVA_VERSION = "8.5";
 
 // Widget metadata: label/emoji + minimum size constraints used by WidgetShell.
 export const WIDGET_CONFIGS = {
@@ -253,6 +253,10 @@ export const PAINT_COLORS = ["#fff","#000","#ff4444","#ff8800","#ffdd00","#44dd4
 // sound palette up or down. The default (mesh) is 0; positive values brighten
 // the chime tones, negative values darken them. See src/lib/audio.js.
 export const WALLPAPERS = {
+  // v8.5: "Auto" is dynamic — the Wallpaper component swaps the real wallpaper
+  // by time of day (see autoWallpaperId in wallpapers.jsx). Listed here so it
+  // shows as a pickable swatch; it has no `grad`, only a preview gradient.
+  auto:     {name:"Auto",      semitones: 0,  preview:"linear-gradient(90deg,#0b1026 0%,#1d4ed8 26%,#f59e0b 52%,#7c3aed 76%,#0b1026 100%)"},
   mesh:     {name:"Mesh",      semitones: 0,  preview:"radial-gradient(ellipse at 18% 22%,#6366f1 0%,transparent 45%),radial-gradient(ellipse at 82% 18%,#ec4899 0%,transparent 40%),radial-gradient(ellipse at 60% 85%,#06b6d4 0%,transparent 45%),linear-gradient(135deg,#0a0a14,#050510)"},
   // v8.0 additions — five new wallpapers designed for the refreshed UI.
   // Prism is SVG-backed (renders the holographic shimmer cleanly at any size);
