@@ -5,6 +5,100 @@ not committed to. Living document — add to it freely.
 
 ---
 
+# 🗺️ v8.3 — next up (playtester feedback)
+
+Scheduled batch. Mix of bug fixes and small features surfaced by playtesters.
+Bug fixes first (they're the priority), then the smaller features.
+
+## Bug fixes
+
+### B1. Space Invaders stops shooting after stage 1
+After clearing the first wave, the player can no longer shoot on the next
+stage. Almost certainly the wave-transition logic doesn't reset/re-enable
+the player-bullet state (or leaves a "can't fire" flag set, or never clears
+the previous wave's bullet array so the cap is hit forever).
+- **Where:** `src/apps/SpaceInvadersApp.jsx` — the wave-advance code.
+- **Approach:** trace what state gates firing (a `canShoot` flag, a bullets
+  array length cap, etc.) and make sure the new-wave handler resets all of it.
+
+### B2. Chess never sends a challenge to the other user
+Challenging a user by name appears to do nothing on the recipient's side.
+Playtester suspects a PWA-vs-Chrome difference (could be an auth/uid
+mismatch between the two session types, or the recipient's `watchMyGames`
+query not matching the created doc).
+- **Where:** `src/lib/chess-game.js` (`challengeUserByName`, `watchMyGames`),
+  `firestore.rules` (`nova_chess_games` block), and the auth/uid layer.
+- **Approach:** verify the created game doc's `participantUids` includes BOTH
+  the challenger's and the recipient's Auth uid (resolved via the username
+  index), confirm the Firestore rule allows the recipient to read it, and
+  check whether the PWA session has a valid `getDbUid()` (the suspected
+  PWA-vs-Chrome difference). Likely the recipient uid isn't being resolved
+  correctly, OR the recipient's `array-contains` query needs the rule to
+  permit listing.
+
+### B3. "Large Text" setting doesn't change text size
+The Settings → Display → Large Text toggle flips `settings.largeFont` but
+the change isn't visibly applied across the OS / apps.
+- **Where:** `src/NovaOS.jsx` reads `largeFnt` and applies `fontSize` only on
+  the root desktop container — it doesn't cascade into windows/apps (which
+  set their own explicit font sizes everywhere).
+- **Approach:** rather than chasing every hardcoded fontSize, apply a root
+  `font-size` bump + use `rem`-relative sizing, OR apply a CSS zoom/scale on
+  the app content area when largeFont is on. Simplest robust fix: set a CSS
+  custom property / root font-size and have a global rule scale things.
+  (Note: lots of inline styles use px, so a true fix may mean a zoom
+  transform on the window content area.)
+
+## Features
+
+### F1. Drag the title bar to un-maximize (Windows-style)
+When a window is maximized (or app-fullscreen), grabbing the title bar and
+dragging should restore it to normal size and let you move it — exactly like
+Windows. Currently the title-bar drag is disabled while maximized
+(`onPointerDown={e=>!isMax&&startDrag(...)}`).
+- **Where:** `src/NovaOS.jsx` window title-bar `onPointerDown` + `startDrag`.
+- **Approach:** allow the drag to start when maximized; on first movement,
+  flip the window to "normal" state, position it centered under the cursor
+  (preserving the grab offset proportionally), then continue the normal
+  move-drag. This is the standard "tear off from maximized" gesture.
+
+### F2. Hide the top bar in fullscreen
+When in fullscreen (the v7.8 OS-level fullscreen), the top info/title bar
+shouldn't show. The only ways out should be the fullscreen toggle (F11 /
+Settings) or a dedicated button in the start menu.
+- **Where:** `src/NovaOS.jsx` — gate the relevant top bar on `isFullscreen()`
+  state, and add an "Exit fullscreen" item to the start menu footer.
+- **Approach:** subscribe to `onFullscreenChange` (from lib/fullscreen.js) at
+  the NovaOS level, hide the bar when fullscreen is active, and surface an
+  exit affordance in the start menu so the user is never trapped.
+
+### F3. AFK screensaver
+After ~1 minute of no input (no key, no mouse move/click), fade in a
+screensaver: blur the entire desktop and show a large clock (reuse the
+ClockWidget styling). Dismiss on any key press or mouse movement.
+- **Where:** new component in `src/NovaOS.jsx` or a small `Screensaver.jsx`.
+- **Approach:** an idle timer reset on `keydown`/`pointermove`/`pointerdown`;
+  when it fires, render a fixed full-screen overlay with `backdrop-filter:
+  blur()` + a centered live clock. Any input clears the overlay and resets
+  the timer. Make the timeout a Setting (default 60s, "off" option).
+
+### F4. Hold backspace to continue deleting
+Holding the Backspace key should continuously delete, like every OS text
+field. Native inputs already do this, so the broken case is likely a
+custom input somewhere (Terminal command line? a canvas-based field?).
+- **Where:** find the input(s) that swallow key-repeat — check Terminal
+  (`src/apps/TerminalApp.jsx`) and any custom `onKeyDown` handlers that
+  `preventDefault()` on Backspace.
+- **Approach:** make sure custom key handlers don't block the browser's
+  native key-repeat, or implement an explicit repeat timer for fields that
+  manage their own value outside a native `<input>`.
+
+---
+
+# Unscheduled backlog
+
+Bigger ideas, not yet slotted into a version.
+
 ## 1. Liquid Glass + dark/light mode (iOS style)
 
 The iOS 17/18 "Liquid Glass" aesthetic — frosted translucent surfaces with
