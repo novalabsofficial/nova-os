@@ -143,10 +143,10 @@ export function StoreIcon({ domain, fallback, size = 26 }) {
 function storeBrandSvg(id, r) {
   switch (id) {
     case "roblox": return (<>
-      <rect width="32" height="32" rx={r} fill="#e2231a"/>
+      <rect width="32" height="32" rx={r} fill="#0084ff"/>
       <g transform="rotate(-13 16 16)">
         <rect x="10" y="10" width="12" height="12" rx="1.6" fill="#fff"/>
-        <rect x="13.7" y="13.7" width="4.6" height="4.6" rx="0.6" fill="#e2231a"/>
+        <rect x="13.7" y="13.7" width="4.6" height="4.6" rx="0.6" fill="#0084ff"/>
       </g>
     </>);
     case "youtube": return (<>
@@ -193,9 +193,10 @@ function storeBrandSvg(id, r) {
     </>);
     case "discord": return (<>
       <rect width="32" height="32" rx={r} fill="#5865f2"/>
-      <path d="M11.4 10 Q16 8.4 20.6 10 Q24 14 23 22 Q20.6 24 18.4 22.4 L18 21.4 Q16 22.1 14 21.4 L13.6 22.4 Q11.4 24 8.8 22 Q7.8 14 11.4 10 Z" fill="#fff"/>
-      <ellipse cx="13.4" cy="16" rx="1.5" ry="2.1" fill="#5865f2"/>
-      <ellipse cx="18.6" cy="16" rx="1.5" ry="2.1" fill="#5865f2"/>
+      {/* Clyde face — wider than tall (the brand mark's true proportions). */}
+      <path d="M8.5 12 Q16 9.6 23.5 12 Q25.2 16 23.4 20.4 Q20.6 22.4 18.2 21 Q16 21.6 13.8 21 Q11.4 22.4 8.6 20.4 Q6.8 16 8.5 12 Z" fill="#fff"/>
+      <ellipse cx="13" cy="15.8" rx="1.5" ry="1.9" fill="#5865f2"/>
+      <ellipse cx="19" cy="15.8" rx="1.5" ry="1.9" fill="#5865f2"/>
     </>);
     case "reddit": return (<>
       <rect width="32" height="32" rx={r} fill="#ff4500"/>

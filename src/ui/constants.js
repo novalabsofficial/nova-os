@@ -132,7 +132,7 @@ export const STORE_CATS = ["All","Games","Media","Tools","Social","News"];
 // Apps without a custom-drawn brand SVG (see StoreBrandIcon) fall back to a
 // monogram tile tinted with `accent`.
 export const STORE_META = {
-  roblox:    { developer:"Roblox Corporation",    tagline:"Reimagine the way people play together", accent:"#e2231a" },
+  roblox:    { developer:"Roblox Corporation",    tagline:"Reimagine the way people play together", accent:"#0084ff" },
   xbox:      { developer:"Microsoft",             tagline:"Stream Xbox Game Pass in your browser",   accent:"#107c10" },
   steam:     { developer:"Valve",                 tagline:"The ultimate destination for PC games",   accent:"#1b2838" },
   ps:        { developer:"Sony Interactive",      tagline:"Play PlayStation in the cloud",           accent:"#0070d1" },

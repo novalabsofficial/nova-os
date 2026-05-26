@@ -413,7 +413,18 @@ export function StoreApp({ user, data, updateData, showToast, AC }) {
   const searchResults = searching ? [...STORE_CATALOG.filter(matches), ...visibleComm.filter(matches)] : [];
 
   const openDetail = (app) => { setDetail(app); };
+  const goCategory = (c) => { setSearch(""); if (c === "Games") { setView("games"); } else { setAppsCat(c); setView("apps"); } };
   const cardProps = { ratings, ac, currentUser: user, onOpen: openDetail, toggleInstall, onDeleteApp: deleteApp };
+
+  // Colorful category tiles for the bottom of Home (fills the page out + aids
+  // navigation, the way the App Store / Play surface "Top Categories").
+  const homeCats = [
+    { cat: "Games", emoji: "🎮", color: "#f43f5e" },
+    { cat: "Media", emoji: "🎬", color: "#a855f7" },
+    { cat: "Tools", emoji: "🛠️", color: "#06b6d4" },
+    { cat: "Social", emoji: "💬", color: "#3b82f6" },
+    { cat: "News", emoji: "📰", color: "#f59e0b" },
+  ].map(c => ({ ...c, count: STORE_CATALOG.filter(a => a.cat === c.cat).length }));
 
   const navItems = [
     ["home", "Home"],
@@ -484,6 +495,35 @@ export function StoreApp({ user, data, updateData, showToast, AC }) {
           <Shelf title="Essential Apps" apps={STORE_CATALOG.filter(a => a.cat === "Tools" || a.cat === "Media")} ratings={ratings} ac={ac} onOpen={openDetail} />
           <Shelf title="Social & News" apps={STORE_CATALOG.filter(a => a.cat === "Social" || a.cat === "News")} ratings={ratings} ac={ac} onOpen={openDetail} />
           {visibleComm.length > 0 && <Shelf title="From the Community" apps={visibleComm} ratings={ratings} ac={ac} onOpen={openDetail} />}
+
+          {/* Browse by category */}
+          <div style={{ marginBottom: 22 }}>
+            <div style={{ fontFamily: FFB, fontWeight: 700, fontSize: 15, color: "rgba(255,255,255,0.92)", marginBottom: 10 }}>Browse by Category</div>
+            <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+              {homeCats.map(c => {
+                const rgb = hexRgb(c.color);
+                return (
+                  <button key={c.cat} onClick={() => goCategory(c.cat)} className="ws" style={{
+                    flex: "1 1 130px", minWidth: 130, textAlign: "left", cursor: "pointer", padding: "14px 16px", borderRadius: 14,
+                    background: `linear-gradient(135deg, rgba(${rgb},0.5), rgba(${rgb},0.14))`, border: "1px solid rgba(255,255,255,0.1)",
+                  }}>
+                    <div style={{ fontSize: 22, marginBottom: 8 }}>{c.emoji}</div>
+                    <div style={{ fontFamily: FFB, fontWeight: 700, fontSize: 14, color: "#fff" }}>{c.cat}</div>
+                    <div style={{ fontSize: 11, color: "rgba(255,255,255,0.65)", marginTop: 1 }}>{c.count} app{c.count === 1 ? "" : "s"}</div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Submit call-to-action */}
+          <div style={{ borderRadius: 16, padding: "20px 22px", marginBottom: 8, background: `linear-gradient(135deg, ${fill(ac)}, rgba(255,255,255,0.02))`, border: "1px solid " + bdr(ac), display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
+            <div>
+              <div style={{ fontFamily: FFB, fontWeight: 700, fontSize: 16, color: "#fff" }}>Built something cool? 🚀</div>
+              <div style={{ fontSize: 13, color: "rgba(255,255,255,0.6)", marginTop: 3 }}>Share your web app with the whole Nova community.</div>
+            </div>
+            <button onClick={() => { setSearch(""); setView("submit"); }} style={{ padding: "10px 22px", borderRadius: 22, cursor: "pointer", fontFamily: FFB, fontWeight: 700, fontSize: 13, whiteSpace: "nowrap", background: "#fff", color: "#111", border: "none" }}>Submit an app →</button>
+          </div>
         </>
       )}
 
