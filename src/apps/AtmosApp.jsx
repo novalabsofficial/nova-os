@@ -296,21 +296,45 @@ export function AtmosApp({AC,showToast,pushNotification,openNovaAi,data,updateSe
             }}>
               <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:4}}>
                 <div style={{flex:1,fontSize:11,fontFamily:FFM,color:"rgba(255,255,255,0.6)",letterSpacing:1,display:"flex",alignItems:"center",gap:6}}>
-                  {savedLoc && loc && savedLoc.lat===loc.lat && savedLoc.lon===loc.lon && (
-                    <span title="Pinned — also shown by the Weather widget" style={{fontSize:13,opacity:0.85}}>📌</span>
-                  )}
+                  {/* v8.2.1: single toggle button. Click 📌 to pin, click
+                      again to unpin. Opacity signals state: full opacity =
+                      pinned, low opacity = not pinned. Replaces the v8.2
+                      pair of (decorative ✛ + tiny grey ✕ to unpin + my
+                      added 📌 to pin) which was confusing — users tried
+                      clicking the visible decorative pin and nothing
+                      happened because it was a non-interactive span. */}
+                  {loc && updateSettings && (() => {
+                    const isPinned = savedLoc && savedLoc.lat===loc.lat && savedLoc.lon===loc.lon;
+                    return (
+                      <button
+                        onClick={()=>{
+                          if (isPinned) {
+                            updateSettings({weatherLocation: null});
+                            showToast?.("Location unpinned");
+                          } else {
+                            const slim = {label: loc.label, lat: loc.lat, lon: loc.lon, countryCode: loc.countryCode || null};
+                            updateSettings({weatherLocation: slim});
+                            showToast?.("Location pinned ✓");
+                          }
+                        }}
+                        title={isPinned ? "Pinned — click to unpin (also drives the Weather widget)" : "Click to pin this location"}
+                        style={{
+                          background: "none",
+                          border: "none",
+                          cursor: "pointer",
+                          fontSize: 13,
+                          padding: "0 2px",
+                          opacity: isPinned ? 0.95 : 0.35,
+                          filter: isPinned ? "drop-shadow(0 0 4px rgba(255,200,80,0.6))" : "none",
+                          transition: "opacity 0.18s, filter 0.18s",
+                          lineHeight: 1,
+                        }}
+                      >
+                        📌
+                      </button>
+                    );
+                  })()}
                   <span>CURRENT · {loc.label}</span>
-                  {savedLoc && loc && savedLoc.lat===loc.lat && savedLoc.lon===loc.lon && updateSettings && (
-                    <button onClick={()=>{updateSettings({weatherLocation:null});showToast?.("Pinned location cleared");}} title="Clear pinned location" style={{background:"none",border:"none",cursor:"pointer",color:"rgba(255,255,255,0.4)",fontSize:11,padding:"0 4px"}}>✕</button>
-                  )}
-                  {/* v8.2: "Pin location" affordance when current loc isn't already pinned */}
-                  {(!savedLoc || (savedLoc && loc && (savedLoc.lat!==loc.lat || savedLoc.lon!==loc.lon))) && updateSettings && (
-                    <button onClick={()=>{
-                      const slim={label:loc.label,lat:loc.lat,lon:loc.lon,countryCode:loc.countryCode||null};
-                      updateSettings({weatherLocation:slim});
-                      showToast?.("Location pinned ✓");
-                    }} title="Pin this location" style={{background:"none",border:"none",cursor:"pointer",color:"rgba(255,255,255,0.4)",fontSize:11,padding:"0 4px"}}>📌</button>
-                  )}
                 </div>
                 <AiAssist AC={AC} openNovaAi={openNovaAi} actions={[
                   {icon:"🧠",label:"Explain this weather",prompt:"In 2-3 sentences, explain what this weather means in plain English for someone planning their day:"},
