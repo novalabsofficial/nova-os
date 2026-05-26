@@ -25,7 +25,7 @@ import { playSound } from "../lib/audio.js";
 const PIXELS_PER_THUMB = 132;   // target thumbnail size in the grid
 const MAX_PHOTO_SIZE   = 20 * 1024 * 1024;  // 20 MB — soft warning above this
 
-export function PhotosApp({ AC, showToast }) {
+export function PhotosApp({ AC, showToast, onSetWallpaper }) {
   // photos: [{ id, name, url, size, w, h }]
   // Width/height load asynchronously after the file is picked so the grid
   // can lay out cells without a CLS jump.
@@ -110,6 +110,36 @@ export function PhotosApp({ AC, showToast }) {
     } else if (idx < viewerIdx) {
       setViewerIdx(i => i - 1);
     }
+  }
+
+  // v8.1 — "Set as wallpaper". Downsamples the photo to the same
+  // ~900px / JPEG-0.72 budget the SettingsApp custom-wallpaper handler
+  // uses, then hands the base64 data URL to NovaOS via the onSetWallpaper
+  // prop. The Firestore image-blob field gets overwritten and the
+  // wallpaper preference is set to "custom" so the new image renders
+  // immediately and survives a refresh.
+  function setAsWallpaper(photo) {
+    if (!onSetWallpaper || !photo) return;
+    const img = new Image();
+    img.onload = () => {
+      try {
+        const MAX = 900;
+        const ratio = Math.min(MAX / img.width, MAX / img.height, 1);
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.round(img.width * ratio);
+        canvas.height = Math.round(img.height * ratio);
+        canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
+        const dataUrl = canvas.toDataURL("image/jpeg", 0.72);
+        onSetWallpaper(dataUrl);
+        // closeViewer so the user actually sees the new wallpaper change
+        // behind them (toast confirmation is shown by NovaOS).
+        closeViewer();
+      } catch (e) {
+        showToast?.("Couldn't set wallpaper");
+      }
+    };
+    img.onerror = () => showToast?.("Couldn't load photo");
+    img.src = photo.url;
   }
 
   function clearAll() {
@@ -246,6 +276,15 @@ export function PhotosApp({ AC, showToast }) {
               style={{ background: slideshow ? fill(AC) : "transparent", border: "1px solid " + (slideshow ? bdr(AC) : "rgba(255,255,255,0.15)"), borderRadius: 7, cursor: "pointer", color: slideshow ? AC : "rgba(255,255,255,0.78)", fontSize: 11, padding: "4px 10px", fontFamily: FFB, fontWeight: 600 }}>
               {slideshow ? "⏸ Slideshow" : "▶ Slideshow"}
             </button>
+            {/* v8.1: only show "Set as wallpaper" when NovaOS passed the
+                handler (which it always does — but the prop check makes
+                the component still work in isolation, e.g. in tests). */}
+            {onSetWallpaper && (
+              <button onClick={() => setAsWallpaper(current)} title="Set this photo as your desktop wallpaper"
+                style={{ background: "transparent", border: "1px solid " + bdr(AC), borderRadius: 7, cursor: "pointer", color: AC, fontSize: 11, padding: "4px 10px", fontFamily: FFB, fontWeight: 600 }}>
+                🖼 Set as wallpaper
+              </button>
+            )}
             <button onClick={() => removePhoto(viewerIdx)} title="Remove this photo"
               style={{ background: "transparent", border: "1px solid rgba(255,80,80,0.3)", borderRadius: 7, cursor: "pointer", color: "rgba(255,130,130,0.9)", fontSize: 11, padding: "4px 10px", fontFamily: FFB, fontWeight: 600 }}>✕ Remove</button>
             <button onClick={closeViewer} title="Close (Esc)"

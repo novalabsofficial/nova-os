@@ -344,3 +344,119 @@ export function SysInfoWidgetContent({ state }) {
     </div>
   );
 }
+
+// v8.1 — Battery widget. Reads navigator.getBattery() (Chromium / most
+// PWA installs). Subscribes to level / charging-state change events so
+// the display updates in real time without polling.
+//
+// Three states it can be in:
+//   1. API unsupported          → friendly "Battery unavailable" message
+//   2. Desktop (no battery)     → device reports level=1 + charging=true
+//                                 perpetually; show "Plugged in" pill
+//                                 instead of a useless 100% forever
+//   3. Laptop / tablet on battery → live percent + horizontal battery
+//                                   glyph + charging/discharging time
+export function BatteryWidgetContent({ state, AC }) {
+  const [info, setInfo] = useState({ status: "loading" });
+  useEffect(() => {
+    if (typeof navigator === "undefined" || !navigator.getBattery) {
+      setInfo({ status: "unsupported" });
+      return;
+    }
+    let mounted = true;
+    let battery = null;
+    function sync() {
+      if (!mounted || !battery) return;
+      setInfo({
+        status: "ok",
+        level: battery.level,
+        charging: battery.charging,
+        // chargingTime / dischargingTime can be Infinity when unknown
+        chargingTime: battery.chargingTime,
+        dischargingTime: battery.dischargingTime,
+      });
+    }
+    navigator.getBattery().then(b => {
+      if (!mounted) return;
+      battery = b;
+      sync();
+      b.addEventListener("levelchange", sync);
+      b.addEventListener("chargingchange", sync);
+      b.addEventListener("chargingtimechange", sync);
+      b.addEventListener("dischargingtimechange", sync);
+    }).catch(() => setInfo({ status: "unsupported" }));
+    return () => {
+      mounted = false;
+      if (battery) {
+        battery.removeEventListener("levelchange", sync);
+        battery.removeEventListener("chargingchange", sync);
+        battery.removeEventListener("chargingtimechange", sync);
+        battery.removeEventListener("dischargingtimechange", sync);
+      }
+    };
+  }, []);
+
+  if (info.status === "loading") {
+    return (
+      <div style={{width:"100%",height:"100%",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:FF,fontSize:11,color:"rgba(255,255,255,0.35)"}}>
+        Reading battery…
+      </div>
+    );
+  }
+  if (info.status === "unsupported") {
+    return (
+      <div style={{width:"100%",height:"100%",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:10,gap:4,textAlign:"center"}}>
+        <div style={{fontSize:20,opacity:0.55}}>🔌</div>
+        <div style={{fontFamily:FF,fontSize:10.5,color:"rgba(255,255,255,0.45)",lineHeight:1.4}}>Battery info unavailable<br/><span style={{fontSize:9,opacity:0.7}}>your browser doesn't expose it</span></div>
+      </div>
+    );
+  }
+  const pct = Math.round(info.level * 100);
+  // Heuristic for "no battery present": desktop with cable plugged in
+  // permanently reports level=1 + charging=true and discharge time
+  // Infinity. Real laptops at 100% report level=1 + charging=true but
+  // also have a finite discharge time on disconnect; while plugged in,
+  // dischargingTime is Infinity. So this isn't a perfect detection,
+  // but it's good enough — when in doubt we still show real numbers.
+  const stuck100 = info.charging && pct === 100 && info.dischargingTime === Infinity;
+
+  // Color the battery fill by level
+  const fillColor = info.charging ? "#4cef90"
+    : pct > 50 ? "#a8c5ff"
+    : pct > 20 ? "#ffcc66"
+    : "#ff7878";
+
+  // Time-remaining string
+  function fmtMin(seconds) {
+    if (!Number.isFinite(seconds) || seconds <= 0) return null;
+    const m = Math.round(seconds / 60);
+    if (m < 60) return m + " min";
+    const h = Math.floor(m / 60), mm = m % 60;
+    return h + "h " + (mm < 10 ? "0" + mm : mm) + "m";
+  }
+  const timeStr = info.charging ? fmtMin(info.chargingTime) : fmtMin(info.dischargingTime);
+
+  const h = state.h - 28;
+  const big = Math.max(20, Math.min(h * 0.36, 36));
+  return (
+    <div style={{width:"100%",height:"100%",padding:"10px 14px",display:"flex",flexDirection:"column",justifyContent:"center",gap:6}}>
+      <div style={{display:"flex",alignItems:"center",gap:10}}>
+        {/* Horizontal battery glyph */}
+        <div style={{position:"relative",width:38,height:18,border:"1.5px solid rgba(255,255,255,0.55)",borderRadius:4,padding:1.5,flexShrink:0}}>
+          <div style={{position:"absolute",right:-4,top:5,width:2.5,height:6,background:"rgba(255,255,255,0.55)",borderRadius:1}}/>
+          <div style={{width:Math.max(2,pct)+"%",height:"100%",background:fillColor,borderRadius:1.5,transition:"width 0.6s, background 0.3s"}}/>
+        </div>
+        <div style={{display:"flex",flexDirection:"column",minWidth:0,flex:1}}>
+          <div style={{fontFamily:FFM,fontWeight:500,fontSize:big,color:"#fff",lineHeight:1,letterSpacing:0.5}}>{pct}%</div>
+          <div style={{fontFamily:FF,fontSize:10,color:"rgba(255,255,255,0.5)",marginTop:3}}>
+            {stuck100 ? "Plugged in" : info.charging ? (timeStr ? "Charging · " + timeStr : "Charging") : (timeStr ? timeStr + " left" : "On battery")}
+          </div>
+        </div>
+        {/* Small lightning icon when charging */}
+        {info.charging && !stuck100 && (
+          <div style={{fontSize:14,color:fillColor,filter:"drop-shadow(0 0 4px " + fillColor + "55)",flexShrink:0}}>⚡</div>
+        )}
+      </div>
+    </div>
+  );
+}

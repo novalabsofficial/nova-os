@@ -24,7 +24,8 @@ import { emptyGrid as tetrisEmpty, randomPiece as tetrisRandom, shapeOf, fits as
 import { wmoIcon, wmoLabel, geocodeUrl, parseGeocode, forecastUrl, parseForecast, alertsUrl, parseAlerts, isLikelyUS } from "./lib/weather.js";
 import { PROVIDERS as AI_PROVIDERS, streamResponse as aiStream, deriveTitle as aiDeriveTitle } from "./lib/ai.js";
 import { playTone, speak, cancelSpeech, playSound, getSoundConfig, setSoundConfig, setSoundWallpaper } from "./lib/audio.js";
-import { db, setDbUid } from "./lib/db.js";
+import { db, setDbUid, getDbUid } from "./lib/db.js";
+import { watchMyThreads } from "./lib/dms.js";
 import { openExternalUrl } from "./lib/openUrl.js";
 import { login as authLogin, register as authRegister, logoutUser as authLogout, normalizeUsername } from "./lib/auth.js";
 import { aiLoad, aiSave, AI_LS_KEYS, AI_LS_CONFIG, AI_LS_CHATS } from "./lib/ai-storage.js";
@@ -47,6 +48,7 @@ import {
   WidgetShell,
   ClockWidgetContent, WeatherWidgetContent, NotesWidgetContent,
   TasksWidgetContent, CalendarWidgetContent, SysInfoWidgetContent,
+  BatteryWidgetContent,
 } from "./widgets/widgets.jsx";
 // Apps — lazy-loaded via React.lazy so each app ships in its own chunk.
 // Vite splits these into separate JS files; the first time you open Notes,
@@ -403,7 +405,37 @@ export default function NovaOS(){
   const clearAllNotifications = useCallback(()=>{
     setData(prev=>{
       if(!prev) return prev;
-      const next = {...prev, notifications: []};
+      // v8.1: also bump lastChatOpenTs so the chat-DM badge clears at
+      // the same time. User expectation for "Clear all" is "no badges
+      // anywhere", not just "wipe the notification panel".
+      const next = {
+        ...prev,
+        notifications: [],
+        settings: {...(prev.settings||{}), lastChatOpenTs: Date.now()},
+      };
+      saveData(next);
+      return next;
+    });
+  },[saveData]);
+  // v8.1 — mark all notifications for a specific app as read. Called
+  // from openApp() when the user launches an app, so the app's badge
+  // clears the moment they engage with it.
+  const markAppNotificationsRead = useCallback((appId)=>{
+    if(!appId) return;
+    setData(prev=>{
+      if(!prev) return prev;
+      const cur = prev.notifications || [];
+      // Bail if nothing for this app is unread — avoid pointless writes
+      const hasUnread = cur.some(n => n.appId === appId && !n.read);
+      const chatNeedsBump = appId === "chat" && (prev.settings?.lastChatOpenTs || 0) < Date.now() - 1000;
+      if (!hasUnread && !chatNeedsBump) return prev;
+      const nextNotifs = hasUnread
+        ? cur.map(n => n.appId === appId ? {...n, read: true} : n)
+        : cur;
+      const nextSettings = appId === "chat"
+        ? {...(prev.settings||{}), lastChatOpenTs: Date.now()}
+        : (prev.settings || {});
+      const next = {...prev, notifications: nextNotifs, settings: nextSettings};
       saveData(next);
       return next;
     });
@@ -420,6 +452,42 @@ export default function NovaOS(){
   },[saveData]);
   const notifications = data?.notifications || [];
   const unreadCount = notifications.filter(n=>!n.read).length;
+
+  // v8.1 — Per-app notification badges.
+  //
+  // Two sources of "this app needs your attention":
+  //   1. Notifications array, filtered by appId + !read. Atmos's NWS-alert
+  //      pushes set appId:"atmos" so those naturally flow into the badge.
+  //   2. Chat: unread DM count, computed by comparing each thread's
+  //      lastTs against data.settings.lastChatOpenTs (set when the user
+  //      opens the Chat app). Skips threads where lastSenderUid is the
+  //      user themselves — no badge for messages I sent.
+  //
+  // Badges clear when:
+  //   • The user opens the app (markAppNotificationsRead in openApp +
+  //     openApp("chat") also bumps lastChatOpenTs)
+  //   • The user hits "Clear all" in the notification center (empties
+  //     notifications AND bumps lastChatOpenTs so chat unread clears too)
+  const [dmThreads, setDmThreads] = useState([]);
+  useEffect(() => {
+    const uid = getDbUid();
+    if (!uid) { setDmThreads([]); return; }
+    return watchMyThreads(uid, setDmThreads);
+  }, [user]); // re-subscribe when the username changes (login → logout → login as someone else)
+
+  // Compute badge counts. The map is { appId: count } so the renderer
+  // can look up by app id with O(1).
+  const lastChatOpenTs = data?.settings?.lastChatOpenTs || 0;
+  const myUid = getDbUid();
+  const chatUnread = dmThreads.filter(t =>
+    t.lastSenderUid && t.lastSenderUid !== myUid && (t.lastTs || 0) > lastChatOpenTs
+  ).length;
+  const appBadgeCounts = {};
+  notifications.forEach(n => {
+    if (n.read || !n.appId) return;
+    appBadgeCounts[n.appId] = (appBadgeCounts[n.appId] || 0) + 1;
+  });
+  if (chatUnread > 0) appBadgeCounts.chat = (appBadgeCounts.chat || 0) + chatUnread;
   // When the panel opens, mark everything read after a tick — avoids visual flash
   useEffect(()=>{
     if(!notifsOpen) return;
@@ -436,6 +504,10 @@ export default function NovaOS(){
   // maximize restores to a sane place if the user later switches modes.
   const openApp=useCallback((appId)=>{
     setMenuOpen(false);
+    // v8.1: opening an app clears its notification badge. Special-cased
+    // for "chat" inside markAppNotificationsRead (bumps lastChatOpenTs
+    // so the DM unread badge clears as well).
+    markAppNotificationsRead(appId);
     setMaxZ(z=>{
       const nz=z+1;
       setWins(ws=>{
@@ -457,7 +529,7 @@ export default function NovaOS(){
       });
       return nz;
     });
-  },[deviceMode]);
+  },[deviceMode,markAppNotificationsRead]);
   function startDrag(e,winId){if(e.button!==0)return;e.preventDefault();const w=winsRef.current.find(w=>w.id===winId);if(w){setDrag({type:"move",winId,ox:e.clientX-w.x,oy:e.clientY-w.y});focusWin(winId);}}
   function startResize(e,winId,edge){if(e.button!==0)return;e.preventDefault();const w=winsRef.current.find(w=>w.id===winId);if(w){setDrag({type:"resize",winId,edge,sx:e.clientX,sy:e.clientY,wx:w.x,wy:w.y,ww:w.width,wh:w.height});focusWin(winId);}}
   function closeWin(id){playSound("windowClose");setWins(ws=>ws.filter(w=>w.id!==id));}
@@ -890,6 +962,7 @@ export default function NovaOS(){
             {id==="tasksw"  &&<TasksWidgetContent    state={s} data={data} updateData={updateData}/>}
             {id==="calendar"&&<CalendarWidgetContent state={s} tick={tick} AC={AC}/>}
             {id==="sysinfo" &&<SysInfoWidgetContent  state={s}/>}
+            {id==="battery" &&<BatteryWidgetContent  state={s} AC={AC}/>}
           </WidgetShell>
         );
       })}
@@ -945,8 +1018,15 @@ export default function NovaOS(){
               {type:"divider"},
               {icon:"📋", label:"Copy app name", onClick:()=>{try{navigator.clipboard?.writeText(app.label);showToast("Copied");}catch{}}},
             ])}>
-            <div style={{pointerEvents:"none",display:"flex",alignItems:"center",justifyContent:"center",filter:"drop-shadow(0 3px 8px rgba(0,0,0,0.55))"}}>
+            <div style={{position:"relative",pointerEvents:"none",display:"flex",alignItems:"center",justifyContent:"center",filter:"drop-shadow(0 3px 8px rgba(0,0,0,0.55))"}}>
               <AppIconDisplay app={app} size={32}/>
+              {/* v8.1: notification badge — small numeric circle in the
+                  upper-right of the icon when the app has unread items. */}
+              {appBadgeCounts[app.id]>0 && (
+                <div style={{position:"absolute",top:-4,right:-4,minWidth:16,height:16,padding:"0 4px",borderRadius:8,background:"#ff4d4f",color:"#fff",fontFamily:FFB,fontWeight:700,fontSize:10,display:"flex",alignItems:"center",justifyContent:"center",lineHeight:1,boxShadow:"0 0 8px rgba(255,77,79,0.55), 0 1px 2px rgba(0,0,0,0.6)",border:"1.5px solid rgba(10,12,24,0.85)"}}>
+                  {appBadgeCounts[app.id]>9?"9+":appBadgeCounts[app.id]}
+                </div>
+              )}
             </div>
             <span style={{fontFamily:FFB,fontWeight:600,fontSize:10.5,color:"#fff",textAlign:"center",lineHeight:1.25,textShadow:"0 1px 3px rgba(0,0,0,0.9), 0 0 8px rgba(0,0,0,0.5)",pointerEvents:"none",letterSpacing:0.15}}>{app.label}</span>
           </div>
@@ -1110,7 +1190,7 @@ export default function NovaOS(){
                 {win.app==="pacman"     &&<PacManApp AC={AC} data={data} updateSettings={updateSettings}/>}
                 {win.app==="chess"      &&<ChessApp user={user} AC={AC}/>}
                 {/* v8.0 round-3 */}
-                {win.app==="photos"     &&<PhotosApp AC={AC} showToast={showToast}/>}
+                {win.app==="photos"     &&<PhotosApp AC={AC} showToast={showToast} onSetWallpaper={handleCustomWallpaper}/>}
               </Suspense>
             </div>
           </div>
@@ -1246,11 +1326,12 @@ export default function NovaOS(){
 
             // Compact pinned-only chip — icon only, fixed 40x40 square.
             if(slot.pinned&&!hasRunning){
+              const badgeCount = appBadgeCounts[slot.appId] || 0;
               return(
                 <button {...dragProps} key={slot.key} className="tb"
                   onClick={wrappedClick}
                   onContextMenu={e=>openContextMenu(e,buildMenu())}
-                  title={app.label}
+                  title={app.label + (badgeCount > 0 ? " — " + badgeCount + " unread" : "")}
                   style={{
                     width:40,height:40,padding:0,
                     background:"rgba(255,255,255,0.05)",
@@ -1258,10 +1339,15 @@ export default function NovaOS(){
                     borderRadius:10,cursor:isDragging?"grabbing":"pointer",
                     display:"flex",alignItems:"center",justifyContent:"center",
                     transition:"all 0.18s cubic-bezier(0.4,0,0.2,1)",
-                    flexShrink:0,
+                    flexShrink:0,position:"relative",
                     ...dragStyle,
                   }}>
                   <AppIconDisplay app={{id:app.id,icon:app.icon}} size={20}/>
+                  {badgeCount > 0 && (
+                    <div style={{position:"absolute",top:-2,right:-2,minWidth:14,height:14,padding:"0 3px",borderRadius:7,background:"#ff4d4f",color:"#fff",fontFamily:FFB,fontWeight:700,fontSize:9,display:"flex",alignItems:"center",justifyContent:"center",lineHeight:1,boxShadow:"0 0 6px rgba(255,77,79,0.6)"}}>
+                      {badgeCount > 9 ? "9+" : badgeCount}
+                    </div>
+                  )}
                 </button>
               );
             }
@@ -1285,7 +1371,14 @@ export default function NovaOS(){
                   flexShrink:0,
                   ...dragStyle,
                 }}>
-                <div style={{pointerEvents:"none",display:"flex",alignItems:"center"}}><AppIconDisplay app={{id:app.id,icon:app.icon}} size={16}/></div>
+                <div style={{position:"relative",pointerEvents:"none",display:"flex",alignItems:"center"}}>
+                  <AppIconDisplay app={{id:app.id,icon:app.icon}} size={16}/>
+                  {appBadgeCounts[slot.appId]>0 && (
+                    <div style={{position:"absolute",top:-5,right:-7,minWidth:13,height:13,padding:"0 3px",borderRadius:6.5,background:"#ff4d4f",color:"#fff",fontFamily:FFB,fontWeight:700,fontSize:8.5,display:"flex",alignItems:"center",justifyContent:"center",lineHeight:1,boxShadow:"0 0 5px rgba(255,77,79,0.6)"}}>
+                      {appBadgeCounts[slot.appId]>9?"9+":appBadgeCounts[slot.appId]}
+                    </div>
+                  )}
+                </div>
                 {deviceMode!=="mobile"&&<span>{app.label}</span>}
                 {hasRunning&&!allMin&&<div style={{position:"absolute",bottom:-1,left:"50%",transform:"translateX(-50%)",width:isTop?22:8,height:3,borderRadius:3,background:AC,boxShadow:isTop?"0 0 10px "+AC+", 0 0 4px "+AC:"none",transition:"width 0.25s cubic-bezier(0.4,0,0.2,1), box-shadow 0.25s cubic-bezier(0.4,0,0.2,1)"}}/>}
               </button>

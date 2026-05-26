@@ -8,7 +8,7 @@ export const COLL = "nova_storage";
 // header. Update this when you do a version sweep — package.json /
 // tauri.conf.json still need their own bumps but at least *display* text
 // won't drift again. Format: "<major>.<minor>".
-export const NOVA_VERSION = "8.0";
+export const NOVA_VERSION = "8.1";
 
 // Widget metadata: label/emoji + minimum size constraints used by WidgetShell.
 export const WIDGET_CONFIGS = {
@@ -18,6 +18,10 @@ export const WIDGET_CONFIGS = {
   tasksw:   { label:"Tasks",        emoji:"✅", minW:200, minH:160 },
   calendar: { label:"Calendar",     emoji:"📅", minW:240, minH:220 },
   sysinfo:  { label:"System Info",  emoji:"💻", minW:180, minH:110 },
+  // v8.1: battery widget reads navigator.getBattery(). On browsers/devices
+  // where it's unsupported or always shows 100%+charging (no battery
+  // present), the widget renders a one-line "no battery" message.
+  battery:  { label:"Battery",      emoji:"🔋", minW:180, minH:90  },
 };
 
 // Initial widget positions/sizes for a freshly-registered account.
@@ -28,6 +32,7 @@ export const DEFAULT_WIDGET_STATE = {
   tasksw:   { x:480, y:220, w:260, h:280 },
   calendar: { x:200, y:220, w:280, h:264 },
   sysinfo:  { x:490, y:220, w:220, h:140 },
+  battery:  { x:730, y:80,  w:200, h:100 },
 };
 
 // Default open size per app type. App ids that aren't listed get {w:520,h:480}.
