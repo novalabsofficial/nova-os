@@ -93,6 +93,46 @@ based on `performance.now()`. Replace with real OS metrics.
 
 ---
 
+## 6. Rework Paint into a real MS-Paint competitor
+
+Requested by a beta tester. The current PaintApp is a minimal sketch tool
+(pen, eraser, size slider, color picker, undo, clear, save). Goal: turn
+it into something that can genuinely replace MS Paint — and ideally do
+some things better.
+
+**Feature set to aim for**
+- **Tools:** pen, brush (multiple textures — airbrush, marker, calligraphy,
+  watercolor), pencil, eraser, fill bucket (flood fill), eyedropper
+  (color picker), text with font selection, selection tool (rectangular
+  + freeform with move/copy/paste).
+- **Shapes:** line, rectangle (filled + outline), circle/ellipse, polygon,
+  arrow, with adjustable stroke width and separate fill / stroke colors.
+- **Canvas controls:** resizable canvas (set custom width/height),
+  zoom in/out, pan via space-drag or middle-click drag.
+- **Layers** (this is where we'd beat MS Paint — Paint doesn't have them):
+  multiple layers with opacity, blend modes, show/hide, reorder, merge.
+- **History:** the current 30-snapshot undo stack works for v8.0 but for
+  a real Paint replacement we'd want redo too, plus a history panel
+  showing the action list.
+- **Files:** save as PNG (already works), JPG, SVG (if we keep stroke
+  data structured), load existing image to edit.
+- **Quality of life:** grid overlay toggle, ruler guides, snap-to-grid,
+  keyboard shortcuts (B for brush, E for eraser, etc.).
+
+**Considerations**
+- Current PaintApp is a single `<canvas>` with raw drawing operations.
+  Adding shapes and selection means tracking a layer of structured
+  drawable objects on top, or compositing multiple canvases.
+- Layers via stacked `<canvas>` elements is the simplest implementation;
+  each layer is its own canvas, the visible result is the stack.
+- Fill bucket is a flood-fill algorithm on the canvas's ImageData buffer
+  (BFS from the clicked pixel matching color within a tolerance).
+- Storage: don't try to save .psd-style multi-layer files to Firestore.
+  Export to flat PNG. For now, layers exist only during the session.
+- This is a big undertaking — probably its own minor version (v8.x or v9.0).
+
+---
+
 ## How to add to this
 
 Edit this file directly, or just mention an idea in conversation and ask
