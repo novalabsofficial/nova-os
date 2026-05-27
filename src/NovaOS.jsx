@@ -38,6 +38,7 @@ import {
 } from "./ui/constants.js";
 import { Wallpaper, NovaBg, BlissBg, AuroraBg, MeshBg } from "./ui/wallpapers.jsx";
 import { NovaSvgIcon, AppIconDisplay, NovaLogo, WindowControlIcon, UserAvatar } from "./ui/icons.jsx";
+import { subscribeDrag, moveDrag, endDrag, getDrag } from "./lib/dragStore.js";
 import { Toggle } from "./ui/Toggle.jsx";
 import { BrowserNav } from "./ui/BrowserNav.jsx";
 import { ResizeHandles } from "./ui/ResizeHandles.jsx";
@@ -121,6 +122,9 @@ export default function NovaOS(){
   const [screensaver, setScreensaver] = useState(false);
   const ssActiveRef = useRef(false);
   const idleTimerRef = useRef(null);
+  // v8.6 cross-app drag-and-drop — mirrors the shared dragStore so we can
+  // render a floating ghost following the pointer.
+  const [dnd, setDnd] = useState(null);
   const [menuOpen,   setMenuOpen]   = useState(false);
   const [menuSrch,   setMenuSrch]   = useState("");
   const [iconPos,    setIconPos]    = useState({});
@@ -351,6 +355,24 @@ export default function NovaOS(){
     return ()=>{ evs.forEach(ev=>window.removeEventListener(ev,onActivity)); if(idleTimerRef.current)clearTimeout(idleTimerRef.current); };
   },[settings.screensaverMins, screen]);
 
+  // v8.6 cross-app drag-and-drop. Mirror the shared store for the ghost, and
+  // while a drag is active track the pointer + resolve the drop on release via
+  // the element under the cursor (data-drop="…").
+  useEffect(()=>subscribeDrag(setDnd),[]);
+  useEffect(()=>{
+    if(!dnd) return;
+    function mv(e){ moveDrag(e.clientX,e.clientY); }
+    function up(e){
+      const item=getDrag();
+      if(item){ const el=document.elementFromPoint(e.clientX,e.clientY); const z=el&&el.closest?el.closest("[data-drop]"):null; handleDrop(item, z?z.getAttribute("data-drop"):null); }
+      endDrag();
+    }
+    window.addEventListener("pointermove",mv,{passive:true});
+    window.addEventListener("pointerup",up);
+    return ()=>{ window.removeEventListener("pointermove",mv); window.removeEventListener("pointerup",up); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[!!dnd]);
+
   // Widget drag — free move, snap to 20px grid on release
   useEffect(()=>{
     if(!widgetDrag)return;
@@ -541,6 +563,21 @@ export default function NovaOS(){
   const updateData    =useCallback((patch)=>{setData(prev=>{const next=typeof patch==="function"?patch(prev):{...prev,...patch};saveData(next);return next;});},[saveData]);
   const updateSettings=useCallback((patch)=>{updateData(prev=>({...prev,settings:{...(prev.settings||{}),...patch}}));},[updateData]);
   const handleCustomWallpaper=useCallback(async(url)=>{setCustomWp(url);await db.set("user:"+user+":wpimg",url);updateSettings({wallpaper:"custom"});showToast("Custom wallpaper set ✓");},[user,updateSettings,showToast]);
+  // v8.6 — downsample a (blob/data) image URL then hand the JPEG data URL to cb.
+  function downsamplePhoto(url, max, quality, cb){
+    const img=new Image();
+    img.onload=()=>{ try{ const r=Math.min(max/img.width,max/img.height,1); const c=document.createElement("canvas"); c.width=Math.round(img.width*r); c.height=Math.round(img.height*r); c.getContext("2d").drawImage(img,0,0,c.width,c.height); cb(c.toDataURL("image/jpeg",quality)); }catch{ showToast("Couldn't process image"); } };
+    img.onerror=()=>showToast("Couldn't load photo");
+    img.src=url;
+  }
+  // v8.6 — resolve a cross-app photo drop. target comes from the dropped
+  // element's data-drop attribute: "wallpaper" (desktop), "avatar" (profile
+  // window). "none"/null = a non-target surface, so do nothing.
+  function handleDrop(item, target){
+    if(!item || item.type!=="photo") return;
+    if(target==="wallpaper") downsamplePhoto(item.url, 900, 0.72, (u)=>handleCustomWallpaper(u));
+    else if(target==="avatar") downsamplePhoto(item.url, 256, 0.85, (u)=>{ updateData({avatar:u}); showToast("Profile picture set ✓"); });
+  }
   const focusWin=useCallback((id)=>{setMaxZ(z=>{const nz=z+1;setWins(ws=>ws.map(w=>w.id===id?{...w,z:nz}:w));return nz;});},[]);
   // On mobile, every new window opens MAXIMIZED. Default sizes (520x480 etc.)
   // are wider than a ~360px phone and would otherwise spill off the right edge.
@@ -1018,7 +1055,7 @@ export default function NovaOS(){
  
   // ── DESKTOP ──────────────────────────────────────────────────────────────
   return(
-    <div style={{width:"100%",height:"100vh",position:"relative",overflow:"hidden",cursor:dragCursor,fontSize:largeFnt?15:13}}
+    <div data-drop="wallpaper" style={{width:"100%",height:"100vh",position:"relative",overflow:"hidden",cursor:dragCursor,fontSize:largeFnt?15:13}}
       onContextMenu={e=>{
         // Only fire if the click is on the desktop itself, not on a child
         // (icons + windows have their own onContextMenu that stopPropagation).
@@ -1052,6 +1089,11 @@ export default function NovaOS(){
           <div style={{fontFamily:FF,fontSize:"min(4.2vw,24px)",color:"rgba(255,255,255,0.62)",marginTop:18,letterSpacing:1}}>{fmtDate(tick)}</div>
           <div style={{fontFamily:FFM,fontSize:12,color:"rgba(255,255,255,0.3)",marginTop:44,letterSpacing:1}}>move the mouse or press any key to wake</div>
         </div>
+      )}
+      {/* v8.6 drag-and-drop ghost — floats under the pointer while dragging a
+          photo. Drop on the desktop = wallpaper, on a Profile window = avatar. */}
+      {dnd && dnd.type==="photo" && (
+        <img src={dnd.url} alt="" style={{position:"fixed",left:(dnd.x||0)+14,top:(dnd.y||0)+14,width:84,height:84,objectFit:"cover",borderRadius:10,border:"2px solid "+AC,boxShadow:"0 12px 40px rgba(0,0,0,0.55)",pointerEvents:"none",zIndex:100001,opacity:0.92,transform:"rotate(3deg)"}}/>
       )}
       {/* v7.0 toast refresh: glass surface, leading accent bar, status icon
           inferred from message text. Floats top-center (more visible than
@@ -1289,7 +1331,7 @@ export default function NovaOS(){
         const winStyle=isMax?{position:"fixed",top:0,left:0,right:0,bottom:TASKBAR_H+"px",zIndex:win.z,borderRadius:0}:{position:"absolute",left:win.x,top:win.y,width:win.width,height:win.height,zIndex:win.z,borderRadius:winRadius};
         const minimizedStyle=isMin?{display:"none"}:{};
         return(
-          <div key={win.id} onClick={()=>focusWin(win.id)} style={{...winStyle,...minimizedStyle,background:"rgba(10,12,24,0.92)",border:"1px solid rgba(255,255,255,0.09)",boxShadow:winShadow,display:isMin?"none":"flex",flexDirection:"column",animation:"win-in 0.28s cubic-bezier(0.16,1,0.3,1)",backdropFilter:"blur("+winBlur+"px) saturate(160%)",WebkitBackdropFilter:"blur("+winBlur+"px) saturate(160%)",transition:isDrg?"box-shadow 0.18s cubic-bezier(0.4,0,0.2,1)":"box-shadow 0.22s cubic-bezier(0.4,0,0.2,1), left 0.28s cubic-bezier(0.4,0,0.2,1), top 0.28s cubic-bezier(0.4,0,0.2,1), width 0.28s cubic-bezier(0.4,0,0.2,1), height 0.28s cubic-bezier(0.4,0,0.2,1)",overflow:"hidden"}}>
+          <div key={win.id} data-win="1" data-drop={win.app==="profile"?"avatar":"none"} onClick={()=>focusWin(win.id)} style={{...winStyle,...minimizedStyle,background:"rgba(10,12,24,0.92)",border:"1px solid rgba(255,255,255,0.09)",boxShadow:winShadow,display:isMin?"none":"flex",flexDirection:"column",animation:"win-in 0.28s cubic-bezier(0.16,1,0.3,1)",backdropFilter:"blur("+winBlur+"px) saturate(160%)",WebkitBackdropFilter:"blur("+winBlur+"px) saturate(160%)",transition:isDrg?"box-shadow 0.18s cubic-bezier(0.4,0,0.2,1)":"box-shadow 0.22s cubic-bezier(0.4,0,0.2,1), left 0.28s cubic-bezier(0.4,0,0.2,1), top 0.28s cubic-bezier(0.4,0,0.2,1), width 0.28s cubic-bezier(0.4,0,0.2,1), height 0.28s cubic-bezier(0.4,0,0.2,1)",overflow:"hidden"}}>
             {!isMax&&<ResizeHandles winId={win.id} onStartResize={startResize} touchy={touchy}/>}
             {/* v8.3 F1: title bar is now draggable even when maximized —
                 dragging restores the window and tears it off (Windows-style),
@@ -1384,7 +1426,7 @@ export default function NovaOS(){
           :"linear-gradient(180deg, rgba(14,16,30,0.78) 0%, rgba(10,12,24,0.86) 100%)";
         // The Nova taskbar is always visible — including in fullscreen.
         return(
-      <div style={{
+      <div data-drop="none" style={{
         position:"fixed",bottom:0,left:0,right:0,height:TASKBAR_H,
         background:tbBg,
         backdropFilter:"blur(28px) saturate(160%)",

@@ -22,6 +22,7 @@ import { FF, FFB, FFM, SEC } from "../ui/styles.js";
 import { fill, bdr } from "../lib/format.js";
 import { playSound } from "../lib/audio.js";
 import { getStorePhotos, subscribeStorePhotos } from "../lib/photoStore.js";
+import { startDrag, moveDrag } from "../lib/dragStore.js";
 
 const PIXELS_PER_THUMB = 132;   // target thumbnail size in the grid
 const MAX_PHOTO_SIZE   = 20 * 1024 * 1024;  // 20 MB — soft warning above this
@@ -35,6 +36,29 @@ export function PhotosApp({ AC, showToast, onSetWallpaper }) {
   const [slideshow, setSlideshow] = useState(false);
   const inputRef = useRef(null);
   const slideshowRef = useRef(null);
+  // v8.6 cross-app drag — drag a thumbnail onto the desktop (set wallpaper) or
+  // a Profile window (set avatar). NovaOS owns the drop; we just start the
+  // drag past an 8px threshold and suppress the click that would open it.
+  const draggedRef = useRef(false);
+  function beginPhotoDrag(e, photo) {
+    if (e.button !== 0) return;
+    const start = { x: e.clientX, y: e.clientY };
+    let started = false;
+    function mv(ev) {
+      if (!started && (Math.abs(ev.clientX - start.x) > 8 || Math.abs(ev.clientY - start.y) > 8)) {
+        started = true; draggedRef.current = true;
+        startDrag({ type: "photo", url: photo.url, name: photo.name, x: ev.clientX, y: ev.clientY });
+      }
+      if (started) moveDrag(ev.clientX, ev.clientY);
+    }
+    function up() {
+      window.removeEventListener("pointermove", mv);
+      window.removeEventListener("pointerup", up);
+      if (started) setTimeout(() => { draggedRef.current = false; }, 60);
+    }
+    window.addEventListener("pointermove", mv);
+    window.addEventListener("pointerup", up);
+  }
 
   // Cleanup blob URLs when the component unmounts. Without this, picking 100
   // photos and closing the app leaks 100 blob URLs into the browser.
@@ -215,7 +239,9 @@ export function PhotosApp({ AC, showToast, onSetWallpaper }) {
           }}>
             {photos.map((p, idx) => (
               <div key={p.id}
-                onClick={() => openViewer(idx)}
+                onPointerDown={e => beginPhotoDrag(e, p)}
+                onClick={() => { if (draggedRef.current) return; openViewer(idx); }}
+                title="Click to open · drag onto the desktop or your profile"
                 style={{
                   position: "relative",
                   aspectRatio: "1/1",

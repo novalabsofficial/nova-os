@@ -5,6 +5,33 @@ not committed to. Living document — add to it freely.
 
 ---
 
+# ✅ v8.6 — shipped (capture & flow batch)
+
+Three self-contained backlog items.
+
+### ✅ AFK screensaver (backlog #14) — SHIPPED
+Idle → blurred desktop + large live clock; any input wakes it. Timeout is a
+Setting (Off / 1 / 3 / 5 / 10 min, default 1). See `src/NovaOS.jsx` (idle
+timer + overlay), `src/apps/SettingsApp.jsx` (Screen Saver picker).
+
+### ✅ Screenshot tool with annotation (backlog #8) — SHIPPED
+New Screenshot app: capture via `getDisplayMedia`, annotate (pen, box, arrow,
+text, blur, color/size, undo), then Download PNG / Set as wallpaper / Save to
+Photos. `src/apps/ScreenshotApp.jsx`, shared `src/lib/photoStore.js` (Photos
+seeds + subscribes), registered in constants + NovaOS.
+- **Deferred:** region/per-window cropping beyond the browser's share picker;
+  a global capture shortcut.
+
+### ✅ Drag-and-drop between apps (backlog #12) — SHIPPED
+Drag a photo from Photos onto the **desktop** (→ set wallpaper) or a **Profile
+window** (→ set avatar), with a floating ghost following the cursor. Generic
+pointer-based infra in `src/lib/dragStore.js`; drops resolve via `data-drop`
+attributes; handled in `src/NovaOS.jsx`.
+- **Deferred:** more flows (photo → Paint to edit, text → DM, file → Chat) —
+  the Chat/DM ones need attachment support; the infra is now in place for them.
+
+---
+
 # ✅ v8.5 — shipped (desktop-feel batch)
 
 Three backlog items knocked out together — all make Nova feel more like a
@@ -328,7 +355,11 @@ as a named "workspace" and restore it with one click.
 
 ---
 
-## 8. Screenshot tool with annotation
+## 8. Screenshot tool with annotation — ✅ SHIPPED in v8.6
+
+> Done: getDisplayMedia capture + annotation (pen/box/arrow/text/blur) +
+> Download / Wallpaper / Save to Photos. Region cropping deferred.
+
 
 Capture region / single window / full screen → opens an annotation
 overlay where you can draw arrows, highlight rectangles, add text, blur
@@ -408,7 +439,12 @@ laptops in the PWA install or Tauri desktop on a battery-powered device.
 
 ---
 
-## 12. Drag-and-drop between apps
+## 12. Drag-and-drop between apps — ✅ SHIPPED in v8.6 (more flows to come)
+
+> Done: generic pointer-drag infra + Photos → desktop (wallpaper) / Profile
+> (avatar). Photo→Paint and text/file→Chat/DM flows deferred (the latter need
+> chat attachments). Original notes below.
+
 
 Drag a photo from Photos → drop onto Chat → it gets attached/embedded
 in the message. Drag selected text from Notes → drop into a DM. Drag a
@@ -460,7 +496,10 @@ Three flavors, picked per wallpaper or globally:
 
 ---
 
-## 14. AFK screensaver (deferred from v8.3)
+## 14. AFK screensaver (deferred from v8.3) — ✅ SHIPPED in v8.6
+
+> Done: idle → blurred clock overlay, wake on any input, timeout Setting.
+
 
 After ~1 minute of no input (no key, no mouse move/click), fade in a
 screensaver: blur the entire desktop and show a large clock (reuse the
