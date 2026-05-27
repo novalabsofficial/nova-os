@@ -115,6 +115,17 @@ export const CSS = `
     --nv-scroll-hover:rgba(0,0,0,0.32);
   }
 
+  /* ── v9.0 Liquid Glass. When enabled (html[data-glass="on"]), surfaces get
+     noticeably sheerer + a heavier blur so the wallpaper frosts through —
+     the "pane of glass" feel. Glass-off values equal the originals, so the
+     default look is unchanged. (Dark-theme tuned; light+glass comes when
+     light mode is rebuilt.) */
+  html[data-glass="on"]{
+    --nv-surface:rgba(15,17,32,0.44);
+    --nv-surface-solid:rgba(10,12,24,0.52);
+    --nv-glass-blur:40px;
+  }
+
   /* v8.0 scrollbar refresh — slightly wider, rounded, smoother fade on hover.
      Firefox uses scrollbar-color; webkit uses ::-webkit-scrollbar. */
   *{scrollbar-width:thin;scrollbar-color:var(--nv-scroll) transparent;}

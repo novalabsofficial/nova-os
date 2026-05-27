@@ -169,6 +169,7 @@ export default function NovaOS(){
   const winBlur =settings.winBlur   ??18;
   const largeFnt=settings.largeFont ||false;
   const themePref=settings.theme    ||"dark"; // "dark" | "light" | "auto"
+  const glass    =!!settings.glass;            // v9.0 Liquid Glass surfaces
   const wpId    =settings.wallpaper ||data?.wallpaper||"mesh";
   const widgets =settings.widgets   ||{};
   // Resolved device mode: user's saved preference overrides detection. "auto"
@@ -358,6 +359,10 @@ export default function NovaOS(){
       return ()=>mq.removeEventListener?.("change",h);
     }
   },[themePref]);
+
+  // v9.0 — Liquid Glass on/off. Sets html[data-glass] so the sheerer surface
+  // tokens (styles.js) kick in for windows, taskbar, menus and widgets.
+  useEffect(()=>{ document.documentElement.setAttribute("data-glass", glass?"on":"off"); },[glass]);
 
   // v8.6 AFK screensaver. settings.screensaverMins: 0 = off, else minutes of
   // idle before it fades in (default 1). Any input dismisses it and re-arms
@@ -1259,7 +1264,7 @@ export default function NovaOS(){
           the screen edge. */}
       {menuOpen&&(<div ref={menuRef} style={{
         position:"fixed",bottom:TASKBAR_H+8,left:8,width:420,maxHeight:"70vh",
-        background:"linear-gradient(180deg, rgba(15,17,32,0.94) 0%, rgba(10,12,24,0.96) 100%)",
+        background:"var(--nv-surface-solid)",
         backdropFilter:"blur(40px) saturate(180%)",
         WebkitBackdropFilter:"blur(40px) saturate(180%)",
         border:"1px solid rgba(255,255,255,0.1)",
@@ -1351,7 +1356,7 @@ export default function NovaOS(){
         const winStyle=isMax?{position:"fixed",top:0,left:0,right:0,bottom:TASKBAR_H+"px",zIndex:win.z,borderRadius:0}:{position:"absolute",left:win.x,top:win.y,width:win.width,height:win.height,zIndex:win.z,borderRadius:winRadius};
         const minimizedStyle=isMin?{display:"none"}:{};
         return(
-          <div key={win.id} data-win="1" data-drop={win.app==="profile"?"avatar":"none"} onClick={()=>focusWin(win.id)} style={{...winStyle,...minimizedStyle,background:"rgba(10,12,24,0.92)",border:"1px solid rgba(255,255,255,0.09)",boxShadow:winShadow,display:isMin?"none":"flex",flexDirection:"column",animation:"win-in 0.28s cubic-bezier(0.16,1,0.3,1)",backdropFilter:"blur("+winBlur+"px) saturate(160%)",WebkitBackdropFilter:"blur("+winBlur+"px) saturate(160%)",transition:isDrg?"box-shadow 0.18s cubic-bezier(0.4,0,0.2,1)":"box-shadow 0.22s cubic-bezier(0.4,0,0.2,1), left 0.28s cubic-bezier(0.4,0,0.2,1), top 0.28s cubic-bezier(0.4,0,0.2,1), width 0.28s cubic-bezier(0.4,0,0.2,1), height 0.28s cubic-bezier(0.4,0,0.2,1)",overflow:"hidden"}}>
+          <div key={win.id} data-win="1" data-drop={win.app==="profile"?"avatar":"none"} onClick={()=>focusWin(win.id)} style={{...winStyle,...minimizedStyle,background:"var(--nv-surface-solid)",border:"1px solid rgba(255,255,255,0.09)",boxShadow:winShadow,display:isMin?"none":"flex",flexDirection:"column",animation:"win-in 0.28s cubic-bezier(0.16,1,0.3,1)",backdropFilter:"blur("+winBlur+"px) saturate(160%)",WebkitBackdropFilter:"blur("+winBlur+"px) saturate(160%)",transition:isDrg?"box-shadow 0.18s cubic-bezier(0.4,0,0.2,1)":"box-shadow 0.22s cubic-bezier(0.4,0,0.2,1), left 0.28s cubic-bezier(0.4,0,0.2,1), top 0.28s cubic-bezier(0.4,0,0.2,1), width 0.28s cubic-bezier(0.4,0,0.2,1), height 0.28s cubic-bezier(0.4,0,0.2,1)",overflow:"hidden"}}>
             {!isMax&&<ResizeHandles winId={win.id} onStartResize={startResize} touchy={touchy}/>}
             {/* v8.3 F1: title bar is now draggable even when maximized —
                 dragging restores the window and tears it off (Windows-style),
@@ -1451,8 +1456,8 @@ export default function NovaOS(){
       <div data-drop="none" style={{
         position:"fixed",bottom:0,left:0,right:0,height:TASKBAR_H,
         background:tbBg,
-        backdropFilter:"blur(28px) saturate(160%)",
-        WebkitBackdropFilter:"blur(28px) saturate(160%)",
+        backdropFilter:"blur(var(--nv-glass-blur)) saturate(160%)",
+        WebkitBackdropFilter:"blur(var(--nv-glass-blur)) saturate(160%)",
         borderTop:"1px solid var(--nv-border)",
         boxShadow:"0 -1px 0 rgba(255,255,255,0.04) inset, 0 -20px 50px -20px rgba(0,0,0,0.5)",
         display:"flex",alignItems:"center",padding:"0 14px",gap:6,zIndex:9999,
@@ -1686,7 +1691,7 @@ export default function NovaOS(){
           <div onClick={()=>setNotifsOpen(false)} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.25)",zIndex:9997}}/>
           <div style={{
             position:"fixed",top:10,right:10,bottom:TASKBAR_H+10,width:"min(360px, calc(100vw - 20px))",
-            background:"linear-gradient(180deg, rgba(15,17,32,0.94) 0%, rgba(10,12,24,0.96) 100%)",
+            background:"var(--nv-surface-solid)",
             backdropFilter:"blur(40px) saturate(180%)",
             WebkitBackdropFilter:"blur(40px) saturate(180%)",
             border:"1px solid rgba(255,255,255,0.1)",

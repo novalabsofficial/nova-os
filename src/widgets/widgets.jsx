@@ -25,9 +25,9 @@ export function WidgetShell({ id, state, onDragStart, onResizeStart, onClose, ch
   return (
     <div className="wgt" style={{
       position:"absolute",left:x,top:y,width:w,height:h,zIndex:4,
-      background:"rgba(7,8,18,0.7)",
-      backdropFilter:"blur(28px) saturate(160%)",
-      WebkitBackdropFilter:"blur(28px) saturate(160%)",
+      background:"var(--nv-surface)",
+      backdropFilter:"blur(var(--nv-glass-blur)) saturate(160%)",
+      WebkitBackdropFilter:"blur(var(--nv-glass-blur)) saturate(160%)",
       border:"1px solid rgba(255,255,255,0.09)",
       borderRadius:16,
       overflow:"hidden",
