@@ -577,13 +577,13 @@ function renderBg(id, customUrl) {
 // wallpaper. Re-checked every few minutes so it transitions through the day.
 export function autoWallpaperId(d = new Date()) {
   const h = d.getHours();
-  if (h < 5)  return "nova";     // deep night — starfield
+  if (h < 5)  return "night";    // deep night — the "Night" wallpaper
   if (h < 8)  return "halcyon";  // dawn — warm coral glow
   if (h < 11) return "cascade";  // morning — sunrise ridges
   if (h < 16) return "mesh";     // midday — bright & vibrant
   if (h < 19) return "ember";    // sunset — golden hour
   if (h < 21) return "tide";     // dusk — cool twilight
-  return "nova";                 // night
+  return "night";                // night — the "Night" wallpaper
 }
 
 /**
