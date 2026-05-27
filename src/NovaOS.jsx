@@ -988,21 +988,19 @@ export default function NovaOS(){
   // and a subtle accent rule under the version line. Same boot sequence,
   // more cinematic feel.
   if(screen==="boot")return(
-    <div style={{width:"100%",height:"100vh",background:"#07080f",display:"flex",flexDirection:"column",justifyContent:"center",padding:"10vh max(24px, 12%)",position:"relative",overflow:"hidden"}}>
+    // v9.0: Windows-style boot — centered Nova logo + brand + spinner. The boot
+    // sequence still runs underneath (drives the timed transition to login);
+    // we just no longer render the terminal log lines.
+    <div style={{width:"100%",height:"100vh",background:"#07080f",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",position:"relative",overflow:"hidden"}}>
       <style>{CSS}</style>
-      {/* Ambient backdrop — soft purple/blue glow behind everything */}
-      <div style={{position:"absolute",top:"30%",left:"50%",transform:"translateX(-50%)",width:680,height:680,borderRadius:"50%",background:"radial-gradient(circle,rgba(99,102,241,0.18) 0%,rgba(99,102,241,0.08) 30%,transparent 65%)",filter:"blur(40px)",pointerEvents:"none"}}/>
-      <div style={{position:"absolute",top:"60%",left:"35%",width:520,height:520,borderRadius:"50%",background:"radial-gradient(circle,rgba(6,182,212,0.10) 0%,transparent 60%)",filter:"blur(50px)",pointerEvents:"none"}}/>
-      <div style={{position:"relative",zIndex:1}}>
-        <div style={{fontFamily:FFB,fontWeight:700,fontSize:"clamp(40px, 12vw, 72px)",letterSpacing:6,color:"#fff",marginBottom:6,lineHeight:1,animation:"nova-breathe 3.6s ease-in-out infinite"}}>NOVA</div>
-        <div style={{fontFamily:FF,fontSize:11,color:"rgba(255,255,255,0.32)",letterSpacing:6,marginBottom:8,fontWeight:500}}>OPERATING SYSTEM  ·  v{NOVA_VERSION}</div>
-        {/* Hairline accent — fades in from the version line */}
-        <div style={{height:1,width:160,background:"linear-gradient(90deg,rgba(99,102,241,0.6),transparent)",marginBottom:46}}/>
-        {bootLines.map((l,i) => (
-          <div key={i} style={{fontFamily:FFM,fontSize:12,color:l.includes("ready")?"#a8c5ff":"rgba(255,255,255,0.5)",marginBottom:5,animation:"boot-in 0.28s cubic-bezier(0.16,1,0.3,1)",letterSpacing:0.3}}>
-            {l.includes("OK") ? <>{l.replace("... OK","")}... <span style={{color:"#4cef90"}}>OK</span></> : l}
-          </div>
-        ))}
+      {/* Ambient backdrop glow */}
+      <div style={{position:"absolute",top:"50%",left:"50%",transform:"translate(-50%,-50%)",width:620,height:620,borderRadius:"50%",background:"radial-gradient(circle,rgba(99,102,241,0.16) 0%,rgba(99,102,241,0.06) 35%,transparent 65%)",filter:"blur(50px)",pointerEvents:"none"}}/>
+      <div style={{position:"relative",zIndex:1,display:"flex",flexDirection:"column",alignItems:"center"}}>
+        <div style={{animation:"nova-breathe 3.6s ease-in-out infinite",filter:"drop-shadow(0 8px 32px rgba(99,102,241,0.45))"}}><NovaLogo size={96}/></div>
+        <div style={{fontFamily:FFB,fontWeight:700,fontSize:22,letterSpacing:3,color:"#fff",marginTop:22}}>NOVA OS</div>
+        <div style={{fontFamily:FF,fontSize:10,color:"rgba(255,255,255,0.3)",letterSpacing:4,marginTop:4,fontWeight:500}}>v{NOVA_VERSION}</div>
+        {/* Windows-style loading spinner */}
+        <div style={{width:30,height:30,marginTop:46,borderRadius:"50%",border:"3px solid rgba(255,255,255,0.12)",borderTopColor:"#a8c5ff",animation:"spin 0.8s linear infinite"}}/>
       </div>
       {MobileNotice}
     </div>
@@ -1013,64 +1011,38 @@ export default function NovaOS(){
   // floating ambient orbs behind the mesh backdrop. More confident typography
   // and inner highlight border to lift the card off the background.
   if(screen==="login")return(
+    // v9.0: macOS-lock-screen style — blurred Mesh wallpaper, a large clock up
+    // top, and a minimal frosted sign-in column with subtle input bars.
     <div style={{width:"100%",height:"100vh",position:"relative",overflow:"hidden"}}>
       <style>{CSS}</style>
       <MeshBg/>
-      {/* Floating ambient orbs behind the card — subtle motion that catches the eye */}
-      <div style={{position:"absolute",top:"15%",left:"12%",width:240,height:240,borderRadius:"50%",background:"radial-gradient(circle,rgba(167,139,250,0.32) 0%,transparent 70%)",filter:"blur(40px)",animation:"float 8s ease-in-out infinite",pointerEvents:"none"}}/>
-      <div style={{position:"absolute",bottom:"18%",right:"14%",width:280,height:280,borderRadius:"50%",background:"radial-gradient(circle,rgba(6,182,212,0.28) 0%,transparent 70%)",filter:"blur(50px)",animation:"float 10s ease-in-out infinite reverse",pointerEvents:"none"}}/>
-      <div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
-        <div style={{
-          background:"linear-gradient(180deg, rgba(12,14,28,0.92), rgba(8,10,22,0.92))",
-          backdropFilter:"blur(28px)",
-          border:"1px solid rgba(255,255,255,0.12)",
-          borderRadius:20,
-          padding:"48px 42px",
-          width:400,
-          maxWidth:"calc(100vw - 24px)",
-          // Layered shadow: deep ambient + close-in directional + inner highlight
-          boxShadow:"0 50px 120px rgba(0,0,0,0.7), 0 0 0 1px rgba(255,255,255,0.04) inset, 0 1px 0 rgba(255,255,255,0.08) inset",
-          position:"relative",
-          overflow:"hidden",
-          animation:"win-in 0.5s cubic-bezier(0.16,1,0.3,1)",
-        }}>
-          {/* Shimmering accent rule at the top of the card */}
-          <div style={{
-            position:"absolute",top:0,left:0,right:0,height:2,
-            background:"linear-gradient(90deg, transparent, rgba(167,139,250,0.8), rgba(99,102,241,1), rgba(6,182,212,0.8), transparent)",
-            backgroundSize:"200% 100%",
-            animation:"shimmer 4s ease-in-out infinite",
-          }}/>
-          <div style={{fontFamily:FFB,fontWeight:700,fontSize:42,color:"#fff",textAlign:"center",letterSpacing:6,marginBottom:6,lineHeight:1}}>NOVA</div>
-          <div style={{fontFamily:FF,fontSize:10,color:"rgba(255,255,255,0.28)",textAlign:"center",letterSpacing:5,marginBottom:34,fontWeight:500}}>OPERATING SYSTEM  ·  v{NOVA_VERSION}</div>
-          <div style={{display:"flex",borderBottom:"1px solid rgba(255,255,255,0.09)",marginBottom:24}}>
+      {/* Frosted blur over the wallpaper */}
+      <div style={{position:"absolute",inset:0,backdropFilter:"blur(30px) saturate(1.1)",WebkitBackdropFilter:"blur(30px) saturate(1.1)",background:"rgba(8,10,22,0.34)"}}/>
+      {/* Clock — top center, like the macOS lock screen */}
+      <div style={{position:"absolute",top:"8%",left:0,right:0,textAlign:"center",zIndex:1,pointerEvents:"none"}}>
+        <div style={{fontFamily:FFB,fontWeight:700,fontSize:"clamp(54px,11vw,104px)",color:"rgba(255,255,255,0.97)",letterSpacing:1,lineHeight:1,textShadow:"0 4px 44px rgba(0,0,0,0.45)"}}>{fmtTime(tick)}</div>
+        <div style={{fontFamily:FF,fontSize:"clamp(13px,2.4vw,19px)",color:"rgba(255,255,255,0.68)",marginTop:12,letterSpacing:0.5}}>{fmtDate(tick)}</div>
+      </div>
+      {/* Sign-in column */}
+      <div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center",zIndex:1}}>
+        <div style={{width:320,maxWidth:"calc(100vw - 32px)",marginTop:"13vh",display:"flex",flexDirection:"column",alignItems:"center",animation:"win-in 0.5s cubic-bezier(0.16,1,0.3,1)"}}>
+          <div style={{filter:"drop-shadow(0 6px 22px rgba(99,102,241,0.4))"}}><NovaLogo size={54}/></div>
+          <div style={{fontFamily:FFB,fontWeight:700,fontSize:19,color:"#fff",letterSpacing:1.5,marginTop:12}}>Nova OS</div>
+          <div style={{fontFamily:FF,fontSize:10,color:"rgba(255,255,255,0.42)",letterSpacing:1,marginTop:2,marginBottom:22}}>v{NOVA_VERSION}</div>
+          <div style={{display:"flex",gap:20,marginBottom:18}}>
             {["login","register"].map(m => (
-              <button key={m} className="lt" onClick={()=>{setMode(m);setAuthErr("");}} style={{flex:1,padding:"10px 0",background:"none",border:"none",borderBottom:mode===m?"2px solid "+DEFAULT_AC:"2px solid transparent",cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:12,letterSpacing:1,color:mode===m?DEFAULT_AC:"rgba(255,255,255,0.32)",transition:"color 0.18s, border-bottom 0.18s"}}>
-                {m==="login" ? "SIGN IN" : "REGISTER"}
+              <button key={m} className="lt" onClick={()=>{setMode(m);setAuthErr("");}} style={{background:"none",border:"none",cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:12,letterSpacing:0.8,padding:"2px 2px 5px",color:mode===m?"#fff":"rgba(255,255,255,0.42)",borderBottom:mode===m?"2px solid #fff":"2px solid transparent",transition:"color 0.18s"}}>
+                {m==="login" ? "Sign in" : "Register"}
               </button>
             ))}
           </div>
-          <input style={{...INP,marginBottom:11,padding:"11px 14px",borderRadius:9}} placeholder="Username" value={uname} onChange={e=>setUname(e.target.value)} onKeyDown={e=>e.key==="Enter"&&handleAuth()} autoFocus/>
-          <input style={{...INP,padding:"11px 14px",borderRadius:9}} type="password" placeholder="Password" value={pass} onChange={e=>setPass(e.target.value)} onKeyDown={e=>e.key==="Enter"&&handleAuth()}/>
-          <button className="ls" disabled={busy} onClick={handleAuth} style={{
-            width:"100%",
-            padding:"13px",
-            // Gradient button — feels more modern than flat fill
-            background:"linear-gradient(135deg, "+DEFAULT_AC+", #6366f1)",
-            border:"1px solid "+bdr(DEFAULT_AC),
-            borderRadius:10,
-            cursor:"pointer",
-            fontFamily:FFB,
-            fontWeight:600,
-            fontSize:14,
-            letterSpacing:1.2,
-            color:"#fff",
-            marginTop:18,
-            transition:"opacity 0.18s, transform 0.18s",
-            boxShadow:"0 8px 24px rgba(99,102,241,0.28)",
-          }}>{busy?"AUTHENTICATING…":mode==="login"?"SIGN IN →":"CREATE ACCOUNT →"}</button>
-          {authErr && <div style={{color:"#ff8b8b",fontFamily:FF,fontSize:13,textAlign:"center",marginTop:14,padding:"8px 12px",background:"rgba(255,80,80,0.08)",border:"1px solid rgba(255,80,80,0.2)",borderRadius:8}}>⚠ {authErr}</div>}
-          <div style={{marginTop:22,fontFamily:FF,fontStyle:"italic",fontSize:11,color:"rgba(255,255,255,0.2)",textAlign:"center"}}>Demo auth — your account syncs across devices.</div>
+          <input value={uname} onChange={e=>setUname(e.target.value)} onKeyDown={e=>e.key==="Enter"&&handleAuth()} autoFocus placeholder="Username"
+            style={{width:"100%",padding:"12px 16px",marginBottom:10,background:"rgba(255,255,255,0.1)",border:"1px solid rgba(255,255,255,0.18)",borderRadius:12,color:"#fff",fontFamily:FF,fontSize:14,outline:"none",backdropFilter:"blur(12px)",WebkitBackdropFilter:"blur(12px)"}}/>
+          <input value={pass} onChange={e=>setPass(e.target.value)} onKeyDown={e=>e.key==="Enter"&&handleAuth()} type="password" placeholder="Password"
+            style={{width:"100%",padding:"12px 16px",background:"rgba(255,255,255,0.1)",border:"1px solid rgba(255,255,255,0.18)",borderRadius:12,color:"#fff",fontFamily:FF,fontSize:14,outline:"none",backdropFilter:"blur(12px)",WebkitBackdropFilter:"blur(12px)"}}/>
+          <button className="ls" disabled={busy} onClick={handleAuth} style={{width:"100%",padding:"12px",marginTop:16,background:"rgba(255,255,255,0.92)",border:"none",borderRadius:12,cursor:"pointer",fontFamily:FFB,fontWeight:700,fontSize:13.5,letterSpacing:0.5,color:"#111",boxShadow:"0 8px 24px rgba(0,0,0,0.3)",transition:"opacity 0.18s"}}>{busy?"Signing in…":mode==="login"?"Sign in":"Create account"}</button>
+          {authErr && <div style={{color:"#ffb4b4",fontFamily:FF,fontSize:12.5,textAlign:"center",marginTop:14,padding:"8px 12px",background:"rgba(255,80,80,0.14)",border:"1px solid rgba(255,80,80,0.3)",borderRadius:10,backdropFilter:"blur(8px)"}}>⚠ {authErr}</div>}
+          <div style={{marginTop:20,fontFamily:FF,fontSize:10.5,color:"rgba(255,255,255,0.4)",textAlign:"center"}}>Your account syncs across devices.</div>
         </div>
       </div>
       {MobileNotice}

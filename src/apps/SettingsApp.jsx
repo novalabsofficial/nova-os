@@ -112,7 +112,7 @@ export function SettingsApp({user,data,updateSettings,showToast,AC,onCustomWallp
       <div style={{...SEC,marginTop:16}}>Screen Saver</div>
       <div style={{fontSize:11,color:"rgba(255,255,255,0.3)",marginBottom:9}}>Show a clock over a blurred desktop after you're idle. Move the mouse or press a key to wake.</div>
       <div style={{display:"flex",gap:6,marginBottom:20,flexWrap:"wrap"}}>
-        {[["Off",0],["1 min",1],["3 min",3],["5 min",5],["10 min",10]].map(([label,mins])=>{
+        {[["Off",0],["30 sec",0.5],["1 min",1],["3 min",3],["5 min",5],["10 min",10]].map(([label,mins])=>{
           const active=(settings.screensaverMins===undefined?1:settings.screensaverMins)===mins;
           return(
             <button key={mins} onClick={()=>{updateSettings({screensaverMins:mins});showToast(mins?"Screen saver: "+label:"Screen saver off");}}
