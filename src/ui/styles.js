@@ -25,14 +25,33 @@ export const SHADOW_SOFT   = "0 1px 2px rgba(0,0,0,0.18), 0 4px 14px rgba(0,0,0,
 export const SHADOW_LIFTED = "0 2px 4px rgba(0,0,0,0.22), 0 10px 30px rgba(0,0,0,0.45), 0 1px 0 rgba(255,255,255,0.08) inset";
 export const SHADOW_DEEP   = "0 8px 16px rgba(0,0,0,0.35), 0 30px 80px rgba(0,0,0,0.6), 0 1px 0 rgba(255,255,255,0.08) inset";
 
+// ── v9.0 theme tokens ──────────────────────────────────────────────────────
+// These resolve to the CSS variables defined in CSS below. A component that
+// uses e.g. `color: T.text` automatically follows the active light/dark theme
+// (toggled by setting html[data-theme="light"|"dark"]). Dark is the default;
+// light is the new opt-in. Surfaces are converted to these tokens
+// incrementally — anything still on a hardcoded rgba simply stays dark for now.
+export const T = {
+  surface:      "var(--nv-surface)",       // frosted glass panel (taskbar, menus)
+  surfaceSolid: "var(--nv-surface-solid)",  // opaque-ish window body
+  elevated:     "var(--nv-elevated)",       // faint raised fill (cards, rows)
+  border:       "var(--nv-border)",
+  borderStrong: "var(--nv-border-strong)",
+  text:         "var(--nv-text)",
+  textStrong:   "var(--nv-text-strong)",
+  textDim:      "var(--nv-text-dim)",
+  hover:        "var(--nv-hover)",
+  inputBg:      "var(--nv-input-bg)",
+};
+
 // Standard input/textarea style — apps use {...INP} as a base and override.
 export const INP = {
   width: "100%",
   padding: "10px 13px",
-  background: "rgba(255,255,255,0.06)",
-  border: "1px solid rgba(255,255,255,0.1)",
+  background: "var(--nv-input-bg)",
+  border: "1px solid var(--nv-border)",
   borderRadius: 9,
-  color: "rgba(255,255,255,0.94)",
+  color: "var(--nv-text-strong)",
   fontFamily: FF,
   fontSize: 14,
   outline: "none",
@@ -45,7 +64,7 @@ export const SEC = {
   fontWeight: 600,
   fontSize: 11,
   letterSpacing: 1.8,
-  color: "rgba(255,255,255,0.4)",
+  color: "var(--nv-text-dim)",
   marginBottom: 12,
   textTransform: "uppercase",
 };
@@ -56,19 +75,57 @@ export const SEC = {
 // .wgt) plus the keyframes used by window/menu/toast animations.
 export const CSS = `
   @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=DM+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
-  *{box-sizing:border-box;}body{margin:0;background:#07080f;color-scheme:dark;}
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--nv-body-bg,#07080f);}
+
+  /* ── v9.0 theme tokens. Dark is the default (:root); light overrides via
+     html[data-theme="light"]. A single root attribute reskins the OS — see
+     the T helper in styles.js. */
+  :root{
+    color-scheme:dark;
+    --nv-body-bg:#07080f;
+    --nv-surface:rgba(15,17,32,0.72);
+    --nv-surface-solid:rgba(10,12,24,0.92);
+    --nv-elevated:rgba(255,255,255,0.04);
+    --nv-border:rgba(255,255,255,0.09);
+    --nv-border-strong:rgba(255,255,255,0.16);
+    --nv-text-strong:rgba(255,255,255,0.95);
+    --nv-text:rgba(255,255,255,0.7);
+    --nv-text-dim:rgba(255,255,255,0.4);
+    --nv-hover:rgba(255,255,255,0.08);
+    --nv-input-bg:rgba(255,255,255,0.06);
+    --nv-scroll:rgba(255,255,255,0.14);
+    --nv-scroll-hover:rgba(255,255,255,0.24);
+    --nv-glass-blur:28px;
+  }
+  html[data-theme="light"]{
+    color-scheme:light;
+    --nv-body-bg:#e7eaf2;
+    --nv-surface:rgba(255,255,255,0.6);
+    --nv-surface-solid:rgba(252,252,255,0.9);
+    --nv-elevated:rgba(0,0,0,0.035);
+    --nv-border:rgba(0,0,0,0.1);
+    --nv-border-strong:rgba(0,0,0,0.2);
+    --nv-text-strong:rgba(15,18,28,0.96);
+    --nv-text:rgba(22,25,36,0.72);
+    --nv-text-dim:rgba(22,25,36,0.45);
+    --nv-hover:rgba(0,0,0,0.06);
+    --nv-input-bg:rgba(0,0,0,0.04);
+    --nv-scroll:rgba(0,0,0,0.2);
+    --nv-scroll-hover:rgba(0,0,0,0.32);
+  }
 
   /* v8.0 scrollbar refresh — slightly wider, rounded, smoother fade on hover.
      Firefox uses scrollbar-color; webkit uses ::-webkit-scrollbar. */
-  *{scrollbar-width:thin;scrollbar-color:rgba(255,255,255,0.14) transparent;}
+  *{scrollbar-width:thin;scrollbar-color:var(--nv-scroll) transparent;}
   ::-webkit-scrollbar{width:6px;height:6px;}
   ::-webkit-scrollbar-track{background:transparent;}
-  ::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.12);border-radius:3px;transition:background 0.2s;}
-  ::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,0.22);}
+  ::-webkit-scrollbar-thumb{background:var(--nv-scroll);border-radius:3px;transition:background 0.2s;}
+  ::-webkit-scrollbar-thumb:hover{background:var(--nv-scroll-hover);}
   ::-webkit-scrollbar-corner{background:transparent;}
 
   input,textarea,button{font-family:inherit;}
-  input::placeholder,textarea::placeholder{color:rgba(255,255,255,0.28);}
+  input::placeholder,textarea::placeholder{color:var(--nv-text-dim);}
   textarea{resize:vertical;}
 
   /* Selection color — uses currentColor-friendly tint, looks polished on any wallpaper */

@@ -32,6 +32,20 @@ export function SettingsApp({user,data,updateSettings,showToast,AC,onCustomWallp
   function setWidget(id,val){updateSettings({widgets:{...widgets,[id]:val}});}
   return(
     <div style={{width:"100%",fontFamily:FF}}>
+      {/* v9.0 — light/dark theme. Surfaces adopt the liquid-glass tokens
+          (styles.js) per theme; rolled out surface-by-surface across v9.0. */}
+      <div style={SEC}>Appearance</div>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:7,marginBottom:6}}>
+        {[["dark","🌙 Dark"],["light","☀️ Light"],["auto","⚙ Auto"]].map(([id,label])=>{
+          const active=(settings.theme||"dark")===id;
+          return(
+            <button key={id} onClick={()=>{updateSettings({theme:id});showToast("Theme: "+label);}}
+              style={{padding:"10px 8px",borderRadius:8,cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:12,background:active?fill(AC):"rgba(255,255,255,0.04)",border:"1px solid "+(active?bdr(AC):"rgba(255,255,255,0.08)"),color:active?AC:"rgba(255,255,255,0.7)"}}>{label}</button>
+          );
+        })}
+      </div>
+      <div style={{fontSize:10,color:"rgba(255,255,255,0.32)",fontStyle:"italic",marginBottom:20}}>Liquid-glass light &amp; dark mode (v9.0). Rolling out across the OS surface-by-surface — “Auto” follows your system.</div>
+
       <div style={SEC}>Accent Color</div>
       <div style={{display:"flex",gap:7,marginBottom:6,flexWrap:"wrap"}}>{ACCENT_PRESETS.map(c=><div key={c} className="ad" onClick={()=>{updateSettings({accent:c});showToast("Accent updated ✓");}} style={{width:28,height:28,borderRadius:7,background:c,cursor:"pointer",border:AC===c?"2.5px solid #fff":"2.5px solid transparent",transition:"transform 0.12s,border 0.12s",boxSizing:"border-box"}}/>)}<input type="color" value={AC} onChange={e=>updateSettings({accent:e.target.value})} style={{width:28,height:28,borderRadius:7,border:"1px solid rgba(255,255,255,0.15)",cursor:"pointer",background:"none"}} title="Custom color"/></div>
       <div style={{fontSize:10,color:"rgba(255,255,255,0.22)",marginBottom:20,fontFamily:FFM}}>Current: {AC}</div>

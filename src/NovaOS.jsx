@@ -168,6 +168,7 @@ export default function NovaOS(){
   const use24h  =settings.clock24h  ||false;
   const winBlur =settings.winBlur   ??18;
   const largeFnt=settings.largeFont ||false;
+  const themePref=settings.theme    ||"dark"; // "dark" | "light" | "auto"
   const wpId    =settings.wallpaper ||data?.wallpaper||"mesh";
   const widgets =settings.widgets   ||{};
   // Resolved device mode: user's saved preference overrides detection. "auto"
@@ -338,6 +339,25 @@ export default function NovaOS(){
     setIsFs(isFullscreen());
     return onFullscreenChange(setIsFs);
   },[]);
+
+  // v9.0 — apply the light/dark theme to the document root so the CSS tokens
+  // (see styles.js) cascade to every surface, including fixed elements like the
+  // taskbar and menus. "auto" follows the OS preference and live-updates.
+  useEffect(()=>{
+    const root=document.documentElement;
+    const apply=()=>{
+      let t=themePref;
+      if(t==="auto") t=(window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches)?"light":"dark";
+      root.setAttribute("data-theme", t==="light"?"light":"dark");
+    };
+    apply();
+    if(themePref==="auto" && window.matchMedia){
+      const mq=window.matchMedia("(prefers-color-scheme: light)");
+      const h=()=>apply();
+      mq.addEventListener?.("change",h);
+      return ()=>mq.removeEventListener?.("change",h);
+    }
+  },[themePref]);
 
   // v8.6 AFK screensaver. settings.screensaverMins: 0 = off, else minutes of
   // idle before it fades in (default 1). Any input dismisses it and re-arms
@@ -1421,9 +1441,11 @@ export default function NovaOS(){
           settings.taskbarColor. Falls back to the v8.0 default gradient. */}
       {(()=>{
         const tbColor=settings.taskbarColor;
+        // v9.0: with no custom color, the taskbar uses the theme glass surface
+        // token so it flips light/dark. A user-picked color still wins.
         const tbBg=tbColor
           ?"linear-gradient(180deg, rgba("+hexRgb(tbColor)+",0.78) 0%, rgba("+hexRgb(tbColor)+",0.86) 100%)"
-          :"linear-gradient(180deg, rgba(14,16,30,0.78) 0%, rgba(10,12,24,0.86) 100%)";
+          :"var(--nv-surface)";
         // The Nova taskbar is always visible — including in fullscreen.
         return(
       <div data-drop="none" style={{
@@ -1431,7 +1453,7 @@ export default function NovaOS(){
         background:tbBg,
         backdropFilter:"blur(28px) saturate(160%)",
         WebkitBackdropFilter:"blur(28px) saturate(160%)",
-        borderTop:"1px solid rgba(255,255,255,0.09)",
+        borderTop:"1px solid var(--nv-border)",
         boxShadow:"0 -1px 0 rgba(255,255,255,0.04) inset, 0 -20px 50px -20px rgba(0,0,0,0.5)",
         display:"flex",alignItems:"center",padding:"0 14px",gap:6,zIndex:9999,
       }}>
@@ -1648,8 +1670,8 @@ export default function NovaOS(){
           background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.06)",
           minWidth:64,
         }}>
-          <div style={{fontFamily:FFM,fontWeight:500,fontSize:13,color:"rgba(255,255,255,0.88)",letterSpacing:0.3,lineHeight:1.1}}>{fmtTime(tick)}</div>
-          {deviceMode!=="mobile"&&<div style={{fontFamily:FF,fontSize:9,color:"rgba(255,255,255,0.4)",marginTop:1,lineHeight:1.1}}>{fmtDate(tick)}</div>}
+          <div style={{fontFamily:FFM,fontWeight:500,fontSize:13,color:"var(--nv-text-strong)",letterSpacing:0.3,lineHeight:1.1}}>{fmtTime(tick)}</div>
+          {deviceMode!=="mobile"&&<div style={{fontFamily:FF,fontSize:9,color:"var(--nv-text-dim)",marginTop:1,lineHeight:1.1}}>{fmtDate(tick)}</div>}
         </div>
       </div>
         );
