@@ -19,6 +19,16 @@ export function CalculatorApp({AC}){
   const wrapRef = useRef(null);
   useEffect(()=>{ wrapRef.current?.focus(); }, []);
 
+  // v9.0: native key auto-repeat on a focusable <div> is unreliable across
+  // browsers, so hold-to-delete didn't actually repeat. Drive it with an
+  // explicit timer instead: the first Backspace deletes + starts an interval;
+  // any keyup / blur / unmount stops it. A ref to the latest pressBackspace
+  // keeps the interval from calling a stale closure.
+  const repeatRef = useRef(null);
+  const bsRef = useRef(null);
+  function stopRepeat(){ if(repeatRef.current){ clearInterval(repeatRef.current); repeatRef.current=null; } }
+  useEffect(()=>()=>stopRepeat(), []);
+
   function pressDigit(d){
     if(justEvaluated){setDisplay(d==="."?"0.":d);setJustEvaluated(false);return;}
     setDisplay(prev=>appendKey(prev,d));
@@ -53,6 +63,8 @@ export function CalculatorApp({AC}){
     });
   }
 
+  bsRef.current = pressBackspace; // keep the repeat timer pointed at the latest closure
+
   // Keyboard handler. preventDefault on handled keys so (a) Backspace
   // doesn't trigger browser back-nav, and (b) Enter/Space don't re-activate
   // a focused button (avoids double-firing).
@@ -65,7 +77,7 @@ export function CalculatorApp({AC}){
     if(k==="*"){ e.preventDefault(); pressOp("×"); return; }
     if(k==="/"){ e.preventDefault(); pressOp("÷"); return; }
     if(k==="Enter" || k==="="){ e.preventDefault(); pressEquals(); return; }
-    if(k==="Backspace"){ e.preventDefault(); pressBackspace(); return; }   // repeats on hold
+    if(k==="Backspace"){ e.preventDefault(); if(e.repeat) return; pressBackspace(); stopRepeat(); repeatRef.current=setInterval(()=>{ bsRef.current && bsRef.current(); }, 90); return; }   // hold-to-repeat via timer
     if(k==="Escape"){ e.preventDefault(); pressClear(); return; }
     if(k==="%"){ e.preventDefault(); pressPercent(); return; }
   }
@@ -89,7 +101,7 @@ export function CalculatorApp({AC}){
   const opStyle={background:"rgba(255,255,255,0.1)",border:"1px solid rgba(255,255,255,0.13)",color:"#fff"};
 
   return(
-    <div ref={wrapRef} tabIndex={0} onKeyDown={onKeyDown} style={{display:"flex",flexDirection:"column",gap:10,fontFamily:FF,height:"100%",minHeight:0,outline:"none"}}>
+    <div ref={wrapRef} tabIndex={0} onKeyDown={onKeyDown} onKeyUp={stopRepeat} onBlur={stopRepeat} style={{display:"flex",flexDirection:"column",gap:10,fontFamily:FF,height:"100%",minHeight:0,outline:"none"}}>
       {/* Display */}
       <div style={{flexShrink:0,padding:"22px 14px 18px",background:"rgba(0,0,0,0.25)",borderRadius:14,border:"1px solid rgba(255,255,255,0.05)",textAlign:"right",minHeight:80,display:"flex",flexDirection:"column",justifyContent:"flex-end",overflow:"hidden"}}>
         {pending && <div style={{fontFamily:FFM,fontSize:11,color:"rgba(255,255,255,0.4)",marginBottom:4}}>{formatDisplay(pending.prev)} {pending.op}</div>}

@@ -173,7 +173,7 @@ function Shelf({ title, apps, ratings, ac, onOpen }) {
 }
 
 // ── App detail page (with reviews) ────────────────────────────────────────
-function AppDetail({ app, ratings, ac, isIn, user, onBack, toggleInstall, rateAndReview, currentUser, onDeleteApp }) {
+function AppDetail({ app, ratings, ac, isIn, user, onBack, toggleInstall, rateAndReview, currentUser, onDeleteApp, canModerate, onDeleteReview }) {
   const r = ratings[app.id] || EMPTY_RATING;
   const meta = metaFor(app, ac);
   const rgb = hexRgb(meta.accent);
@@ -278,6 +278,7 @@ function AppDetail({ app, ratings, ac, isIn, user, onBack, toggleInstall, rateAn
                 <span style={{ fontFamily: FFB, fontWeight: 600, fontSize: 13, color: "rgba(255,255,255,0.9)" }}>@{rv.user}{rv.user === user && <span style={{ fontSize: 10, color: ac, marginLeft: 5 }}>you</span>}</span>
                 <StarRow value={rv.rating} size={11} />
                 <span style={{ fontSize: 10, fontFamily: FFM, color: "rgba(255,255,255,0.3)" }}>{relTime(rv.ts)}</span>
+                {canModerate && <button onClick={() => onDeleteReview(app.id, rv.user)} title="Delete review (moderator)" style={{ marginLeft: "auto", background: "none", border: "none", cursor: "pointer", color: "rgba(255,90,90,0.6)", fontSize: 12, padding: "0 2px" }}>🗑</button>}
               </div>
               <div style={{ fontSize: 13, color: "rgba(255,255,255,0.62)", lineHeight: 1.55, marginTop: 4, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{rv.text}</div>
             </div>
@@ -370,6 +371,17 @@ export function StoreApp({ user, data, updateData, showToast, AC }) {
       await setDoc(doc(firestoreDb, "nova_ratings", appId + "_" + user), payload, { merge: true });
       showToast(t ? "Review posted ✓" : "Rated " + rating + "★ ✓");
     } catch { showToast("Couldn't save — try again"); }
+  }
+
+  // v9.0 — moderators can remove a review that violates the rules. Deletes the
+  // user's rating doc (stars + text); the Firestore rule permits mod deletes.
+  async function deleteReview(appId, reviewUser) {
+    if (!isAdmin(user)) return;
+    if (!window.confirm("Delete @" + reviewUser + "'s review? This removes their rating and text.")) return;
+    try {
+      await deleteDoc(doc(firestoreDb, "nova_ratings", appId + "_" + reviewUser));
+      showToast("Review removed ✓");
+    } catch { showToast("Couldn't delete review"); }
   }
 
   async function submitApp() {
@@ -492,7 +504,7 @@ export function StoreApp({ user, data, updateData, showToast, AC }) {
       {detail && (
         <AppDetail app={detail} ratings={ratings} ac={ac} isIn={installed.includes(detail.id)} user={user}
           onBack={() => setDetail(null)} toggleInstall={toggleInstall} rateAndReview={rateAndReview}
-          currentUser={user} onDeleteApp={deleteApp} />
+          currentUser={user} onDeleteApp={deleteApp} canModerate={userIsAdmin} onDeleteReview={deleteReview} />
       )}
 
       {/* ── Search results (overrides the active view) ──────────────────── */}

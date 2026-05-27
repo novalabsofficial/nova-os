@@ -125,6 +125,9 @@ export default function NovaOS(){
   // v8.6 cross-app drag-and-drop — mirrors the shared dragStore so we can
   // render a floating ghost following the pointer.
   const [dnd, setDnd] = useState(null);
+  // v9.0 — community store apps, so the ones a user installs to their desktop
+  // actually render there (previously only catalog apps did).
+  const [commApps, setCommApps] = useState([]);
   const [menuOpen,   setMenuOpen]   = useState(false);
   const [menuSrch,   setMenuSrch]   = useState("");
   const [iconPos,    setIconPos]    = useState({});
@@ -348,6 +351,13 @@ export default function NovaOS(){
   // v9.0 — Liquid Glass on/off. Sets html[data-glass] so the sheerer surface
   // tokens (styles.js) kick in for windows, taskbar, menus and widgets.
   useEffect(()=>{ document.documentElement.setAttribute("data-glass", glass?"on":"off"); },[glass]);
+
+  // v9.0 — watch community store apps so installed ones render on the desktop.
+  useEffect(()=>{
+    const q=query(collection(firestoreDb,"nova_user_apps"),orderBy("ts","desc"),limit(60));
+    const unsub=onSnapshot(q,snap=>setCommApps(snap.docs.map(d=>({id:d.id,...d.data()}))),()=>{});
+    return ()=>unsub();
+  },[]);
 
   // v8.6 AFK screensaver. settings.screensaverMins: 0 = off, else minutes of
   // idle before it fades in (default 1). Any input dismisses it and re-arms
@@ -921,7 +931,11 @@ export default function NovaOS(){
   const fmtTime=d=>use24h?d.toLocaleTimeString([],{hour:"2-digit",minute:"2-digit",hour12:false}):d.toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"});
   const fmtDate=d=>d.toLocaleDateString([],{weekday:"short",month:"short",day:"numeric"});
   const installedApps=data?.installedApps||[];
-  const storeIcons=STORE_CATALOG.filter(a=>installedApps.includes(a.id)).map(a=>({id:"store_"+a.id,icon:a.icon,label:a.name,desc:a.desc,storeApp:a}));
+  const catalogIcons=STORE_CATALOG.filter(a=>installedApps.includes(a.id)).map(a=>({id:"store_"+a.id,icon:a.icon,label:a.name,desc:a.desc,storeApp:a}));
+  // v9.0: installed community apps render on the desktop too (only show ones
+  // still publicly visible — a later-rejected/removed app drops off).
+  const commIcons=commApps.filter(a=>isPubliclyVisible(a)&&installedApps.includes(a.id)).map(a=>({id:"store_"+a.id,icon:a.icon,label:a.name,desc:a.desc,storeApp:a}));
+  const storeIcons=[...catalogIcons,...commIcons];
   // allApps = every app launcher entry that should appear in the start menu —
   // always the full list, regardless of what's pinned to the desktop.
   const allApps=[...APPS,...storeIcons];
