@@ -296,6 +296,10 @@ function storeBrandSvg(id) {
 export function StoreBrandIcon({ app, size = 44 }) {
   const id = app?.id;
   const r = Math.round(size * 0.22);
+  // v9.0 — a community app can carry an uploaded logo (base64); show it as the icon.
+  if (app?.iconImg) {
+    return <div style={{ width: size, height: size, borderRadius: r, backgroundImage: `url("${app.iconImg}")`, backgroundSize: "cover", backgroundPosition: "center", boxShadow: "inset 0 1px 0 rgba(255,255,255,0.15), inset 0 0 0 1px rgba(255,255,255,0.08)" }}/>;
+  }
   const glyph = id ? storeBrandSvg(id) : null;
   if (glyph) {
     // The bg rect inside the glyph already rounds the square (rx=7 in viewBox
