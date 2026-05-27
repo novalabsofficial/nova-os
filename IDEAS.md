@@ -5,6 +5,34 @@ not committed to. Living document — add to it freely.
 
 ---
 
+# 🚧 v9.0 — in progress (feature/v9.0 branch)
+
+A big release built on a branch, shipped when satisfied. Lots planned.
+
+**Done so far**
+- Liquid Glass: a Settings → Appearance toggle that frosts the OS surfaces
+  (windows, taskbar, menus, widgets) — sheerer + heavier blur.
+- Liquid-glass app icons: when glass is on, all built-in icons redraw as
+  colorless white-on-clear-glass tiles; store apps show a white monogram.
+- Light/dark mode: **scrapped** (didn't suit Nova OS) — dark is forced.
+
+**Planned**
+- **Custom app images / logos.** Let users upload their own image for a
+  custom/submitted app instead of only picking an emoji.
+  - *Where:* Store → Submit App form (currently an emoji `sIcon` field), and
+    the per-app icon renderers (`StoreBrandIcon` / `AppIconDisplay`).
+  - *How:* add an "upload image" option beside the emoji picker; downsample
+    the image to a small icon (~128px, JPEG/PNG) the same way the avatar +
+    custom-wallpaper handlers do, store it as e.g. `iconImg` (base64) on the
+    app doc. Render `iconImg` when present, else fall back to emoji/monogram.
+    No Firebase Storage needed — the downsampled icon is tiny enough to live
+    in the app's Firestore doc (same approach as profile avatars).
+  - *Glass note:* in Liquid Glass mode an uploaded logo could either show as-is
+    or get the frosted treatment — decide during build.
+- (More v9.0 features TBD — the user has a list.)
+
+---
+
 # ✅ v8.7 — shipped
 
 ### ✅ Region snip (backlog #15) — SHIPPED

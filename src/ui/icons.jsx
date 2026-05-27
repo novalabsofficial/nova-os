@@ -498,6 +498,27 @@ function GlassSvgIcon({ id, size }) {
   );
 }
 
+// Colorless-glass version of a store app icon: the app's first letter in white
+// on the clear glass tile (brand glyphs/colors would be unrecognizable when
+// stripped to glass, so a monogram is the clean colorless choice).
+function GlassMonogram({ name, size }) {
+  const letter = (name || "?").replace(/[^A-Za-z0-9]/g, "").charAt(0).toUpperCase() || "?";
+  const r = Math.round(size * 0.24);
+  return (
+    <div style={{
+      position: "relative", width: size, height: size, borderRadius: r, overflow: "hidden",
+      background: "rgba(255,255,255,0.1)",
+      backdropFilter: "blur(6px) saturate(1.4)", WebkitBackdropFilter: "blur(6px) saturate(1.4)",
+      boxShadow: "inset 0 0 0 1px rgba(255,255,255,0.32), inset 0 2px 2px rgba(255,255,255,0.4), 0 3px 9px rgba(0,0,0,0.3)",
+      display: "flex", alignItems: "center", justifyContent: "center",
+    }}>
+      <span style={{ fontFamily: "'Space Grotesk',sans-serif", fontWeight: 700, fontSize: size * 0.46, color: "rgba(255,255,255,0.95)", lineHeight: 1 }}>{letter}</span>
+      <div style={{ position: "absolute", inset: 0, borderRadius: "inherit", pointerEvents: "none",
+        background: "linear-gradient(135deg, rgba(255,255,255,0.42) 0%, rgba(255,255,255,0.08) 36%, rgba(255,255,255,0) 60%)" }}/>
+    </div>
+  );
+}
+
 export function AppIconDisplay({ app, size = 26, glass = false }) {
   let inner;
   if (app.storeApp) {
@@ -519,9 +540,9 @@ export function AppIconDisplay({ app, size = 26, glass = false }) {
     );
   }
   if (glass) {
-    // True clear-glass redraw where available; coating placeholder elsewhere.
-    if (!app.storeApp && GLASS_GLYPHS.has(app.id)) return <GlassSvgIcon id={app.id} size={size}/>;
-    return <GlassIcon size={size}>{inner}</GlassIcon>;
+    if (app.storeApp) return <GlassMonogram name={app.storeApp.name} size={size}/>;
+    if (GLASS_GLYPHS.has(app.id)) return <GlassSvgIcon id={app.id} size={size}/>;
+    return <GlassIcon size={size}>{inner}</GlassIcon>; // emoji-fallback apps → coating
   }
   return inner;
 }
