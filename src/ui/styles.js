@@ -98,22 +98,8 @@ export const CSS = `
     --nv-scroll-hover:rgba(255,255,255,0.24);
     --nv-glass-blur:28px;
   }
-  html[data-theme="light"]{
-    color-scheme:light;
-    --nv-body-bg:#e7eaf2;
-    --nv-surface:rgba(255,255,255,0.6);
-    --nv-surface-solid:rgba(252,252,255,0.9);
-    --nv-elevated:rgba(0,0,0,0.035);
-    --nv-border:rgba(0,0,0,0.1);
-    --nv-border-strong:rgba(0,0,0,0.2);
-    --nv-text-strong:rgba(15,18,28,0.96);
-    --nv-text:rgba(22,25,36,0.72);
-    --nv-text-dim:rgba(22,25,36,0.45);
-    --nv-hover:rgba(0,0,0,0.06);
-    --nv-input-bg:rgba(0,0,0,0.04);
-    --nv-scroll:rgba(0,0,0,0.2);
-    --nv-scroll-hover:rgba(0,0,0,0.32);
-  }
+  /* (v9.0: light mode was scrapped — Nova OS is dark-only. The tokens above
+     stay because surfaces reference them; only the light overrides are gone.) */
 
   /* ── v9.0 Liquid Glass. When enabled (html[data-glass="on"]), surfaces get
      noticeably sheerer + a heavier blur so the wallpaper frosts through —

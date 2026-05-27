@@ -168,7 +168,6 @@ export default function NovaOS(){
   const use24h  =settings.clock24h  ||false;
   const winBlur =settings.winBlur   ??18;
   const largeFnt=settings.largeFont ||false;
-  const themePref=settings.theme    ||"dark"; // "dark" | "light" | "auto"
   const glass    =!!settings.glass;            // v9.0 Liquid Glass surfaces
   const wpId    =settings.wallpaper ||data?.wallpaper||"mesh";
   const widgets =settings.widgets   ||{};
@@ -341,24 +340,10 @@ export default function NovaOS(){
     return onFullscreenChange(setIsFs);
   },[]);
 
-  // v9.0 — apply the light/dark theme to the document root so the CSS tokens
-  // (see styles.js) cascade to every surface, including fixed elements like the
-  // taskbar and menus. "auto" follows the OS preference and live-updates.
-  useEffect(()=>{
-    const root=document.documentElement;
-    const apply=()=>{
-      let t=themePref;
-      if(t==="auto") t=(window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches)?"light":"dark";
-      root.setAttribute("data-theme", t==="light"?"light":"dark");
-    };
-    apply();
-    if(themePref==="auto" && window.matchMedia){
-      const mq=window.matchMedia("(prefers-color-scheme: light)");
-      const h=()=>apply();
-      mq.addEventListener?.("change",h);
-      return ()=>mq.removeEventListener?.("change",h);
-    }
-  },[themePref]);
+  // v9.0 — light mode was scrapped (didn't suit Nova OS). Force dark always so
+  // any previously-saved settings.theme:"light" can't leave the OS in light
+  // tokens. The dark :root tokens in styles.js are the only palette now.
+  useEffect(()=>{ document.documentElement.setAttribute("data-theme","dark"); },[]);
 
   // v9.0 — Liquid Glass on/off. Sets html[data-glass] so the sheerer surface
   // tokens (styles.js) kick in for windows, taskbar, menus and widgets.
@@ -1241,7 +1226,7 @@ export default function NovaOS(){
               {icon:"📋", label:"Copy app name", onClick:()=>{try{navigator.clipboard?.writeText(app.label);showToast("Copied");}catch{}}},
             ])}>
             <div style={{position:"relative",pointerEvents:"none",display:"flex",alignItems:"center",justifyContent:"center",filter:"drop-shadow(0 3px 8px rgba(0,0,0,0.55))"}}>
-              <AppIconDisplay app={app} size={32}/>
+              <AppIconDisplay app={app} size={32} glass={glass}/>
               {/* v8.1: notification badge — small numeric circle in the
                   upper-right of the icon when the app has unread items. */}
               {appBadgeCounts[app.id]>0 && (
@@ -1305,7 +1290,7 @@ export default function NovaOS(){
                 ]);}}
                 style={{display:"flex",flexDirection:"column",alignItems:"center",gap:7,padding:"14px 6px 12px",borderRadius:11,cursor:"pointer",position:"relative"}}>
                 {isRunning&&<div style={{position:"absolute",bottom:5,left:"50%",transform:"translateX(-50%)",width:5,height:5,borderRadius:"50%",background:AC,boxShadow:"0 0 6px "+AC}}/>}
-                <div style={{display:"flex",alignItems:"center",justifyContent:"center",opacity:isHidden?0.5:1}}><AppIconDisplay app={app} size={28}/></div>
+                <div style={{display:"flex",alignItems:"center",justifyContent:"center",opacity:isHidden?0.5:1}}><AppIconDisplay app={app} size={28} glass={glass}/></div>
                 <span style={{fontFamily:FF,fontWeight:600,fontSize:10.5,color:isHidden?"rgba(255,255,255,0.45)":"rgba(255,255,255,0.85)",textAlign:"center",lineHeight:1.3,letterSpacing:0.1}}>{app.label}</span>
               </div>
               );
@@ -1362,7 +1347,7 @@ export default function NovaOS(){
                 dragging restores the window and tears it off (Windows-style),
                 so the cursor is always grab/grabbing rather than default. */}
             <div onPointerDown={e=>startDrag(e,win.id)} style={{height:40,display:"flex",alignItems:"center",padding:"0 6px 0 14px",gap:10,background:"linear-gradient(180deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.02) 100%)",borderBottom:"1px solid rgba(255,255,255,0.06)",borderRadius:isMax?"0":winRadius+"px "+winRadius+"px 0 0",cursor:isDrg?"grabbing":"grab",userSelect:"none",flexShrink:0,touchAction:"none"}}>
-              <div style={{display:"flex",alignItems:"center",justifyContent:"center"}}><AppIconDisplay app={{id:win.app,icon:app?.icon||"📦"}} size={18}/></div>
+              <div style={{display:"flex",alignItems:"center",justifyContent:"center"}}><AppIconDisplay app={{id:win.app,icon:app?.icon||"📦"}} size={18} glass={glass}/></div>
               <span style={{flex:1,fontFamily:FFB,fontWeight:600,fontSize:13,color:"rgba(255,255,255,0.92)",letterSpacing:0.2}}>{app?.label}</span>
               {/* v8.0 round 3 — proper SVG window controls. Unicode glyphs
                   rendered inconsistently across platforms and weren't pixel-
@@ -1584,7 +1569,7 @@ export default function NovaOS(){
                     flexShrink:0,position:"relative",
                     ...dragStyle,
                   }}>
-                  <AppIconDisplay app={{id:app.id,icon:app.icon}} size={20}/>
+                  <AppIconDisplay app={{id:app.id,icon:app.icon}} size={20} glass={glass}/>
                   {badgeCount > 0 && (
                     <div style={{position:"absolute",top:-2,right:-2,minWidth:14,height:14,padding:"0 3px",borderRadius:7,background:"#ff4d4f",color:"#fff",fontFamily:FFB,fontWeight:700,fontSize:9,display:"flex",alignItems:"center",justifyContent:"center",lineHeight:1,boxShadow:"0 0 6px rgba(255,77,79,0.6)"}}>
                       {badgeCount > 9 ? "9+" : badgeCount}
@@ -1614,7 +1599,7 @@ export default function NovaOS(){
                   ...dragStyle,
                 }}>
                 <div style={{position:"relative",pointerEvents:"none",display:"flex",alignItems:"center"}}>
-                  <AppIconDisplay app={{id:app.id,icon:app.icon}} size={16}/>
+                  <AppIconDisplay app={{id:app.id,icon:app.icon}} size={16} glass={glass}/>
                   {appBadgeCounts[slot.appId]>0 && (
                     <div style={{position:"absolute",top:-5,right:-7,minWidth:13,height:13,padding:"0 3px",borderRadius:6.5,background:"#ff4d4f",color:"#fff",fontFamily:FFB,fontWeight:700,fontSize:8.5,display:"flex",alignItems:"center",justifyContent:"center",lineHeight:1,boxShadow:"0 0 5px rgba(255,77,79,0.6)"}}>
                       {appBadgeCounts[slot.appId]>9?"9+":appBadgeCounts[slot.appId]}

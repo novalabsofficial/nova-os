@@ -333,25 +333,46 @@ export function StoreBrandIcon({ app, size = 44 }) {
 // glyph at 85% of `size`, making apps like the v7.4 games (Tic-Tac-Toe,
 // Pac-Man, Chess, etc.) look visually smaller than the SVG-icon apps on
 // the desktop. Now every app fills the same WxH box regardless of source.
-export function AppIconDisplay({ app, size = 26 }) {
-  if (app.storeApp) {
-    // v8.4: route store apps through the unified brand-icon set (was Clearbit).
-    return <StoreBrandIcon app={app.storeApp} size={size}/>;
-  }
-  if (HAS_SVG_ICON.has(app.id)) {
-    return <NovaSvgIcon id={app.id} size={size}/>;
-  }
-  // Emoji-fallback: wrap in a same-sized box so layout matches SVG/Store icons.
+// v9.0 — iOS "liquid glass" coating for app icons when Liquid Glass is on.
+// Frosts whatever's behind the icon (wallpaper on the desktop, the panel in
+// menus/taskbar), drops the icon to ~80% so it reads as translucent, and lays
+// a diagonal sheen + rim highlight on top for the pane-of-glass feel.
+function GlassIcon({ size, children }) {
+  const r = Math.round(size * 0.24);
   return (
     <div style={{
-      width: size, height: size,
-      borderRadius: Math.round(size * 0.22),
-      background: "rgba(255,255,255,0.07)",
-      border: "1px solid rgba(255,255,255,0.08)",
-      display: "flex", alignItems: "center", justifyContent: "center",
-      fontSize: size * 0.65, lineHeight: 1,
-    }}>{app.icon || "📦"}</div>
+      position: "relative", width: size, height: size, borderRadius: r, overflow: "hidden",
+      backdropFilter: "blur(4px) saturate(1.5)", WebkitBackdropFilter: "blur(4px) saturate(1.5)",
+      boxShadow: "inset 0 0 0 1px rgba(255,255,255,0.3), inset 0 1.5px 1px rgba(255,255,255,0.45), 0 2px 7px rgba(0,0,0,0.28)",
+    }}>
+      <div style={{ opacity: 0.82 }}>{children}</div>
+      <div style={{ position: "absolute", inset: 0, borderRadius: "inherit", pointerEvents: "none",
+        background: "linear-gradient(135deg, rgba(255,255,255,0.42) 0%, rgba(255,255,255,0.1) 34%, rgba(255,255,255,0) 58%)" }}/>
+    </div>
   );
+}
+
+export function AppIconDisplay({ app, size = 26, glass = false }) {
+  let inner;
+  if (app.storeApp) {
+    // v8.4: route store apps through the unified brand-icon set (was Clearbit).
+    inner = <StoreBrandIcon app={app.storeApp} size={size}/>;
+  } else if (HAS_SVG_ICON.has(app.id)) {
+    inner = <NovaSvgIcon id={app.id} size={size}/>;
+  } else {
+    // Emoji-fallback: wrap in a same-sized box so layout matches SVG/Store icons.
+    inner = (
+      <div style={{
+        width: size, height: size,
+        borderRadius: Math.round(size * 0.22),
+        background: "rgba(255,255,255,0.07)",
+        border: "1px solid rgba(255,255,255,0.08)",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        fontSize: size * 0.65, lineHeight: 1,
+      }}>{app.icon || "📦"}</div>
+    );
+  }
+  return glass ? <GlassIcon size={size}>{inner}</GlassIcon> : inner;
 }
 
 // v8.0 — Refined window-control glyphs. Previously inline unicode (—, ❐, ✕)
