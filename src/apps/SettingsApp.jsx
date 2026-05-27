@@ -100,6 +100,19 @@ export function SettingsApp({user,data,updateSettings,showToast,AC,onCustomWallp
           if you typically work with the same set of windows; turn off if
           you'd rather start clean each session. */}
       <Toggle label="Restore open apps on sign-in" value={!!settings.restoreOnSignin} onChange={v=>updateSettings({restoreOnSignin:v})} ac={AC}/>
+      {/* v8.6 AFK screensaver — minutes of inactivity before the blurred-clock
+          overlay fades in. 0 = off. Default is 1 minute. */}
+      <div style={{...SEC,marginTop:16}}>Screen Saver</div>
+      <div style={{fontSize:11,color:"rgba(255,255,255,0.3)",marginBottom:9}}>Show a clock over a blurred desktop after you're idle. Move the mouse or press a key to wake.</div>
+      <div style={{display:"flex",gap:6,marginBottom:20,flexWrap:"wrap"}}>
+        {[["Off",0],["1 min",1],["3 min",3],["5 min",5],["10 min",10]].map(([label,mins])=>{
+          const active=(settings.screensaverMins===undefined?1:settings.screensaverMins)===mins;
+          return(
+            <button key={mins} onClick={()=>{updateSettings({screensaverMins:mins});showToast(mins?"Screen saver: "+label:"Screen saver off");}}
+              style={{padding:"6px 14px",borderRadius:20,cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:11.5,background:active?fill(AC):"rgba(255,255,255,0.05)",border:"1px solid "+(active?bdr(AC):"rgba(255,255,255,0.1)"),color:active?AC:"rgba(255,255,255,0.55)"}}>{label}</button>
+          );
+        })}
+      </div>
       <div style={{...SEC,marginTop:22}}>Display Mode</div>
       <div style={{fontSize:11,color:"rgba(255,255,255,0.3)",marginBottom:9,lineHeight:1.55}}>How Nova OS sizes for your device. "Auto" picks based on screen size + touch capability — override here if you want a specific look.</div>
       <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:7,marginBottom:6}}>

@@ -82,6 +82,7 @@ export const CSS = `
   @keyframes menu-up{from{opacity:0;transform:translateY(16px) scale(0.97);}to{opacity:1;transform:none;}}
   @keyframes toast-in{from{opacity:0;transform:translateY(-12px) scale(0.95);}to{opacity:1;transform:none;}}
   @keyframes spin{to{transform:rotate(360deg);}}
+  @keyframes ss-fade{from{opacity:0;}to{opacity:1;}}
   @keyframes pulse{0%,100%{opacity:1;}50%{opacity:0.5;}}
   @keyframes nova-breathe{0%,100%{opacity:0.92;filter:drop-shadow(0 0 24px rgba(99,102,241,0.25));}50%{opacity:1;filter:drop-shadow(0 0 48px rgba(99,102,241,0.55));}}
   @keyframes shimmer{0%{background-position:-200% 0;}100%{background-position:200% 0;}}

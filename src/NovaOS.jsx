@@ -114,6 +114,12 @@ export default function NovaOS(){
   // read the final zone without being re-bound on every zone change.
   const [snap,       setSnap]       = useState(null);
   const snapRef = useRef(null);
+  // v8.6 AFK screensaver — `screensaver` shows the blurred-clock overlay after
+  // an idle period. ssActiveRef mirrors it so the high-frequency activity
+  // listeners can check "are we showing it?" without reading stale state.
+  const [screensaver, setScreensaver] = useState(false);
+  const ssActiveRef = useRef(false);
+  const idleTimerRef = useRef(null);
   const [menuOpen,   setMenuOpen]   = useState(false);
   const [menuSrch,   setMenuSrch]   = useState("");
   const [iconPos,    setIconPos]    = useState({});
@@ -327,6 +333,22 @@ export default function NovaOS(){
     setIsFs(isFullscreen());
     return onFullscreenChange(setIsFs);
   },[]);
+
+  // v8.6 AFK screensaver. settings.screensaverMins: 0 = off, else minutes of
+  // idle before it fades in (default 1). Any input dismisses it and re-arms
+  // the timer. We use a ref + a single set of passive listeners so the common
+  // case (mouse moving) only resets a timeout — never triggers a re-render.
+  useEffect(()=>{
+    if(screen!=="desktop"){ if(idleTimerRef.current)clearTimeout(idleTimerRef.current); return; }
+    const mins = settings.screensaverMins===undefined ? 1 : settings.screensaverMins;
+    if(!mins){ if(idleTimerRef.current)clearTimeout(idleTimerRef.current); ssActiveRef.current=false; setScreensaver(false); return; }
+    const arm=()=>{ if(idleTimerRef.current)clearTimeout(idleTimerRef.current); idleTimerRef.current=setTimeout(()=>{ ssActiveRef.current=true; setScreensaver(true); }, mins*60*1000); };
+    function onActivity(){ if(ssActiveRef.current){ ssActiveRef.current=false; setScreensaver(false); } arm(); }
+    const evs=["pointermove","pointerdown","keydown","wheel","touchstart"];
+    evs.forEach(ev=>window.addEventListener(ev,onActivity,{passive:true}));
+    arm();
+    return ()=>{ evs.forEach(ev=>window.removeEventListener(ev,onActivity)); if(idleTimerRef.current)clearTimeout(idleTimerRef.current); };
+  },[settings.screensaverMins, screen]);
 
   // Widget drag — free move, snap to 20px grid on release
   useEffect(()=>{
@@ -1014,6 +1036,22 @@ export default function NovaOS(){
       {snap && drag && drag.type==="move" && (()=>{ const r=snapZoneRect(snap); if(!r) return null; return (
         <div style={{position:"fixed",left:r.x,top:r.y,width:r.width,height:r.height,borderRadius:12,background:fill(AC),border:"2px solid "+AC,boxShadow:"0 10px 40px rgba(0,0,0,0.35)",pointerEvents:"none",zIndex:9990,transition:"left 0.12s ease,top 0.12s ease,width 0.12s ease,height 0.12s ease"}}/>
       ); })()}
+      {/* v8.6 AFK screensaver — blurred desktop + large clock. Any input wakes
+          it (handled by the global activity listeners); the onPointerDown here
+          is just an immediate belt-and-suspenders dismiss. */}
+      {screensaver && (
+        <div onPointerDown={()=>{ssActiveRef.current=false;setScreensaver(false);}} style={{
+          position:"fixed",inset:0,zIndex:100000,
+          background:"rgba(5,6,14,0.4)",
+          backdropFilter:"blur(28px) saturate(120%)",WebkitBackdropFilter:"blur(28px) saturate(120%)",
+          display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",
+          cursor:"none",userSelect:"none",animation:"ss-fade 0.7s ease both",
+        }}>
+          <div style={{fontFamily:FFB,fontWeight:700,fontSize:"min(19vw,148px)",color:"rgba(255,255,255,0.96)",letterSpacing:1,lineHeight:1,textShadow:"0 6px 50px rgba(0,0,0,0.55)"}}>{fmtTime(tick)}</div>
+          <div style={{fontFamily:FF,fontSize:"min(4.2vw,24px)",color:"rgba(255,255,255,0.62)",marginTop:18,letterSpacing:1}}>{fmtDate(tick)}</div>
+          <div style={{fontFamily:FFM,fontSize:12,color:"rgba(255,255,255,0.3)",marginTop:44,letterSpacing:1}}>move the mouse or press any key to wake</div>
+        </div>
+      )}
       {/* v7.0 toast refresh: glass surface, leading accent bar, status icon
           inferred from message text. Floats top-center (more visible than
           the old top-right corner). Animates in from above with a soft scale. */}
