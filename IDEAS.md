@@ -540,29 +540,6 @@ highlighted portion → straight into the annotation editor.
 
 ---
 
-## 16. Images in chat / DMs
-
-Let users send images in global Chat and DMs — drag a photo in (the #12 DnD
-infra is already built), paste from clipboard, or pick from a file/Photos.
-
-**Considerations**
-- Storage is the hard part. Chat messages are tiny Firestore docs with a 500-
-  char text cap; a base64 image blows past that and bloats the collection.
-  Options:
-  1. **Firebase Storage** (the right answer): upload the image, store only the
-     download URL in the message. Needs Storage enabled + security rules +
-     the `firebase/storage` SDK (already a dependency).
-  2. Heavily downsampled base64 inline (e.g. ≤ 200px thumb) — cheap to build,
-     but ugly and still sizable; only acceptable as a stopgap.
-- Message shape: add an optional `imageUrl` (+ maybe `w`/`h`) field; render an
-  inline thumbnail that opens full-size in the Photos-style viewer.
-- Ties together #8 (screenshots), #12 (drag a photo → Chat), and the Photos
-  app (drag a gallery photo into a DM).
-- Moderation: images need the same auto-filter / mod-delete treatment as text
-  (can't auto-scan pixels easily — rely on report + mod delete).
-
----
-
 ## How to add to this
 
 Edit this file directly, or just mention an idea in conversation and ask
