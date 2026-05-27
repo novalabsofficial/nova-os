@@ -606,7 +606,7 @@ export function Wallpaper({ id, customUrl, animate }) {
   if (!animate) return bg;
   return (
     <div style={{position:"absolute",inset:0,overflow:"hidden"}}>
-      <div style={{position:"absolute",inset:0,transformOrigin:"center",animation:"wp-drift 42s ease-in-out infinite",willChange:"transform"}}>{bg}</div>
+      <div style={{position:"absolute",inset:0,transformOrigin:"center",animation:"wp-drift 26s ease-in-out infinite",willChange:"transform"}}>{bg}</div>
     </div>
   );
 }

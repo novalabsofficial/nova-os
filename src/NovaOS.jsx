@@ -131,12 +131,10 @@ export default function NovaOS(){
   const tbDragRef = useRef(null);
   const justDraggedRef = useRef(false);
   const pinChipRefs = useRef({});
-  // v8.3 F2: fullscreen state + taskbar auto-hide. In OS fullscreen the
-  // taskbar slides off-screen for an immersive view; moving the pointer to
-  // the bottom edge of the screen reveals it (standard OS auto-hide). The
-  // start menu also gains an explicit "Exit Fullscreen" button.
+  // Fullscreen state — drives the start menu's "Exit Fullscreen" button label.
+  // (v8.5: the Nova taskbar now stays visible in fullscreen at all times — the
+  // earlier auto-hide was removed at the user's request.)
   const [isFs, setIsFs] = useState(()=>isFullscreen());
-  const [tbPeek, setTbPeek] = useState(false);
   // Detected device mode — re-detect on window resize so rotating a tablet
   // or resizing the browser shifts the layout. The user's saved preference
   // (data.settings.displayMode) is layered on top via effectiveDeviceMode.
@@ -329,21 +327,6 @@ export default function NovaOS(){
     setIsFs(isFullscreen());
     return onFullscreenChange(setIsFs);
   },[]);
-
-  // v8.3 F2: taskbar auto-hide reveal. Only active while in fullscreen.
-  // When the pointer drops within 6px of the bottom edge, peek the
-  // taskbar back up; hide it again once the pointer moves away (with a
-  // little hysteresis so it doesn't flicker right at the boundary).
-  useEffect(()=>{
-    if(!isFs){ setTbPeek(false); return; }
-    function onMove(e){
-      const fromBottom = window.innerHeight - e.clientY;
-      if(fromBottom <= 6) setTbPeek(true);
-      else if(fromBottom > TASKBAR_H + 20) setTbPeek(false);
-    }
-    window.addEventListener("pointermove", onMove);
-    return ()=>window.removeEventListener("pointermove", onMove);
-  },[isFs]);
 
   // Widget drag — free move, snap to 20px grid on release
   useEffect(()=>{
@@ -1359,11 +1342,7 @@ export default function NovaOS(){
         const tbBg=tbColor
           ?"linear-gradient(180deg, rgba("+hexRgb(tbColor)+",0.78) 0%, rgba("+hexRgb(tbColor)+",0.86) 100%)"
           :"linear-gradient(180deg, rgba(14,16,30,0.78) 0%, rgba(10,12,24,0.86) 100%)";
-        // v8.3 F2: in fullscreen, the taskbar auto-hides (slides off the
-        // bottom edge) for an immersive view. Moving the pointer to the
-        // bottom edge sets tbPeek=true and slides it back up. When not in
-        // fullscreen it's always visible.
-        const tbHidden = isFs && !tbPeek;
+        // The Nova taskbar is always visible — including in fullscreen.
         return(
       <div style={{
         position:"fixed",bottom:0,left:0,right:0,height:TASKBAR_H,
@@ -1373,8 +1352,6 @@ export default function NovaOS(){
         borderTop:"1px solid rgba(255,255,255,0.09)",
         boxShadow:"0 -1px 0 rgba(255,255,255,0.04) inset, 0 -20px 50px -20px rgba(0,0,0,0.5)",
         display:"flex",alignItems:"center",padding:"0 14px",gap:6,zIndex:9999,
-        transform: tbHidden ? "translateY(110%)" : "translateY(0)",
-        transition: "transform 0.28s cubic-bezier(0.4,0,0.2,1)",
       }}>
         {/* v7.7: Start menu button — now shows the Nova OS brand mark (gradient
             N) instead of the generic "◈" glyph. The button background lights

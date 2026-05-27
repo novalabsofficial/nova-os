@@ -86,9 +86,10 @@ export const CSS = `
   @keyframes nova-breathe{0%,100%{opacity:0.92;filter:drop-shadow(0 0 24px rgba(99,102,241,0.25));}50%{opacity:1;filter:drop-shadow(0 0 48px rgba(99,102,241,0.55));}}
   @keyframes shimmer{0%{background-position:-200% 0;}100%{background-position:200% 0;}}
   @keyframes float{0%,100%{transform:translateY(0) translateX(0);}50%{transform:translateY(-12px) translateX(6px);}}
-  /* v8.5 dynamic wallpaper drift — slow, subtle pan/zoom. Base scale stays
-     ≥1.08 (overscan) so the panning never reveals the wallpaper's edge. */
-  @keyframes wp-drift{0%{transform:scale(1.08) translate(0,0);}25%{transform:scale(1.11) translate(-1.1%,-0.7%);}50%{transform:scale(1.09) translate(0.9%,0.6%);}75%{transform:scale(1.12) translate(0.6%,-0.9%);}100%{transform:scale(1.08) translate(0,0);}}
+  /* v8.5 dynamic wallpaper drift — a gentle but visible pan + zoom. Base scale
+     stays ≥1.12 (overscan) and translate is capped well under that, so the
+     panning never reveals the wallpaper's edge. */
+  @keyframes wp-drift{0%{transform:scale(1.12) translate(-2.4%,-1.6%);}50%{transform:scale(1.2) translate(2.4%,1.6%);}100%{transform:scale(1.12) translate(-2.4%,-1.6%);}}
 
   /* v8.0 — soft accent-tinged glow ring on focused buttons (used by .sb:focus-visible) */
   @keyframes ring-in{from{box-shadow:0 0 0 0 rgba(99,102,241,0);}to{box-shadow:0 0 0 3px rgba(99,102,241,0.35);}}
