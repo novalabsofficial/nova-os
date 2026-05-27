@@ -517,6 +517,52 @@ ClockWidget styling). Dismiss on any key press or mouse movement.
 
 ---
 
+## 15. Region snip (Windows Snipping Tool style)
+
+A "snip" mode for the Screenshot tool: instead of the browser's share picker,
+dim the whole screen and let the user drag a rectangle to capture just that
+highlighted portion → straight into the annotation editor.
+
+**Considerations**
+- This is the region-crop piece deferred from #8 (v8.6 shipped full-screen /
+  window / tab capture via `getDisplayMedia`, but not region select).
+- Web reality: we can't capture arbitrary screen pixels without
+  `getDisplayMedia`. The practical path: still call `getDisplayMedia` once to
+  get a frame, then overlay a dimmed full-screen canvas and let the user
+  drag-select a rectangle to crop from that captured frame. (A true "snip the
+  live desktop without a share prompt" only works in the Tauri desktop build
+  via a Rust screen-capture command.)
+- UX: `Shift`-drag from a corner, show dimensions while dragging, Enter/click
+  to confirm, Esc to cancel. Feed the cropped region into the existing
+  ScreenshotApp annotation canvas.
+- Tauri build: use a native capture command (no permission prompt) + the same
+  drag-select overlay for a real Snipping-Tool feel.
+
+---
+
+## 16. Images in chat / DMs
+
+Let users send images in global Chat and DMs — drag a photo in (the #12 DnD
+infra is already built), paste from clipboard, or pick from a file/Photos.
+
+**Considerations**
+- Storage is the hard part. Chat messages are tiny Firestore docs with a 500-
+  char text cap; a base64 image blows past that and bloats the collection.
+  Options:
+  1. **Firebase Storage** (the right answer): upload the image, store only the
+     download URL in the message. Needs Storage enabled + security rules +
+     the `firebase/storage` SDK (already a dependency).
+  2. Heavily downsampled base64 inline (e.g. ≤ 200px thumb) — cheap to build,
+     but ugly and still sizable; only acceptable as a stopgap.
+- Message shape: add an optional `imageUrl` (+ maybe `w`/`h`) field; render an
+  inline thumbnail that opens full-size in the Photos-style viewer.
+- Ties together #8 (screenshots), #12 (drag a photo → Chat), and the Photos
+  app (drag a gallery photo into a DM).
+- Moderation: images need the same auto-filter / mod-delete treatment as text
+  (can't auto-scan pixels easily — rely on report + mod delete).
+
+---
+
 ## How to add to this
 
 Edit this file directly, or just mention an idea in conversation and ask
