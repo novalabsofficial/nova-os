@@ -37,6 +37,12 @@ export function ScreenshotApp({ AC, showToast, onSetWallpaper }) {
   const canvasRef = useRef(null);
   const undoRef = useRef([]);
   const dragRef = useRef(null);
+  // v8.7 region snip — `rawShot` is a captured full frame awaiting a crop; the
+  // crop view lets the user drag a rectangle, then we crop into `shot`.
+  const [rawShot, setRawShot] = useState(null);
+  const [sel, setSel] = useState(null); // {x0,y0,x1,y1} in displayed px
+  const cropImgRef = useRef(null);
+  const cropDragRef = useRef(false);
 
   // Load the captured image onto the canvas whenever a new shot arrives.
   useEffect(() => {
@@ -54,7 +60,7 @@ export function ScreenshotApp({ AC, showToast, onSetWallpaper }) {
     img.src = shot;
   }, [shot]);
 
-  async function capture() {
+  async function capture(region) {
     if (!supported) { showToast?.("Screen capture isn't supported here"); return; }
     setCapturing(true);
     try {
@@ -68,12 +74,41 @@ export function ScreenshotApp({ AC, showToast, onSetWallpaper }) {
       c.width = w; c.height = h;
       c.getContext("2d").drawImage(video, 0, 0, w, h);
       stream.getTracks().forEach(t => t.stop());
-      setShot(c.toDataURL("image/png"));
+      const url = c.toDataURL("image/png");
+      if (region) setRawShot(url); else setShot(url);
       playSound?.("success");
     } catch (e) {
       if (e && e.name !== "NotAllowedError") showToast?.("Capture failed");
     }
     setCapturing(false);
+  }
+
+  // ── region snip: crop the captured frame to a dragged rectangle ──────────
+  function cropDown(e) {
+    e.preventDefault();
+    const r = cropImgRef.current.getBoundingClientRect();
+    cropDragRef.current = true;
+    setSel({ x0: e.clientX - r.left, y0: e.clientY - r.top, x1: e.clientX - r.left, y1: e.clientY - r.top });
+    try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* noop */ }
+  }
+  function cropMove(e) {
+    if (!cropDragRef.current) return;
+    const r = cropImgRef.current.getBoundingClientRect();
+    setSel(s => s ? { ...s, x1: e.clientX - r.left, y1: e.clientY - r.top } : s);
+  }
+  function cropUp(e) {
+    if (!cropDragRef.current) return;
+    cropDragRef.current = false;
+    try { e.currentTarget.releasePointerCapture(e.pointerId); } catch { /* noop */ }
+    const s = sel; if (!s) return;
+    if (Math.abs(s.x1 - s.x0) < 8 || Math.abs(s.y1 - s.y0) < 8) { setSel(null); return; }
+    const img = cropImgRef.current; const r = img.getBoundingClientRect();
+    const fx = img.naturalWidth / r.width, fy = img.naturalHeight / r.height;
+    const x = Math.min(s.x0, s.x1), y = Math.min(s.y0, s.y1), w = Math.abs(s.x1 - s.x0), h = Math.abs(s.y1 - s.y0);
+    const c = document.createElement("canvas");
+    c.width = Math.max(1, Math.round(w * fx)); c.height = Math.max(1, Math.round(h * fy));
+    c.getContext("2d").drawImage(img, x * fx, y * fy, w * fx, h * fy, 0, 0, c.width, c.height);
+    setSel(null); setRawShot(null); setShot(c.toDataURL("image/png"));
   }
 
   // ── canvas helpers ───────────────────────────────────────────────────────
@@ -184,22 +219,46 @@ export function ScreenshotApp({ AC, showToast, onSetWallpaper }) {
 
   return (
     <div style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column", gap: 12, fontFamily: FF, minHeight: 0 }}>
-      {!shot ? (
+      {!shot && !rawShot && (
         <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", textAlign: "center", padding: 30, color: "rgba(255,255,255,0.4)" }}>
           <div style={{ fontSize: 60, marginBottom: 16, filter: "drop-shadow(0 0 24px " + fill(AC) + ")" }}>📸</div>
           <div style={{ fontFamily: FFB, fontWeight: 700, fontSize: 17, color: "rgba(255,255,255,0.8)", marginBottom: 8 }}>Screenshot &amp; Annotate</div>
           <div style={{ fontSize: 12.5, color: "rgba(255,255,255,0.45)", maxWidth: 340, lineHeight: 1.7, marginBottom: 20 }}>
-            Capture your screen, a window, or a tab, then draw arrows, boxes, text and blur over it — and save it to Photos or set it as your wallpaper.
+            Capture your whole screen, or <strong style={{ color: "rgba(255,255,255,0.7)" }}>snip a region</strong>, then draw arrows, boxes, text and blur over it — save it to Photos or set it as your wallpaper.
           </div>
           {supported ? (
-            <button onClick={capture} disabled={capturing} style={{ padding: "11px 26px", borderRadius: 10, cursor: "pointer", fontFamily: FFB, fontWeight: 700, fontSize: 14, background: fill(AC), border: "1px solid " + bdr(AC), color: AC, opacity: capturing ? 0.5 : 1 }}>
-              {capturing ? "Waiting for capture…" : "📸 Capture screen"}
-            </button>
+            <div style={{ display: "flex", gap: 10, flexWrap: "wrap", justifyContent: "center" }}>
+              <button onClick={() => capture(false)} disabled={capturing} style={{ padding: "11px 24px", borderRadius: 10, cursor: "pointer", fontFamily: FFB, fontWeight: 700, fontSize: 14, background: fill(AC), border: "1px solid " + bdr(AC), color: AC, opacity: capturing ? 0.5 : 1 }}>
+                {capturing ? "Waiting…" : "📸 Capture full"}
+              </button>
+              <button onClick={() => capture(true)} disabled={capturing} style={{ padding: "11px 24px", borderRadius: 10, cursor: "pointer", fontFamily: FFB, fontWeight: 700, fontSize: 14, background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.14)", color: "rgba(255,255,255,0.8)", opacity: capturing ? 0.5 : 1 }}>
+                ✂ Snip a region
+              </button>
+            </div>
           ) : (
             <div style={{ fontSize: 12, color: "rgba(255,180,80,0.8)", maxWidth: 320, lineHeight: 1.6 }}>Screen capture isn't available in this browser/runtime. Try the web app in Chrome or Edge.</div>
           )}
         </div>
-      ) : (
+      )}
+      {!shot && rawShot && (
+        <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", gap: 10 }}>
+          <div style={{ fontSize: 12.5, color: "rgba(255,255,255,0.62)", textAlign: "center", flexShrink: 0 }}>✂ Drag to select the region to keep</div>
+          <div style={{ flex: 1, minHeight: 0, overflow: "auto", display: "flex", alignItems: "flex-start", justifyContent: "center", background: "rgba(0,0,0,0.4)", borderRadius: 10, border: "1px solid rgba(255,255,255,0.07)", padding: 10 }}>
+            <div style={{ position: "relative", lineHeight: 0, touchAction: "none" }} onPointerDown={cropDown} onPointerMove={cropMove} onPointerUp={cropUp} onPointerCancel={cropUp}>
+              <img ref={cropImgRef} src={rawShot} alt="" draggable={false} style={{ maxWidth: "100%", height: "auto", borderRadius: 6, display: "block", cursor: "crosshair", userSelect: "none" }}/>
+              {sel && (() => { const x = Math.min(sel.x0, sel.x1), y = Math.min(sel.y0, sel.y1), w = Math.abs(sel.x1 - sel.x0), h = Math.abs(sel.y1 - sel.y0); return (
+                <div style={{ position: "absolute", left: x, top: y, width: w, height: h, border: "2px solid " + AC, boxShadow: "0 0 0 9999px rgba(0,0,0,0.5)", pointerEvents: "none" }}/>
+              ); })()}
+            </div>
+          </div>
+          <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
+            <button onClick={() => { setSel(null); setRawShot(null); }} style={actBtn}>← Back</button>
+            <div style={{ flex: 1 }}/>
+            <button onClick={() => { setSel(null); setShot(rawShot); setRawShot(null); }} style={actBtn}>Use full image</button>
+          </div>
+        </div>
+      )}
+      {shot && (
         <>
           {/* Toolbar */}
           <div style={{ display: "flex", alignItems: "center", gap: 7, flexWrap: "wrap", flexShrink: 0 }}>

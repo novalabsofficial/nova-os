@@ -5,6 +5,29 @@ not committed to. Living document — add to it freely.
 
 ---
 
+# ✅ v8.7 — shipped
+
+### ✅ Region snip (backlog #15) — SHIPPED
+The Screenshot app now offers **Snip a region** alongside Capture full: after
+grabbing the frame it shows a crop view where you drag a rectangle (dimmed
+outside) to keep just that area, then drops into the annotation editor. "Use
+full image" / Back escape hatches included.
+- **Where:** `src/apps/ScreenshotApp.jsx` (capture(region) + crop view).
+- **Note:** still goes through the browser's one share prompt first (web
+  can't read screen pixels otherwise); a true promptless live-desktop snip
+  remains a Tauri-only future.
+
+### ✅ Real System Info widget — desktop only (backlog #5) — SHIPPED
+On the **Tauri desktop build** the System Info widget shows real CPU %, RAM
+used/total, and core count via a new Rust `system_info` command (the
+`sysinfo` crate). The **web build keeps its simulated numbers** (no OS access
+in a browser).
+- **Where:** `src-tauri/src/lib.rs` + `Cargo.toml` (sysinfo), `src/lib/sysinfo.js`
+  (Tauri-guarded invoke), `src/widgets/widgets.jsx` (real vs simulated).
+- **Deferred:** GPU/disk metrics; Wi-Fi + audio device controls (#2).
+
+---
+
 # ✅ v8.6 — shipped (capture & flow batch)
 
 Three self-contained backlog items.
@@ -272,7 +295,11 @@ don't match the in-store look-and-feel.
 
 ---
 
-## 5. Actually-functioning System Info widget
+## 5. Actually-functioning System Info widget — ✅ SHIPPED in v8.7 (desktop)
+
+> Done: real CPU/RAM/cores on the Tauri desktop build via the `sysinfo` crate
+> + a `system_info` command; web keeps simulated numbers. GPU/disk deferred.
+
 
 The SysInfo widget currently shows pseudo-CPU/RAM percentages that drift
 based on `performance.now()`. Replace with real OS metrics.
@@ -517,7 +544,12 @@ ClockWidget styling). Dismiss on any key press or mouse movement.
 
 ---
 
-## 15. Region snip (Windows Snipping Tool style)
+## 15. Region snip (Windows Snipping Tool style) — ✅ SHIPPED in v8.7
+
+> Done: "Snip a region" in the Screenshot app — capture a frame, drag-select
+> a rectangle, crop into the annotation editor. Promptless live-desktop snip
+> (Tauri-native) still future.
+
 
 A "snip" mode for the Screenshot tool: instead of the browser's share picker,
 dim the whole screen and let the user drag a rectangle to capture just that

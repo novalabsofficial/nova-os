@@ -9,6 +9,8 @@ import { FF, FFB, FFM } from "../ui/styles.js";
 import { WIDGET_CONFIGS, WGT_HANDLES_MOUSE, WGT_HANDLES_TOUCH, WMO } from "../ui/constants.js";
 // v7.1: weather widget gains NWS alerts + unit toggle, mirroring Atmos
 import { alertsUrl, parseAlerts, isLikelyUS } from "../lib/weather.js";
+// v8.7: real CPU/RAM metrics on the Tauri desktop build (null on web).
+import { getSystemInfo, isDesktop } from "../lib/sysinfo.js";
 
 export function WidgetShell({ id, state, onDragStart, onResizeStart, onClose, children, touchy }) {
   const { x, y, w, h } = state;
@@ -311,13 +313,31 @@ export function CalendarWidgetContent({ tick, state, AC }) {
 
 export function SysInfoWidgetContent({ state }) {
   const [uptime, setUptime] = useState(0);
+  // v8.7: real metrics on the Tauri desktop build; `real` stays null on web,
+  // where we fall back to the simulated numbers below.
+  const [real, setReal] = useState(null);
   useEffect(() => {
     const t = setInterval(() => setUptime(Math.floor(performance.now() / 1000)), 1000);
     return () => clearInterval(t);
   }, []);
+  useEffect(() => {
+    if (!isDesktop()) return;
+    let alive = true;
+    const poll = async () => { const info = await getSystemInfo(); if (alive && info) setReal(info); };
+    poll();
+    const t = setInterval(poll, 2000);
+    return () => { alive = false; clearInterval(t); };
+  }, []);
   const fmtUp = s => { const h = Math.floor(s/3600), m = Math.floor((s%3600)/60), sec = s%60; return h > 0 ? `${h}h ${m}m` : `${m}m ${sec}s`; };
-  const cpu = 55 + Math.floor((uptime % 30) / 30 * 30);
-  const ram = 62 + Math.floor((uptime % 20) / 20 * 20);
+  const fmtGB = b => (b / 1073741824).toFixed(1) + " GB";
+  const clamp = n => Math.max(0, Math.min(100, Math.round(n)));
+  // Simulated fallback (web) drifts gently; desktop uses the real readings.
+  const simCpu = 55 + Math.floor((uptime % 30) / 30 * 30);
+  const simRam = 62 + Math.floor((uptime % 20) / 20 * 20);
+  const cpu = real ? clamp(real.cpu) : simCpu;
+  const ram = real ? clamp(real.memTotal ? (real.memUsed / real.memTotal) * 100 : 0) : simRam;
+  const cpuSub = real ? (real.cores + (real.cores === 1 ? " core" : " cores")) : "Virtual Core";
+  const ramSub = real ? (fmtGB(real.memUsed) + " / " + fmtGB(real.memTotal)) : "8.0 GB";
   // v8.0: progress bars become rounded gradient pills with a subtle inner
   // shadow for depth; labels are uppercase + spaced for that "system monitor"
   // typographic vibe.
@@ -330,7 +350,7 @@ export function SysInfoWidgetContent({ state }) {
   const fs = Math.max(9, Math.min(h * 0.1, 12));
   return (
     <div style={{width:"100%",height:"100%",padding:"10px 14px",display:"flex",flexDirection:"column",justifyContent:"space-evenly",gap:6}}>
-      {[["CPU","Virtual Core",cpu,"#4f9eff"],["RAM","8.0 GB",ram,"#4cef90"]].map(([lbl,sub,pct,col]) => (
+      {[["CPU",cpuSub,cpu,"#4f9eff"],["RAM",ramSub,ram,"#4cef90"]].map(([lbl,sub,pct,col]) => (
         <div key={lbl}>
           <div style={{display:"flex",justifyContent:"space-between",marginBottom:4,alignItems:"baseline"}}>
             <span style={{fontFamily:FFB,fontWeight:600,fontSize:fs,color:"rgba(255,255,255,0.78)",letterSpacing:1,textTransform:"uppercase"}}>{lbl}</span>

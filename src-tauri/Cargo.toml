@@ -26,3 +26,6 @@ tauri-plugin-log = "2"
 # v7.0.3: shell plugin lets the JS side ask the OS to open URLs/files in the
 # user's default app. Used to hand off un-iframable sites to the real browser.
 tauri-plugin-shell = "2"
+# v8.7: real system metrics (CPU %, RAM) for the System Info widget's desktop
+# build. Exposed to the frontend via the `system_info` command in lib.rs.
+sysinfo = "0.33"
