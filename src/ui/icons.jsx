@@ -352,6 +352,61 @@ function GlassIcon({ size, children }) {
   );
 }
 
+// v9.0 — TRUE clear-glass icon redraw (the look you actually want): the glyph
+// is re-rendered in white/frosted glass on a CLEAR, colorless tile (no brand
+// color), with backdrop-blur so the wallpaper frosts through + a sheen on top.
+// Prototyped on a few icons first; the rest fall back to the coating until the
+// whole set is redrawn. Glyph shapes mirror their dark-mode NovaSvgIcon, white.
+function glassGlyph(id) {
+  const W = "rgba(255,255,255,0.95)", Wd = "rgba(255,255,255,0.72)", hole = "rgba(255,255,255,0.22)";
+  switch (id) {
+    case "notes": return (<>
+      <rect x="7" y="10" width="18" height="2.4" rx="1.2" fill={W}/>
+      <rect x="7" y="15" width="14" height="2.4" rx="1.2" fill={Wd}/>
+      <rect x="7" y="20" width="16" height="2.4" rx="1.2" fill={Wd}/>
+    </>);
+    case "files": return <path d="M6 13 Q6 11 8 11 L13 11 L15 13 L24 13 Q26 13 26 15 L26 23 Q26 25 24 25 L8 25 Q6 25 6 23 Z" fill={W}/>;
+    case "settings": {
+      const sp = [0,45,90,135,180,225,270,315].map(d => { const a = d*Math.PI/180; return { x1:16+6.5*Math.cos(a), y1:16+6.5*Math.sin(a), x2:16+9.8*Math.cos(a), y2:16+9.8*Math.sin(a) }; });
+      return (<>{sp.map((s,i) => <line key={i} x1={s.x1} y1={s.y1} x2={s.x2} y2={s.y2} stroke={W} strokeWidth="2.4" strokeLinecap="round"/>)}<circle cx="16" cy="16" r="4.5" fill={W}/><circle cx="16" cy="16" r="1.8" fill={hole}/></>);
+    }
+    case "chat": return (<>
+      <path d="M6 9 Q6 7 8 7 L24 7 Q26 7 26 9 L26 19 Q26 21 24 21 L14 21 L9 25.5 L9.5 21 L8 21 Q6 21 6 19 Z" fill={W}/>
+      <circle cx="12" cy="14" r="1.2" fill={hole}/><circle cx="16" cy="14" r="1.2" fill={hole}/><circle cx="20" cy="14" r="1.2" fill={hole}/>
+    </>);
+    case "music": return (<>
+      <ellipse cx="12.5" cy="21" rx="3" ry="2.5" fill={W}/><ellipse cx="22" cy="19" rx="3" ry="2.5" fill={W}/>
+      <rect x="15" y="9" width="1.6" height="13" fill={W}/><rect x="24.4" y="7" width="1.6" height="12.5" fill={W}/>
+      <path d="M15 9 Q20.5 7.5 26 7 L26 9 Q20.5 9.5 15 11 Z" fill={W}/>
+    </>);
+    case "browser": return (<>
+      <circle cx="16" cy="16" r="8.5" fill="none" stroke={W} strokeWidth="1.6"/>
+      <ellipse cx="16" cy="16" rx="4" ry="8.5" fill="none" stroke={W} strokeWidth="1.3"/>
+      <line x1="7.5" y1="16" x2="24.5" y2="16" stroke={W} strokeWidth="1.3"/>
+    </>);
+    default: return null;
+  }
+}
+const GLASS_GLYPHS = new Set(["notes", "files", "settings", "chat", "music", "browser"]);
+
+function GlassSvgIcon({ id, size }) {
+  const r = Math.round(size * 0.24);
+  const glyph = glassGlyph(id);
+  if (!glyph) return null;
+  return (
+    <div style={{
+      position: "relative", width: size, height: size, borderRadius: r, overflow: "hidden",
+      background: "rgba(255,255,255,0.1)",
+      backdropFilter: "blur(6px) saturate(1.4)", WebkitBackdropFilter: "blur(6px) saturate(1.4)",
+      boxShadow: "inset 0 0 0 1px rgba(255,255,255,0.32), inset 0 2px 2px rgba(255,255,255,0.4), 0 3px 9px rgba(0,0,0,0.3)",
+    }}>
+      <svg width="100%" height="100%" viewBox="0 0 32 32" style={{ display: "block", position: "relative" }}>{glyph}</svg>
+      <div style={{ position: "absolute", inset: 0, borderRadius: "inherit", pointerEvents: "none",
+        background: "linear-gradient(135deg, rgba(255,255,255,0.42) 0%, rgba(255,255,255,0.08) 36%, rgba(255,255,255,0) 60%)" }}/>
+    </div>
+  );
+}
+
 export function AppIconDisplay({ app, size = 26, glass = false }) {
   let inner;
   if (app.storeApp) {
@@ -372,7 +427,12 @@ export function AppIconDisplay({ app, size = 26, glass = false }) {
       }}>{app.icon || "📦"}</div>
     );
   }
-  return glass ? <GlassIcon size={size}>{inner}</GlassIcon> : inner;
+  if (glass) {
+    // True clear-glass redraw where available; coating placeholder elsewhere.
+    if (!app.storeApp && GLASS_GLYPHS.has(app.id)) return <GlassSvgIcon id={app.id} size={size}/>;
+    return <GlassIcon size={size}>{inner}</GlassIcon>;
+  }
+  return inner;
 }
 
 // v8.0 — Refined window-control glyphs. Previously inline unicode (—, ❐, ✕)
