@@ -86,6 +86,7 @@ const PacManApp       = lazy(() => import("./apps/PacManApp.jsx").then(m       =
 const ChessApp        = lazy(() => import("./apps/ChessApp.jsx").then(m        => ({default: m.ChessApp})));
 // v8.0 round-3
 const PhotosApp       = lazy(() => import("./apps/PhotosApp.jsx").then(m       => ({default: m.PhotosApp})));
+const ScreenshotApp   = lazy(() => import("./apps/ScreenshotApp.jsx").then(m   => ({default: m.ScreenshotApp})));
 
  
 // ─── ROOT ─────────────────────────────────────────────────────────────────────
@@ -1361,6 +1362,7 @@ export default function NovaOS(){
                 {win.app==="chess"      &&<ChessApp user={user} AC={AC}/>}
                 {/* v8.0 round-3 */}
                 {win.app==="photos"     &&<PhotosApp AC={AC} showToast={showToast} onSetWallpaper={handleCustomWallpaper}/>}
+                {win.app==="screenshot" &&<ScreenshotApp AC={AC} showToast={showToast} onSetWallpaper={handleCustomWallpaper}/>}
               </Suspense>
             </div>
           </div>

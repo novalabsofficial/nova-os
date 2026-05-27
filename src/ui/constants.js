@@ -38,7 +38,7 @@ export const DEFAULT_WIDGET_STATE = {
 // Default open size per app type. App ids that aren't listed get {w:520,h:480}.
 export const DEFAULT_SIZES = {
   notes:{w:500,h:520},tasks:{w:460,h:520},files:{w:540,h:520},
-  paint:{w:700,h:560},browser:{w:760,h:620},
+  paint:{w:700,h:560},browser:{w:760,h:620},screenshot:{w:740,h:600},
   snake:{w:460,h:560},"2048":{w:480,h:580},
   store:{w:680,h:600},terminal:{w:580,h:460},
   settings:{w:480,h:640},profile:{w:440,h:540},chat:{w:480,h:580},
@@ -95,6 +95,8 @@ export const APPS = [
   {id:"chess",      icon:"♟️",label:"Chess",       desc:"Online multiplayer vs other Nova users"},
   // v8.0
   {id:"photos",     icon:"📷",label:"Photos",      desc:"Browse photos from your device"},
+  // v8.6
+  {id:"screenshot", icon:"📸",label:"Screenshot",  desc:"Capture & annotate your screen"},
 ];
 
 // Curated catalog of external apps shown in the Store's "Official" tab.

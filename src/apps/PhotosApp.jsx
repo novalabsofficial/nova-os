@@ -21,6 +21,7 @@ import { useState, useEffect, useRef } from "react";
 import { FF, FFB, FFM, SEC } from "../ui/styles.js";
 import { fill, bdr } from "../lib/format.js";
 import { playSound } from "../lib/audio.js";
+import { getStorePhotos, subscribeStorePhotos } from "../lib/photoStore.js";
 
 const PIXELS_PER_THUMB = 132;   // target thumbnail size in the grid
 const MAX_PHOTO_SIZE   = 20 * 1024 * 1024;  // 20 MB — soft warning above this
@@ -38,6 +39,19 @@ export function PhotosApp({ AC, showToast, onSetWallpaper }) {
   // Cleanup blob URLs when the component unmounts. Without this, picking 100
   // photos and closing the app leaks 100 blob URLs into the browser.
   useEffect(() => () => { photos.forEach(p => URL.revokeObjectURL(p.url)); }, []); // eslint-disable-line
+
+  // v8.6 — surface screenshots saved from the Screenshot tool. Seed from the
+  // shared store on mount, then append any added while we're open. (Store
+  // photos are data URLs, so the unmount revoke above is a harmless no-op.)
+  useEffect(() => {
+    const merge = (all) => setPhotos(prev => {
+      const ids = new Set(prev.map(p => p.id));
+      const add = all.filter(p => !ids.has(p.id));
+      return add.length ? [...prev, ...add] : prev;
+    });
+    merge(getStorePhotos());
+    return subscribeStorePhotos(merge);
+  }, []);
 
   // Slideshow auto-advance — 4 seconds per photo. Wraps around at the end.
   useEffect(() => {
