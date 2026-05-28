@@ -938,6 +938,88 @@ opens in PowerPoint / Keynote / Google Slides.
 
 ---
 
+## 24. Nova OS as a real bootable Linux distribution
+
+**The endgame** — the most ambitious thing on this whole list. Parked
+explicitly for after everything else (post-Supernova, post v9.x polish).
+A summer-project-or-longer effort to take Nova from "browser-based OS" to
+*an actual OS you boot from a USB stick or run as a VM*, with Nova as the
+entire desktop environment on top of a minimal Linux base.
+
+This effectively combines and supersedes IDEAS #2 (Wi-Fi + system sound)
+and IDEAS #21 (Tauri webview tabs) — once Nova owns the underlying OS,
+both of those become trivially solvable.
+
+**What "real OS" means here**
+- **Bootable**: ships as a `.iso` that works in a VM (VirtualBox / QEMU /
+  VMware) and writes to a USB stick (via Ventoy / Rufus / dd) for direct
+  boot on real hardware.
+- **Real shutdown / power settings**: a system power menu with Shut
+  down / Restart / Sleep / Sign out — the actual Windows-style options
+  backed by real `systemctl` calls. Lock screen on resume. Power-button
+  capture so the lid doesn't kill the machine ungracefully.
+- **Real app installer**: a Store where "Install" actually installs.
+  Hooks into the underlying package manager (Flatpak is the best fit —
+  sandboxed, cross-distro, no root needed) so the user can install
+  Firefox, VLC, GIMP, Steam, etc. directly from Nova's Store and have
+  them appear as real launchable entries (with real launcher icons
+  alongside Nova's built-in apps).
+- **Real browser, no iframe limits**: when Nova owns the desktop, the
+  Browser app can spawn actual Firefox/Chromium windows (or embed real
+  webviews) — no `X-Frame-Options` problems, real cookies/sessions/
+  history. Sites that today are stuck on `newTab: true` finally work
+  inside Nova.
+
+**Architecture (the realistic shape)**
+- **Base distro:** Debian-minimal or Arch (broad hardware support) — not
+  Alpine, because the hardware story matters once it's on real laptops.
+- **Display server:** Wayland session.
+- **Nova as the desktop environment:** Tauri build of Nova OS launched
+  at session start as the *only* GUI app — no GNOME/KDE underneath.
+  Replaces the traditional DE entirely.
+- **OS bridge layer:** new Tauri commands (Rust) for shutdown / restart /
+  sleep / lock, network listing + connect, audio device + volume,
+  brightness, battery, package install/uninstall via Flatpak.
+- **Settings → real settings:** the existing v9.0 Settings panes
+  (Network / Sound / Display / Account) get their stubs replaced with
+  the genuine system-level controls via those Tauri commands.
+
+**Honest prerequisites (do these first, independent of Linux work)**
+- **Offline mode / graceful Firebase degradation.** A bootable USB run
+  on a plane / school network / fresh machine has no internet on boot.
+  Nova OS today expects Firebase to be reachable. The UI needs to load
+  + work locally; sync/auth degrade gracefully when offline.
+- **Bundled assets.** The `dist/` build needs to be packed into the
+  ISO so the OS loads without ever fetching from Vercel.
+- **Polish the Tauri build.** Today it's a downloadable wrapper around
+  the web app. For a Linux DE it needs to be the *session* — survives a
+  crash gracefully, can be relaunched without losing state, etc.
+
+**Tiers (build incrementally)**
+1. **Kiosk Linux** — minimal Linux + Chromium kiosk pointed at Nova OS.
+   ~4–6 weeks of evenings. Real bootable distro, but Nova is "just" a
+   web app on top. No real OS integration yet.
+2. **Nova as the DE** — Tauri build replaces the desktop session. Real
+   power menu, real Wi-Fi, real audio. ~2–3 months of summer work.
+3. **Full distro** — Flatpak Store integration, custom installer,
+   Plymouth boot splash, polished hardware support. Months / years for
+   production-quality (ChromeOS-style polish).
+
+**Caveats**
+- Hardware drivers are Linux's eternal headache (Wi-Fi chips, GPUs,
+  laptop function keys). Stick to a major upstream like Debian/Ubuntu
+  rather than ultra-minimal bases — inherit their hardware stack.
+- USB persistence (saving user state across boots from a live USB) is
+  its own feature — decide upfront.
+- VM target first, real hardware second. VM removes the driver
+  variable entirely while you build the rest.
+
+**Status:** explicitly deferred. The kind of thing to spend a summer on
+once v9.x / Supernova have landed and Nova OS proper is stable enough
+to stand on its own.
+
+---
+
 ## How to add to this
 
 Edit this file directly, or just mention an idea in conversation and ask
