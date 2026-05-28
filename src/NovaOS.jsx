@@ -1597,7 +1597,7 @@ export default function NovaOS(){
               }>
                 {win.app==="notes"    &&<NotesApp    data={data} updateData={updateData} showToast={showToast} AC={AC} openNovaAi={()=>openApp("novaai")}/>}
                 {win.app==="tasks"    &&<TasksApp    data={data} updateData={updateData} showToast={showToast} AC={AC} openNovaAi={()=>openApp("novaai")}/>}
-                {win.app==="files"    &&<FilesApp    data={data} updateData={updateData} showToast={showToast}/>}
+                {win.app==="files"    &&<FilesApp    data={data} updateData={updateData} showToast={showToast} AC={AC} commApps={commApps} openApp={openApp}/>}
                 {win.app==="paint"    &&<PaintApp    showToast={showToast} AC={AC}/>}
                 {win.app==="browser"  &&<BrowserApp  AC={AC}/>}
                 {win.app==="snake"    &&<SnakeApp    AC={AC}/>}
