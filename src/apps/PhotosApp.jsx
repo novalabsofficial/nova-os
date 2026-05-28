@@ -21,7 +21,7 @@ import { useState, useEffect, useRef } from "react";
 import { FF, FFB, FFM, SEC } from "../ui/styles.js";
 import { fill, bdr } from "../lib/format.js";
 import { playSound } from "../lib/audio.js";
-import { getStorePhotos, subscribeStorePhotos } from "../lib/photoStore.js";
+import { getStorePhotos, subscribeStorePhotos, addStorePhoto, removeStorePhoto, updateStorePhoto } from "../lib/photoStore.js";
 import { startDrag, moveDrag } from "../lib/dragStore.js";
 
 const PIXELS_PER_THUMB = 132;   // target thumbnail size in the grid
@@ -60,21 +60,17 @@ export function PhotosApp({ AC, showToast, onSetWallpaper }) {
     window.addEventListener("pointerup", up);
   }
 
-  // Cleanup blob URLs when the component unmounts. Without this, picking 100
-  // photos and closing the app leaks 100 blob URLs into the browser.
-  useEffect(() => () => { photos.forEach(p => URL.revokeObjectURL(p.url)); }, []); // eslint-disable-line
-
-  // v8.6 — surface screenshots saved from the Screenshot tool. Seed from the
-  // shared store on mount, then append any added while we're open. (Store
-  // photos are data URLs, so the unmount revoke above is a harmless no-op.)
+  // v9.3 (issue #19) — uploaded photos now live in the shared session-level
+  // photoStore so they survive closing/reopening the app for the whole
+  // session. Local state is a mirror of the store: the subscription replaces
+  // it wholesale on every store change, and every mutation goes through the
+  // store helpers (add / remove / updateStorePhoto), never directly through
+  // `setPhotos`. The previous unmount-revoke effect was removed for the same
+  // reason — blob URLs need to outlive the component so the photos still
+  // render after a close/reopen. Browser GC frees them at page unload.
   useEffect(() => {
-    const merge = (all) => setPhotos(prev => {
-      const ids = new Set(prev.map(p => p.id));
-      const add = all.filter(p => !ids.has(p.id));
-      return add.length ? [...prev, ...add] : prev;
-    });
-    merge(getStorePhotos());
-    return subscribeStorePhotos(merge);
+    setPhotos(getStorePhotos());
+    return subscribeStorePhotos(setPhotos);
   }, []);
 
   // Slideshow auto-advance — 4 seconds per photo. Wraps around at the end.
@@ -119,14 +115,14 @@ export function PhotosApp({ AC, showToast, onSetWallpaper }) {
       w:    null,
       h:    null,
     }));
-    setPhotos(prev => [...prev, ...next]);
+    // v9.3: push into the shared store rather than local state — the
+    // subscription above mirrors it back into `photos` automatically.
+    next.forEach(addStorePhoto);
     // Probe each image to capture intrinsic width/height — used by the
     // viewer to size the image without a janky "0×0" → actual transition.
     next.forEach(p => {
       const img = new Image();
-      img.onload = () => {
-        setPhotos(cur => cur.map(x => x.id === p.id ? { ...x, w: img.width, h: img.height } : x));
-      };
+      img.onload = () => { updateStorePhoto(p.id, { w: img.width, h: img.height }); };
       img.src = p.url;
     });
     playSound("success");
@@ -135,12 +131,16 @@ export function PhotosApp({ AC, showToast, onSetWallpaper }) {
   }
 
   function removePhoto(idx) {
-    setPhotos(cur => {
-      const next = [...cur];
-      const removed = next.splice(idx, 1)[0];
-      if (removed) URL.revokeObjectURL(removed.url);
-      return next;
-    });
+    // v9.3: remove via the store so the change is reflected everywhere
+    // (subscription mirrors the new list back into local state). Revoke
+    // the blob URL only for uploaded photos (data: URLs from screenshots
+    // don't need revoking and revokeObjectURL on a data URL is a no-op).
+    const target = photos[idx];
+    if (!target) return;
+    const removed = removeStorePhoto(target.id);
+    if (removed && removed.url && removed.url.startsWith("blob:")) {
+      URL.revokeObjectURL(removed.url);
+    }
     // If the deleted photo was being viewed, close the viewer or step back.
     if (viewerIdx === idx) {
       if (photos.length <= 1) closeViewer();

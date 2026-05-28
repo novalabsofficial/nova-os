@@ -16,6 +16,14 @@ export function MinesweeperApp({AC}){
   const [elapsed,setElapsed]=useState(0);
   const pressTimer=useRef(null);
   const pressIsLong=useRef(false);
+  // v9.3 — track which mouse button started the press. Right-clicking a cell
+  // used to fire BOTH onContextMenu (flag) AND onPointerUp (reveal); the
+  // reveal's `flagged.has(key)` check ran against stale closure state since
+  // React hadn't re-rendered yet, so the cell would get revealed anyway —
+  // and if it was a mine, the user instantly lost a game they were trying
+  // to flag. Now: capture the button on pointerdown; if it's not the left
+  // button, pointerup skips reveal entirely.
+  const pressButton=useRef(0);
 
   // Timer tick during play
   useEffect(()=>{
@@ -68,15 +76,20 @@ export function MinesweeperApp({AC}){
   }
 
   // Long-press detection for touch users — short press reveals, long press flags.
-  function onCellPointerDown(r,c){
+  // v9.3: also gates reveal-on-pointerup behind a left-button check so
+  // right-click only fires the contextmenu flag path.
+  function onCellPointerDown(e,r,c){
+    pressButton.current=e.button;
     pressIsLong.current=false;
+    if(e.button!==0)return;          // right-click is handled by onContextMenu — no timer, no reveal
     pressTimer.current=setTimeout(()=>{
       pressIsLong.current=true;
       toggleFlag(r,c);
     },350);
   }
-  function onCellPointerUp(r,c){
+  function onCellPointerUp(e,r,c){
     clearTimeout(pressTimer.current);
+    if(pressButton.current!==0)return;  // right-click pointerup must not reveal
     if(!pressIsLong.current) reveal(r,c);
   }
   function onCellPointerCancel(){
@@ -117,8 +130,8 @@ export function MinesweeperApp({AC}){
             const num=isRev&&cell&&!cell.isMine?cell.neighbors:0;
             return(
               <div key={key}
-                onPointerDown={()=>onCellPointerDown(r,c)}
-                onPointerUp={()=>onCellPointerUp(r,c)}
+                onPointerDown={e=>onCellPointerDown(e,r,c)}
+                onPointerUp={e=>onCellPointerUp(e,r,c)}
                 onPointerCancel={onCellPointerCancel}
                 onPointerLeave={onCellPointerCancel}
                 onContextMenu={e=>onCellContextMenu(e,r,c)}

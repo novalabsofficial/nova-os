@@ -79,6 +79,16 @@ function Avatar({ name, ac, size = 30 }) {
   );
 }
 
+// v9.3 — extract a friendly host (e.g. "roblox.com") from a full URL, used
+// throughout the Store to show users where a "Open" button will actually
+// send them before they click. Falls back to the raw string if URL parsing
+// fails (e.g. for malformed/legacy entries).
+function storeUrlHost(u) {
+  if (!u) return "";
+  try { return new URL(u).hostname.replace(/^www\./, ""); }
+  catch { return u; }
+}
+
 // ── Vertical app tile (used in Home shelves) ──────────────────────────────
 function AppTile({ app, ratings, ac, onOpen }) {
   const r = ratings[app.id] || EMPTY_RATING;
@@ -153,7 +163,7 @@ function GridCard({ app, ratings, ac, isIn, onOpen, toggleInstall, currentUser, 
       <div style={{ fontSize: 12, color: "rgba(255,255,255,0.48)", lineHeight: 1.5, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", minHeight: 34 }}>{app.desc}</div>
       <div style={{ display: "flex", gap: 8 }}>
         <button onClick={(e) => { e.stopPropagation(); toggleInstall(app); }} style={{ flex: 1, padding: "7px", borderRadius: 9, cursor: "pointer", fontFamily: FFB, fontWeight: 600, fontSize: 11.5, background: isIn ? "rgba(255,80,80,0.1)" : "rgba(255,255,255,0.07)", border: "1px solid " + (isIn ? "rgba(255,80,80,0.3)" : "rgba(255,255,255,0.12)"), color: isIn ? "rgba(255,130,130,0.9)" : "rgba(255,255,255,0.7)" }}>{isIn ? "Remove" : "Add"}</button>
-        <button onClick={(e) => { e.stopPropagation(); openExternalUrl(app.url); }} style={{ flex: 1, padding: "7px", borderRadius: 9, cursor: "pointer", fontFamily: FFB, fontWeight: 700, fontSize: 11.5, background: fill(ac), border: "1px solid " + bdr(ac), color: ac }}>Open ↗</button>
+        <button onClick={(e) => { e.stopPropagation(); openExternalUrl(app.url); }} title={app.url ? "Open " + app.url : "Open"} style={{ flex: 1, padding: "7px", borderRadius: 9, cursor: "pointer", fontFamily: FFB, fontWeight: 700, fontSize: 11.5, background: fill(ac), border: "1px solid " + bdr(ac), color: ac }}>Open ↗</button>
       </div>
     </div>
   );
@@ -218,8 +228,25 @@ function AppDetail({ app, ratings, ac, isIn, user, onBack, toggleInstall, rateAn
             </div>
           </div>
         </div>
-        <div style={{ display: "flex", gap: 10, marginTop: 18 }}>
-          <button onClick={() => openExternalUrl(app.url)} style={{ padding: "10px 26px", borderRadius: 22, cursor: "pointer", fontFamily: FFB, fontWeight: 700, fontSize: 13.5, background: "#fff", color: "#111", border: "none" }}>Open ↗</button>
+        {/* v9.3 — link-target transparency (issue #20). Show the actual URL
+            the Open button will navigate to so users can verify it's not
+            a phishing site before clicking. Host shown prominently; full
+            URL underneath in a smaller mono font. */}
+        {app.url && (
+          <div style={{ marginTop: 16, padding: "10px 14px", background: "rgba(0,0,0,0.22)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 10, display: "flex", alignItems: "center", gap: 10 }}>
+            <span style={{ fontSize: 14, color: "rgba(255,255,255,0.5)", flexShrink: 0 }} title="External link">🔗</span>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontFamily: FFB, fontWeight: 600, fontSize: 12.5, color: "#fff", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                Opens {storeUrlHost(app.url)}
+              </div>
+              <div style={{ fontFamily: FFM, fontSize: 10.5, color: "rgba(255,255,255,0.5)", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={app.url}>
+                {app.url}
+              </div>
+            </div>
+          </div>
+        )}
+        <div style={{ display: "flex", gap: 10, marginTop: 14 }}>
+          <button onClick={() => openExternalUrl(app.url)} title={app.url ? "Open " + app.url : "Open"} style={{ padding: "10px 26px", borderRadius: 22, cursor: "pointer", fontFamily: FFB, fontWeight: 700, fontSize: 13.5, background: "#fff", color: "#111", border: "none" }}>Open ↗</button>
           <button onClick={() => toggleInstall(app)} style={{ padding: "10px 22px", borderRadius: 22, cursor: "pointer", fontFamily: FFB, fontWeight: 600, fontSize: 13.5, background: isIn ? "rgba(255,80,80,0.12)" : "rgba(255,255,255,0.1)", border: "1px solid " + (isIn ? "rgba(255,80,80,0.35)" : "rgba(255,255,255,0.18)"), color: isIn ? "rgba(255,140,140,0.95)" : "#fff" }}>{isIn ? "Remove from Desktop" : "+ Add to Desktop"}</button>
           {canDelete && <button onClick={() => onDeleteApp(app)} style={{ padding: "10px 16px", borderRadius: 22, cursor: "pointer", fontFamily: FFB, fontWeight: 600, fontSize: 13, background: "none", border: "1px solid rgba(255,80,80,0.3)", color: "rgba(255,120,120,0.8)" }}>🗑 Remove</button>}
         </div>
@@ -365,7 +392,14 @@ export function StoreApp({ user, data, updateData, showToast, AC }) {
     // always wins — see NovaOS.jsx for the full rationale (any doc whose
     // data carried its own `id` field would otherwise hide the doc id and
     // break `installedApps` matching).
-    const unsub = onSnapshot(q, snap => { setCommApps(snap.docs.map(d => { const x = d.data(); return { ...x, legacyId: x.id, id: d.id }; })); setLoadingComm(false); }, () => setLoadingComm(false));
+    // v9.3 — surface snapshot errors via console.warn instead of silently
+    // dropping into the "empty store" state. Mirrors the NovaOS-side
+    // diagnostic; both subscriptions log under their own labels so we can
+    // tell which side failed.
+    const unsub = onSnapshot(q,
+      snap => { setCommApps(snap.docs.map(d => { const x = d.data(); return { ...x, legacyId: x.id, id: d.id }; })); setLoadingComm(false); },
+      err => { console.warn("[StoreApp/nova_user_apps] snapshot error:", err?.message || err); setLoadingComm(false); }
+    );
     return () => unsub();
   }, []);
 

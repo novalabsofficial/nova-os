@@ -13,7 +13,7 @@ import {
 } from "./lib/constants.js";
 import { hexRgb, fill, bdr, isUrl } from "./lib/format.js";
 import { toggleFullscreen, isFullscreen, onFullscreenChange, exitFullscreen } from "./lib/fullscreen.js";
-import { defaultIconPos, snapToFreeGrid, snapW, snapWSize } from "./lib/geometry.js";
+import { defaultIconPos, snapToFreeGrid, snapW, snapWSize, layoutIcons } from "./lib/geometry.js";
 import { autoModerate, isAdmin, isPubliclyVisible } from "./lib/moderation.js";
 import { rewriteForIframe, isLikelyUnframable } from "./lib/browser.js";
 import { detectDevice, effectiveDeviceMode, isTouchMode } from "./lib/device.js";
@@ -23,7 +23,7 @@ import { dailyWord, scoreGuess, normalizeGuess } from "./lib/wordle.js";
 import { emptyGrid as tetrisEmpty, randomPiece as tetrisRandom, shapeOf, fits as tetrisFits, lockPiece as tetrisLock, clearLines as tetrisClearLines, scoreForLines, tickInterval, PIECE_COLORS, BOARD_W as TETRIS_W, BOARD_H as TETRIS_H } from "./lib/tetris.js";
 import { wmoIcon, wmoLabel, geocodeUrl, parseGeocode, forecastUrl, parseForecast, alertsUrl, parseAlerts, isLikelyUS } from "./lib/weather.js";
 import { PROVIDERS as AI_PROVIDERS, streamResponse as aiStream, deriveTitle as aiDeriveTitle } from "./lib/ai.js";
-import { playTone, speak, cancelSpeech, playSound, getSoundConfig, setSoundConfig, setSoundWallpaper } from "./lib/audio.js";
+import { playTone, speak, cancelSpeech, playSound, getSoundConfig, setSoundConfig, setSoundWallpaper, subscribeSoundConfig } from "./lib/audio.js";
 import { db, setDbUid, getDbUid } from "./lib/db.js";
 import { watchMyThreads } from "./lib/dms.js";
 import { openExternalUrl } from "./lib/openUrl.js";
@@ -334,6 +334,9 @@ export default function NovaOS(){
   const [menuOpen,   setMenuOpen]   = useState(false);
   const [menuSrch,   setMenuSrch]   = useState("");
   const [iconPos,    setIconPos]    = useState({});
+  // v9.3 — viewport size, bumped on window resize so layoutIcons re-runs
+  // and the desktop icon grid recomputes (fixes #21).
+  const [viewport,   setViewport]   = useState(() => ({ w: typeof window !== "undefined" ? window.innerWidth : 1280, h: typeof window !== "undefined" ? window.innerHeight : 800 }));
   const [iconDrag,   setIconDrag]   = useState(null);
   const [widgetState,setWidgetState]= useState(DEFAULT_WIDGET_STATE);
   const [widgetDrag, setWidgetDrag] = useState(null);
@@ -413,8 +416,19 @@ export default function NovaOS(){
   // Watch viewport size so the detected device mode stays current (e.g. on
   // rotation or window resize). Throttled-by-debounce isn't needed — resize
   // fires sparingly and detectDevice is cheap.
+  //
+  // v9.3 (issue #21): also bump a viewport state so the desktop icon layout
+  // recomputes on resize. Without this, only detectDevice changes triggered
+  // a re-render — resizing within the same mode left icons stuck at their
+  // pre-resize positions, with un-saved icons "dancing" because their
+  // fallback layout (defaultIconPos) silently re-derived from window size
+  // every render but only had a chance to be observed when something else
+  // re-rendered the tree.
   useEffect(()=>{
-    function onResize(){setDetectedMode(detectDevice());}
+    function onResize(){
+      setDetectedMode(detectDevice());
+      setViewport({ w: window.innerWidth, h: window.innerHeight });
+    }
     window.addEventListener("resize",onResize);
     return ()=>window.removeEventListener("resize",onResize);
   },[]);
@@ -475,7 +489,7 @@ export default function NovaOS(){
   useEffect(()=>{
     if(!iconDrag)return;
     function onMove(e){const nx=Math.max(0,Math.min(e.clientX-iconDrag.ox,window.innerWidth-ICON_W));const ny=Math.max(0,Math.min(e.clientY-iconDrag.oy,window.innerHeight-TASKBAR_H-ICON_H));setIconPos(prev=>({...prev,[iconDrag.id]:{x:nx,y:ny}}));}
-    function onUp(){const allPos={};(iconDrag.allIcons||[]).forEach((app,idx)=>{allPos[app.id]=iconPosRef.current[app.id]||defaultIconPos(idx);});const raw=iconPosRef.current[iconDrag.id]||allPos[iconDrag.id];const snapped=raw?snapToFreeGrid(iconDrag.id,raw.x,raw.y,allPos):null;const fp=snapped?{...iconPosRef.current,[iconDrag.id]:snapped}:iconPosRef.current;setIconPos(fp);db.set("user:"+iconDrag.user+":iconpos",fp).catch(()=>{});setIconDrag(null);}
+    function onUp(){const allPos=layoutIcons(iconDrag.allIcons||[],iconPosRef.current);const raw=iconPosRef.current[iconDrag.id]||allPos[iconDrag.id];const snapped=raw?snapToFreeGrid(iconDrag.id,raw.x,raw.y,allPos):null;const fp=snapped?{...iconPosRef.current,[iconDrag.id]:snapped}:iconPosRef.current;setIconPos(fp);db.set("user:"+iconDrag.user+":iconpos",fp).catch(()=>{});setIconDrag(null);}
     window.addEventListener("pointermove",onMove);window.addEventListener("pointerup",onUp);window.addEventListener("pointercancel",onUp);return()=>{window.removeEventListener("pointermove",onMove);window.removeEventListener("pointerup",onUp);window.removeEventListener("pointercancel",onUp);};
   },[iconDrag]);
 
@@ -567,14 +581,44 @@ export default function NovaOS(){
   //      reference the *data* id (e.g. McDonald's, which predates this fix)
   //      still match via the legacy fallback in the filter below. New
   //      installs always use the canonical doc id.
+  // v9.3 — replaced the silent `() => {}` error handler with a console.warn.
+  // The v9.2 DM bug spent an unknowable amount of time invisibly broken
+  // because watchMyThreads's onSnapshot swallowed its error. Same shape
+  // here: if this query ever errors, no community store apps render and
+  // the user has no way to know why. A console line is a cheap insurance.
   useEffect(()=>{
     const q=query(collection(firestoreDb,"nova_user_apps"),orderBy("ts","desc"),limit(60));
     const unsub=onSnapshot(q,snap=>setCommApps(snap.docs.map(d=>{
       const x=d.data();
       return {...x, legacyId: x.id, id: d.id};
-    })),()=>{});
+    })),err=>{ console.warn("[nova_user_apps] snapshot error:", err?.message || err); });
     return ()=>unsub();
   },[]);
+
+  // v9.3 (community-app desktop install bug, batch 2) — runtime diagnostic.
+  // Logs to console whenever commApps or installedApps changes so we can
+  // see at runtime why an installed app isn't appearing on the desktop.
+  // Reads from `data` directly so we don't depend on the later-declared
+  // `installedApps` memo (would hit TDZ — see the v9.0 mishap). Safe to
+  // leave in until we confirm the install path is reliable for all users.
+  useEffect(()=>{
+    if(typeof console==="undefined")return;
+    const inst = data?.installedApps || [];
+    const visible = commApps.filter(a => isPubliclyVisible(a));
+    const matched = commApps.filter(a => isPubliclyVisible(a) && (inst.includes(a.id) || (a.legacyId && inst.includes(a.legacyId))));
+    console.group("[nova-install-debug]");
+    console.log("commApps total:", commApps.length, "  publicly-visible:", visible.length);
+    console.log("data.installedApps:", inst);
+    console.log("matching desktop icons:", matched.map(a => ({docId:a.id, legacyId:a.legacyId, name:a.name, status:a.status})));
+    // Surface installedApps entries that DO NOT correspond to any current
+    // community app — strong hint of a stale id from a deleted/rejected app.
+    const allKnownIds = new Set();
+    commApps.forEach(a => { allKnownIds.add(a.id); if (a.legacyId) allKnownIds.add(a.legacyId); });
+    const orphans = inst.filter(id => !allKnownIds.has(id));
+    if (orphans.length) console.warn("[nova-install-debug] orphan installedApps ids (no matching community-app doc):", orphans);
+    console.groupEnd();
+  }, [commApps, data?.installedApps]);
+
 
   // v8.6 AFK screensaver. settings.screensaverMins: 0 = off, else minutes of
   // idle before it fades in (default 1). Any input dismisses it and re-arms
@@ -681,6 +725,12 @@ export default function NovaOS(){
   // section the Settings app should open to when deep-linked from it.
   const [qsOpen, setQsOpen] = useState(false);
   const [settingsSection, setSettingsSection] = useState(null);
+  // v9.3 (#22) — mirror sound config so the taskbar volume icon's mute
+  // indicator stays in sync no matter which app changed it (Settings,
+  // QuickSettingsPanel, etc.). audio.js fires `subscribeSoundConfig`
+  // synchronously inside setSoundConfig.
+  const [soundCfg, setSoundCfgState] = useState(() => getSoundConfig());
+  useEffect(() => subscribeSoundConfig(setSoundCfgState), []);
   const pushNotification = useCallback((n)=>{
     if(!n || !n.title) return;
     const notif = {
@@ -1022,7 +1072,7 @@ export default function NovaOS(){
     document.addEventListener("keydown", onKey);
     return ()=>document.removeEventListener("keydown", onKey);
   },[]);
-  function onIconMouseDown(e,appId,allIcons){if(e.button!==0)return;e.stopPropagation();e.preventDefault();const idx=allIcons.findIndex(a=>a.id===appId);const pos=iconPos[appId]||defaultIconPos(idx);setIconDrag({id:appId,ox:e.clientX-pos.x,oy:e.clientY-pos.y,user,allIcons:[...allIcons]});}
+  function onIconMouseDown(e,appId,allIcons){if(e.button!==0)return;e.stopPropagation();e.preventDefault();const positions=layoutIcons(allIcons,iconPos);const pos=positions[appId]||{x:0,y:0};setIconDrag({id:appId,ox:e.clientX-pos.x,oy:e.clientY-pos.y,user,allIcons:[...allIcons]});}
   function onWidgetDragStart(e,id){if(e.button!==0)return;e.stopPropagation();e.preventDefault();const s=widgetState[id]||DEFAULT_WIDGET_STATE[id];setWidgetDrag({id,ox:e.clientX-s.x,oy:e.clientY-s.y});}
   function onWidgetResizeStart(e,id,edge){if(e.button!==0)return;e.stopPropagation();e.preventDefault();const s=widgetState[id]||DEFAULT_WIDGET_STATE[id];setWidgetResize({id,edge,sx:e.clientX,sy:e.clientY,x0:s.x,y0:s.y,w0:s.w,h0:s.h});}
   function closeWidget(id){updateSettings({widgets:{...widgets,[id]:false}});}
@@ -1387,8 +1437,16 @@ export default function NovaOS(){
       })}
  
       {/* Desktop icons */}
-      {allDesktopIcons.map((app,idx)=>{
-        const pos=iconPos[app.id]||defaultIconPos(idx);
+      {/* v9.3 (#21): compute one coherent layout for the whole desktop per
+          render. Saved positions are honored when in-bounds; the rest pack
+          into the next free grid slot — no more "icons dance + leave gaps"
+          when the window resizes. `viewport.w/h` are referenced inside the
+          IIFE so the React renderer treats this expression as depending on
+          the viewport state and recomputes on resize. */}
+      {(() => { const positions = layoutIcons(allDesktopIcons, iconPos);
+                void viewport.w; void viewport.h;
+                return allDesktopIcons.map((app) => {
+        const pos = positions[app.id] || { x: 0, y: 0 };
         const isDrg=iconDrag?.id===app.id;
         function launch(){if(app.storeApp){if(app.storeApp.newTab)openExternalUrl(app.storeApp.url);else openApp("browser");}else openApp(app.id);}
         return(
@@ -1450,8 +1508,8 @@ export default function NovaOS(){
             <span style={{fontFamily:FFB,fontWeight:600,fontSize:10.5,color:"#fff",textAlign:"center",lineHeight:1.25,textShadow:"0 1px 3px rgba(0,0,0,0.9), 0 0 8px rgba(0,0,0,0.5)",pointerEvents:"none",letterSpacing:0.15}}>{app.label}</span>
           </div>
         );
-      })}
- 
+      }); })()}
+
       {/* Start menu — v8.0 refresh.
           Wider (420 vs 360), more breathing room around the search bar, app
           grid spaced more generously, footer user-card gains a subtle accent
@@ -1862,7 +1920,24 @@ export default function NovaOS(){
           height:44,display:"flex",alignItems:"center",gap:3,padding:"0 4px",
           background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.06)",borderRadius:13,
         }}>
-          {/* v9.0 — Quick settings (network + volume + glass). Opens the flyout. */}
+          {/* v9.3 (#22) — Dedicated volume button so the slider is one click
+              away without opening Settings. Same flyout as the network
+              button; both are at-a-glance indicators that share quick
+              settings. The icon reflects the current mute state. */}
+          {(() => {
+            const muted = !soundCfg.enabled || soundCfg.volume <= 0;
+            return (
+              <button className="sb" onClick={()=>setQsOpen(o=>!o)} title={muted ? "Muted — click to adjust" : "Volume " + Math.round(soundCfg.volume*100) + "%"} style={{
+                width:36,height:36,borderRadius:9,
+                background:qsOpen?fill(AC):"transparent",
+                border:qsOpen?"1px solid "+bdr(AC):"1px solid transparent",
+                cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",
+                color:qsOpen?AC:(muted?"rgba(255,255,255,0.42)":"rgba(255,255,255,0.62)"),
+                transition:"all 0.18s cubic-bezier(0.4,0,0.2,1)",
+              }}><VolumeGlyph size={17} muted={muted}/></button>
+            );
+          })()}
+          {/* v9.0 — Network/quick-settings button. Opens the same flyout. */}
           <button className="sb" onClick={()=>setQsOpen(o=>!o)} title="Quick settings" style={{
             width:36,height:36,borderRadius:9,
             background:qsOpen?fill(AC):"transparent",

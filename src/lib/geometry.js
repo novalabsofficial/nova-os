@@ -20,6 +20,70 @@ export function defaultIconPos(i) {
   };
 }
 
+/**
+ * v9.3 (issue #21) — Lay out every desktop icon into a consistent grid for
+ * the current viewport. Honors saved positions when they're still in bounds
+ * and not colliding; for everything else, packs into the next available
+ * column-major grid slot.
+ *
+ * Why this exists: the v8.x code did `iconPos[id] || defaultIconPos(idx)`
+ * per icon at render time. defaultIconPos depends on the window height
+ * (rows = floor(availH / cellHeight)), so resizing the window changed the
+ * fallback positions of ALL un-saved icons — they "danced" around. Saved
+ * icons could also drift off-screen entirely. This helper computes one
+ * coherent layout per render: nothing moves unless it has to, and nothing
+ * sits off-screen leaving a visible gap.
+ *
+ * Returns: { [iconId]: {x, y} }
+ */
+export function layoutIcons(icons, savedPos) {
+  const cW = ICON_W + ICON_GAP;
+  const cH = ICON_H + ICON_GAP;
+  const maxC = Math.max(1, Math.floor((window.innerWidth - ICON_PAD_X) / cW));
+  const availH = window.innerHeight - TASKBAR_H - ICON_PAD_Y - 10;
+  const maxR = Math.max(1, Math.floor(availH / cH));
+  const occupied = new Set();
+  const out = {};
+
+  // Pass 1: honour saved positions that snap to a valid in-bounds cell that
+  // isn't already taken. (Two icons sharing the same saved cell is rare but
+  // possible — earlier in-bounds wins, the loser falls through to pass 2.)
+  for (const icon of icons) {
+    const s = savedPos[icon.id];
+    if (!s) continue;
+    const col = Math.round((s.x - ICON_PAD_X) / cW);
+    const row = Math.round((s.y - ICON_PAD_Y) / cH);
+    if (col < 0 || col >= maxC || row < 0 || row >= maxR) continue;
+    const key = col + "," + row;
+    if (occupied.has(key)) continue;
+    occupied.add(key);
+    out[icon.id] = { x: ICON_PAD_X + col * cW, y: ICON_PAD_Y + row * cH };
+  }
+
+  // Pass 2: assign every remaining icon to the next unoccupied grid slot in
+  // column-major order. Guarantees a compact layout with no gaps.
+  let cursor = 0;
+  for (const icon of icons) {
+    if (out[icon.id]) continue;
+    while (cursor < maxC * maxR) {
+      const col = Math.floor(cursor / maxR);
+      const row = cursor % maxR;
+      cursor++;
+      const key = col + "," + row;
+      if (!occupied.has(key)) {
+        occupied.add(key);
+        out[icon.id] = { x: ICON_PAD_X + col * cW, y: ICON_PAD_Y + row * cH };
+        break;
+      }
+    }
+    // If we ran out of cells (more icons than fit), stack the extras at
+    // (0,0) — bad case but graceful (rather than blowing up).
+    if (!out[icon.id]) out[icon.id] = { x: ICON_PAD_X, y: ICON_PAD_Y };
+  }
+
+  return out;
+}
+
 export function snapToFreeGrid(dragId, rawX, rawY, allPos) {
   const cW = ICON_W + ICON_GAP;
   const cH = ICON_H + ICON_GAP;
