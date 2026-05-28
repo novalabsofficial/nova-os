@@ -172,13 +172,22 @@ export function ChatApp({ user, AC }) {
   }
 
   // ── Build the grouped list for whichever view is showing ─────────────
+  // v9.2: Discord-style consecutive-message grouping. If the next message is
+  // from the same user within 7 minutes, mark it `grouped: true` so the
+  // renderer skips the avatar/name/timestamp header and just renders the
+  // text — matches the Discord "messages from the same person stack" feel.
   const activeMessages = view === "dm" ? dmMessages : messages;
   const grouped = [];
   let lastDay = null;
+  let lastUser = null;
+  let lastTs = 0;
   activeMessages.forEach(msg => {
     const day = new Date(msg.ts).toDateString();
-    if (day !== lastDay) { grouped.push({ type: "day", label: fmtDay(msg.ts), key: "day-"+msg.ts }); lastDay = day; }
-    grouped.push({ type: "msg", ...msg });
+    if (day !== lastDay) { grouped.push({ type: "day", label: fmtDay(msg.ts), key: "day-"+msg.ts }); lastDay = day; lastUser = null; }
+    const isGrouped = msg.user === lastUser && (msg.ts - lastTs) < 7 * 60 * 1000;
+    grouped.push({ type: "msg", ...msg, grouped: isGrouped });
+    lastUser = msg.user;
+    lastTs = msg.ts;
   });
 
   // ── Header content varies by view ────────────────────────────────────
@@ -193,8 +202,8 @@ export function ChatApp({ user, AC }) {
   return (
     <div style={{ width: "100%", height: "100%", display: "flex", fontFamily: FF, minHeight: 0 }}>
 
-      {/* ───────── Sidebar ───────── */}
-      <div style={{ width: 168, flexShrink: 0, borderRight: "1px solid rgba(255,255,255,0.07)", display: "flex", flexDirection: "column", background: "rgba(255,255,255,0.015)", minHeight: 0 }}>
+      {/* ───────── Sidebar (v9.2 — wider, Discord-style) ───────── */}
+      <div style={{ width: 220, flexShrink: 0, borderRight: "1px solid var(--nv-border)", display: "flex", flexDirection: "column", background: "rgba(255,255,255,0.02)", minHeight: 0 }}>
         {/* Global entry */}
         <SidebarRow
           label="# Global"
@@ -312,10 +321,10 @@ export function ChatApp({ user, AC }) {
             {grouped.map(item => {
               if (item.type === "day") {
                 return (
-                  <div key={item.key} style={{ display: "flex", alignItems: "center", gap: 10, margin: "10px 0 6px" }}>
-                    <div style={{ flex: 1, height: 1, background: "rgba(255,255,255,0.07)" }} />
-                    <span style={{ fontFamily: FFB, fontSize: 10, color: "rgba(255,255,255,0.25)", letterSpacing: 0.8 }}>{item.label}</span>
-                    <div style={{ flex: 1, height: 1, background: "rgba(255,255,255,0.07)" }} />
+                  <div key={item.key} style={{ display: "flex", alignItems: "center", gap: 10, margin: "14px 0 8px" }}>
+                    <div style={{ flex: 1, height: 1, background: "rgba(255,255,255,0.08)" }} />
+                    <span style={{ fontFamily: FFB, fontSize: 10, color: "var(--nv-text-dim)", letterSpacing: 1, padding: "2px 10px", background: "rgba(255,255,255,0.04)", borderRadius: 10, border: "1px solid rgba(255,255,255,0.06)" }}>{item.label}</span>
+                    <div style={{ flex: 1, height: 1, background: "rgba(255,255,255,0.08)" }} />
                   </div>
                 );
               }
@@ -326,45 +335,57 @@ export function ChatApp({ user, AC }) {
                 ? () => deleteGlobalMessage(item.id, item.user)
                 : () => deleteDmMessage(item.id, item.user);
 
-              return (
-                <div key={item.id} style={{ display: "flex", flexDirection: "column", alignItems: isMe ? "flex-end" : "flex-start", marginBottom: 6 }}>
-                  {!isMe && view === "global" && (
-                    <span style={{ fontFamily: FFB, fontWeight: 600, fontSize: 10, color: uc, marginBottom: 3, marginLeft: 2 }}>@{item.user}</span>
-                  )}
-                  <div style={{ display: "flex", alignItems: "flex-end", gap: 6, flexDirection: isMe ? "row-reverse" : "row" }}>
-                    <div style={{ width: 22, height: 22, borderRadius: "50%", background: "rgba("+hexRgb(uc)+",0.2)", border: "1.5px solid "+uc, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, flexShrink: 0, marginBottom: 2 }}>
-                      {(item.user||"?")[0].toUpperCase()}
+              // v9.2 — Discord-style flat, left-aligned messages. Grouped
+              // consecutive messages from the same sender skip the
+              // avatar/name header and just render the text body (with a
+              // hover timestamp on the left margin).
+              if (item.grouped) {
+                return (
+                  <div key={item.id} className="msgrow" style={{ display: "flex", padding: "1px 8px", borderRadius: 4 }}>
+                    {/* avatar gutter — empty for grouped messages; the timestamp appears here on hover */}
+                    <div className="ts-hover" style={{ width: 40, flexShrink: 0, fontFamily: FFM, fontSize: 9.5, color: "transparent", paddingTop: 4, textAlign: "center", transition: "color 0.12s" }}>
+                      {fmtTime(item.ts)}
                     </div>
-                    <div style={{
-                      maxWidth: "70%",
-                      padding: "8px 12px",
-                      borderRadius: isMe ? "14px 14px 3px 14px" : "14px 14px 14px 3px",
-                      background: isMe ? "rgba("+hexRgb(AC)+",0.18)" : "rgba(255,255,255,0.06)",
-                      border: "1px solid " + (isMe ? "rgba("+hexRgb(AC)+",0.45)" : "rgba(255,255,255,0.1)"),
-                      fontSize: 13,
-                      color: "rgba(255,255,255,0.92)",
-                      lineHeight: 1.55,
-                      wordBreak: "break-word",
-                      fontFamily: FF,
-                    }}>
-                      {item.text}
+                    <div style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "flex-start", gap: 8 }}>
+                      <div style={{ flex: 1, fontSize: 14, color: "var(--nv-text)", lineHeight: 1.55, wordBreak: "break-word", fontFamily: FF }}>{item.text}</div>
+                      {(isMe || isMod) && (
+                        <button
+                          className="dl rowact"
+                          onClick={onDelete}
+                          title={isMe ? "Delete message" : "Mod delete — TOS violation"}
+                          style={{ background: "rgba(0,0,0,0.25)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 6, cursor: "pointer", color: isMe ? "rgba(255,80,80,0.6)" : "rgba(255,200,80,0.7)", fontSize: 11, padding: "2px 6px", flexShrink: 0, opacity: 0, transition: "opacity 0.12s" }}
+                        >{isMe ? "✕" : "🛡"}</button>
+                      )}
                     </div>
-                    {(isMe || isMod) && (
-                      <button
-                        className="dl"
-                        onClick={onDelete}
-                        title={isMe ? "Delete message" : "Mod delete — TOS violation"}
-                        style={{
-                          background: "none", border: "none", cursor: "pointer",
-                          color: isMe ? "rgba(255,80,80,0.35)" : "rgba(255,200,80,0.6)",
-                          fontSize: 12, padding: "2px 5px",
-                          transition: "color 0.12s", flexShrink: 0, marginBottom: 2,
-                        }}>{isMe ? "✕" : "🛡"}</button>
-                    )}
                   </div>
-                  <span style={{ fontSize: 9, fontFamily: FFM, color: "rgba(255,255,255,0.2)", marginTop: 2, marginLeft: isMe ? 0 : 28, marginRight: isMe ? 28 : 0 }}>
-                    {fmtTime(item.ts)}
-                  </span>
+                );
+              }
+
+              // Fresh message (first of a group) — full avatar + name + timestamp header.
+              return (
+                <div key={item.id} className="msgrow" style={{ display: "flex", padding: "5px 8px", borderRadius: 4, marginTop: 8 }}>
+                  <div style={{ width: 40, flexShrink: 0, display: "flex", justifyContent: "center", paddingTop: 1 }}>
+                    <div style={{ width: 32, height: 32, borderRadius: "50%", background: `rgba(${hexRgb(uc)},0.22)`, border: `1.5px solid ${uc}`, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: FFB, fontWeight: 700, fontSize: 13, color: "#fff" }}>
+                      {(item.user || "?")[0].toUpperCase()}
+                    </div>
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+                      <span style={{ fontFamily: FFB, fontWeight: 700, fontSize: 13.5, color: uc }}>@{item.user || "unknown"}</span>
+                      <span style={{ fontFamily: FFM, fontSize: 10.5, color: "var(--nv-text-dim)" }}>{fmtTime(item.ts)}</span>
+                      {isMe && <span style={{ fontFamily: FFB, fontSize: 9, padding: "1px 5px", borderRadius: 3, background: `rgba(${hexRgb(AC)},0.16)`, border: `1px solid rgba(${hexRgb(AC)},0.32)`, color: AC, letterSpacing: 0.5 }}>YOU</span>}
+                      <div style={{ flex: 1 }} />
+                      {(isMe || isMod) && (
+                        <button
+                          className="dl rowact"
+                          onClick={onDelete}
+                          title={isMe ? "Delete message" : "Mod delete — TOS violation"}
+                          style={{ background: "rgba(0,0,0,0.25)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 6, cursor: "pointer", color: isMe ? "rgba(255,80,80,0.6)" : "rgba(255,200,80,0.7)", fontSize: 11, padding: "2px 6px", opacity: 0, transition: "opacity 0.12s" }}
+                        >{isMe ? "✕" : "🛡"}</button>
+                      )}
+                    </div>
+                    <div style={{ fontSize: 14, color: "var(--nv-text)", lineHeight: 1.55, wordBreak: "break-word", fontFamily: FF, marginTop: 2 }}>{item.text}</div>
+                  </div>
                 </div>
               );
             })}
@@ -401,45 +422,60 @@ export function ChatApp({ user, AC }) {
   );
 }
 
-// ── Sidebar row components ───────────────────────────────────────────────
+// ── Sidebar row components (v9.2 — Discord-style) ─────────────────────────
 function SidebarRow({ label, active, onClick, AC }) {
   return (
     <button
       onClick={onClick}
+      className="fr"
       style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 10,
         textAlign: "left",
-        padding: "11px 14px",
+        margin: "0 8px",
+        padding: "9px 11px",
         background: active ? fill(AC) : "transparent",
-        border: "none",
-        borderLeft: active ? "3px solid " + AC : "3px solid transparent",
+        border: "1px solid " + (active ? bdr(AC) : "transparent"),
+        borderRadius: 8,
         cursor: "pointer",
         fontFamily: FFB,
         fontWeight: 600,
         fontSize: 13,
-        color: active ? AC : "rgba(255,255,255,0.85)",
+        color: active ? AC : "var(--nv-text)",
         transition: "background 0.12s, color 0.12s",
-        width: "100%",
+        width: "calc(100% - 16px)",
       }}
-    >{label}</button>
+    >
+      <span style={{ fontFamily: FFM, fontSize: 16, opacity: active ? 1 : 0.6, lineHeight: 1, flexShrink: 0 }}>#</span>
+      <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{label.replace(/^#\s*/, "")}</span>
+    </button>
   );
 }
 
 function DmRow({ username, preview, lastTs, active, onClick, AC }) {
+  const uc = (() => {
+    // Same colorer used in the message list; pair the avatar to the user.
+    const palette = ["#4f9eff","#ff6b6b","#4cef90","#ffcc44","#cc44ff","#ff8c44","#44ddcc","#ff44aa","#f97316","#06b6d4"];
+    let h = 0;
+    for (let i = 0; i < (username || "").length; i++) h = (h * 31 + username.charCodeAt(i)) & 0xffffffff;
+    return palette[Math.abs(h) % palette.length];
+  })();
   return (
     <button
       onClick={onClick}
       title={username}
+      className="fr"
       style={{
         display: "flex",
-        flexDirection: "column",
-        alignItems: "flex-start",
-        gap: 1,
+        alignItems: "center",
+        gap: 10,
         textAlign: "left",
         padding: "8px 10px",
-        margin: "2px 0",
-        background: active ? "rgba("+hexRgb(AC)+",0.15)" : "transparent",
+        margin: "1px 0",
+        background: active ? "rgba("+hexRgb(AC)+",0.16)" : "transparent",
         border: "1px solid " + (active ? "rgba("+hexRgb(AC)+",0.35)" : "transparent"),
-        borderRadius: 6,
+        borderRadius: 8,
         cursor: "pointer",
         fontFamily: FF,
         width: "100%",
@@ -447,16 +483,22 @@ function DmRow({ username, preview, lastTs, active, onClick, AC }) {
         overflow: "hidden",
       }}
     >
-      <div style={{ display: "flex", alignItems: "center", gap: 6, width: "100%", overflow: "hidden" }}>
-        <span style={{ fontFamily: FFB, fontWeight: 600, fontSize: 12, color: active ? AC : "rgba(255,255,255,0.9)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>
+      <div style={{
+        width: 32, height: 32, borderRadius: "50%", flexShrink: 0,
+        background: `rgba(${hexRgb(uc)},0.22)`, border: `1.5px solid ${uc}`,
+        display: "flex", alignItems: "center", justifyContent: "center",
+        fontFamily: FFB, fontWeight: 700, fontSize: 13, color: "#fff",
+      }}>{(username || "?")[0].toUpperCase()}</div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontFamily: FFB, fontWeight: 600, fontSize: 12.5, color: active ? AC : "var(--nv-text-strong)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
           @{username}
-        </span>
+        </div>
+        {preview && (
+          <div style={{ fontSize: 10.5, color: "var(--nv-text-dim)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", lineHeight: 1.35, marginTop: 1 }}>
+            {preview}
+          </div>
+        )}
       </div>
-      {preview && (
-        <span style={{ fontSize: 10, color: "rgba(255,255,255,0.4)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", width: "100%", lineHeight: 1.3 }}>
-          {preview}
-        </span>
-      )}
     </button>
   );
 }
