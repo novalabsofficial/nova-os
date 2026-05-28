@@ -317,7 +317,7 @@ export function SettingsApp({ user, data, updateSettings, showToast, AC, onCusto
           <div style={SEC}>Shortcuts</div>
           <div style={{ display: "flex", flexDirection: "column", gap: 5, padding: "10px 12px", background: "rgba(255,255,255,0.03)", border: "1px solid var(--nv-border)", borderRadius: 8 }}>
             {[
-              ["⌘/Ctrl + K", "Open start menu"],
+              ["⌘/Ctrl + K", "Spotlight global search"],
               ["⌘/Ctrl + ,", "Open Settings"],
               ["Esc", "Close start menu / dialogs"],
               ["Alt + W", "Close active window"],

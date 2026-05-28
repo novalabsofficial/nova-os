@@ -188,6 +188,217 @@ function TaskbarWeather({ data, onClick }) {
   );
 }
 
+// ─── v9.4 — Spotlight (global search palette) ───────────────────────────
+// Floating Ctrl+K palette that searches across apps, notes, tasks,
+// folders, store apps, and Settings panes. Module-level so it isn't
+// re-instantiated on every NovaOS render. All state is local — opening
+// always starts at an empty query, which is the right default.
+
+// Settings panes to surface in the palette. id matches SettingsApp's
+// internal section ids (see SettingsApp.jsx). Subtitle is the short
+// description shown under each result.
+const SPOTLIGHT_SETTINGS = [
+  { id: "appearance", label: "Appearance",           subtitle: "Liquid Glass, accent, wallpaper" },
+  { id: "display",    label: "Display",              subtitle: "Fullscreen, clock, large text, screensaver" },
+  { id: "sound",      label: "Sound",                subtitle: "System sound volume, preview" },
+  { id: "network",    label: "Network",              subtitle: "Connection status" },
+  { id: "widgets",    label: "Widgets",              subtitle: "Desktop widgets" },
+  { id: "keyboard",   label: "Keyboard shortcuts",   subtitle: "Global hotkeys reference" },
+  { id: "account",    label: "Account",              subtitle: "Sign out" },
+  { id: "about",      label: "About Nova OS",        subtitle: "Version, edition" },
+];
+
+function scoreMatch(label, sub, q) {
+  if (!q) return 0;
+  const L = (label || "").toLowerCase();
+  const S = (sub || "").toLowerCase();
+  const Q = q.toLowerCase();
+  if (L === Q) return 1000;
+  if (L.startsWith(Q)) return 500;
+  if (L.includes(Q)) return 200;
+  if (S.includes(Q)) return 50;
+  return 0;
+}
+
+function Spotlight({ AC, data, apps, storeCatalog, commApps, isPubliclyVisible, openApp, openExternalUrl, openSettingsSection, onClose }) {
+  const [q, setQ] = useState("");
+  const [idx, setIdx] = useState(0);
+  const inputRef = useRef(null);
+  useEffect(() => { inputRef.current?.focus(); }, []);
+
+  // Build the full searchable item list. Each item:
+  //   { key, label, subtitle, icon, type, action }
+  const items = (() => {
+    const out = [];
+    // Built-in apps.
+    for (const a of (apps || [])) {
+      out.push({
+        key: "app-" + a.id, label: a.label, subtitle: a.desc || "", icon: a.icon || "▣",
+        type: "App", action: () => openApp(a.id),
+      });
+    }
+    // Catalog apps (whether installed or not — open ones launch, others can still navigate to Store).
+    for (const a of (storeCatalog || [])) {
+      out.push({
+        key: "cat-" + a.id, label: a.name, subtitle: "Store · " + (a.cat || "Apps") + (a.desc ? " · " + a.desc : ""),
+        icon: a.icon || "🚀", type: "Store",
+        action: () => {
+          if (a.newTab) openExternalUrl(a.url);
+          else openApp("browser");
+        },
+      });
+    }
+    // Community apps (publicly visible).
+    for (const a of (commApps || [])) {
+      if (!isPubliclyVisible || !isPubliclyVisible(a)) continue;
+      out.push({
+        key: "comm-" + a.id, label: a.name, subtitle: "Community · " + (a.cat || "Apps") + (a.desc ? " · " + a.desc : ""),
+        icon: a.icon || "🚀", type: "Store",
+        action: () => {
+          if (a.newTab) openExternalUrl(a.url);
+          else openApp("browser");
+        },
+      });
+    }
+    // Notes.
+    for (const n of (data?.notes || [])) {
+      out.push({
+        key: "note-" + n.id, label: n.title || "Untitled note",
+        subtitle: (n.body || "").replace(/\s+/g, " ").trim().slice(0, 80),
+        icon: "📝", type: "Note", action: () => openApp("notes"),
+      });
+    }
+    // Tasks.
+    for (const t of (data?.tasks || [])) {
+      out.push({
+        key: "task-" + t.id, label: t.text || "Task",
+        subtitle: t.done ? "Done" : "Open",
+        icon: "✅", type: "Task", action: () => openApp("tasks"),
+      });
+    }
+    // Folders.
+    for (const f of (data?.folders || [])) {
+      out.push({
+        key: "folder-" + f.id, label: f.name || "Folder",
+        subtitle: "Folder",
+        icon: "📁", type: "Folder", action: () => openApp("files"),
+      });
+    }
+    // Settings panes.
+    for (const s of SPOTLIGHT_SETTINGS) {
+      out.push({
+        key: "settings-" + s.id, label: s.label + " — Settings", subtitle: s.subtitle,
+        icon: "⚙", type: "Setting",
+        action: () => openSettingsSection(s.id),
+      });
+    }
+    return out;
+  })();
+
+  // Filter + score + sort. Empty query → show a small set of recent items.
+  const trimmed = q.trim();
+  let results;
+  if (!trimmed) {
+    // Empty state: a handful of built-in apps + recent notes as suggestions.
+    const recent = [];
+    const appSlice = (apps || []).slice(0, 6).map(a => ({
+      key: "app-" + a.id, label: a.label, subtitle: a.desc || "", icon: a.icon || "▣",
+      type: "App", action: () => openApp(a.id),
+    }));
+    const noteSlice = [...(data?.notes || [])].sort((a, b) => (b.ts || 0) - (a.ts || 0)).slice(0, 3).map(n => ({
+      key: "note-" + n.id, label: n.title || "Untitled note",
+      subtitle: new Date(n.ts || 0).toLocaleDateString(),
+      icon: "📝", type: "Note", action: () => openApp("notes"),
+    }));
+    results = [...appSlice, ...noteSlice];
+  } else {
+    results = items
+      .map(it => ({ it, score: scoreMatch(it.label, it.subtitle, trimmed) }))
+      .filter(x => x.score > 0)
+      .sort((a, b) => b.score - a.score || a.it.label.localeCompare(b.it.label))
+      .slice(0, 12)
+      .map(x => x.it);
+  }
+  // Clamp idx whenever results change — useEffect avoids the
+  // "setState during render" warning that an inline `if` would cause.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { if (idx >= results.length) setIdx(0); }, [q]);
+
+  function exec(item) { item.action(); onClose(); }
+  function onKey(e) {
+    if (e.key === "ArrowDown") { e.preventDefault(); setIdx(i => Math.min(i + 1, results.length - 1)); }
+    else if (e.key === "ArrowUp") { e.preventDefault(); setIdx(i => Math.max(i - 1, 0)); }
+    else if (e.key === "Enter") { e.preventDefault(); if (results[idx]) exec(results[idx]); }
+    else if (e.key === "Escape") { e.preventDefault(); onClose(); }
+  }
+
+  return (
+    <>
+      <div onClick={onClose} style={{ position: "fixed", inset: 0, zIndex: 100050, background: "rgba(0,0,0,0.45)", backdropFilter: "blur(10px)", WebkitBackdropFilter: "blur(10px)" }} />
+      <div style={{
+        position: "fixed", left: "50%", top: "13%", transform: "translateX(-50%)",
+        width: "min(560px, calc(100vw - 28px))", zIndex: 100051,
+        background: "var(--nv-surface-solid)",
+        backdropFilter: "blur(40px) saturate(180%)", WebkitBackdropFilter: "blur(40px) saturate(180%)",
+        border: "1px solid rgba(255,255,255,0.1)", borderRadius: 16,
+        boxShadow: "0 30px 90px rgba(0,0,0,0.6), 0 1px 0 rgba(255,255,255,0.08) inset",
+        overflow: "hidden", fontFamily: FF,
+        animation: "menu-up 0.22s cubic-bezier(0.16,1,0.3,1)",
+      }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 11, padding: "16px 18px", borderBottom: "1px solid var(--nv-border)" }}>
+          <span style={{ fontSize: 18 }}>🔍</span>
+          <input
+            ref={inputRef}
+            value={q}
+            onChange={e => setQ(e.target.value)}
+            onKeyDown={onKey}
+            placeholder="Search Nova OS — apps, notes, tasks, folders, settings…"
+            style={{ flex: 1, background: "transparent", border: "none", outline: "none", color: "var(--nv-text-strong)", fontFamily: FF, fontSize: 15, letterSpacing: 0.2 }}
+          />
+          <button onClick={onClose} style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 6, cursor: "pointer", color: "var(--nv-text-dim)", fontFamily: FFM, fontSize: 10.5, padding: "2px 7px" }}>Esc</button>
+        </div>
+        <div style={{ maxHeight: "min(420px, 60vh)", overflowY: "auto", padding: 6 }}>
+          {results.length === 0 && (
+            <div style={{ padding: "32px 18px", textAlign: "center", color: "var(--nv-text-dim)", fontSize: 12.5 }}>
+              No matches{trimmed ? ' for "' + trimmed + '"' : ""}.
+            </div>
+          )}
+          {results.map((r, i) => (
+            <div
+              key={r.key}
+              onClick={() => exec(r)}
+              onMouseEnter={() => setIdx(i)}
+              style={{
+                display: "flex", alignItems: "center", gap: 12,
+                padding: "10px 12px", borderRadius: 8, cursor: "pointer",
+                background: i === idx ? fill(AC) : "transparent",
+                border: "1px solid " + (i === idx ? bdr(AC) : "transparent"),
+                marginBottom: 2, transition: "background 0.1s, border-color 0.1s",
+              }}
+            >
+              <div style={{ width: 30, height: 30, fontSize: 18, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{r.icon}</div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontFamily: FFB, fontWeight: 600, fontSize: 13, color: i === idx ? AC : "var(--nv-text-strong)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.label}</div>
+                {r.subtitle && (
+                  <div style={{ fontSize: 11, color: "var(--nv-text-dim)", marginTop: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.subtitle}</div>
+                )}
+              </div>
+              <div style={{ fontFamily: FFM, fontSize: 9.5, color: "var(--nv-text-dim)", letterSpacing: 0.6, textTransform: "uppercase", flexShrink: 0, padding: "2px 7px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 4 }}>{r.type}</div>
+            </div>
+          ))}
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 14, padding: "8px 14px", borderTop: "1px solid var(--nv-border)", fontFamily: FFM, fontSize: 10.5, color: "var(--nv-text-dim)" }}>
+          <span><strong style={{ color: "var(--nv-text)" }}>↑↓</strong> Navigate</span>
+          <span><strong style={{ color: "var(--nv-text)" }}>↵</strong> Open</span>
+          <span><strong style={{ color: "var(--nv-text)" }}>Esc</strong> Close</span>
+          <div style={{ flex: 1 }} />
+          <span>{results.length} {results.length === 1 ? "result" : "results"}</span>
+        </div>
+      </div>
+    </>
+  );
+}
+
 // ─── v9.0 quick-settings glyphs ─────────────────────────────────────────
 function WifiGlyph({ size = 16, on = true }) {
   return (
@@ -327,6 +538,10 @@ export default function NovaOS(){
   // Severe/Extreme NWS alert object (with `locationLabel` added by Atmos).
   // null = no alert overlay. Atmos sets it via the onSevereAlert prop.
   const [severeAlert, setSevereAlert] = useState(null);
+  // v9.4 — Spotlight (global search palette). Toggled by the taskbar
+  // Search button or by Ctrl/Cmd+K. Searches across apps, notes, tasks,
+  // folders, store apps, and Settings panes.
+  const [spotlightOpen, setSpotlightOpen] = useState(false);
   const ssActiveRef = useRef(false);
   const idleTimerRef = useRef(null);
   // v8.6 cross-app drag-and-drop — mirrors the shared dragStore so we can
@@ -1034,7 +1249,7 @@ export default function NovaOS(){
   }
 
   // v6.4: Global keyboard shortcuts.
-  //   Cmd/Ctrl + K    → toggle start menu (search auto-focused)
+  //   Cmd/Ctrl + K    → Spotlight global search (v9.4 — was start menu)
   //   Cmd/Ctrl + ,    → open Settings
   //   Esc             → close start menu (apps handle Esc themselves)
   //   Alt + W         → close the active window
@@ -1045,14 +1260,14 @@ export default function NovaOS(){
   // can't preventDefault them. Alt-based combos are the cleanest dodge.
   //
   // We avoid firing shortcuts while typing into <input>/<textarea> so
-  // Cmd+K inside a search box doesn't surprise-open the start menu.
+  // Cmd+K inside a search box doesn't surprise-open Spotlight.
   // (Esc is allowed everywhere — it's expected to "cancel" universally.)
   //
   // Handler ref pattern: keeps the listener stable across renders while
   // still reading the latest handler functions. Re-binding the listener
   // on every render would work too, just slightly noisier.
   const kbHandlersRef = useRef(null);
-  kbHandlersRef.current = { openApp, closeWin, minimizeWin, setMenuOpen, screen, applySnap, snapDown };
+  kbHandlersRef.current = { openApp, closeWin, minimizeWin, setMenuOpen, setSpotlightOpen, screen, applySnap, snapDown };
   useEffect(()=>{
     function onKey(e){
       const h = kbHandlersRef.current;
@@ -1066,10 +1281,12 @@ export default function NovaOS(){
         h.setMenuOpen(false);
         return;
       }
-      // Cmd/Ctrl + K — start menu
+      // Cmd/Ctrl + K — Spotlight (v9.4). Reassigned from the start menu;
+      // Spotlight is the better search target and the Start button is
+      // still one click away in the taskbar.
       if(mod && (e.key === "k" || e.key === "K") && !isTyping){
         e.preventDefault();
-        h.setMenuOpen(o => !o);
+        h.setSpotlightOpen(o => !o);
         return;
       }
       // Cmd/Ctrl + , — Settings
@@ -1409,6 +1626,23 @@ export default function NovaOS(){
           <div style={{fontFamily:FF,fontSize:"min(4.2vw,24px)",color:"rgba(255,255,255,0.62)",marginTop:18,letterSpacing:1}}>{fmtDate(tick)}</div>
           <div style={{fontFamily:FFM,fontSize:12,color:"rgba(255,255,255,0.3)",marginTop:44,letterSpacing:1}}>move the mouse or press any key to wake</div>
         </div>
+      )}
+      {/* v9.4 — Spotlight (Ctrl/Cmd+K). Floats above everything except
+          the severe-weather alert. Closes on backdrop click, Esc, or
+          after picking a result. */}
+      {spotlightOpen && (
+        <Spotlight
+          AC={AC}
+          data={data}
+          apps={APPS}
+          storeCatalog={STORE_CATALOG}
+          commApps={commApps}
+          isPubliclyVisible={isPubliclyVisible}
+          openApp={openApp}
+          openExternalUrl={openExternalUrl}
+          openSettingsSection={(id) => { setSettingsSection(id); openApp("settings"); }}
+          onClose={() => setSpotlightOpen(false)}
+        />
       )}
       {/* v9.4 — Atmos severe-weather lock-screen alert. Fires above
           everything when a Severe/Extreme NWS alert reaches the pinned
@@ -1853,6 +2087,19 @@ export default function NovaOS(){
           <NovaLogo size={30}/>
         </button>
         <div style={{width:1,height:26,background:"linear-gradient(180deg, transparent, rgba(255,255,255,0.12) 50%, transparent)",margin:"0 3px"}}/>
+        {/* v9.4 — Spotlight launcher. Opens the global-search palette. */}
+        {deviceMode!=="mobile" && (
+          <button className="sb" onClick={()=>setSpotlightOpen(true)} title="Search (Ctrl+K)" style={{
+            height:42,display:"flex",alignItems:"center",gap:8,padding:"0 14px",borderRadius:12,
+            background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.07)",
+            cursor:"pointer",fontFamily:FF,fontSize:12.5,color:"var(--nv-text-dim)",
+            transition:"all 0.18s cubic-bezier(0.4,0,0.2,1)",flexShrink:0,
+          }}>
+            <span style={{fontSize:14,lineHeight:1}}>🔍</span>
+            <span>Search</span>
+            <span style={{fontFamily:FFM,fontSize:10,padding:"1px 6px",background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.09)",borderRadius:4,marginLeft:4,letterSpacing:0.3}}>Ctrl+K</span>
+          </button>
+        )}
         {/* v9.0 — Windows 11-style weather pill in the bottom-left corner. */}
         {deviceMode!=="mobile" && <TaskbarWeather data={data} onClick={()=>openApp("atmos")} />}
         </div>
