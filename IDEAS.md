@@ -995,22 +995,75 @@ both of those become trivially solvable.
   the web app. For a Linux DE it needs to be the *session* — survives a
   crash gracefully, can be relaunched without losing state, etc.
 
-**Tiers (build incrementally)**
-1. **Kiosk Linux** — minimal Linux + Chromium kiosk pointed at Nova OS.
-   ~4–6 weeks of evenings. Real bootable distro, but Nova is "just" a
-   web app on top. No real OS integration yet.
-2. **Nova as the DE** — Tauri build replaces the desktop session. Real
-   power menu, real Wi-Fi, real audio. ~2–3 months of summer work.
-3. **Full distro** — Flatpak Store integration, custom installer,
-   Plymouth boot splash, polished hardware support. Months / years for
-   production-quality (ChromeOS-style polish).
+**Build phases (one project, three milestones — NOT three alternatives)**
+
+This is a single goal — get Nova running as the OS on real laptop hardware
+— built in three escalating phases. Each phase is shippable but only
+Phase 2 is a usable daily-driver. Phase 1 alone is a demo / kiosk
+appliance, not a real OS.
+
+1. **Phase 1 — fast VM kiosk (~4–6 weeks).** Minimal Linux + Chromium
+   kiosk pointed at a locally-bundled Nova OS. Goal is to **prove the
+   pipeline works**: ISO boots, Nova loads, Wi-Fi reaches Firebase, the
+   build artifact is a real `.iso` that runs in VirtualBox. **Not** a
+   daily-driver — power button still kills the machine, Wi-Fi has to be
+   set up outside Nova's UI, no real system controls. Think of this as
+   "verify the foundation," not "final product."
+2. **Phase 2 — Nova as the daily-driver desktop environment
+   (~2–3 months on top of Phase 1).** Tauri build replaces the Linux
+   desktop session. *This* is the line where you can actually use the
+   laptop:
+   - Real power menu (Shut down / Restart / Sleep / Lock — graceful
+     shutdown, no more hard power-off).
+   - Real Wi-Fi management from inside Nova's Settings → Network.
+   - Real system volume from the taskbar quick-settings.
+   - Brightness + battery actually wired up.
+   - Real Store that installs Flatpak apps (Firefox, VLC, etc.).
+   - Browser app uses real webviews — no iframe limits.
+3. **Phase 3 — polish into a distributable distro (open-ended).**
+   Custom installer, Plymouth boot splash, hardware QA across a couple
+   of laptop models, optional code signing, release on a website.
+   ChromeOS-style polish. Months/years of work if you want it that good;
+   easy to defer until you've actually used Phase 2 daily for a while.
+
+**For your goal — "run Nova on my old laptop as my actual OS" — Phase 2
+is the target. Phase 1 is the stepping stone we build on the way there.**
+
+**Build environment + what you supply**
+
+Nothing Linux-specific. The build tool (`live-build` / `archiso`) pulls
+the base Linux packages from official mirrors at build time — you don't
+host a Linux ISO, you don't pick a kernel, the build script handles it.
+
+What you'd need on your end:
+- **VirtualBox or VMware Player** (free) — to boot the ISO in a VM.
+- **WSL2** (optional, ~10 min one-time install) — for fast local ISO
+  builds. Skipping this is fine; the GitHub Actions CI workflow can
+  build the ISO on every tag push and you download it from the release
+  page. Slower iteration (~5–10 min per build) but zero local lift.
+
+That's it. No Linux setup, no kernel choices, no driver wrangling on
+your side. The configs in the repo do all the assembly.
+
+**Workload split (honest)**
+- ~**80 % on me** (Claude): writing the build configs, the Plymouth
+  splash theme, the Rust system-bridge for Phase 2, the JS glue
+  threading real settings into Nova's existing Settings panes, the CI
+  workflow, the docs.
+- ~**20 % on you**: booting the ISO in a VM, telling me what's broken,
+  taste calls on branding, optional WSL2 setup, eventually testing on
+  the real old laptop.
+
+The actual bottleneck isn't typing, it's the **test cycle**: ISO build
++ VM boot is minutes, not seconds. Pace is "evening sessions" rather
+than "lunch break" iteration. That's the real human cost.
 
 **Caveats**
 - Hardware drivers are Linux's eternal headache (Wi-Fi chips, GPUs,
   laptop function keys). Stick to a major upstream like Debian/Ubuntu
   rather than ultra-minimal bases — inherit their hardware stack.
 - USB persistence (saving user state across boots from a live USB) is
-  its own feature — decide upfront.
+  its own feature — decide upfront, probably for Phase 2.
 - VM target first, real hardware second. VM removes the driver
   variable entirely while you build the rest.
 
