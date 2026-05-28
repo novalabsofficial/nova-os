@@ -392,7 +392,14 @@ export function StoreApp({ user, data, updateData, showToast, AC }) {
     // always wins — see NovaOS.jsx for the full rationale (any doc whose
     // data carried its own `id` field would otherwise hide the doc id and
     // break `installedApps` matching).
-    const unsub = onSnapshot(q, snap => { setCommApps(snap.docs.map(d => { const x = d.data(); return { ...x, legacyId: x.id, id: d.id }; })); setLoadingComm(false); }, () => setLoadingComm(false));
+    // v9.3 — surface snapshot errors via console.warn instead of silently
+    // dropping into the "empty store" state. Mirrors the NovaOS-side
+    // diagnostic; both subscriptions log under their own labels so we can
+    // tell which side failed.
+    const unsub = onSnapshot(q,
+      snap => { setCommApps(snap.docs.map(d => { const x = d.data(); return { ...x, legacyId: x.id, id: d.id }; })); setLoadingComm(false); },
+      err => { console.warn("[StoreApp/nova_user_apps] snapshot error:", err?.message || err); setLoadingComm(false); }
+    );
     return () => unsub();
   }, []);
 

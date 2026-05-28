@@ -581,14 +581,44 @@ export default function NovaOS(){
   //      reference the *data* id (e.g. McDonald's, which predates this fix)
   //      still match via the legacy fallback in the filter below. New
   //      installs always use the canonical doc id.
+  // v9.3 — replaced the silent `() => {}` error handler with a console.warn.
+  // The v9.2 DM bug spent an unknowable amount of time invisibly broken
+  // because watchMyThreads's onSnapshot swallowed its error. Same shape
+  // here: if this query ever errors, no community store apps render and
+  // the user has no way to know why. A console line is a cheap insurance.
   useEffect(()=>{
     const q=query(collection(firestoreDb,"nova_user_apps"),orderBy("ts","desc"),limit(60));
     const unsub=onSnapshot(q,snap=>setCommApps(snap.docs.map(d=>{
       const x=d.data();
       return {...x, legacyId: x.id, id: d.id};
-    })),()=>{});
+    })),err=>{ console.warn("[nova_user_apps] snapshot error:", err?.message || err); });
     return ()=>unsub();
   },[]);
+
+  // v9.3 (community-app desktop install bug, batch 2) — runtime diagnostic.
+  // Logs to console whenever commApps or installedApps changes so we can
+  // see at runtime why an installed app isn't appearing on the desktop.
+  // Reads from `data` directly so we don't depend on the later-declared
+  // `installedApps` memo (would hit TDZ — see the v9.0 mishap). Safe to
+  // leave in until we confirm the install path is reliable for all users.
+  useEffect(()=>{
+    if(typeof console==="undefined")return;
+    const inst = data?.installedApps || [];
+    const visible = commApps.filter(a => isPubliclyVisible(a));
+    const matched = commApps.filter(a => isPubliclyVisible(a) && (inst.includes(a.id) || (a.legacyId && inst.includes(a.legacyId))));
+    console.group("[nova-install-debug]");
+    console.log("commApps total:", commApps.length, "  publicly-visible:", visible.length);
+    console.log("data.installedApps:", inst);
+    console.log("matching desktop icons:", matched.map(a => ({docId:a.id, legacyId:a.legacyId, name:a.name, status:a.status})));
+    // Surface installedApps entries that DO NOT correspond to any current
+    // community app — strong hint of a stale id from a deleted/rejected app.
+    const allKnownIds = new Set();
+    commApps.forEach(a => { allKnownIds.add(a.id); if (a.legacyId) allKnownIds.add(a.legacyId); });
+    const orphans = inst.filter(id => !allKnownIds.has(id));
+    if (orphans.length) console.warn("[nova-install-debug] orphan installedApps ids (no matching community-app doc):", orphans);
+    console.groupEnd();
+  }, [commApps, data?.installedApps]);
+
 
   // v8.6 AFK screensaver. settings.screensaverMins: 0 = off, else minutes of
   // idle before it fades in (default 1). Any input dismisses it and re-arms

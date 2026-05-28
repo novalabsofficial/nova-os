@@ -171,12 +171,19 @@ export function ChessApp({ user, AC }) {
     return (
       <div style={{
         display: "grid",
-        // v7.6: explicitly size both axes to 8 equal tracks. Without
-        // gridTemplateRows, empty squares collapsed to ~0 height while
-        // occupied squares stretched to fit their piece, making the board
-        // look ragged. Now every cell is a true square = boardSize / 8.
-        gridTemplateColumns: "repeat(8, 1fr)",
-        gridTemplateRows: "repeat(8, 1fr)",
+        // v7.6 explicitly sized both axes to 8 tracks of `1fr`. That should
+        // produce equal cells but in practice didn't: `1fr` resolves to
+        // `minmax(auto, 1fr)`, and the `auto` minimum is the row/column's
+        // min-content size. Rows with a piece have min-content = the piece
+        // glyph's height; rows with no pieces have min-content ≈ 0. When
+        // those minima differ, the `1fr` distribution honors them first
+        // and only spreads the leftover — so empty rows ended up smaller
+        // than rows with pieces. v9.3 (issue: chess board sizing still
+        // off) uses the standard `minmax(0, 1fr)` pattern that forces a
+        // 0 minimum, so every cell is genuinely boardSize/8 regardless of
+        // whether it has a piece on it.
+        gridTemplateColumns: "repeat(8, minmax(0, 1fr))",
+        gridTemplateRows: "repeat(8, minmax(0, 1fr))",
         width: "min(440px, 80vmin)",
         aspectRatio: "1/1",
         border: "2px solid #2a2a3a",
