@@ -451,16 +451,28 @@ const SOUND_RECIPES = {
   },
 
   // ── v9.4 — Atmos severe-weather alert ──────────────────────────────
-  // Three-pulse 607 Hz sawtooth — mirrors the classic Weatherscan alarm
-  // cadence (three urgent bursts) using the original NWS alert frequency.
-  // Sawtooth carries the "this is an alert" timbre; the master lowpass
-  // softens the harshness so it grabs attention without piercing.
+  // Weatherscan / EAS-style dual-tone attention signal, Nova-branded.
+  //
+  // The real EAS attention signal is two pure sawtooth tones at 853 Hz +
+  // 960 Hz played SIMULTANEOUSLY — that's where the iconic "EEE-OOOO"
+  // buzz comes from (a 107 Hz beating between the two carriers). Single
+  // tones can never sound right because the whole identity is the dyad.
+  //
+  // Nova's twist: keep the 607 Hz signature we've used since v5.3 and
+  // pair it with 683 Hz — same 1.125 frequency ratio as the real EAS
+  // pair (853 / 960 ≈ 1.1255), so the beat / "buzzy" character matches
+  // Weatherscan while the absolute pitch stays uniquely Nova.
+  //
+  // Three sustained 950 ms bursts with ~200 ms gaps = three cycles in
+  // ~3.5 s total, the typical Weatherscan / NWR cadence before the voice
+  // read-out kicks in. Sub-octave sine body keeps it from being piercing.
   nwsAlert: (ctx, t, v, r, d) => {
     const er = Math.min(1, r);
     for (let i = 0; i < 3; i++) {
-      const start = t + i * 0.55;
-      _voice(ctx, d, 607 * er, start, 400, 0.22 * v, "sawtooth", 12);
-      _voice(ctx, d, 303.5 * er, start, 400, 0.10 * v, "sine", 12);   // sub-octave body
+      const start = t + i * 1.15;
+      _voice(ctx, d, 607 * er, start, 950, 0.15 * v, "sawtooth", 25);
+      _voice(ctx, d, 683 * er, start, 950, 0.15 * v, "sawtooth", 25);  // partner tone — same 1.125 ratio as EAS 853/960
+      _voice(ctx, d, 303.5 * er, start, 950, 0.07 * v, "sine", 25);    // sub-octave body
     }
   },
 };
@@ -476,7 +488,7 @@ const SOUND_TAILS = {
   error: 700, message: 900, toast: 450, windowOpen: 250,
   windowClose: 300, appLaunch: 300, click: 100,
   // v9.4 — alarm + NWS recipes ring out longer than typical UI sounds.
-  alarmSunrise: 4200, alarmPulse: 3500, alarmClassic: 2500, nwsAlert: 2200,
+  alarmSunrise: 4200, alarmPulse: 3500, alarmClassic: 2500, nwsAlert: 3800,
   // v9.4 — volume preview is a quick chime, no reverb tail (see DRY_SOUNDS).
   volumeSample: 250,
 };

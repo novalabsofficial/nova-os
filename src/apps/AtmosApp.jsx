@@ -107,8 +107,9 @@ export function AtmosApp({AC,showToast,pushNotification,openNovaAi,data,updateSe
         //   1. Three-pulse 607 Hz sawtooth — the v9.4 NWS recipe, mirroring
         //      Weatherscan's classic alarm cadence (was a single sine tone
         //      pre-v9.4).
-        //   2. After ~2.5 s, TTS reads each alert's event + headline so the
-        //      user can hear what's happening without looking at the screen.
+        //   2. After ~3.7 s (a beat after the dual-tone signal ends), TTS
+        //      reads each alert's event + headline so the user can hear
+        //      what's happening without looking at the screen.
         // The tone plays each time a location with alerts is loaded; the
         // TTS queues all alerts in order, automatically read back-to-back
         // by the browser's SpeechSynthesis queue.
@@ -119,7 +120,7 @@ export function AtmosApp({AC,showToast,pushNotification,openNovaAi,data,updateSe
               const summary = a.event + (a.headline ? ". " + a.headline : "");
               speak(summary);
             }
-          }, 2500);
+          }, 3700);
           // Mirror each active alert into the persistent notification center
           // so the user can revisit them later via the bell icon.
           if(pushNotification){
