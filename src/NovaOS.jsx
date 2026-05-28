@@ -188,6 +188,111 @@ function TaskbarWeather({ data, onClick }) {
   );
 }
 
+// ─── v9.0 quick-settings glyphs ─────────────────────────────────────────
+function WifiGlyph({ size = 16, on = true }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" style={{display:"block",opacity:on?1:0.5}}>
+      <path d="M5 12.55a11 11 0 0 1 14 0M1.42 9a16 16 0 0 1 21.16 0M8.53 16.11a6 6 0 0 1 6.95 0"/>
+      <path d="M12 20h.01"/>
+    </svg>
+  );
+}
+function VolumeGlyph({ size = 16, muted = false }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" style={{display:"block"}}>
+      <path d="M11 5 6 9H2v6h4l5 4z"/>
+      {muted
+        ? <path d="M22 9l-6 6M16 9l6 6"/>
+        : <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/>}
+    </svg>
+  );
+}
+
+// ─── v9.0 taskbar quick-settings flyout ─────────────────────────────────
+// Windows 11-style quick-settings panel that opens from the system tray.
+// Holds a network status tile (informational — a browser can't switch Wi-Fi),
+// a Nova system-sound volume slider + mute, and a Liquid Glass quick toggle.
+// "Network/Sound settings" links deep-link into the Settings app.
+function QuickSettingsPanel({ AC, glass, onToggleGlass, onClose, openSettingsSection }) {
+  const readNet = () => {
+    if (typeof navigator === "undefined") return { online: true, label: "Connected" };
+    const c = navigator.connection || navigator.mozConnection || navigator.webkitConnection || null;
+    const online = navigator.onLine !== false;
+    const label = !online ? "Offline"
+      : c && c.type === "wifi" ? "Wi-Fi"
+      : c && c.type === "ethernet" ? "Ethernet"
+      : c && c.type === "cellular" ? "Cellular"
+      : "Connected";
+    const sub = !online ? "No connection" : (c && c.downlink ? "~" + c.downlink + " Mbps" : "Online");
+    return { online, label, sub };
+  };
+  const [net, setNet] = useState(readNet);
+  const [snd, setSnd] = useState(() => getSoundConfig());
+  useEffect(() => {
+    const refresh = () => setNet(readNet());
+    window.addEventListener("online", refresh);
+    window.addEventListener("offline", refresh);
+    const c = navigator.connection || navigator.mozConnection || navigator.webkitConnection || null;
+    if (c && c.addEventListener) c.addEventListener("change", refresh);
+    return () => {
+      window.removeEventListener("online", refresh);
+      window.removeEventListener("offline", refresh);
+      if (c && c.removeEventListener) c.removeEventListener("change", refresh);
+    };
+  }, []);
+  function applySnd(patch) { const next = { ...snd, ...patch }; setSnd(next); setSoundConfig(next); }
+  const muted = !snd.enabled || snd.volume <= 0;
+
+  const tile = (active) => ({
+    flex: 1, display: "flex", alignItems: "center", gap: 11, padding: "12px 13px", borderRadius: 12,
+    background: active ? fill(AC) : "rgba(255,255,255,0.05)",
+    border: "1px solid " + (active ? bdr(AC) : "rgba(255,255,255,0.08)"),
+    cursor: "pointer", textAlign: "left", transition: "all 0.15s",
+  });
+
+  return (
+    <>
+      <div onClick={onClose} style={{ position: "fixed", inset: 0, zIndex: 9997 }} />
+      <div style={{
+        position: "fixed", bottom: TASKBAR_H + 10, right: 10, width: "min(312px, calc(100vw - 20px))",
+        background: "var(--nv-surface-solid)",
+        backdropFilter: "blur(40px) saturate(180%)", WebkitBackdropFilter: "blur(40px) saturate(180%)",
+        border: "1px solid rgba(255,255,255,0.1)", borderRadius: 16,
+        boxShadow: "0 8px 16px rgba(0,0,0,0.35), 0 30px 80px rgba(0,0,0,0.55), 0 1px 0 rgba(255,255,255,0.08) inset",
+        zIndex: 9998, padding: 14, animation: "menu-up 0.24s cubic-bezier(0.16,1,0.3,1)",
+      }}>
+        {/* Top tiles: Network + Liquid Glass */}
+        <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+          <button onClick={() => { openSettingsSection("network"); onClose(); }} style={tile(net.online)} title="Network settings">
+            <span style={{ color: net.online ? AC : "rgba(255,255,255,0.6)", display: "flex" }}><WifiGlyph size={20} on={net.online} /></span>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontFamily: FFB, fontWeight: 600, fontSize: 12, color: net.online ? AC : "#fff", lineHeight: 1.2 }}>{net.label}</div>
+              <div style={{ fontFamily: FF, fontSize: 10, color: "rgba(255,255,255,0.5)", marginTop: 1 }}>{net.sub}</div>
+            </div>
+          </button>
+          <button onClick={onToggleGlass} style={{ ...tile(glass), flex: "0 0 auto", width: 58, justifyContent: "center" }} title="Liquid Glass">
+            <span style={{ fontSize: 18, color: glass ? AC : "rgba(255,255,255,0.6)" }}>✨</span>
+          </button>
+        </div>
+
+        {/* Volume */}
+        <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 12, marginBottom: 10 }}>
+          <button onClick={() => applySnd(muted ? { enabled: true, volume: snd.volume > 0 ? snd.volume : 0.6 } : { enabled: false })} title={muted ? "Unmute" : "Mute"} style={{ background: "none", border: "none", cursor: "pointer", color: muted ? "rgba(255,255,255,0.4)" : AC, display: "flex", padding: 0, flexShrink: 0 }}>
+            <VolumeGlyph size={20} muted={muted} />
+          </button>
+          <input type="range" min={0} max={1} step={0.05} value={snd.enabled ? snd.volume : 0}
+            onChange={e => { const v = +e.target.value; applySnd({ volume: v, enabled: v > 0 }); }}
+            style={{ flex: 1, accentColor: AC }} />
+          <span style={{ fontFamily: FFM, fontSize: 11, color: "rgba(255,255,255,0.5)", width: 30, textAlign: "right" }}>{Math.round((snd.enabled ? snd.volume : 0) * 100)}%</span>
+        </div>
+
+        {/* Footer */}
+        <button onClick={() => { openSettingsSection("sound"); onClose(); }} style={{ width: "100%", padding: "9px", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 10, cursor: "pointer", fontFamily: FFB, fontWeight: 600, fontSize: 11.5, color: "rgba(255,255,255,0.7)" }}>All settings</button>
+      </div>
+    </>
+  );
+}
+
 // ─── ROOT ─────────────────────────────────────────────────────────────────────
 export default function NovaOS(){
   const [screen,     setScreen]     = useState("boot");
@@ -558,6 +663,10 @@ export default function NovaOS(){
   // newest first). Different from toasts: toasts are ephemeral action
   // confirmations, notifications are events the user might want to revisit.
   const [notifsOpen, setNotifsOpen] = useState(false);
+  // v9.0 — taskbar quick-settings flyout (network + volume + glass) and the
+  // section the Settings app should open to when deep-linked from it.
+  const [qsOpen, setQsOpen] = useState(false);
+  const [settingsSection, setSettingsSection] = useState(null);
   const pushNotification = useCallback((n)=>{
     if(!n || !n.title) return;
     const notif = {
@@ -1477,7 +1586,7 @@ export default function NovaOS(){
                 {win.app==="store"    &&<StoreApp    user={user} data={data} updateData={updateData} showToast={showToast} AC={AC}/>}
                 {win.app==="terminal" &&<TerminalApp user={user} AC={AC}/>}
                 {win.app==="chat"     &&<ChatApp     user={user} AC={AC}/>}
-                {win.app==="settings" &&<SettingsApp user={user} data={data} updateSettings={updateSettings} showToast={showToast} AC={AC} onCustomWallpaper={handleCustomWallpaper} onLogout={logout}/>}
+                {win.app==="settings" &&<SettingsApp user={user} data={data} updateSettings={updateSettings} showToast={showToast} AC={AC} onCustomWallpaper={handleCustomWallpaper} onLogout={logout} initialSection={settingsSection}/>}
                 {win.app==="profile"  &&<ProfileApp  user={user} data={data} updateData={updateData} showToast={showToast} AC={AC}/>}
                 {win.app==="calculator" &&<CalculatorApp AC={AC}/>}
                 {win.app==="clock"      &&<ClockApp AC={AC} data={data} updateSettings={updateSettings}/>}
@@ -1734,6 +1843,15 @@ export default function NovaOS(){
           height:44,display:"flex",alignItems:"center",gap:3,padding:"0 4px",
           background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.06)",borderRadius:13,
         }}>
+          {/* v9.0 — Quick settings (network + volume + glass). Opens the flyout. */}
+          <button className="sb" onClick={()=>setQsOpen(o=>!o)} title="Quick settings" style={{
+            width:36,height:36,borderRadius:9,
+            background:qsOpen?fill(AC):"transparent",
+            border:qsOpen?"1px solid "+bdr(AC):"1px solid transparent",
+            cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",
+            color:qsOpen?AC:"rgba(255,255,255,0.62)",
+            transition:"all 0.18s cubic-bezier(0.4,0,0.2,1)",
+          }}><WifiGlyph size={17}/></button>
           {/* Notification bell — badge shows unread count, click toggles the panel.
               v9.0: monochrome glass glyph (inherits color via currentColor). */}
           <button className="sb" onClick={()=>setNotifsOpen(o=>!o)} title={unreadCount>0?unreadCount+" unread":"Notifications"} style={{
@@ -1769,6 +1887,16 @@ export default function NovaOS(){
       </div>
         );
       })()}
+      {/* v9.0 — Quick-settings flyout (network status, Nova volume, glass). */}
+      {qsOpen && (
+        <QuickSettingsPanel
+          AC={AC}
+          glass={glass}
+          onToggleGlass={()=>{const v=!glass;updateSettings({glass:v});showToast(v?"Liquid Glass on ✨":"Liquid Glass off");}}
+          onClose={()=>setQsOpen(false)}
+          openSettingsSection={(id)=>{setSettingsSection(id);openApp("settings");}}
+        />
+      )}
       {/* Notification Center side panel — v8.0 refresh.
           Floating panel (slight margin from screen edges, full rounded
           corners) rather than glued to the right edge. Header gains an
