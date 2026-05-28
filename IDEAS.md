@@ -5,41 +5,50 @@ not committed to. Living document — add to it freely.
 
 ---
 
-# 🚧 v9.0 — in progress (feature/v9.0 branch)
+# 🚧 v9.2 — planned
 
-A big release built on a branch, shipped when satisfied. Lots planned.
-
-**Done so far**
-- Liquid Glass: a Settings → Appearance toggle that frosts the OS surfaces
-  (windows, taskbar, menus, widgets) — sheerer + heavier blur.
-- Liquid-glass app icons: when glass is on, all built-in icons redraw as
-  colorless white-on-clear-glass tiles; store apps show a white monogram.
-- Light/dark mode: **scrapped** (didn't suit Nova OS) — dark is forced.
-- Sound engine rewrite: shared master bus (lowpass → limiter → convolution
-  reverb) — kills the old clipping, gives real resonant tails; cleaner recipes.
-- macOS-style login + Windows-style boot screen; 30-sec screensaver option.
-- Floating glass taskbar dock: detached/rounded, centered apps (Win11-style),
-  bigger chips, glass tray glyphs, a Win11-style weather pill bottom-left.
-- Settings refresh: two-pane Windows-style layout (left rail of categories +
-  scrolling content) — Appearance / Display / Sound / Network / Widgets /
-  Keyboard / Account / About.
-- Taskbar quick-settings flyout: network status tile + Nova volume/mute +
-  Liquid Glass toggle, with deep-links into the Settings panes.
+Mid-size release that extends the "two-pane sidebar" visual formula
+(established by v9.0 Settings and v9.1 File Explorer) to the apps that
+still feel dated.
 
 **Planned**
-- **Custom app images / logos.** Let users upload their own image for a
-  custom/submitted app instead of only picking an emoji.
-  - *Where:* Store → Submit App form (currently an emoji `sIcon` field), and
-    the per-app icon renderers (`StoreBrandIcon` / `AppIconDisplay`).
-  - *How:* add an "upload image" option beside the emoji picker; downsample
-    the image to a small icon (~128px, JPEG/PNG) the same way the avatar +
-    custom-wallpaper handlers do, store it as e.g. `iconImg` (base64) on the
-    app doc. Render `iconImg` when present, else fall back to emoji/monogram.
-    No Firebase Storage needed — the downsampled icon is tiny enough to live
-    in the app's Firestore doc (same approach as profile avatars).
-  - *Glass note:* in Liquid Glass mode an uploaded logo could either show as-is
-    or get the frosted treatment — decide during build.
-- (More v9.0 features TBD — the user has a list.)
+- **Notes rework.** Completely rebuild Notes to feel high-quality and
+  professional. Sidebar (folders/notebooks — ideally reusing the same
+  folder system File Explorer already uses, so they share storage) + a
+  middle note list + an editor pane. Apple Notes / Bear / Obsidian as the
+  aesthetic targets.
+- **Music — genuine Spotify competitor.** Full visual + structural rebuild:
+  sidebar (Library / Playlists / Recently Played) + main browse area +
+  persistent now-playing bar. Layouts that actually compete with Spotify's
+  desktop client. Local-file playback can come in a follow-up release.
+- **Chat — Discord-style layout.** Server/DM list on the left, conversation
+  on the right, optional member list on the far right. Visual upgrade plus
+  the navigation pattern Discord made standard.
+
+---
+
+# ✅ v9.0 + v9.1 — shipped
+
+**v9.0 — "Liquid Glass" release**
+- Liquid Glass surface toggle + full colorless glass icon set; light mode
+  scrapped, dark forced.
+- Sound engine rewrite (master bus: lowpass → limiter → convolution reverb).
+- macOS-style login + Windows-style boot screen; 30-sec screensaver option.
+- Floating glass taskbar dock (centered apps, bigger chips, glass tray
+  glyphs, Windows 11-style weather pill).
+- Settings two-pane refresh + taskbar quick-settings flyout (network status
+  tile + Nova volume/mute + Liquid Glass toggle).
+- Custom community app logos; community apps on desktop; mod review
+  deletion; hold-backspace fix.
+
+**v9.1 — File Explorer + housekeeping**
+- File Explorer rebuilt as a Windows-style two-pane layout (Home / My Files
+  / Documents / Tasks / Pictures / Applications). Installed apps —
+  built-in, catalog, and community — now live in **Applications**, grouped
+  by category.
+- Trademarks & attributions footer in Settings → About.
+- Fix: newly installed community apps now reliably appear on the desktop
+  (spread-order id bug + legacy-id fallback).
 
 ---
 
@@ -796,6 +805,136 @@ pattern the v9.0 Settings refresh used.
 Explorer into Chat / DMs (IDEAS #12), the revamp is the right moment to
 make items first-class draggable. Not required for v9.1, just an alignment
 point.
+
+---
+
+## 20. Photos — real editor + better browsing
+
+Lift the Photos app from "gallery viewer" to a genuine competitor to the
+Windows 11 Photos app / Apple Photos.
+
+**Editor (the big addition)**
+- Crop (with aspect-ratio presets), rotate, flip.
+- One-tap **Auto enhance** (canvas filters).
+- Sliders for brightness, contrast, saturation, warmth.
+- A handful of **filters / presets** (Mono, Sepia, Vivid, Noir, Fade) —
+  cheap to implement via canvas filter strings.
+- Save edits as a new copy in Photos (preserve the original).
+
+**Better browsing**
+- Sidebar (mirroring File Explorer): Library / Albums / Recently Added.
+- **Albums** — user-created groupings of photos.
+- A "Memories" or "On this day" view if time is left.
+- Slideshow mode (fullscreen, ken-burns subtle pan, music optional).
+
+**Considerations**
+- The non-editor canvas patterns are already proven in PaintApp + the
+  Screenshot annotation editor — reuse them.
+- Storage: avoid re-encoding originals every edit; store the edit pipeline
+  (an array of operations) separately and apply on render, OR just save
+  the JPEG output as a new photo (simpler; current Photos store already
+  handles base64).
+- File-size: cap exports at ~1600px JPEG quality 0.85 so multi-megabyte
+  iPhone photos don't bloat user docs.
+
+---
+
+## 21. Real browser tabs via Tauri webview
+
+The Browser app currently iframes pages, which is why so many store
+entries are flagged `newTab: true` — the big sites set
+`X-Frame-Options: DENY` and won't load in an iframe at all. On the
+**Tauri desktop build**, Tauri 2 supports spawning real webview windows /
+embedded webviews that don't have iframe restrictions. That unlocks a real
+"open this in Nova's browser" experience for every site.
+
+**Plan**
+- Detect the Tauri environment (existing `isTauri()` helper).
+- On Tauri: open a Tauri **WebviewWindow** (or a child webview embedded in
+  the Browser window) targeted at the URL. Real cookies, real sessions,
+  real history, no `X-Frame-Options` problems.
+- On web: keep the existing iframe behaviour. Be honest in the UI that
+  full-fidelity browsing is a desktop feature.
+- Browser app gains: **tabs**, **back/forward** (already partially there),
+  **reload**, **address bar**, **history**, **bookmarks** sync via
+  Firestore. With real webviews this becomes a credible browser.
+- Drop `newTab: true` flags for sites that now load inside Nova on
+  desktop — but keep them on web.
+
+**Considerations**
+- Tauri 2 webview APIs are still maturing; check current capabilities.
+- Permission model — must respect the user's OS-level security; Tauri
+  isolation between webviews matters.
+- Add a small "Open externally" button so the user can always escape to
+  their system browser.
+
+---
+
+## 22. Calculator — genuine competitor to Windows 11 Calculator
+
+The current Calculator is solid for the basics (and got the hold-backspace
+fix in v8.3). v9.x can lift it to feature parity with Windows 11's
+Calculator app.
+
+**Modes (tabs / segmented control along the top)**
+- **Standard** — what exists today.
+- **Scientific** — sin/cos/tan, log/ln, x^y, factorial, π/e, parentheses,
+  degree/radian toggle.
+- **Programmer** — hex/dec/oct/bin views, bitwise ops, shift, byte/word size.
+- **Date** — date difference, date + days.
+- **Converter** — currency (offline rates table), length, weight, volume,
+  temperature, area, speed, time, energy, power, pressure, angle, data.
+
+**Polish**
+- **History rail** showing recent calculations (collapsible) — click to
+  re-run. Persist in user data so it syncs across devices.
+- Keyboard mappings for the new operators.
+- Copy/paste integration with the OS clipboard.
+
+**Considerations**
+- All math is local — no external services needed.
+- Currency rates table can be a static JSON (acceptable lag) or fetched
+  once a day from a free FX API (with offline fallback).
+- Layout shouldn't bloat the window — the segmented mode picker keeps the
+  per-mode UI focused.
+
+---
+
+## 23. Slides — a free, exportable PowerPoint competitor
+
+A new presentation app: build slide decks, edit text/images/shapes per
+slide, present in fullscreen, and **export to a real `.pptx`** file that
+opens in PowerPoint / Keynote / Google Slides.
+
+**Editor**
+- Slide list rail (left) + canvas (center) + properties panel (right).
+- Per-slide content: text boxes, images, shapes (rect, ellipse, line,
+  arrow), bulleted lists.
+- Themes / templates (a handful — Modern, Mono, Pastel, Bold, etc.).
+- Reorder slides by drag.
+
+**Presenter mode**
+- Fullscreen one-slide-per-screen, arrow keys / clicker to advance.
+- Speaker-notes view (if there's a second monitor on Tauri desktop) —
+  desktop-only refinement.
+
+**Export (the differentiator)**
+- **PPTX** export via the `pptxgenjs` library (well-maintained, runs in
+  the browser, no server). Real Office-compatible file that opens in
+  PowerPoint and Google Slides cleanly.
+- Also export to **PDF** (via the same canvas-to-PDF approach the
+  Screenshot app uses for printable exports, or `jsPDF`).
+- Save the deck itself in Firestore (`nova_slides`?) so it syncs across
+  devices — same pattern as Notes.
+
+**Considerations**
+- `pptxgenjs` is ~200 KB minified — meaningful but acceptable; lazy-load
+  the export path so it only loads when the user actually clicks Export.
+- Image handling: store at modest sizes (max ~1200px) in the deck doc;
+  exports embed them at full resolution.
+- This is a **big** feature — comparable to the Paint rework. Sized for
+  a major release of its own (maybe Supernova alongside Paint and the
+  mobile pass) rather than a v9.x point release.
 
 ---
 
