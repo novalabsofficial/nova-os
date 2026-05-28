@@ -5,6 +5,44 @@ not committed to. Living document — add to it freely.
 
 ---
 
+# 🚧 v9.0 — in progress (feature/v9.0 branch)
+
+A big release built on a branch, shipped when satisfied. Lots planned.
+
+**Done so far**
+- Liquid Glass: a Settings → Appearance toggle that frosts the OS surfaces
+  (windows, taskbar, menus, widgets) — sheerer + heavier blur.
+- Liquid-glass app icons: when glass is on, all built-in icons redraw as
+  colorless white-on-clear-glass tiles; store apps show a white monogram.
+- Light/dark mode: **scrapped** (didn't suit Nova OS) — dark is forced.
+- Sound engine rewrite: shared master bus (lowpass → limiter → convolution
+  reverb) — kills the old clipping, gives real resonant tails; cleaner recipes.
+- macOS-style login + Windows-style boot screen; 30-sec screensaver option.
+- Floating glass taskbar dock: detached/rounded, centered apps (Win11-style),
+  bigger chips, glass tray glyphs, a Win11-style weather pill bottom-left.
+- Settings refresh: two-pane Windows-style layout (left rail of categories +
+  scrolling content) — Appearance / Display / Sound / Network / Widgets /
+  Keyboard / Account / About.
+- Taskbar quick-settings flyout: network status tile + Nova volume/mute +
+  Liquid Glass toggle, with deep-links into the Settings panes.
+
+**Planned**
+- **Custom app images / logos.** Let users upload their own image for a
+  custom/submitted app instead of only picking an emoji.
+  - *Where:* Store → Submit App form (currently an emoji `sIcon` field), and
+    the per-app icon renderers (`StoreBrandIcon` / `AppIconDisplay`).
+  - *How:* add an "upload image" option beside the emoji picker; downsample
+    the image to a small icon (~128px, JPEG/PNG) the same way the avatar +
+    custom-wallpaper handlers do, store it as e.g. `iconImg` (base64) on the
+    app doc. Render `iconImg` when present, else fall back to emoji/monogram.
+    No Firebase Storage needed — the downsampled icon is tiny enough to live
+    in the app's Firestore doc (same approach as profile avatars).
+  - *Glass note:* in Liquid Glass mode an uploaded logo could either show as-is
+    or get the frosted treatment — decide during build.
+- (More v9.0 features TBD — the user has a list.)
+
+---
+
 # ✅ v8.7 — shipped
 
 ### ✅ Region snip (backlog #15) — SHIPPED
@@ -235,7 +273,16 @@ currently dark-only).
 
 ---
 
-## 2. Wi-Fi + system sound settings
+## 2. Wi-Fi + system sound settings — ⏳ PARTIAL in v9.0
+
+> v9.0 added a **taskbar quick-settings flyout** (network status tile + Nova
+> volume slider/mute + Liquid Glass toggle) and a **Network section** in the
+> refreshed Settings app. These are the *web-honest* versions: network is
+> read-only (online/offline + connection type/speed where the browser exposes
+> it — a browser can't list or switch Wi-Fi), and "volume" controls Nova's own
+> system sounds (a web page can't set the OS master volume). The Tauri-native
+> bits below (real network/audio device control) are still open. Original
+> notes follow.
 
 OS-level controls — actual Wi-Fi network selection, audio output device
 selection, system master volume — surfaced inside Nova OS the way they
@@ -569,6 +616,64 @@ highlighted portion → straight into the annotation editor.
   ScreenshotApp annotation canvas.
 - Tauri build: use a native capture command (no permission prompt) + the same
   drag-select overlay for a real Snipping-Tool feel.
+
+---
+
+## 16. Nova OS Mobile — a real phone-OS experience
+
+Make Nova OS, on a phone, fullscreen and behave like an actual mobile OS
+(home screen of app icons, one app fullscreen at a time, status bar, swipe
+gestures, app switcher) — instead of the current "best viewed on a larger
+screen" notice.
+
+**Verdict: yes, and it should stay in THIS project — not a fork.** Nova OS
+already renders a single component tree (`NovaOS.jsx`) that branches on
+`deviceMode`; a phone OS is a *third rendering branch* (a new mobile "shell"),
+not a parallel codebase. All ~30 apps, Firebase auth/sync, the sound system,
+theming, wallpapers, Store, DMs, chess, etc. would be shared. A fork would
+mean building and maintaining everything twice forever.
+
+**Groundwork that already exists (the head start)**
+- `detectDevice()` returns a `mobile` mode (< 600px), and `effectiveDeviceMode()`
+  + the `displayMode` setting can force it. (`src/lib/device.js`)
+- `deviceMode==="mobile"` already drives behavior in `NovaOS.jsx`:
+  force-maximize windows, compact taskbar, hidden chip labels, the
+  centered-apps width cap, mobile-first focus state, etc.
+- Input is already Pointer Events everywhere (v5.0 refactor) → touch-ready.
+- PWA is already set up: `public/manifest.webmanifest` + `index.html` link →
+  installs to the home screen and runs standalone/chromeless. Fullscreen
+  plumbing landed in v7.8.
+- Apps are self-contained React components that render in any container — they
+  don't care whether they're in a draggable window or a fullscreen sheet.
+
+**What the mobile-OS mode actually needs (the work)**
+- **A mobile shell** that *replaces* the desktop + window-manager when
+  `deviceMode==="mobile"`: a home screen (app-icon grid / pages), a top status
+  bar (time, battery, signal-ish), and a bottom gesture/nav bar.
+- **Window manager → app stack.** Reuse the existing `wins` state, but each
+  open app becomes a fullscreen "screen" you push/pop, not a tiled window.
+  Swap the window chrome (title bar, resize handles, snap) for mobile nav.
+- **Touch navigation:** home gesture, back, swipe-down for notifications /
+  quick settings, an app-switcher (card stack of open apps).
+- **Per-app responsive passes at ~390px.** Many apps already flex/scroll fine;
+  the dense ones (Store, Chess board, Atmos radar, Paint toolbars) need mobile
+  layouts. This is the tedious long-tail, not the hard part.
+- **Flip the `MobileNotice`** from "go away" into the actual entry point (or
+  make it opt-in / first-run only).
+
+**Honest caveats**
+- This is a *big* feature — on the order of the v8.0 UI refresh. Best as its
+  own major version (v9.x / v10), built on a branch like v8.0 / v9.0.
+- The window-manager → app-stack swap is the interesting architecture; the
+  per-app responsive cleanup is the long, unglamorous part.
+- A few apps will never be great on a phone (full Paint, Chess on a tiny
+  board) — that's fine, just lower priority.
+- Plain mobile-browser gestures fight the OS's own edge-swipes; running as an
+  installed PWA (standalone) reclaims them, which is why the manifest matters.
+- Tauri 2 also has iOS/Android targets, so the *same repo* could one day ship a
+  native app store build — but that's a separate, much larger lift (native
+  build pipeline, signing, store review) and not required for a great
+  installed-PWA phone experience.
 
 ---
 

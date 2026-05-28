@@ -173,7 +173,7 @@ function Shelf({ title, apps, ratings, ac, onOpen }) {
 }
 
 // ── App detail page (with reviews) ────────────────────────────────────────
-function AppDetail({ app, ratings, ac, isIn, user, onBack, toggleInstall, rateAndReview, currentUser, onDeleteApp }) {
+function AppDetail({ app, ratings, ac, isIn, user, onBack, toggleInstall, rateAndReview, currentUser, onDeleteApp, canModerate, onDeleteReview }) {
   const r = ratings[app.id] || EMPTY_RATING;
   const meta = metaFor(app, ac);
   const rgb = hexRgb(meta.accent);
@@ -278,6 +278,7 @@ function AppDetail({ app, ratings, ac, isIn, user, onBack, toggleInstall, rateAn
                 <span style={{ fontFamily: FFB, fontWeight: 600, fontSize: 13, color: "rgba(255,255,255,0.9)" }}>@{rv.user}{rv.user === user && <span style={{ fontSize: 10, color: ac, marginLeft: 5 }}>you</span>}</span>
                 <StarRow value={rv.rating} size={11} />
                 <span style={{ fontSize: 10, fontFamily: FFM, color: "rgba(255,255,255,0.3)" }}>{relTime(rv.ts)}</span>
+                {canModerate && <button onClick={() => onDeleteReview(app.id, rv.user)} title="Delete review (moderator)" style={{ marginLeft: "auto", background: "none", border: "none", cursor: "pointer", color: "rgba(255,90,90,0.6)", fontSize: 12, padding: "0 2px" }}>🗑</button>}
               </div>
               <div style={{ fontSize: 13, color: "rgba(255,255,255,0.62)", lineHeight: 1.55, marginTop: 4, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{rv.text}</div>
             </div>
@@ -300,7 +301,32 @@ export function StoreApp({ user, data, updateData, showToast, AC }) {
   const [sName, setSName] = useState(""); const [sUrl, setSUrl] = useState("");
   const [sDesc, setSDesc] = useState(""); const [sCat, setSCat] = useState("Tools");
   const [sIcon, setSIcon] = useState("🚀"); const [submitting, setSubmitting] = useState(false);
+  const [sIconImg, setSIconImg] = useState(null); // v9.0: uploaded custom logo (base64) or null
   const installed = data?.installedApps || [];
+
+  // v9.0 — let submitters upload their own logo instead of an emoji. Downsample
+  // to a 128² cover-cropped JPEG (~5–15 KB base64) so it fits comfortably in the
+  // app's Firestore doc — no Firebase Storage needed.
+  function handleIconUpload(e) {
+    const f = e.target.files?.[0]; if (!f) return;
+    if (f.size > 8 * 1024 * 1024) { showToast("Image too large (max 8MB)"); return; }
+    const rd = new FileReader();
+    rd.onload = ev => {
+      const img = new Image();
+      img.onload = () => {
+        const S = 128, c = document.createElement("canvas"); c.width = S; c.height = S;
+        const ctx = c.getContext("2d");
+        const scale = Math.max(S / img.width, S / img.height);   // cover-crop to square
+        const dw = img.width * scale, dh = img.height * scale;
+        ctx.drawImage(img, (S - dw) / 2, (S - dh) / 2, dw, dh);
+        setSIconImg(c.toDataURL("image/jpeg", 0.82));
+      };
+      img.onerror = () => showToast("Couldn't load image");
+      img.src = ev.target.result;
+    };
+    rd.readAsDataURL(f);
+    e.target.value = "";
+  }
 
   // ── Realtime ratings + reviews aggregation ──────────────────────────────
   useEffect(() => {
@@ -347,6 +373,17 @@ export function StoreApp({ user, data, updateData, showToast, AC }) {
     } catch { showToast("Couldn't save — try again"); }
   }
 
+  // v9.0 — moderators can remove a review that violates the rules. Deletes the
+  // user's rating doc (stars + text); the Firestore rule permits mod deletes.
+  async function deleteReview(appId, reviewUser) {
+    if (!isAdmin(user)) return;
+    if (!window.confirm("Delete @" + reviewUser + "'s review? This removes their rating and text.")) return;
+    try {
+      await deleteDoc(doc(firestoreDb, "nova_ratings", appId + "_" + reviewUser));
+      showToast("Review removed ✓");
+    } catch { showToast("Couldn't delete review"); }
+  }
+
   async function submitApp() {
     const name = sName.trim(), desc = sDesc.trim();
     let url = sUrl.trim();
@@ -356,12 +393,12 @@ export function StoreApp({ user, data, updateData, showToast, AC }) {
     const autoFlags = autoModerate({ name, desc, url });
     try {
       await addDoc(collection(firestoreDb, "nova_user_apps"), {
-        name, url, desc, cat: sCat, icon: sIcon, submitter: user, submitterUid: getDbUid(), ts: Date.now(),
+        name, url, desc, cat: sCat, icon: sIcon, iconImg: sIconImg || null, submitter: user, submitterUid: getDbUid(), ts: Date.now(),
         newTab: true, badge: "↗ New Tab",
         status: "pending", autoFlags, reviewedBy: null, reviewedAt: null, rejectReason: null,
       });
       showToast(autoFlags.length > 0 ? "Submitted — flagged for review ⚠" : "Submitted — pending admin review ✓");
-      setSName(""); setSUrl(""); setSDesc(""); setSIcon("🚀"); setView("community");
+      setSName(""); setSUrl(""); setSDesc(""); setSIcon("🚀"); setSIconImg(null); setView("community");
     } catch { showToast("Submission failed"); }
     setSubmitting(false);
   }
@@ -467,7 +504,7 @@ export function StoreApp({ user, data, updateData, showToast, AC }) {
       {detail && (
         <AppDetail app={detail} ratings={ratings} ac={ac} isIn={installed.includes(detail.id)} user={user}
           onBack={() => setDetail(null)} toggleInstall={toggleInstall} rateAndReview={rateAndReview}
-          currentUser={user} onDeleteApp={deleteApp} />
+          currentUser={user} onDeleteApp={deleteApp} canModerate={userIsAdmin} onDeleteReview={deleteReview} />
       )}
 
       {/* ── Search results (overrides the active view) ──────────────────── */}
@@ -588,7 +625,18 @@ export function StoreApp({ user, data, updateData, showToast, AC }) {
             <div style={{ display: "flex", gap: 10 }}>
               <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
                 <label style={{ ...SEC, marginBottom: 0 }}>Icon</label>
-                <input value={sIcon} onChange={e => setSIcon(e.target.value)} maxLength={2} style={{ ...INP, width: 56, textAlign: "center", fontSize: 22, padding: "6px 4px" }} />
+                {sIconImg ? (
+                  <div style={{ position: "relative", width: 56, height: 56 }}>
+                    <img src={sIconImg} alt="" style={{ width: 56, height: 56, borderRadius: 12, objectFit: "cover", border: "1px solid rgba(255,255,255,0.15)" }} />
+                    <button onClick={() => setSIconImg(null)} title="Remove logo" style={{ position: "absolute", top: -6, right: -6, width: 20, height: 20, borderRadius: "50%", background: "rgba(255,80,80,0.92)", border: "none", cursor: "pointer", color: "#fff", fontSize: 11, lineHeight: 1, padding: 0 }}>✕</button>
+                  </div>
+                ) : (
+                  <input value={sIcon} onChange={e => setSIcon(e.target.value)} maxLength={2} style={{ ...INP, width: 56, textAlign: "center", fontSize: 22, padding: "6px 4px" }} />
+                )}
+                <label style={{ fontSize: 9, color: ac, cursor: "pointer", fontFamily: FFB, fontWeight: 600, textAlign: "center", marginTop: 1 }}>
+                  {sIconImg ? "Change" : "↑ Upload logo"}
+                  <input type="file" accept="image/*" onChange={handleIconUpload} style={{ display: "none" }} />
+                </label>
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: 4, flex: 1 }}>
                 <label style={{ ...SEC, marginBottom: 0 }}>App Name</label>
@@ -630,7 +678,7 @@ export function StoreApp({ user, data, updateData, showToast, AC }) {
             {modQueue.map(app => (
               <div key={app.id} style={{ padding: "12px 14px", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 10 }}>
                 <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
-                  <div style={{ fontSize: 24, flexShrink: 0, lineHeight: 1 }}>{app.icon || "📦"}</div>
+                  <div style={{ flexShrink: 0 }}><StoreBrandIcon app={app} size={40}/></div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontFamily: FFB, fontWeight: 600, fontSize: 13, color: "#fff" }}>{app.name}</div>
                     <div style={{ fontSize: 11, color: "rgba(255,255,255,0.4)", marginTop: 1 }}>by @{app.submitter || "unknown"} · {app.cat || "Uncategorized"}</div>

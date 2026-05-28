@@ -107,8 +107,15 @@ service cloud.firestore {
       // Anyone signed in can browse the catalog.
       allow read: if signedIn();
 
-      // Submissions must stamp the submitter's uid.
-      allow create: if willOwnUid('submitterUid');
+      // Submissions must stamp the submitter's uid. v9.0: an optional uploaded
+      // logo (`iconImg`, base64) is allowed but capped so it can't bloat the
+      // doc — the client downsamples to a 128px icon (well under this).
+      allow create: if willOwnUid('submitterUid') &&
+        (
+          !('iconImg' in request.resource.data) ||
+          request.resource.data.iconImg == null ||
+          (request.resource.data.iconImg is string && request.resource.data.iconImg.size() <= 60000)
+        );
 
       // Updates: only the submitter can edit their own pending submission,
       // mods can change status / add reject reasons.

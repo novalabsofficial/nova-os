@@ -296,6 +296,10 @@ function storeBrandSvg(id) {
 export function StoreBrandIcon({ app, size = 44 }) {
   const id = app?.id;
   const r = Math.round(size * 0.22);
+  // v9.0 — a community app can carry an uploaded logo (base64); show it as the icon.
+  if (app?.iconImg) {
+    return <div style={{ width: size, height: size, borderRadius: r, backgroundImage: `url("${app.iconImg}")`, backgroundSize: "cover", backgroundPosition: "center", boxShadow: "inset 0 1px 0 rgba(255,255,255,0.15), inset 0 0 0 1px rgba(255,255,255,0.08)" }}/>;
+  }
   const glyph = id ? storeBrandSvg(id) : null;
   if (glyph) {
     // The bg rect inside the glyph already rounds the square (rx=7 in viewBox
@@ -333,25 +337,218 @@ export function StoreBrandIcon({ app, size = 44 }) {
 // glyph at 85% of `size`, making apps like the v7.4 games (Tic-Tac-Toe,
 // Pac-Man, Chess, etc.) look visually smaller than the SVG-icon apps on
 // the desktop. Now every app fills the same WxH box regardless of source.
-export function AppIconDisplay({ app, size = 26 }) {
-  if (app.storeApp) {
-    // v8.4: route store apps through the unified brand-icon set (was Clearbit).
-    return <StoreBrandIcon app={app.storeApp} size={size}/>;
-  }
-  if (HAS_SVG_ICON.has(app.id)) {
-    return <NovaSvgIcon id={app.id} size={size}/>;
-  }
-  // Emoji-fallback: wrap in a same-sized box so layout matches SVG/Store icons.
+// v9.0 — iOS "liquid glass" coating for app icons when Liquid Glass is on.
+// Frosts whatever's behind the icon (wallpaper on the desktop, the panel in
+// menus/taskbar), drops the icon to ~80% so it reads as translucent, and lays
+// a diagonal sheen + rim highlight on top for the pane-of-glass feel.
+function GlassIcon({ size, children }) {
+  const r = Math.round(size * 0.24);
   return (
     <div style={{
-      width: size, height: size,
-      borderRadius: Math.round(size * 0.22),
-      background: "rgba(255,255,255,0.07)",
-      border: "1px solid rgba(255,255,255,0.08)",
-      display: "flex", alignItems: "center", justifyContent: "center",
-      fontSize: size * 0.65, lineHeight: 1,
-    }}>{app.icon || "📦"}</div>
+      position: "relative", width: size, height: size, borderRadius: r, overflow: "hidden",
+      backdropFilter: "blur(4px) saturate(1.5)", WebkitBackdropFilter: "blur(4px) saturate(1.5)",
+      boxShadow: "inset 0 0 0 1px rgba(255,255,255,0.3), inset 0 1.5px 1px rgba(255,255,255,0.45), 0 2px 7px rgba(0,0,0,0.28)",
+    }}>
+      <div style={{ opacity: 0.82 }}>{children}</div>
+      <div style={{ position: "absolute", inset: 0, borderRadius: "inherit", pointerEvents: "none",
+        background: "linear-gradient(135deg, rgba(255,255,255,0.42) 0%, rgba(255,255,255,0.1) 34%, rgba(255,255,255,0) 58%)" }}/>
+    </div>
   );
+}
+
+// v9.0 — TRUE clear-glass icon redraw (the look you actually want): the glyph
+// is re-rendered in white/frosted glass on a CLEAR, colorless tile (no brand
+// color), with backdrop-blur so the wallpaper frosts through + a sheen on top.
+// Prototyped on a few icons first; the rest fall back to the coating until the
+// whole set is redrawn. Glyph shapes mirror their dark-mode NovaSvgIcon, white.
+function glassGlyph(id) {
+  const W = "rgba(255,255,255,0.95)", Wd = "rgba(255,255,255,0.72)", Wf = "rgba(255,255,255,0.48)", hole = "rgba(255,255,255,0.2)";
+  switch (id) {
+    case "notes": return (<>
+      <rect x="7" y="10" width="18" height="2.4" rx="1.2" fill={W}/>
+      <rect x="7" y="15" width="14" height="2.4" rx="1.2" fill={Wd}/>
+      <rect x="7" y="20" width="16" height="2.4" rx="1.2" fill={Wd}/>
+    </>);
+    case "tasks": return (<>
+      <circle cx="11" cy="11.5" r="4.2" fill={W}/>
+      <polyline points="8.8,11.5 10.4,13 13.2,9.8" stroke={hole} strokeWidth="1.6" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
+      <rect x="17.5" y="10.2" width="9" height="2.4" rx="1.2" fill={W}/>
+      <circle cx="11" cy="21" r="4.2" fill="none" stroke={W} strokeWidth="1.4"/>
+      <rect x="17.5" y="19.8" width="7" height="2.4" rx="1.2" fill={Wd}/>
+    </>);
+    case "files": return <path d="M6 13 Q6 11 8 11 L13 11 L15 13 L24 13 Q26 13 26 15 L26 23 Q26 25 24 25 L8 25 Q6 25 6 23 Z" fill={W}/>;
+    case "paint": return (<>
+      <circle cx="10.5" cy="11.5" r="2.3" fill={W}/><circle cx="17" cy="9" r="2.3" fill={Wd}/><circle cx="23" cy="13" r="2.3" fill={W}/><circle cx="22" cy="21" r="2.3" fill={Wd}/><circle cx="14" cy="22.5" r="2.3" fill={Wf}/>
+    </>);
+    case "browser": return (<>
+      <circle cx="16" cy="16" r="8.5" fill="none" stroke={W} strokeWidth="1.6"/>
+      <ellipse cx="16" cy="16" rx="4" ry="8.5" fill="none" stroke={W} strokeWidth="1.3"/>
+      <line x1="7.5" y1="16" x2="24.5" y2="16" stroke={W} strokeWidth="1.3"/>
+    </>);
+    case "snake": return (<>
+      <path d="M7 23 Q7 14 13 14 Q19 14 19 10 Q19 7 22 7" stroke={W} strokeWidth="3.5" fill="none" strokeLinecap="round"/>
+      <circle cx="22" cy="7" r="3.3" fill={W}/><circle cx="20.8" cy="6.2" r="0.7" fill={hole}/><circle cx="23.2" cy="6.2" r="0.7" fill={hole}/>
+    </>);
+    case "2048": return (<>
+      <rect x="6" y="6" width="8" height="8" rx="1.5" fill={hole}/><rect x="18" y="6" width="8" height="8" rx="1.5" fill={Wf}/><rect x="6" y="18" width="8" height="8" rx="1.5" fill={Wf}/><rect x="18" y="18" width="8" height="8" rx="1.5" fill={W}/>
+      <text x="22" y="25.2" textAnchor="middle" fill={hole} fontSize="7.5" fontWeight="700" fontFamily="sans-serif">8</text>
+    </>);
+    case "store": return (<>
+      <path d="M9 12 L9 24 Q9 25.5 10.5 25.5 L21.5 25.5 Q23 25.5 23 24 L23 12 Z" fill={W}/>
+      <path d="M12 13 L12 11 Q12 8 16 8 Q20 8 20 11 L20 13" stroke={W} strokeWidth="1.6" fill="none" strokeLinecap="round"/>
+      <circle cx="16" cy="17.5" r="2" fill={hole}/>
+    </>);
+    case "terminal": return (<>
+      <polyline points="8,11 12,16 8,21" stroke={W} strokeWidth="2.2" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
+      <line x1="14" y1="22" x2="24" y2="22" stroke={W} strokeWidth="2.2" strokeLinecap="round"/>
+    </>);
+    case "settings": {
+      const sp = [0,45,90,135,180,225,270,315].map(d => { const a = d*Math.PI/180; return { x1:16+6.5*Math.cos(a), y1:16+6.5*Math.sin(a), x2:16+9.8*Math.cos(a), y2:16+9.8*Math.sin(a) }; });
+      return (<>{sp.map((s,i) => <line key={i} x1={s.x1} y1={s.y1} x2={s.x2} y2={s.y2} stroke={W} strokeWidth="2.4" strokeLinecap="round"/>)}<circle cx="16" cy="16" r="4.5" fill={W}/><circle cx="16" cy="16" r="1.8" fill={hole}/></>);
+    }
+    case "profile": return (<>
+      <circle cx="16" cy="12.5" r="5" fill={W}/>
+      <path d="M6 27 Q6 21 16 21 Q26 21 26 27 L26 32 L6 32 Z" fill={W}/>
+    </>);
+    case "chat": return (<>
+      <path d="M6 9 Q6 7 8 7 L24 7 Q26 7 26 9 L26 19 Q26 21 24 21 L14 21 L9 25.5 L9.5 21 L8 21 Q6 21 6 19 Z" fill={W}/>
+      <circle cx="12" cy="14" r="1.2" fill={hole}/><circle cx="16" cy="14" r="1.2" fill={hole}/><circle cx="20" cy="14" r="1.2" fill={hole}/>
+    </>);
+    case "calculator": return (<>
+      <rect x="9" y="12.5" width="14" height="2.6" rx="1.3" fill={W}/><rect x="9" y="17.5" width="14" height="2.6" rx="1.3" fill={W}/>
+      <rect x="22.5" y="22.5" width="4.5" height="4.5" rx="1.2" fill={Wd}/><text x="24.75" y="26.1" textAnchor="middle" fill={hole} fontSize="4.5" fontWeight="700" fontFamily="sans-serif">+</text>
+    </>);
+    case "clock": return (<>
+      <circle cx="16" cy="16" r="10" fill={W}/>
+      <line x1="16" y1="16" x2="16" y2="9" stroke={hole} strokeWidth="1.6" strokeLinecap="round"/><line x1="16" y1="16" x2="21" y2="16" stroke={hole} strokeWidth="1.4" strokeLinecap="round"/><circle cx="16" cy="16" r="1.2" fill={hole}/>
+    </>);
+    case "calendar": return (<>
+      <rect x="5" y="6" width="22" height="21" rx="2.5" fill="none" stroke={W} strokeWidth="1.5"/>
+      <text x="16" y="14" textAnchor="middle" fill={Wd} fontSize="5.5" fontFamily="sans-serif" fontWeight="700" letterSpacing="0.5">{(new Date()).toLocaleDateString([],{weekday:'short'}).toUpperCase()}</text>
+      <text x="16" y="24" textAnchor="middle" fill={W} fontSize="11" fontFamily="sans-serif" fontWeight="700">{(new Date()).getDate()}</text>
+    </>);
+    case "music": return (<>
+      <ellipse cx="12.5" cy="21" rx="3" ry="2.5" fill={W}/><ellipse cx="22" cy="19" rx="3" ry="2.5" fill={W}/>
+      <rect x="15" y="9" width="1.6" height="13" fill={W}/><rect x="24.4" y="7" width="1.6" height="12.5" fill={W}/>
+      <path d="M15 9 Q20.5 7.5 26 7 L26 9 Q20.5 9.5 15 11 Z" fill={W}/>
+    </>);
+    case "pdf": return (<>
+      <path d="M8 4 L8 28 L24 28 L24 10 L18 4 Z" fill={W}/><path d="M18 4 L18 10 L24 10 Z" fill={Wd}/>
+      <rect x="10" y="18" width="12" height="6" rx="1" fill={hole}/><text x="16" y="22.8" textAnchor="middle" fill={W} fontSize="4.5" fontFamily="sans-serif" fontWeight="800">PDF</text>
+    </>);
+    case "atmos": return (<>
+      <circle cx="11.5" cy="11.5" r="4.2" fill={Wd}/>
+      <path d="M9 18.5 Q9 16.5 11.5 16.5 Q12 14.5 14.5 14.5 Q16.5 12.5 19 14.5 Q22 13.8 23 17 Q25 17 25 19.5 Q25 22 22.5 22 L11.5 22 Q9 22 9 19.5 Z" fill={W}/>
+    </>);
+    case "minesweeper": return (<>
+      <circle cx="16" cy="19" r="7" fill={W}/><circle cx="13.5" cy="16.5" r="1.6" fill={hole}/>
+      <path d="M16 12 Q18.5 9 20 7" stroke={W} strokeWidth="1.6" fill="none" strokeLinecap="round"/><circle cx="20.5" cy="6" r="1.8" fill={Wd}/><circle cx="20.5" cy="6" r="0.9" fill={W}/>
+    </>);
+    case "wordle": return (<>
+      <rect x="4" y="9" width="5.5" height="6.5" rx="1" fill={W}/><rect x="10.5" y="9" width="5.5" height="6.5" rx="1" fill={hole}/><rect x="17" y="9" width="5.5" height="6.5" rx="1" fill={Wd}/>
+      <rect x="7.25" y="16.5" width="5.5" height="6.5" rx="1" fill={Wd}/><rect x="13.75" y="16.5" width="5.5" height="6.5" rx="1" fill={W}/>
+    </>);
+    case "tetris": return (<>
+      <rect x="8.5" y="6.5" width="5" height="5" rx="0.6" fill={W}/><rect x="13.5" y="6.5" width="5" height="5" rx="0.6" fill={W}/><rect x="18.5" y="6.5" width="5" height="5" rx="0.6" fill={W}/><rect x="13.5" y="11.5" width="5" height="5" rx="0.6" fill={W}/>
+      <rect x="5.5" y="20.5" width="5" height="5" rx="0.6" fill={Wd}/><rect x="10.5" y="20.5" width="5" height="5" rx="0.6" fill={Wd}/><rect x="15.5" y="20.5" width="5" height="5" rx="0.6" fill={Wd}/><rect x="20.5" y="20.5" width="5" height="5" rx="0.6" fill={Wd}/>
+    </>);
+    case "novaai": return (<>
+      <path d="M16 7 L18.5 13.5 L25 16 L18.5 18.5 L16 25 L13.5 18.5 L7 16 L13.5 13.5 Z" fill={W}/>
+      <circle cx="23" cy="10" r="1.3" fill={Wd}/><circle cx="9" cy="22" r="1" fill={Wf}/>
+    </>);
+    case "photos": return (<>
+      <circle cx="10.5" cy="11" r="2.8" fill={W}/>
+      <path d="M0 32 L0 22 L8 14 L13 19 L18 12 L22 16 L27 11 L32 17 L32 32 Z" fill={Wf}/>
+      <path d="M0 32 L0 26 L6 22 L11 25 L17 21 L24 24 L32 22 L32 32 Z" fill={Wd}/>
+    </>);
+    case "tictactoe": return (<>
+      <line x1="13" y1="6" x2="13" y2="26" stroke={W} strokeWidth="2.2" strokeLinecap="round"/><line x1="20" y1="6" x2="20" y2="26" stroke={W} strokeWidth="2.2" strokeLinecap="round"/>
+      <line x1="6" y1="13" x2="26" y2="13" stroke={W} strokeWidth="2.2" strokeLinecap="round"/><line x1="6" y1="20" x2="26" y2="20" stroke={W} strokeWidth="2.2" strokeLinecap="round"/>
+    </>);
+    case "pong": return (<>
+      <rect x="5" y="10" width="2.8" height="12" rx="1.4" fill={W}/><rect x="24.2" y="10" width="2.8" height="12" rx="1.4" fill={W}/><circle cx="16" cy="16" r="2.2" fill={W}/>
+    </>);
+    case "flappy": return (<>
+      <circle cx="15" cy="16" r="7" fill={Wd}/><path d="M11 16.5 Q13 19.5 16 19.5 Q15 16.5 11 16.5 Z" fill={Wf}/><circle cx="17.5" cy="14" r="1.4" fill={W}/><circle cx="17.7" cy="14" r="0.7" fill={hole}/><path d="M21 16 L25 15.2 L21 17.2 Z" fill={W}/>
+    </>);
+    case "invaders": return (<>{[[1,0],[3,0],[0,1],[1,1],[2,1],[3,1],[4,1],[0,2],[2,2],[4,2],[1,3],[3,3]].map(([c,rr],i) => <rect key={i} x={8+c*3.2} y={9+rr*3.2} width="3" height="3" fill={W}/>)}</>);
+    case "pacman": return (<>
+      <path d="M16 16 L28 8 A13 13 0 1 0 28 24 Z" fill={W}/><circle cx="14" cy="11" r="1.3" fill={hole}/>
+    </>);
+    case "chess": return (<>
+      <rect x="15.2" y="5.5" width="1.6" height="4" rx="0.4" fill={W}/><rect x="14" y="6.6" width="4" height="1.4" rx="0.4" fill={W}/>
+      <path d="M11 12 L21 12 L21 14.5 L23 16.5 L23 24 Q23 25 22 25 L10 25 Q9 25 9 24 L9 16.5 L11 14.5 Z" fill={W}/><rect x="9" y="24.5" width="14" height="2.5" rx="0.8" fill={W}/>
+    </>);
+    default: return null;
+  }
+}
+const GLASS_GLYPHS = new Set(["notes","tasks","files","paint","browser","snake","2048","store","terminal","settings","profile","chat","calculator","clock","calendar","music","pdf","atmos","minesweeper","wordle","tetris","novaai","photos","tictactoe","pong","flappy","invaders","pacman","chess"]);
+
+function GlassSvgIcon({ id, size }) {
+  const r = Math.round(size * 0.24);
+  const glyph = glassGlyph(id);
+  if (!glyph) return null;
+  return (
+    <div style={{
+      position: "relative", width: size, height: size, borderRadius: r, overflow: "hidden",
+      background: "rgba(255,255,255,0.1)",
+      backdropFilter: "blur(6px) saturate(1.4)", WebkitBackdropFilter: "blur(6px) saturate(1.4)",
+      boxShadow: "inset 0 0 0 1px rgba(255,255,255,0.32), inset 0 2px 2px rgba(255,255,255,0.4), 0 3px 9px rgba(0,0,0,0.3)",
+    }}>
+      <svg width="100%" height="100%" viewBox="0 0 32 32" style={{ display: "block", position: "relative" }}>{glyph}</svg>
+      <div style={{ position: "absolute", inset: 0, borderRadius: "inherit", pointerEvents: "none",
+        background: "linear-gradient(135deg, rgba(255,255,255,0.42) 0%, rgba(255,255,255,0.08) 36%, rgba(255,255,255,0) 60%)" }}/>
+    </div>
+  );
+}
+
+// Colorless-glass version of a store app icon: the app's first letter in white
+// on the clear glass tile (brand glyphs/colors would be unrecognizable when
+// stripped to glass, so a monogram is the clean colorless choice).
+function GlassMonogram({ name, size }) {
+  const letter = (name || "?").replace(/[^A-Za-z0-9]/g, "").charAt(0).toUpperCase() || "?";
+  const r = Math.round(size * 0.24);
+  return (
+    <div style={{
+      position: "relative", width: size, height: size, borderRadius: r, overflow: "hidden",
+      background: "rgba(255,255,255,0.1)",
+      backdropFilter: "blur(6px) saturate(1.4)", WebkitBackdropFilter: "blur(6px) saturate(1.4)",
+      boxShadow: "inset 0 0 0 1px rgba(255,255,255,0.32), inset 0 2px 2px rgba(255,255,255,0.4), 0 3px 9px rgba(0,0,0,0.3)",
+      display: "flex", alignItems: "center", justifyContent: "center",
+    }}>
+      <span style={{ fontFamily: "'Space Grotesk',sans-serif", fontWeight: 700, fontSize: size * 0.46, color: "rgba(255,255,255,0.95)", lineHeight: 1 }}>{letter}</span>
+      <div style={{ position: "absolute", inset: 0, borderRadius: "inherit", pointerEvents: "none",
+        background: "linear-gradient(135deg, rgba(255,255,255,0.42) 0%, rgba(255,255,255,0.08) 36%, rgba(255,255,255,0) 60%)" }}/>
+    </div>
+  );
+}
+
+export function AppIconDisplay({ app, size = 26, glass = false }) {
+  let inner;
+  if (app.storeApp) {
+    // v8.4: route store apps through the unified brand-icon set (was Clearbit).
+    inner = <StoreBrandIcon app={app.storeApp} size={size}/>;
+  } else if (HAS_SVG_ICON.has(app.id)) {
+    inner = <NovaSvgIcon id={app.id} size={size}/>;
+  } else {
+    // Emoji-fallback: wrap in a same-sized box so layout matches SVG/Store icons.
+    inner = (
+      <div style={{
+        width: size, height: size,
+        borderRadius: Math.round(size * 0.22),
+        background: "rgba(255,255,255,0.07)",
+        border: "1px solid rgba(255,255,255,0.08)",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        fontSize: size * 0.65, lineHeight: 1,
+      }}>{app.icon || "📦"}</div>
+    );
+  }
+  if (glass) {
+    if (app.storeApp) return <GlassMonogram name={app.storeApp.name} size={size}/>;
+    if (GLASS_GLYPHS.has(app.id)) return <GlassSvgIcon id={app.id} size={size}/>;
+    return <GlassIcon size={size}>{inner}</GlassIcon>; // emoji-fallback apps → coating
+  }
+  return inner;
 }
 
 // v8.0 — Refined window-control glyphs. Previously inline unicode (—, ❐, ✕)
