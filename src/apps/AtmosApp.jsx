@@ -4,7 +4,7 @@ import { fill, bdr, hexRgb } from "../lib/format.js";
 import { WMO } from "../ui/constants.js";
 import { AiAssist } from "../ui/AiAssist.jsx";
 import { wmoIcon, wmoLabel, geocodeUrl, parseGeocode, forecastUrl, parseForecast, alertsUrl, parseAlerts, isLikelyUS } from "../lib/weather.js";
-import { speak, cancelSpeech, playTone } from "../lib/audio.js";
+import { speak, cancelSpeech, playSound } from "../lib/audio.js";
 
 const ALERT_COLOR = {
   Extreme:  {bg:"rgba(255,80,80,0.18)",  border:"rgba(255,80,80,0.55)",  fg:"#ff8080"},
@@ -13,7 +13,12 @@ const ALERT_COLOR = {
   Minor:    {bg:"rgba(100,200,255,0.12)",border:"rgba(100,200,255,0.4)", fg:"#88c8ff"},
 };
 
-export function AtmosApp({AC,showToast,pushNotification,openNovaAi,data,updateSettings}){
+export function AtmosApp({AC,showToast,pushNotification,openNovaAi,data,updateSettings,onSevereAlert}){
+  // v9.4 — track which severe-alert ids have already triggered the
+  // lock-screen-style overlay so re-fetches (every poll) don't re-pop the
+  // same alert over and over. Lives in a ref because we only need it for
+  // dedup, not render.
+  const firedSevereRef = useRef(new Set());
   const [query,setQuery]=useState("");
   const [suggestions,setSuggestions]=useState([]);    // array of suggestion objects
   const [openSuggest,setOpenSuggest]=useState(false);
@@ -99,20 +104,22 @@ export function AtmosApp({AC,showToast,pushNotification,openNovaAi,data,updateSe
         const parsed=parseAlerts(ajson);
         setAlerts(parsed);
         // Audible alert sequence when active alerts are present:
-        //   1. 607 Hz tone for 3 seconds (jolts the user to look)
-        //   2. After ~3.1 s, TTS reads each alert's event + headline so the
+        //   1. Three-pulse 607 Hz sawtooth — the v9.4 NWS recipe, mirroring
+        //      Weatherscan's classic alarm cadence (was a single sine tone
+        //      pre-v9.4).
+        //   2. After ~2.5 s, TTS reads each alert's event + headline so the
         //      user can hear what's happening without looking at the screen.
         // The tone plays each time a location with alerts is loaded; the
         // TTS queues all alerts in order, automatically read back-to-back
         // by the browser's SpeechSynthesis queue.
         if(parsed.length>0){
-          playTone(607, 3000);
+          playSound("nwsAlert");
           setTimeout(()=>{
             for(const a of parsed){
               const summary = a.event + (a.headline ? ". " + a.headline : "");
               speak(summary);
             }
-          }, 3100);
+          }, 2500);
           // Mirror each active alert into the persistent notification center
           // so the user can revisit them later via the bell icon.
           if(pushNotification){
@@ -123,6 +130,21 @@ export function AtmosApp({AC,showToast,pushNotification,openNovaAi,data,updateSe
                 body: a.headline || a.description?.slice(0,180) || "",
                 appId: "atmos",
               });
+            }
+          }
+          // v9.4 — surface a lock-screen-style severe-weather card for any
+          // Severe / Extreme alert. NovaOS owns the overlay; we just hand
+          // it the alert. Dedup via a ref so a re-fetch of the same alert
+          // id doesn't re-pop the overlay every poll.
+          if (onSevereAlert) {
+            const severe = parsed.find(a => a.severity === "Extreme")
+                      || parsed.find(a => a.severity === "Severe");
+            if (severe) {
+              const key = severe.id || (severe.event + "|" + (severe.headline || ""));
+              if (!firedSevereRef.current.has(key)) {
+                firedSevereRef.current.add(key);
+                onSevereAlert({ ...severe, locationLabel: s.label });
+              }
             }
           }
         }

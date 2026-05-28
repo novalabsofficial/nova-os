@@ -323,6 +323,10 @@ export default function NovaOS(){
   // an idle period. ssActiveRef mirrors it so the high-frequency activity
   // listeners can check "are we showing it?" without reading stale state.
   const [screensaver, setScreensaver] = useState(false);
+  // v9.4 — Atmos severe-weather lock-screen alert. Stores the active
+  // Severe/Extreme NWS alert object (with `locationLabel` added by Atmos).
+  // null = no alert overlay. Atmos sets it via the onSevereAlert prop.
+  const [severeAlert, setSevereAlert] = useState(null);
   const ssActiveRef = useRef(false);
   const idleTimerRef = useRef(null);
   // v8.6 cross-app drag-and-drop — mirrors the shared dragStore so we can
@@ -1406,6 +1410,67 @@ export default function NovaOS(){
           <div style={{fontFamily:FFM,fontSize:12,color:"rgba(255,255,255,0.3)",marginTop:44,letterSpacing:1}}>move the mouse or press any key to wake</div>
         </div>
       )}
+      {/* v9.4 — Atmos severe-weather lock-screen alert. Fires above
+          everything when a Severe/Extreme NWS alert reaches the pinned
+          location. The new three-pulse 607 Hz sawtooth tone has already
+          played from Atmos itself; this is the visual half. Dismissable
+          via the Dismiss button (also click-anywhere on the backdrop). */}
+      {severeAlert && (
+        <div onClick={(e)=>{ if(e.target===e.currentTarget) setSevereAlert(null); }} style={{
+          position:"fixed",inset:0,zIndex:100002,
+          background:"rgba(80,18,18,0.55)",
+          backdropFilter:"blur(28px) saturate(140%)",WebkitBackdropFilter:"blur(28px) saturate(140%)",
+          display:"flex",alignItems:"center",justifyContent:"center",
+          padding:24,userSelect:"none",animation:"ss-fade 0.4s ease both",
+        }}>
+          <div style={{
+            width:"min(620px, 100%)",maxHeight:"90vh",overflow:"auto",
+            background:"linear-gradient(180deg, rgba(40,8,12,0.96), rgba(28,5,10,0.96))",
+            border:"2px solid rgba(255,90,90,0.55)",
+            borderRadius:18,
+            padding:"28px 30px 24px",
+            boxShadow:"0 30px 80px rgba(0,0,0,0.7), 0 0 60px rgba(255,90,90,0.18)",
+            fontFamily:FF,
+          }}>
+            <div style={{display:"flex",alignItems:"center",gap:14,marginBottom:18}}>
+              <div style={{
+                width:60,height:60,borderRadius:14,flexShrink:0,
+                background:"rgba(255,90,90,0.18)",
+                border:"2px solid rgba(255,90,90,0.55)",
+                display:"flex",alignItems:"center",justifyContent:"center",
+                fontSize:30,
+              }}>⚠</div>
+              <div style={{minWidth:0,flex:1}}>
+                <div style={{fontFamily:FFB,fontWeight:800,fontSize:10.5,letterSpacing:2,color:"#ff8b8b",textTransform:"uppercase",marginBottom:4}}>
+                  {severeAlert.severity === "Extreme" ? "Extreme weather alert" : "Severe weather alert"}
+                </div>
+                <div style={{fontFamily:FFB,fontWeight:700,fontSize:22,color:"#fff",lineHeight:1.15}}>
+                  {severeAlert.event || "Weather alert"}
+                </div>
+                {severeAlert.locationLabel && (
+                  <div style={{fontSize:12.5,color:"rgba(255,255,255,0.6)",marginTop:4}}>{severeAlert.locationLabel}</div>
+                )}
+              </div>
+            </div>
+            {severeAlert.headline && (
+              <div style={{fontFamily:FFB,fontWeight:700,fontSize:14,color:"rgba(255,255,255,0.95)",marginBottom:10,lineHeight:1.5}}>
+                {severeAlert.headline}
+              </div>
+            )}
+            {severeAlert.description && (
+              <div style={{fontSize:12.5,color:"rgba(255,255,255,0.72)",lineHeight:1.65,marginBottom:18,maxHeight:200,overflow:"auto",whiteSpace:"pre-wrap"}}>
+                {severeAlert.description.slice(0, 800)}{severeAlert.description.length > 800 ? "…" : ""}
+              </div>
+            )}
+            <div style={{display:"flex",alignItems:"center",gap:10}}>
+              <div style={{flex:1,fontSize:10.5,color:"rgba(255,255,255,0.4)",fontFamily:FFM,letterSpacing:0.5}}>
+                Source · NWS · National Weather Service
+              </div>
+              <button onClick={()=>setSevereAlert(null)} style={{padding:"10px 22px",borderRadius:10,cursor:"pointer",fontFamily:FFB,fontWeight:700,fontSize:13,background:"rgba(255,255,255,0.92)",border:"none",color:"#3a0a0a"}}>Dismiss</button>
+            </div>
+          </div>
+        </div>
+      )}
       {/* v8.6 drag-and-drop ghost — floats under the pointer while dragging a
           photo. Drop on the desktop = wallpaper, on a Profile window = avatar. */}
       {dnd && dnd.type==="photo" && (
@@ -1714,7 +1779,7 @@ export default function NovaOS(){
                 {win.app==="calendar"   &&<CalendarApp data={data} updateData={updateData} showToast={showToast} AC={AC}/>}
                 {win.app==="music"      &&<MusicApp AC={AC} showToast={showToast}/>}
                 {win.app==="pdf"        &&<PdfApp AC={AC} showToast={showToast}/>}
-                {win.app==="atmos"      &&<AtmosApp AC={AC} showToast={showToast} pushNotification={pushNotification} openNovaAi={()=>openApp("novaai")} data={data} updateSettings={updateSettings}/>}
+                {win.app==="atmos"      &&<AtmosApp AC={AC} showToast={showToast} pushNotification={pushNotification} openNovaAi={()=>openApp("novaai")} data={data} updateSettings={updateSettings} onSevereAlert={alert=>setSevereAlert(alert)}/>}
                 {win.app==="minesweeper"&&<MinesweeperApp AC={AC}/>}
                 {win.app==="wordle"     &&<WordleApp AC={AC} showToast={showToast}/>}
                 {win.app==="tetris"     &&<TetrisApp AC={AC}/>}
