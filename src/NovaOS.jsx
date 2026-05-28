@@ -583,8 +583,12 @@ export default function NovaOS(){
   // the bug pins itself. Remove this entire effect after the fix lands.
   useEffect(()=>{
     if(typeof console==="undefined")return;
+    // Read from `data` directly (declared earlier) — referencing the
+    // memoized `installedApps` const (declared further down the component)
+    // would hit the temporal dead zone and crash the whole render.
+    const inst = data?.installedApps || [];
     console.group("[nova-desktop-debug] community apps");
-    console.log("installedApps:", installedApps);
+    console.log("installedApps:", inst);
     console.log("commApps count:", commApps.length);
     console.table(commApps.map(a=>({
       docId: a._docId,
@@ -594,13 +598,13 @@ export default function NovaOS(){
       status: a.status,
       hasTs: typeof a.ts !== "undefined",
       approved: isPubliclyVisible(a),
-      installedBySpreadId: installedApps.includes(a.id),
-      installedByDocId: installedApps.includes(a._docId),
+      installedBySpreadId: inst.includes(a.id),
+      installedByDocId: inst.includes(a._docId),
     })));
-    const passing = commApps.filter(a => isPubliclyVisible(a) && installedApps.includes(a.id));
+    const passing = commApps.filter(a => isPubliclyVisible(a) && inst.includes(a.id));
     console.log("would render on desktop (passes filter):", passing.map(a=>({docId:a._docId, spreadId:a.id, name:a.name})));
     console.groupEnd();
-  },[commApps, installedApps]);
+  },[commApps, data?.installedApps]);
 
   // v8.6 AFK screensaver. settings.screensaverMins: 0 = off, else minutes of
   // idle before it fades in (default 1). Any input dismisses it and re-arms
