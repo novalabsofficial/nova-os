@@ -13,7 +13,7 @@ import {
 } from "./lib/constants.js";
 import { hexRgb, fill, bdr, isUrl } from "./lib/format.js";
 import { toggleFullscreen, isFullscreen, onFullscreenChange, exitFullscreen } from "./lib/fullscreen.js";
-import { defaultIconPos, snapToFreeGrid, snapW, snapWSize } from "./lib/geometry.js";
+import { defaultIconPos, snapToFreeGrid, snapW, snapWSize, layoutIcons } from "./lib/geometry.js";
 import { autoModerate, isAdmin, isPubliclyVisible } from "./lib/moderation.js";
 import { rewriteForIframe, isLikelyUnframable } from "./lib/browser.js";
 import { detectDevice, effectiveDeviceMode, isTouchMode } from "./lib/device.js";
@@ -334,6 +334,9 @@ export default function NovaOS(){
   const [menuOpen,   setMenuOpen]   = useState(false);
   const [menuSrch,   setMenuSrch]   = useState("");
   const [iconPos,    setIconPos]    = useState({});
+  // v9.3 — viewport size, bumped on window resize so layoutIcons re-runs
+  // and the desktop icon grid recomputes (fixes #21).
+  const [viewport,   setViewport]   = useState(() => ({ w: typeof window !== "undefined" ? window.innerWidth : 1280, h: typeof window !== "undefined" ? window.innerHeight : 800 }));
   const [iconDrag,   setIconDrag]   = useState(null);
   const [widgetState,setWidgetState]= useState(DEFAULT_WIDGET_STATE);
   const [widgetDrag, setWidgetDrag] = useState(null);
@@ -413,8 +416,19 @@ export default function NovaOS(){
   // Watch viewport size so the detected device mode stays current (e.g. on
   // rotation or window resize). Throttled-by-debounce isn't needed — resize
   // fires sparingly and detectDevice is cheap.
+  //
+  // v9.3 (issue #21): also bump a viewport state so the desktop icon layout
+  // recomputes on resize. Without this, only detectDevice changes triggered
+  // a re-render — resizing within the same mode left icons stuck at their
+  // pre-resize positions, with un-saved icons "dancing" because their
+  // fallback layout (defaultIconPos) silently re-derived from window size
+  // every render but only had a chance to be observed when something else
+  // re-rendered the tree.
   useEffect(()=>{
-    function onResize(){setDetectedMode(detectDevice());}
+    function onResize(){
+      setDetectedMode(detectDevice());
+      setViewport({ w: window.innerWidth, h: window.innerHeight });
+    }
     window.addEventListener("resize",onResize);
     return ()=>window.removeEventListener("resize",onResize);
   },[]);
@@ -475,7 +489,7 @@ export default function NovaOS(){
   useEffect(()=>{
     if(!iconDrag)return;
     function onMove(e){const nx=Math.max(0,Math.min(e.clientX-iconDrag.ox,window.innerWidth-ICON_W));const ny=Math.max(0,Math.min(e.clientY-iconDrag.oy,window.innerHeight-TASKBAR_H-ICON_H));setIconPos(prev=>({...prev,[iconDrag.id]:{x:nx,y:ny}}));}
-    function onUp(){const allPos={};(iconDrag.allIcons||[]).forEach((app,idx)=>{allPos[app.id]=iconPosRef.current[app.id]||defaultIconPos(idx);});const raw=iconPosRef.current[iconDrag.id]||allPos[iconDrag.id];const snapped=raw?snapToFreeGrid(iconDrag.id,raw.x,raw.y,allPos):null;const fp=snapped?{...iconPosRef.current,[iconDrag.id]:snapped}:iconPosRef.current;setIconPos(fp);db.set("user:"+iconDrag.user+":iconpos",fp).catch(()=>{});setIconDrag(null);}
+    function onUp(){const allPos=layoutIcons(iconDrag.allIcons||[],iconPosRef.current);const raw=iconPosRef.current[iconDrag.id]||allPos[iconDrag.id];const snapped=raw?snapToFreeGrid(iconDrag.id,raw.x,raw.y,allPos):null;const fp=snapped?{...iconPosRef.current,[iconDrag.id]:snapped}:iconPosRef.current;setIconPos(fp);db.set("user:"+iconDrag.user+":iconpos",fp).catch(()=>{});setIconDrag(null);}
     window.addEventListener("pointermove",onMove);window.addEventListener("pointerup",onUp);window.addEventListener("pointercancel",onUp);return()=>{window.removeEventListener("pointermove",onMove);window.removeEventListener("pointerup",onUp);window.removeEventListener("pointercancel",onUp);};
   },[iconDrag]);
 
@@ -1022,7 +1036,7 @@ export default function NovaOS(){
     document.addEventListener("keydown", onKey);
     return ()=>document.removeEventListener("keydown", onKey);
   },[]);
-  function onIconMouseDown(e,appId,allIcons){if(e.button!==0)return;e.stopPropagation();e.preventDefault();const idx=allIcons.findIndex(a=>a.id===appId);const pos=iconPos[appId]||defaultIconPos(idx);setIconDrag({id:appId,ox:e.clientX-pos.x,oy:e.clientY-pos.y,user,allIcons:[...allIcons]});}
+  function onIconMouseDown(e,appId,allIcons){if(e.button!==0)return;e.stopPropagation();e.preventDefault();const positions=layoutIcons(allIcons,iconPos);const pos=positions[appId]||{x:0,y:0};setIconDrag({id:appId,ox:e.clientX-pos.x,oy:e.clientY-pos.y,user,allIcons:[...allIcons]});}
   function onWidgetDragStart(e,id){if(e.button!==0)return;e.stopPropagation();e.preventDefault();const s=widgetState[id]||DEFAULT_WIDGET_STATE[id];setWidgetDrag({id,ox:e.clientX-s.x,oy:e.clientY-s.y});}
   function onWidgetResizeStart(e,id,edge){if(e.button!==0)return;e.stopPropagation();e.preventDefault();const s=widgetState[id]||DEFAULT_WIDGET_STATE[id];setWidgetResize({id,edge,sx:e.clientX,sy:e.clientY,x0:s.x,y0:s.y,w0:s.w,h0:s.h});}
   function closeWidget(id){updateSettings({widgets:{...widgets,[id]:false}});}
@@ -1387,8 +1401,16 @@ export default function NovaOS(){
       })}
  
       {/* Desktop icons */}
-      {allDesktopIcons.map((app,idx)=>{
-        const pos=iconPos[app.id]||defaultIconPos(idx);
+      {/* v9.3 (#21): compute one coherent layout for the whole desktop per
+          render. Saved positions are honored when in-bounds; the rest pack
+          into the next free grid slot — no more "icons dance + leave gaps"
+          when the window resizes. `viewport.w/h` are referenced inside the
+          IIFE so the React renderer treats this expression as depending on
+          the viewport state and recomputes on resize. */}
+      {(() => { const positions = layoutIcons(allDesktopIcons, iconPos);
+                void viewport.w; void viewport.h;
+                return allDesktopIcons.map((app) => {
+        const pos = positions[app.id] || { x: 0, y: 0 };
         const isDrg=iconDrag?.id===app.id;
         function launch(){if(app.storeApp){if(app.storeApp.newTab)openExternalUrl(app.storeApp.url);else openApp("browser");}else openApp(app.id);}
         return(
@@ -1450,8 +1472,8 @@ export default function NovaOS(){
             <span style={{fontFamily:FFB,fontWeight:600,fontSize:10.5,color:"#fff",textAlign:"center",lineHeight:1.25,textShadow:"0 1px 3px rgba(0,0,0,0.9), 0 0 8px rgba(0,0,0,0.5)",pointerEvents:"none",letterSpacing:0.15}}>{app.label}</span>
           </div>
         );
-      })}
- 
+      }); })()}
+
       {/* Start menu — v8.0 refresh.
           Wider (420 vs 360), more breathing room around the search bar, app
           grid spaced more generously, footer user-card gains a subtle accent
