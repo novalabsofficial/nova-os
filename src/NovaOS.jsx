@@ -89,7 +89,105 @@ const ChessApp        = lazy(() => import("./apps/ChessApp.jsx").then(m        =
 const PhotosApp       = lazy(() => import("./apps/PhotosApp.jsx").then(m       => ({default: m.PhotosApp})));
 const ScreenshotApp   = lazy(() => import("./apps/ScreenshotApp.jsx").then(m   => ({default: m.ScreenshotApp})));
 
- 
+// ─── v9.0 taskbar glyphs ────────────────────────────────────────────────
+// Monochrome line-glyphs for the system tray, replacing the old emoji
+// 🔔 / ⚙️. Stroke uses currentColor so they inherit the button's color
+// (which lights up to the accent when the panel is open), matching the
+// clear-glass icon language introduced in v9.0.
+function BellGlyph({ size = 16 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" style={{display:"block"}}>
+      <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+      <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+    </svg>
+  );
+}
+function GearGlyph({ size = 16 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" style={{display:"block"}}>
+      <circle cx="12" cy="12" r="3"/>
+      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+    </svg>
+  );
+}
+
+// ─── v9.0 taskbar weather pill ──────────────────────────────────────────
+// Windows 11-style weather chip for the dock's bottom-left corner. Reuses
+// the same data the Weather widget / Atmos use: the pinned location
+// (data.settings.weatherLocation) and unit preference (weatherUnits).
+//
+// To avoid a surprise geolocation prompt on every boot (the dock is always
+// visible), it only falls back to browser geolocation when that permission
+// has ALREADY been granted; otherwise it shows a gentle "Weather" prompt
+// that opens Atmos so the user can pin a location.
+function TaskbarWeather({ data, onClick }) {
+  const [wx, setWx] = useState(null);                  // { temp, code }
+  const [status, setStatus] = useState("loading");     // loading | ok | noloc | error
+  const savedLoc = data?.settings?.weatherLocation || null;
+  const units = data?.settings?.weatherUnits || "imperial";
+  const tempUnit = units === "imperial" ? "fahrenheit" : "celsius";
+  const tempSymbol = units === "imperial" ? "°F" : "°C";
+
+  useEffect(() => {
+    let dead = false;
+    const fetchAt = (lat, lon) =>
+      fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,weathercode&temperature_unit=${tempUnit}&timezone=auto`)
+        .then(r => r.json())
+        .then(j => {
+          if (dead) return;
+          if (j?.current) { setWx({ temp: Math.round(j.current.temperature_2m), code: j.current.weathercode }); setStatus("ok"); }
+          else setStatus("error");
+        })
+        .catch(() => { if (!dead) setStatus("error"); });
+
+    setStatus("loading");
+    if (savedLoc) { fetchAt(savedLoc.lat, savedLoc.lon); return () => { dead = true; }; }
+
+    // No pinned location — only geolocate if permission is already granted.
+    (async () => {
+      try {
+        if (!navigator.geolocation) { if (!dead) setStatus("noloc"); return; }
+        let granted = false;
+        if (navigator.permissions?.query) {
+          try { const p = await navigator.permissions.query({ name: "geolocation" }); granted = p.state === "granted"; } catch {}
+        }
+        if (!granted) { if (!dead) setStatus("noloc"); return; }
+        navigator.geolocation.getCurrentPosition(
+          ({ coords }) => { if (!dead) fetchAt(coords.latitude, coords.longitude); },
+          () => { if (!dead) setStatus("noloc"); },
+          { timeout: 8000 }
+        );
+      } catch { if (!dead) setStatus("noloc"); }
+    })();
+    return () => { dead = true; };
+  }, [savedLoc?.lat, savedLoc?.lon, tempUnit]);
+
+  const pill = {
+    height: 42, display: "flex", alignItems: "center", gap: 7, padding: "0 13px",
+    borderRadius: 12, background: "rgba(255,255,255,0.04)",
+    border: "1px solid rgba(255,255,255,0.07)", cursor: "pointer",
+    fontFamily: FF, flexShrink: 0, transition: "all 0.18s cubic-bezier(0.4,0,0.2,1)",
+  };
+
+  if (status === "ok" && wx) {
+    const city = savedLoc?.label ? savedLoc.label.split(",")[0].trim() : "";
+    return (
+      <button className="sb" onClick={onClick} title={(city ? city + " · " : "") + wx.temp + tempSymbol + " — open Atmos"} style={pill}>
+        <span style={{ fontSize: 18, lineHeight: 1 }}>{WMO[wx.code] || "🌡️"}</span>
+        <span style={{ fontFamily: FFM, fontWeight: 500, fontSize: 14, color: "var(--nv-text-strong)", lineHeight: 1 }}>{wx.temp}°</span>
+      </button>
+    );
+  }
+  return (
+    <button className="sb" onClick={onClick} title="Set your location in Atmos" style={{ ...pill, opacity: status === "loading" ? 0.55 : 0.8 }}>
+      <span style={{ fontSize: 18, lineHeight: 1 }}>⛅</span>
+      <span style={{ fontFamily: FF, fontSize: 12, color: "var(--nv-text-dim)", lineHeight: 1 }}>{status === "loading" ? "…" : "Weather"}</span>
+    </button>
+  );
+}
+
 // ─── ROOT ─────────────────────────────────────────────────────────────────────
 export default function NovaOS(){
   const [screen,     setScreen]     = useState("boot");
@@ -1423,22 +1521,33 @@ export default function NovaOS(){
           ?"linear-gradient(180deg, rgba("+hexRgb(tbColor)+",0.78) 0%, rgba("+hexRgb(tbColor)+",0.86) 100%)"
           :"var(--nv-surface)";
         // The Nova taskbar is always visible — including in fullscreen.
+        //
+        // v9.0 — floating glass dock. Detached from the screen edge (8px inset
+        // on the sides + bottom), fully rounded, with a soft drop shadow so it
+        // reads as a Liquid-Glass island. The background uses the theme glass
+        // surface token (var(--nv-surface)), so it stays a solid-ish dark bar
+        // in dark mode when Liquid Glass is OFF and goes translucent when it's
+        // ON — a user-picked taskbarColor still wins. Three zones: a left
+        // cluster (Start + weather), the apps absolutely centered (Windows 11
+        // style), and a right system-tray cluster.
         return(
       <div data-drop="none" style={{
-        position:"fixed",bottom:0,left:0,right:0,height:TASKBAR_H,
+        position:"fixed",bottom:8,left:8,right:8,height:TASKBAR_H-12,
         background:tbBg,
         backdropFilter:"blur(var(--nv-glass-blur)) saturate(160%)",
         WebkitBackdropFilter:"blur(var(--nv-glass-blur)) saturate(160%)",
-        borderTop:"1px solid var(--nv-border)",
-        boxShadow:"0 -1px 0 rgba(255,255,255,0.04) inset, 0 -20px 50px -20px rgba(0,0,0,0.5)",
-        display:"flex",alignItems:"center",padding:"0 14px",gap:6,zIndex:9999,
+        border:"1px solid var(--nv-border)",
+        borderRadius:18,
+        boxShadow:"0 1px 0 rgba(255,255,255,0.07) inset, 0 14px 44px -10px rgba(0,0,0,0.6)",
+        display:"flex",alignItems:"center",justifyContent:"space-between",
+        padding:"0 10px",gap:8,zIndex:9999,
       }}>
-        {/* v7.7: Start menu button — now shows the Nova OS brand mark (gradient
-            N) instead of the generic "◈" glyph. The button background lights
-            up with the accent color when the menu is open so the affordance
-            is still obvious despite the busier icon. */}
+        {/* LEFT cluster — Start button, divider, weather pill */}
+        <div style={{display:"flex",alignItems:"center",gap:8,zIndex:2,flexShrink:0}}>
+        {/* v7.7: Start menu button — shows the Nova OS brand mark. The button
+            lights up with the accent color when the menu is open. */}
         <button className="sb" onClick={()=>{setMenuOpen(o=>!o);setMenuSrch("");}} title="Nova OS" style={{
-          width:42,height:42,borderRadius:12,
+          width:46,height:46,borderRadius:13,
           background:menuOpen?fill(AC):"rgba(255,255,255,0.06)",
           border:"1px solid "+(menuOpen?bdr(AC):"rgba(255,255,255,0.09)"),
           boxShadow:menuOpen?"0 0 16px "+fill(AC)+", 0 2px 8px rgba(0,0,0,0.3) inset":"none",
@@ -1446,9 +1555,16 @@ export default function NovaOS(){
           transition:"all 0.2s cubic-bezier(0.4,0,0.2,1)",
           padding:0,
         }}>
-          <NovaLogo size={26}/>
+          <NovaLogo size={30}/>
         </button>
-        <div style={{width:1,height:26,background:"linear-gradient(180deg, transparent, rgba(255,255,255,0.12) 50%, transparent)",margin:"0 5px"}}/>
+        <div style={{width:1,height:26,background:"linear-gradient(180deg, transparent, rgba(255,255,255,0.12) 50%, transparent)",margin:"0 3px"}}/>
+        {/* v9.0 — Windows 11-style weather pill in the bottom-left corner. */}
+        {deviceMode!=="mobile" && <TaskbarWeather data={data} onClick={()=>openApp("atmos")} />}
+        </div>
+        {/* CENTER cluster — pinned + running apps, absolutely centered
+            (Windows 11 style). Capped width so a long row of apps never runs
+            under the left/right clusters. */}
+        <div style={{position:"absolute",left:"50%",top:"50%",transform:"translate(-50%,-50%)",display:"flex",alignItems:"center",gap:7,maxWidth:deviceMode==="mobile"?"calc(100% - 220px)":"calc(100% - 400px)",zIndex:1}}>
         {/* v8.0 — Taskbar: pinned apps + running windows.
             Pinned apps with NO running windows render as compact icon-only
             "launcher" chips (40x40, no label). Pinned apps WITH running
@@ -1537,7 +1653,7 @@ export default function NovaOS(){
               },
             }:{};
 
-            // Compact pinned-only chip — icon only, fixed 40x40 square.
+            // Compact pinned-only chip — icon only, fixed 46x46 square.
             if(slot.pinned&&!hasRunning){
               const badgeCount = appBadgeCounts[slot.appId] || 0;
               return(
@@ -1546,16 +1662,16 @@ export default function NovaOS(){
                   onContextMenu={e=>openContextMenu(e,buildMenu())}
                   title={app.label + (badgeCount > 0 ? " — " + badgeCount + " unread" : "")}
                   style={{
-                    width:40,height:40,padding:0,
+                    width:46,height:46,padding:0,
                     background:"rgba(255,255,255,0.05)",
                     border:"1px solid rgba(255,255,255,0.07)",
-                    borderRadius:10,cursor:isDragging?"grabbing":"pointer",
+                    borderRadius:12,cursor:isDragging?"grabbing":"pointer",
                     display:"flex",alignItems:"center",justifyContent:"center",
                     transition:"all 0.18s cubic-bezier(0.4,0,0.2,1)",
                     flexShrink:0,position:"relative",
                     ...dragStyle,
                   }}>
-                  <AppIconDisplay app={{id:app.id,icon:app.icon}} size={20} glass={glass}/>
+                  <AppIconDisplay app={{id:app.id,icon:app.icon}} size={26} glass={glass}/>
                   {badgeCount > 0 && (
                     <div style={{position:"absolute",top:-2,right:-2,minWidth:14,height:14,padding:"0 3px",borderRadius:7,background:"#ff4d4f",color:"#fff",fontFamily:FFB,fontWeight:700,fontSize:9,display:"flex",alignItems:"center",justifyContent:"center",lineHeight:1,boxShadow:"0 0 6px rgba(255,77,79,0.6)"}}>
                       {badgeCount > 9 ? "9+" : badgeCount}
@@ -1572,11 +1688,11 @@ export default function NovaOS(){
                 onClick={wrappedClick}
                 onContextMenu={e=>openContextMenu(e,buildMenu())}
                 style={{
-                  height:40,padding:"0 12px",
+                  height:46,padding:"0 14px",
                   background:isTop?"rgba(255,255,255,0.14)":"rgba(255,255,255,0.05)",
                   border:"1px solid "+(isTop?"rgba(255,255,255,0.14)":"rgba(255,255,255,0.07)"),
-                  borderRadius:10,cursor:isDragging?"grabbing":"pointer",
-                  fontFamily:FF,fontSize:12,fontWeight:600,
+                  borderRadius:12,cursor:isDragging?"grabbing":"pointer",
+                  fontFamily:FF,fontSize:13,fontWeight:600,
                   color:allMin?"rgba(255,255,255,0.45)":"rgba(255,255,255,0.88)",
                   whiteSpace:"nowrap",
                   transition:"all 0.22s cubic-bezier(0.4,0,0.2,1)",
@@ -1585,7 +1701,7 @@ export default function NovaOS(){
                   ...dragStyle,
                 }}>
                 <div style={{position:"relative",pointerEvents:"none",display:"flex",alignItems:"center"}}>
-                  <AppIconDisplay app={{id:app.id,icon:app.icon}} size={16} glass={glass}/>
+                  <AppIconDisplay app={{id:app.id,icon:app.icon}} size={22} glass={glass}/>
                   {appBadgeCounts[slot.appId]>0 && (
                     <div style={{position:"absolute",top:-5,right:-7,minWidth:13,height:13,padding:"0 3px",borderRadius:6.5,background:"#ff4d4f",color:"#fff",fontFamily:FFB,fontWeight:700,fontSize:8.5,display:"flex",alignItems:"center",justifyContent:"center",lineHeight:1,boxShadow:"0 0 5px rgba(255,77,79,0.6)"}}>
                       {appBadgeCounts[slot.appId]>9?"9+":appBadgeCounts[slot.appId]}
@@ -1593,61 +1709,62 @@ export default function NovaOS(){
                   )}
                 </div>
                 {deviceMode!=="mobile"&&<span>{app.label}</span>}
-                {hasRunning&&!allMin&&<div style={{position:"absolute",bottom:-1,left:"50%",transform:"translateX(-50%)",width:isTop?22:8,height:3,borderRadius:3,background:AC,boxShadow:isTop?"0 0 10px "+AC+", 0 0 4px "+AC:"none",transition:"width 0.25s cubic-bezier(0.4,0,0.2,1), box-shadow 0.25s cubic-bezier(0.4,0,0.2,1)"}}/>}
+                {hasRunning&&!allMin&&<div style={{position:"absolute",bottom:-1,left:"50%",transform:"translateX(-50%)",width:isTop?28:10,height:3,borderRadius:3,background:AC,boxShadow:isTop?"0 0 10px "+AC+", 0 0 4px "+AC:"none",transition:"width 0.25s cubic-bezier(0.4,0,0.2,1), box-shadow 0.25s cubic-bezier(0.4,0,0.2,1)"}}/>}
               </button>
             );
           });
         })()}
-        <div style={{flex:1}}/>
-        {/* v7.7: right-side cluster — every pill is locked to height:40 so
-            they sit on the same baseline. Internal layout uses flex centering
-            so multi-line content (the clock's time+date stack) stays vertically
-            balanced without resizing the chip. */}
+        </div>
+        {/* RIGHT cluster — profile, system tray (notifications + settings),
+            clock. Pills share a height so they sit on the same baseline. */}
+        <div style={{display:"flex",alignItems:"center",gap:8,zIndex:2,flexShrink:0}}>
         {deviceMode!=="mobile"&&
           <button className="sb" onClick={()=>openApp("profile")} title="Profile" style={{
-            height:40,display:"flex",alignItems:"center",gap:8,
-            padding:"0 14px 0 8px",borderRadius:10,
+            height:44,display:"flex",alignItems:"center",gap:8,
+            padding:"0 14px 0 8px",borderRadius:12,
             background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.07)",
-            cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:12,color:AC,
+            cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:12.5,color:AC,
             transition:"all 0.18s cubic-bezier(0.4,0,0.2,1)",
           }}>
-            <UserAvatar name={user} img={data?.avatar} ac={AC} size={22} ring={false}/>
+            <UserAvatar name={user} img={data?.avatar} ac={AC} size={24} ring={false}/>
             @{user}
           </button>
         }
         <div style={{
-          height:40,display:"flex",alignItems:"center",gap:2,padding:"0 3px",
-          background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.06)",borderRadius:11,
+          height:44,display:"flex",alignItems:"center",gap:3,padding:"0 4px",
+          background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.06)",borderRadius:13,
         }}>
-          {/* Notification bell — badge shows unread count, click toggles the panel */}
+          {/* Notification bell — badge shows unread count, click toggles the panel.
+              v9.0: monochrome glass glyph (inherits color via currentColor). */}
           <button className="sb" onClick={()=>setNotifsOpen(o=>!o)} title={unreadCount>0?unreadCount+" unread":"Notifications"} style={{
-            position:"relative",width:32,height:32,borderRadius:8,
+            position:"relative",width:36,height:36,borderRadius:9,
             background:notifsOpen?fill(AC):"transparent",
             border:notifsOpen?"1px solid "+bdr(AC):"1px solid transparent",
             cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",
-            fontSize:14,color:notifsOpen?AC:"rgba(255,255,255,0.6)",
+            color:notifsOpen?AC:"rgba(255,255,255,0.62)",
             transition:"all 0.18s cubic-bezier(0.4,0,0.2,1)",
           }}>
-            🔔
-            {unreadCount>0 && <span style={{position:"absolute",top:2,right:2,minWidth:14,height:14,padding:"0 3px",borderRadius:7,background:"#ff5555",color:"#fff",fontFamily:FFB,fontWeight:700,fontSize:9,display:"flex",alignItems:"center",justifyContent:"center",lineHeight:1,boxShadow:"0 0 8px rgba(255,85,85,0.5)"}}>{unreadCount>9?"9+":unreadCount}</span>}
+            <BellGlyph size={17}/>
+            {unreadCount>0 && <span style={{position:"absolute",top:3,right:3,minWidth:14,height:14,padding:"0 3px",borderRadius:7,background:"#ff5555",color:"#fff",fontFamily:FFB,fontWeight:700,fontSize:9,display:"flex",alignItems:"center",justifyContent:"center",lineHeight:1,boxShadow:"0 0 8px rgba(255,85,85,0.5)"}}>{unreadCount>9?"9+":unreadCount}</span>}
           </button>
           <button className="sb" onClick={()=>openApp("settings")} title="Settings" style={{
-            width:32,height:32,borderRadius:8,
+            width:36,height:36,borderRadius:9,
             background:"transparent",border:"1px solid transparent",
             cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",
-            fontSize:14,color:"rgba(255,255,255,0.55)",
+            color:"rgba(255,255,255,0.55)",
             transition:"all 0.18s cubic-bezier(0.4,0,0.2,1)",
-          }}>⚙️</button>
+          }}><GearGlyph size={17}/></button>
         </div>
         <div style={{
-          height:40,display:"flex",flexDirection:"column",justifyContent:"center",
+          height:44,display:"flex",flexDirection:"column",justifyContent:"center",
           textAlign:"right",cursor:"default",
-          padding:"0 14px",borderRadius:10,
+          padding:"0 14px",borderRadius:12,
           background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.06)",
           minWidth:64,
         }}>
           <div style={{fontFamily:FFM,fontWeight:500,fontSize:13,color:"var(--nv-text-strong)",letterSpacing:0.3,lineHeight:1.1}}>{fmtTime(tick)}</div>
           {deviceMode!=="mobile"&&<div style={{fontFamily:FF,fontSize:9,color:"var(--nv-text-dim)",marginTop:1,lineHeight:1.1}}>{fmtDate(tick)}</div>}
+        </div>
         </div>
       </div>
         );
