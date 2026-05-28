@@ -355,7 +355,7 @@ export function SettingsApp({ user, data, updateSettings, showToast, AC, onCusto
               <div style={{ fontSize: 12, color: "var(--nv-text-dim)", marginTop: 2, fontFamily: FFM }}>Version {NOVA_VERSION}</div>
             </div>
           </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 1, padding: "4px 0", background: "rgba(255,255,255,0.03)", border: "1px solid var(--nv-border)", borderRadius: 10 }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 1, padding: "4px 0", background: "rgba(255,255,255,0.03)", border: "1px solid var(--nv-border)", borderRadius: 10, marginBottom: 18 }}>
             {[
               ["Edition", "Web + Desktop (Tauri)"],
               ["Built with", "React · Vite · Firebase"],
@@ -366,6 +366,15 @@ export function SettingsApp({ user, data, updateSettings, showToast, AC, onCusto
                 <span style={{ fontFamily: FFM, fontSize: 11.5, color: "var(--nv-text-strong)" }}>{v}</span>
               </div>
             ))}
+          </div>
+
+          {/* v9.1 — Trademarks & attributions. The Store lists shortcuts to
+              third-party services (Roblox, YouTube, Spotify, Netflix, etc.)
+              under nominative-fair-use; this footer makes the relationship
+              explicit and disclaims any sponsorship/endorsement. */}
+          <div style={SEC}>Trademarks &amp; Attributions</div>
+          <div style={{ padding: "12px 14px", background: "rgba(255,255,255,0.03)", border: "1px solid var(--nv-border)", borderRadius: 10, fontSize: 11.5, lineHeight: 1.6, color: "var(--nv-text-dim)" }}>
+            Nova OS provides launchers to third-party services. All trademarks, logos and brand names are property of their respective owners. Nova OS is not affiliated with, endorsed by, or sponsored by any service listed in the Store.
           </div>
         </>)}
 
