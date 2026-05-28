@@ -151,20 +151,23 @@ export function MusicApp({ AC, showToast }) {
         <div style={{ flex: 1, minWidth: 0, overflowY: "auto" }}>
           {view === "home" && (
             <div style={{ padding: "28px 28px 24px" }}>
-              {/* Hero */}
+              {/* Hero — v9.2 fix: removed minWidth on the text column so it
+                  shrinks with the parent at narrow widths, and the title font
+                  now scales with clamp() so it never overflows the card. */}
               <div style={{
                 background: `linear-gradient(135deg, rgba(${hexRgb(AC)},0.35), rgba(${hexRgb(AC)},0.06))`,
                 border: "1px solid " + bdr(AC), borderRadius: 16,
                 padding: "26px 28px", marginBottom: 24,
                 display: "flex", alignItems: "center", gap: 20, flexWrap: "wrap",
+                overflow: "hidden",
               }}>
                 <div style={{ width: 88, height: 88, borderRadius: 14, background: fill(AC), border: "1px solid " + bdr(AC), display: "flex", alignItems: "center", justifyContent: "center", fontSize: 44, flexShrink: 0, boxShadow: "0 8px 32px rgba(0,0,0,0.4)" }}>🎵</div>
-                <div style={{ flex: 1, minWidth: 200 }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontFamily: FFM, fontSize: 11, color: AC, letterSpacing: 1, textTransform: "uppercase", marginBottom: 4 }}>{tracks.length === 0 ? "Get started" : "Welcome back"}</div>
-                  <div style={{ fontFamily: FFB, fontWeight: 800, fontSize: 26, color: "var(--nv-text-strong)", lineHeight: 1.1, marginBottom: 8 }}>
+                  <div style={{ fontFamily: FFB, fontWeight: 800, fontSize: "clamp(17px, 3vw, 26px)", color: "var(--nv-text-strong)", lineHeight: 1.15, marginBottom: 8, wordBreak: "break-word" }}>
                     {tracks.length === 0 ? "Add your music to begin" : "Your music, ready when you are"}
                   </div>
-                  <div style={{ fontSize: 13, color: "var(--nv-text)", lineHeight: 1.55, opacity: 0.85, marginBottom: 14 }}>
+                  <div style={{ fontSize: 13, color: "var(--nv-text)", lineHeight: 1.55, opacity: 0.85, marginBottom: 14, wordBreak: "break-word" }}>
                     {tracks.length === 0
                       ? "Pull in audio files from your device — MP3, WAV, OGG, M4A all work. They stay in this session."
                       : tracks.length + " track" + (tracks.length === 1 ? "" : "s") + " in your library."}
@@ -332,13 +335,16 @@ export function MusicApp({ AC, showToast }) {
             <button onClick={next} disabled={idx >= tracks.length - 1} title="Next" style={transportBtn(idx >= 0 && idx < tracks.length - 1)}>⏭</button>
           </div>
 
-          {/* RIGHT — volume */}
+          {/* RIGHT — volume. v9.2 fix: slider is no longer a fixed 110px
+              that overflows at narrow window widths. It uses flex:1 with a
+              maxWidth so it shrinks with the column, and the icon shrinks
+              away below ~140px so the slider always has somewhere to live. */}
           <div style={{ display: "flex", alignItems: "center", gap: 8, flex: "1 1 0", justifyContent: "flex-end", minWidth: 0 }}>
-            <span style={{ fontSize: 14, color: "var(--nv-text-dim)" }}>{volume === 0 ? "🔇" : volume < 0.5 ? "🔉" : "🔊"}</span>
+            <span style={{ fontSize: 14, color: "var(--nv-text-dim)", flexShrink: 0 }}>{volume === 0 ? "🔇" : volume < 0.5 ? "🔉" : "🔊"}</span>
             <input
               type="range" min={0} max={1} step={0.01}
               value={volume} onChange={e => setVolume(+e.target.value)}
-              style={{ width: 110, accentColor: AC }}
+              style={{ flex: "1 1 0", minWidth: 40, maxWidth: 130, accentColor: AC }}
               title={Math.round(volume * 100) + "%"}
             />
           </div>

@@ -44,18 +44,28 @@ export async function resolveUsername(rawUsername) {
  * Subscribe to the current user's DM threads (most-recent first).
  * Calls cb with an array of thread docs each time anything changes.
  * Returns an unsubscribe function.
+ *
+ * v9.2: dropped the server-side `orderBy("lastTs","desc")` and sort
+ * client-side instead. The `where(array-contains) + orderBy` combination
+ * requires a composite Firestore index, which would otherwise silently
+ * error and leave the sidebar empty for users who don't have it. Same fix
+ * pattern as v8.3 B2 for chess. Also logs the error so a future silent
+ * failure is at least visible in the console.
  */
 export function watchMyThreads(myUid, cb) {
   if (!myUid) return () => {};
   const q = query(
     collection(firestoreDb, "nova_dm_threads"),
     where("participantUids", "array-contains", myUid),
-    orderBy("lastTs", "desc"),
     limit(100),
   );
   return onSnapshot(q,
-    snap => cb(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
-    () => cb([]),  // permission errors → empty list (graceful degradation)
+    snap => {
+      const threads = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      threads.sort((a, b) => (b.lastTs || 0) - (a.lastTs || 0));
+      cb(threads);
+    },
+    err => { console.warn("[dms] watchMyThreads error:", err?.message || err); cb([]); },
   );
 }
 
