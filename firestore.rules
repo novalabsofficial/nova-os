@@ -102,6 +102,31 @@ service cloud.firestore {
         isMod();
     }
 
+    // ── chat reactions (v9.4) ────────────────────────────────────────────
+    // Emoji reactions on global chat messages. Stored as a separate
+    // collection so we don't have to relax the append-only `update` rule
+    // on nova_chat itself. Doc id format is `<msgId>_<uid>_<emoji>` so
+    // there's exactly one doc per (message, user, emoji) — clicking the
+    // same emoji again deletes the doc (toggle behaviour).
+    match /nova_chat_reactions/{rxId} {
+      allow read: if signedIn();
+      // Create: must stamp own uid, name a real message and a single
+      // emoji string (no length cap to keep the rules simple — the
+      // client only sends short presets).
+      allow create: if willOwnUid('uid') &&
+        request.resource.data.msgId is string &&
+        request.resource.data.msgId.size() > 0 &&
+        request.resource.data.emoji is string &&
+        request.resource.data.emoji.size() > 0 &&
+        request.resource.data.emoji.size() < 12;
+      // Reactions never get edited in place — toggle = delete + recreate.
+      allow update: if false;
+      // Delete: only your own reaction (or a mod for cleanup).
+      allow delete: if
+        (signedIn() && resource.data.uid == request.auth.uid) ||
+        isMod();
+    }
+
     // ── community store apps ─────────────────────────────────────────────
     match /nova_user_apps/{appId} {
       // Anyone signed in can browse the catalog.
