@@ -152,7 +152,7 @@ function GridCard({ app, ratings, ac, isIn, onOpen, toggleInstall, currentUser, 
       </div>
       <div style={{ fontSize: 12, color: "rgba(255,255,255,0.48)", lineHeight: 1.5, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", minHeight: 34 }}>{app.desc}</div>
       <div style={{ display: "flex", gap: 8 }}>
-        <button onClick={(e) => { e.stopPropagation(); toggleInstall(app.id); }} style={{ flex: 1, padding: "7px", borderRadius: 9, cursor: "pointer", fontFamily: FFB, fontWeight: 600, fontSize: 11.5, background: isIn ? "rgba(255,80,80,0.1)" : "rgba(255,255,255,0.07)", border: "1px solid " + (isIn ? "rgba(255,80,80,0.3)" : "rgba(255,255,255,0.12)"), color: isIn ? "rgba(255,130,130,0.9)" : "rgba(255,255,255,0.7)" }}>{isIn ? "Remove" : "Add"}</button>
+        <button onClick={(e) => { e.stopPropagation(); toggleInstall(app); }} style={{ flex: 1, padding: "7px", borderRadius: 9, cursor: "pointer", fontFamily: FFB, fontWeight: 600, fontSize: 11.5, background: isIn ? "rgba(255,80,80,0.1)" : "rgba(255,255,255,0.07)", border: "1px solid " + (isIn ? "rgba(255,80,80,0.3)" : "rgba(255,255,255,0.12)"), color: isIn ? "rgba(255,130,130,0.9)" : "rgba(255,255,255,0.7)" }}>{isIn ? "Remove" : "Add"}</button>
         <button onClick={(e) => { e.stopPropagation(); openExternalUrl(app.url); }} style={{ flex: 1, padding: "7px", borderRadius: 9, cursor: "pointer", fontFamily: FFB, fontWeight: 700, fontSize: 11.5, background: fill(ac), border: "1px solid " + bdr(ac), color: ac }}>Open ↗</button>
       </div>
     </div>
@@ -220,7 +220,7 @@ function AppDetail({ app, ratings, ac, isIn, user, onBack, toggleInstall, rateAn
         </div>
         <div style={{ display: "flex", gap: 10, marginTop: 18 }}>
           <button onClick={() => openExternalUrl(app.url)} style={{ padding: "10px 26px", borderRadius: 22, cursor: "pointer", fontFamily: FFB, fontWeight: 700, fontSize: 13.5, background: "#fff", color: "#111", border: "none" }}>Open ↗</button>
-          <button onClick={() => toggleInstall(app.id)} style={{ padding: "10px 22px", borderRadius: 22, cursor: "pointer", fontFamily: FFB, fontWeight: 600, fontSize: 13.5, background: isIn ? "rgba(255,80,80,0.12)" : "rgba(255,255,255,0.1)", border: "1px solid " + (isIn ? "rgba(255,80,80,0.35)" : "rgba(255,255,255,0.18)"), color: isIn ? "rgba(255,140,140,0.95)" : "#fff" }}>{isIn ? "Remove from Desktop" : "+ Add to Desktop"}</button>
+          <button onClick={() => toggleInstall(app)} style={{ padding: "10px 22px", borderRadius: 22, cursor: "pointer", fontFamily: FFB, fontWeight: 600, fontSize: 13.5, background: isIn ? "rgba(255,80,80,0.12)" : "rgba(255,255,255,0.1)", border: "1px solid " + (isIn ? "rgba(255,80,80,0.35)" : "rgba(255,255,255,0.18)"), color: isIn ? "rgba(255,140,140,0.95)" : "#fff" }}>{isIn ? "Remove from Desktop" : "+ Add to Desktop"}</button>
           {canDelete && <button onClick={() => onDeleteApp(app)} style={{ padding: "10px 16px", borderRadius: 22, cursor: "pointer", fontFamily: FFB, fontWeight: 600, fontSize: 13, background: "none", border: "1px solid rgba(255,80,80,0.3)", color: "rgba(255,120,120,0.8)" }}>🗑 Remove</button>}
         </div>
       </div>
@@ -303,6 +303,11 @@ export function StoreApp({ user, data, updateData, showToast, AC }) {
   const [sIcon, setSIcon] = useState("🚀"); const [submitting, setSubmitting] = useState(false);
   const [sIconImg, setSIconImg] = useState(null); // v9.0: uploaded custom logo (base64) or null
   const installed = data?.installedApps || [];
+  // v9.1: also accept the doc's `legacyId` (its old data `id` field, if any)
+  // so pre-v9.1 `installedApps` entries that referenced the data id rather
+  // than the Firestore doc id still register as installed. Catalog apps
+  // have no `legacyId` so the second branch short-circuits to false.
+  const isInstalled = (app) => installed.includes(app.id) || (app.legacyId && installed.includes(app.legacyId));
 
   // v9.0 — let submitters upload their own logo instead of an emoji. Downsample
   // to a 128² cover-cropped JPEG (~5–15 KB base64) so it fits comfortably in the
@@ -356,7 +361,11 @@ export function StoreApp({ user, data, updateData, showToast, AC }) {
   // ── Realtime community apps ──────────────────────────────────────────────
   useEffect(() => {
     const q = query(collection(firestoreDb, "nova_user_apps"), orderBy("ts", "desc"), limit(60));
-    const unsub = onSnapshot(q, snap => { setCommApps(snap.docs.map(d => ({ id: d.id, ...d.data() }))); setLoadingComm(false); }, () => setLoadingComm(false));
+    // v9.1: spread is `{...d.data(), id: d.id}` so the Firestore doc id
+    // always wins — see NovaOS.jsx for the full rationale (any doc whose
+    // data carried its own `id` field would otherwise hide the doc id and
+    // break `installedApps` matching).
+    const unsub = onSnapshot(q, snap => { setCommApps(snap.docs.map(d => { const x = d.data(); return { ...x, legacyId: x.id, id: d.id }; })); setLoadingComm(false); }, () => setLoadingComm(false));
     return () => unsub();
   }, []);
 
@@ -414,9 +423,21 @@ export function StoreApp({ user, data, updateData, showToast, AC }) {
     try { await updateDoc(doc(firestoreDb, "nova_user_apps", app.id), { status: "rejected", rejectReason: reason || null, reviewedBy: user, reviewedAt: Date.now() }); showToast("Rejected \"" + app.name + "\""); }
     catch { showToast("Reject failed"); }
   }
-  function toggleInstall(appId) {
-    const isIn = installed.includes(appId);
-    updateData(p => ({ ...p, installedApps: isIn ? p.installedApps.filter(id => id !== appId) : [...(p.installedApps || []), appId] }));
+  // v9.1: accept either the full app object (so we can also clean up a
+  // legacy data-id entry on remove) or a bare id (for catalog apps where the
+  // id is the only thing the call site has). On remove we strip every id
+  // that matches — covers the case where `installedApps` still holds an old
+  // `legacyId` from a pre-v9.1 install.
+  function toggleInstall(appOrId) {
+    const app = typeof appOrId === "string" ? { id: appOrId } : appOrId;
+    const ids = [app.id, app.legacyId].filter(Boolean);
+    const isIn = ids.some(id => installed.includes(id));
+    updateData(p => ({
+      ...p,
+      installedApps: isIn
+        ? (p.installedApps || []).filter(id => !ids.includes(id))
+        : [...(p.installedApps || []), app.id],
+    }));
     showToast(isIn ? "App removed" : "Added to desktop ✓");
   }
   async function deleteApp(app) {
@@ -502,7 +523,7 @@ export function StoreApp({ user, data, updateData, showToast, AC }) {
 
       {/* ── Detail page takes over the content area ─────────────────────── */}
       {detail && (
-        <AppDetail app={detail} ratings={ratings} ac={ac} isIn={installed.includes(detail.id)} user={user}
+        <AppDetail app={detail} ratings={ratings} ac={ac} isIn={isInstalled(detail)} user={user}
           onBack={() => setDetail(null)} toggleInstall={toggleInstall} rateAndReview={rateAndReview}
           currentUser={user} onDeleteApp={deleteApp} canModerate={userIsAdmin} onDeleteReview={deleteReview} />
       )}
@@ -513,7 +534,7 @@ export function StoreApp({ user, data, updateData, showToast, AC }) {
           <div style={{ fontFamily: FFB, fontWeight: 700, fontSize: 15, color: "rgba(255,255,255,0.9)", marginBottom: 12 }}>{searchResults.length} result{searchResults.length === 1 ? "" : "s"} for “{search.trim()}”</div>
           {searchResults.length === 0 && <div style={{ color: "rgba(255,255,255,0.25)", fontStyle: "italic", fontSize: 13, textAlign: "center", padding: "40px 0" }}>Nothing matched. Try another search.</div>}
           <div style={gridStyle}>
-            {searchResults.map(app => <GridCard key={app.id} app={app} isIn={installed.includes(app.id)} {...cardProps} />)}
+            {searchResults.map(app => <GridCard key={app.id} app={app} isIn={isInstalled(app)} {...cardProps} />)}
           </div>
         </>
       )}
@@ -567,7 +588,7 @@ export function StoreApp({ user, data, updateData, showToast, AC }) {
       {/* ── Games ───────────────────────────────────────────────────────── */}
       {!detail && !searching && view === "games" && (
         <div style={gridStyle}>
-          {games.map(app => <GridCard key={app.id} app={app} isIn={installed.includes(app.id)} {...cardProps} />)}
+          {games.map(app => <GridCard key={app.id} app={app} isIn={isInstalled(app)} {...cardProps} />)}
         </div>
       )}
 
@@ -580,7 +601,7 @@ export function StoreApp({ user, data, updateData, showToast, AC }) {
             ))}
           </div>
           <div style={gridStyle}>
-            {nonGames.filter(a => appsCat === "All" || a.cat === appsCat).map(app => <GridCard key={app.id} app={app} isIn={installed.includes(app.id)} {...cardProps} />)}
+            {nonGames.filter(a => appsCat === "All" || a.cat === appsCat).map(app => <GridCard key={app.id} app={app} isIn={isInstalled(app)} {...cardProps} />)}
           </div>
         </>
       )}
@@ -611,7 +632,7 @@ export function StoreApp({ user, data, updateData, showToast, AC }) {
           {loadingComm && <div style={{ textAlign: "center", padding: "36px 0" }}><div style={{ width: 24, height: 24, border: "3px solid rgba(255,255,255,0.1)", borderTopColor: ac, borderRadius: "50%", animation: "spin 0.8s linear infinite", margin: "0 auto" }} /></div>}
           {!loadingComm && visibleComm.length === 0 && <div style={{ color: "rgba(255,255,255,0.18)", fontStyle: "italic", fontSize: 13, textAlign: "center", padding: "40px 0" }}>No community apps yet — be the first! 🚀</div>}
           <div style={gridStyle}>
-            {visibleComm.map(app => <GridCard key={app.id} app={app} isIn={installed.includes(app.id)} {...cardProps} />)}
+            {visibleComm.map(app => <GridCard key={app.id} app={app} isIn={isInstalled(app)} {...cardProps} />)}
           </div>
         </>
       )}
