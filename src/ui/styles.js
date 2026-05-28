@@ -184,6 +184,13 @@ export const CSS = `
   .ps{transition:transform 0.22s cubic-bezier(0.34,1.56,0.64,1);}.ps:hover{transform:scale(1.22);z-index:2;}
   .fr{transition:background 0.18s cubic-bezier(0.4,0,0.2,1);}.fr:hover{background:rgba(255,255,255,0.08)!important;}
   .sr{transition:background 0.18s cubic-bezier(0.4,0,0.2,1);}.sr:hover{background:rgba(255,255,255,0.07)!important;}
+  /* v9.2 — Discord-style chat rows. Whole row highlights on hover; the
+     delete/mod button (.rowact) and the per-message timestamp shown in the
+     avatar gutter for grouped messages (.ts-hover) reveal on hover. */
+  .msgrow{transition:background 0.12s;}
+  .msgrow:hover{background:rgba(255,255,255,0.035);}
+  .msgrow:hover .rowact{opacity:1!important;}
+  .msgrow:hover .ts-hover{color:var(--nv-text-dim)!important;}
   .bp{transition:background 0.18s cubic-bezier(0.4,0,0.2,1);}.bp:hover{background:rgba(255,255,255,0.12)!important;}
   .ad{transition:transform 0.22s cubic-bezier(0.34,1.56,0.64,1);}.ad:hover{transform:scale(1.16);}
   .ws{transition:border-color 0.2s cubic-bezier(0.4,0,0.2,1),transform 0.2s cubic-bezier(0.4,0,0.2,1);}.ws:hover{border-color:rgba(255,255,255,0.55)!important;transform:scale(1.02);}
