@@ -452,6 +452,16 @@ function QuickSettingsPanel({ AC, glass, onToggleGlass, onClose, openSettingsSec
     };
   }, []);
   function applySnd(patch) { const next = { ...snd, ...patch }; setSnd(next); setSoundConfig(next); }
+  // v9.4 — same volume-preview chime as the Settings slider. Throttled
+  // so a smooth drag triggers a steady series of pings, not overlap.
+  const lastVolPreviewRef = useRef(0);
+  function previewVolume(newVolume) {
+    const now = Date.now();
+    if (now - lastVolPreviewRef.current < 150) return;
+    if (!(newVolume > 0)) return;
+    lastVolPreviewRef.current = now;
+    playSound("volumeSample");
+  }
   const muted = !snd.enabled || snd.volume <= 0;
 
   const tile = (active) => ({
@@ -492,7 +502,7 @@ function QuickSettingsPanel({ AC, glass, onToggleGlass, onClose, openSettingsSec
             <VolumeGlyph size={20} muted={muted} />
           </button>
           <input type="range" min={0} max={1} step={0.05} value={snd.enabled ? snd.volume : 0}
-            onChange={e => { const v = +e.target.value; applySnd({ volume: v, enabled: v > 0 }); }}
+            onChange={e => { const v = +e.target.value; applySnd({ volume: v, enabled: v > 0 }); previewVolume(v); }}
             style={{ flex: 1, accentColor: AC }} />
           <span style={{ fontFamily: FFM, fontSize: 11, color: "rgba(255,255,255,0.5)", width: 30, textAlign: "right" }}>{Math.round((snd.enabled ? snd.volume : 0) * 100)}%</span>
         </div>

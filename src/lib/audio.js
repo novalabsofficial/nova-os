@@ -438,6 +438,18 @@ const SOUND_RECIPES = {
     }
   },
 
+  // v9.4 — Volume-sample tone. Plays when the user moves the volume
+  // slider (Settings → Sound, or the taskbar quick-settings flyout) so
+  // they can hear how loud the new level actually is — same UX trick
+  // Windows uses. Two-note rising chime (A5 → C#6, a major third) is
+  // short, instantly recognizable as "this is a volume preview," and
+  // plays at the just-set volume (playSound reads the live config on
+  // every call).
+  volumeSample: (ctx, t, v, r, d) => {
+    _voice(ctx, d, 880.00 * r, t + 0.00, 100, 0.18 * v, "sine", 5);   // A5
+    _voice(ctx, d, 1108.73 * r, t + 0.06, 130, 0.16 * v, "sine", 5);  // C#6
+  },
+
   // ── v9.4 — Atmos severe-weather alert ──────────────────────────────
   // Three-pulse 607 Hz sawtooth — mirrors the classic Weatherscan alarm
   // cadence (three urgent bursts) using the original NWS alert frequency.
@@ -465,11 +477,13 @@ const SOUND_TAILS = {
   windowClose: 300, appLaunch: 300, click: 100,
   // v9.4 — alarm + NWS recipes ring out longer than typical UI sounds.
   alarmSunrise: 4200, alarmPulse: 3500, alarmClassic: 2500, nwsAlert: 2200,
+  // v9.4 — volume preview is a quick chime, no reverb tail (see DRY_SOUNDS).
+  volumeSample: 250,
 };
 
 // Sounds that skip the reverb send — short UI ticks that should stay crisp
 // and cheap (no impulse generation, no lingering tail).
-const DRY_SOUNDS = new Set(["click", "windowOpen", "windowClose", "appLaunch", "toast"]);
+const DRY_SOUNDS = new Set(["click", "windowOpen", "windowClose", "appLaunch", "toast", "volumeSample"]);
 
 // Build a decaying-white-noise impulse response — a cheap, plausible "small
 // room" reverb tail. Stereo so the space feels wide.
