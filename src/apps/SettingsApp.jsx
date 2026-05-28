@@ -73,6 +73,18 @@ export function SettingsApp({ user, data, updateSettings, showToast, AC, onCusto
     setSoundCfgState(next);
     setSoundConfig(next);
   }
+  // v9.4 — volume-sample chime. Plays a short A5→C#6 ping at the new
+  // volume so the user hears how loud the slider position actually is —
+  // same trick Windows uses. Throttled to once per ~150 ms so a smooth
+  // drag triggers a steady series of pings instead of overlapping audio.
+  const lastVolPreviewRef = useRef(0);
+  function previewVolume(newVolume) {
+    const now = Date.now();
+    if (now - lastVolPreviewRef.current < 150) return;
+    if (!(newVolume > 0)) return;     // muted / zero: nothing to sample
+    lastVolPreviewRef.current = now;
+    playSound("volumeSample");
+  }
 
   // v9.0: live network status for the Network pane.
   const [net, setNet] = useState(() => readNet());
@@ -248,7 +260,7 @@ export function SettingsApp({ user, data, updateSettings, showToast, AC, onCusto
           <Toggle label="System sounds" value={soundCfg.enabled} onChange={v => updateSoundCfg({ enabled: v })} ac={AC} />
           <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 10, marginBottom: 8, opacity: soundCfg.enabled ? 1 : 0.4, pointerEvents: soundCfg.enabled ? "auto" : "none" }}>
             <span style={{ fontSize: 11, fontFamily: FFM, color: "var(--nv-text-dim)", width: 54 }}>Volume</span>
-            <input type="range" min={0} max={1} step={0.05} value={soundCfg.volume} onChange={e => updateSoundCfg({ volume: +e.target.value })} style={{ flex: 1, accentColor: AC }} />
+            <input type="range" min={0} max={1} step={0.05} value={soundCfg.volume} onChange={e => { const v = +e.target.value; updateSoundCfg({ volume: v }); previewVolume(v); }} style={{ flex: 1, accentColor: AC }} />
             <span style={{ fontSize: 11, fontFamily: FFM, color: "var(--nv-text-dim)", width: 32 }}>{Math.round(soundCfg.volume * 100)}%</span>
           </div>
           <div style={{ fontSize: 10.5, color: "var(--nv-text-dim)", marginBottom: 12, lineHeight: 1.5 }}>This controls Nova's own UI sounds. Media volume (the Music app, videos) and your computer's master volume are set by your device.</div>
@@ -317,7 +329,7 @@ export function SettingsApp({ user, data, updateSettings, showToast, AC, onCusto
           <div style={SEC}>Shortcuts</div>
           <div style={{ display: "flex", flexDirection: "column", gap: 5, padding: "10px 12px", background: "rgba(255,255,255,0.03)", border: "1px solid var(--nv-border)", borderRadius: 8 }}>
             {[
-              ["⌘/Ctrl + K", "Open start menu"],
+              ["⌘/Ctrl + K", "Spotlight global search"],
               ["⌘/Ctrl + ,", "Open Settings"],
               ["Esc", "Close start menu / dialogs"],
               ["Alt + W", "Close active window"],

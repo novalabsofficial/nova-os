@@ -5,29 +5,35 @@ not committed to. Living document — add to it freely.
 
 ---
 
-# 🚧 v9.2 — planned
+# 🚧 v9.4 — planned
 
-Mid-size release that extends the "two-pane sidebar" visual formula
-(established by v9.0 Settings and v9.1 File Explorer) to the apps that
-still feel dated.
+Focused feature release on top of the v9.3 bug-fix pass. Four items,
+each well-bounded, each elevates a daily-use surface.
 
 **Planned**
-- **Notes rework.** Completely rebuild Notes to feel high-quality and
-  professional. Sidebar (folders/notebooks — ideally reusing the same
-  folder system File Explorer already uses, so they share storage) + a
-  middle note list + an editor pane. Apple Notes / Bear / Obsidian as the
-  aesthetic targets.
-- **Music — genuine Spotify competitor.** Full visual + structural rebuild:
-  sidebar (Library / Playlists / Recently Played) + main browse area +
-  persistent now-playing bar. Layouts that actually compete with Spotify's
-  desktop client. Local-file playback can come in a follow-up release.
-- **Chat — Discord-style layout.** Server/DM list on the left, conversation
-  on the right, optional member list on the far right. Visual upgrade plus
-  the navigation pattern Discord made standard.
+- **Spotlight — global search in the taskbar.** A search bar embedded in
+  the taskbar (Windows-style) that searches across notes, tasks, files,
+  folders, photos, apps, Store entries, even Settings panes. Type
+  anything → instant filtered results → Enter to open. The single
+  highest-utility navigation upgrade.
+- **Alarms (Clock app).** Fourth tab in the Clock app alongside World /
+  Stopwatch / Timer. Real scheduled alarms with `{time, days, label,
+  enabled}` storage and three built-in alarm sounds designed in the same
+  master-bus sound engine: gentle/sunrise, pulse, and a classic alarm
+  beep. Pairs with the existing notification + sound stack as the ringer.
+- **Chat — reactions + typing indicators.** Discord-style emoji reactions
+  on messages (per-message reactions sub-doc) and "@alice is typing…"
+  presence via a TTL'd Firestore field. Makes the most-used social
+  surface feel real.
+- **Atmos — lock-screen severe-weather alert + new tone.** When a Severe
+  or Extreme NWS alert hits the pinned location, the screensaver
+  overlay turns into a full-screen warning card. Replace the single
+  607 Hz sine tone with a **three-pulse 607 Hz sawtooth** that mirrors
+  the classic Weatherscan alarm cadence.
 
 ---
 
-# ✅ v9.0 + v9.1 — shipped
+# ✅ v9.0 + v9.1 + v9.2 + v9.3 — shipped
 
 **v9.0 — "Liquid Glass" release**
 - Liquid Glass surface toggle + full colorless glass icon set; light mode
@@ -49,6 +55,27 @@ still feel dated.
 - Trademarks & attributions footer in Settings → About.
 - Fix: newly installed community apps now reliably appear on the desktop
   (spread-order id bug + legacy-id fallback).
+
+**v9.2 — Notes / Music / Chat reworks**
+- Notes rebuilt as a three-pane editor (folder rail + note list + editor
+  with auto-save) sharing folders with File Explorer.
+- Music rebuilt Spotify-style (sidebar + persistent now-playing bar +
+  per-track gradient album-art tiles).
+- Chat reworked to true Discord style (flat left-aligned messages with
+  consecutive-message grouping, 32 px avatars, hover-revealed actions).
+- Fixes for DM persistence (composite-index issue) + Music narrow-window
+  overflow.
+
+**v9.3 — playtester bug-fix pass**
+- Minesweeper right-click no longer reveals the cell (#18).
+- Photos persist across close/reopen for the session (#19).
+- Store shows link target before opening (#20).
+- Desktop icons stop dancing + leaving gaps on resize (#21).
+- Dedicated volume button on the taskbar (#22).
+- Chess board squares now genuinely equal (`minmax(0, 1fr)`).
+- Community-app install bug — surfaced silent snapshot errors via
+  console.warn + added a runtime [nova-install-debug] diagnostic to pin
+  the cause if it still recurs.
 
 ---
 
@@ -1070,6 +1097,234 @@ than "lunch break" iteration. That's the real human cost.
 **Status:** explicitly deferred. The kind of thing to spend a summer on
 once v9.x / Supernova have landed and Nova OS proper is stable enough
 to stand on its own.
+
+---
+
+## 25. Music — shuffle, repeat, queue
+
+Today's Music app plays the playlist in order, end-of-list-stops. Missing
+the table-stakes controls a real music player has.
+
+- **Shuffle** — randomize the order of unplayed tracks. Persist a
+  per-session shuffled order so going back/forward stays consistent.
+- **Repeat** — three states (off / repeat-all / repeat-one), Spotify-style
+  cycle button in the now-playing bar.
+- **Queue** — explicit "Add to queue" action that puts a track after the
+  current one without replacing the playlist. Sidebar view to see /
+  reorder the queue.
+
+**Considerations**
+- All session-state (matches the v9.2 model — local-file persistence is
+  the bigger follow-up that depends on the File System Access API).
+- Small additions to MusicApp.jsx's existing `idx` / `tracks` model;
+  shuffle is a separate ordered list, queue is a separate array consulted
+  before falling back to the playlist's next track.
+
+---
+
+## 26. Notes — light markdown shortcuts
+
+The v9.2 Notes editor takes plain text. A light-touch markdown layer would
+add real formatting without becoming a heavy WYSIWYG.
+
+- `# `, `## `, `### ` at the start of a line → header sizes on render.
+- `**bold**`, `*italic*` → inline emphasis.
+- `- ` / `1. ` → bulleted / numbered lists.
+- Backtick wrapping → inline code.
+- Live-preview in the editor (not a separate "render" mode) — typing
+  `**word**` renders bold immediately, while the asterisks stay visible
+  and editable. Same trick Bear and iA Writer use.
+
+**Considerations**
+- Use a small library like `marked` for parsing OR write a tiny custom
+  tokenizer (the syntax set is small — probably 100 lines of code).
+- Editor stays a `<textarea>` for simplicity; overlay a styled `<div>`
+  layer with the rendered markdown that the textarea overlays
+  transparently. (Alternatively, use a contenteditable rich editor —
+  more code but better UX.)
+
+---
+
+## 27. Achievements / first-week badges
+
+Gentle, optional gamification. Reuse the existing notification toast
+system as the "you earned this!" surface.
+
+- A small set of unlock-able badges: "Welcome to Nova" (first sign-in),
+  "Customizer" (changed wallpaper + accent + glass), "Communicator"
+  (sent 10 chat messages), "Creator" (made a note + a task), "Gamer"
+  (played each game once), "Mod" (auto-granted to mods), etc.
+- Badges live on the user data doc (`data.badges: [...]`).
+- A new "Achievements" pane in Profile (or a small modal launched from
+  the start menu) shows earned + locked badges.
+- On unlock: a celebratory toast + the achievement sound from v9.0's
+  sound engine.
+
+**Considerations**
+- Keep it gentle — opt-out toggle in Settings → Display.
+- No leaderboards / public badges (this is personal flair, not social
+  pressure).
+
+---
+
+## 28. High-score leaderboards for the games
+
+Snake, Tetris, 2048, Space Invaders, Pac-Man, Flappy Bird, Minesweeper
+(fastest-time) — each has a clear scoring model but no public leaderboard.
+
+- A `nova_scores/<gameId>` collection in Firestore. Each user keeps one
+  doc per game with their personal best; the leaderboard is a single
+  query for the top 10 (ordered by score desc).
+- A "Leaderboard" button in each game's UI opens a small modal showing
+  global top 10 + your personal best + your rank.
+- Game-end flow: if the new score beats personal best, write it; if it
+  also reaches top 10, show "🎉 You're on the board!"
+
+**Considerations**
+- Anti-cheat is real: scores write from the client, so a determined user
+  can submit anything. Mitigations:
+  - Soft validation (a Minesweeper "3-second easy win" is implausible —
+    flag for mod review).
+  - Cap submissions to plausible upper bounds in Firestore rules.
+  - Accept that this is a low-stakes leaderboard, not a competitive one.
+- Rules pattern mirrors `nova_ratings` (uid-stamped, owner-only writes).
+
+---
+
+## 29. Pomodoro / focus-timer widget
+
+A small desktop widget that runs Pomodoro cycles (25 work / 5 break) or
+a custom interval. Ties into the Clock app philosophically but lives on
+the desktop as a glance-able countdown.
+
+- Configurable work/break durations.
+- Cycle counter ("Round 3 of 4").
+- Audio cue at each transition (reuse the v9.0 alert recipe).
+- Optional "do not disturb" — silences other Nova notifications during a
+  focus block.
+
+**Considerations**
+- New widget in `widgets.jsx`, registered in `WIDGET_CONFIGS`.
+- State persists across page reloads (localStorage) so a refresh
+  doesn't kill an in-progress session.
+
+---
+
+## 30. Multiple desktops + Linux-style window overview
+
+A real virtual-desktops system plus a Mission-Control / GNOME Activities
+style overview. This turns Nova OS from "one big desktop" into a
+multi-context workspace.
+
+**Multiple desktops**
+- A new dedicated key (e.g., **Super / Win key**, or **Alt + Tab**
+  variant) zooms the current desktop out, blurs the background, and
+  shrinks it to a tile alongside thumbnails of every other desktop you
+  have. Smooth transition animation.
+- Arrow keys or mouse navigate between desktops; **Enter** activates the
+  selected one with a "zoom into" animation.
+- Each desktop has its own:
+  - Set of open windows (windows can be moved between desktops via
+    drag-to-edge or right-click → "Move to Desktop 2").
+  - Optional separate wallpaper.
+  - Same shared apps + data (it's not multiple sessions — just multiple
+    workspace contexts).
+- The Start menu / taskbar shows windows from the current desktop only;
+  a small indicator in the taskbar shows which desktop you're on.
+
+**Window overview (within a single desktop)**
+- A separate key (e.g., **F3** or **3-finger swipe up**) zooms the
+  current desktop out and arranges every open window as a tile grid
+  with a blurred background. Click a window thumbnail to focus it;
+  press Enter to focus the highlighted one. Smooth zoom transition.
+- Pairs with the existing snap-layout work (v8.5 / Alt+Arrow) — pick a
+  window from the overview, then snap it into a quadrant.
+
+**Considerations**
+- Storage: `data.desktops: [{id, wallpaper, windowIds: [...]}, ...]` +
+  `data.activeDesktop`. Windows already have ids; add a `desktopId`
+  field to each window.
+- This is a Supernova-sized feature — touches the core window manager,
+  the taskbar render, and the desktop layout simultaneously.
+- The animations are doable in CSS (transform: scale + transition) +
+  a slide between desktops; nothing exotic required.
+
+---
+
+## 31. AI command bar — function-calling Nova AI
+
+The single biggest "Nova OS feels intelligent" upgrade. Turn Nova AI
+from a chat into an *agent* that can actually act on the OS.
+
+**What it does**
+- A floating command bar (Cmd/Ctrl + J, or a dedicated taskbar button)
+  accepts natural-language commands:
+  - "Open Notes and write down 'pick up milk'"
+  - "DM @alex saying I'll be late"
+  - "Set wallpaper to Ember"
+  - "What's the weather in Brooklyn?"
+  - "Summarize my notes from this week"
+  - "Play the next track"
+  - "Take a screenshot"
+- The model gets a curated **toolbox** of safe Nova OS operations and
+  decides which to call (often multiple in sequence).
+
+**Architecture (Anthropic SDK + Gemini both support tool use)**
+- Define a small set of tools matching Nova's existing actions: `openApp`,
+  `createNote`, `sendDm`, `setWallpaper`, `playSound`, `searchSpotlight`,
+  `getWeather`, `setVolume`, etc. Each tool has a JSON schema and a JS
+  handler that calls the corresponding Nova function.
+- The streamed conversation interleaves tool calls and natural-language
+  responses — UI shows each action as it executes ("Opening Notes…",
+  "Creating note 'pick up milk'…", "Done.").
+- Every action is **undoable** for ~10 seconds via a toast ("Undo last
+  AI action"). Critical for trust.
+- Safety: destructive operations (delete note, send DM) require an
+  explicit confirm step before execution.
+
+**Considerations**
+- Biggest UX challenge is *latency masking* — make tool calls feel
+  instant via optimistic local actions, only roll back if the AI
+  contradicts.
+- Extends the existing v6.0 AI integration / v7.6 Gemini provider work;
+  same BYOK pattern stays.
+- Sized for Supernova alongside Paint + the mobile pass.
+
+---
+
+## 32. Backup / Export your profile
+
+One-click export of your entire Nova account as a single JSON file.
+Restore on any account (yours or a fresh one) to bring everything back.
+
+**What's exported**
+- Notes, tasks, folders (the whole `data.folders` / `data.notes` / etc.).
+- Settings (accent, wallpaper, glass, displayMode, etc.).
+- Custom wallpaper image (base64).
+- Installed app list (`installedApps`).
+- Avatar image (base64).
+- Pinned-to-taskbar / hidden-from-desktop arrays.
+
+**What's NOT exported (and why)**
+- Chat messages / DMs — those live in shared collections and aren't
+  the user's to export.
+- Community-app submissions — same reason.
+- Photos (session-only blob URLs).
+- Firebase Auth credentials.
+
+**Usage**
+- Settings → Account → "Export profile" button. Downloads
+  `nova-profile-<username>-<date>.json`.
+- Settings → Account → "Import profile" button. Picks a JSON, validates
+  the schema (graceful on missing fields), shows a "this will overwrite
+  X notes, Y tasks…" confirmation, then writes the merged state.
+
+**Considerations**
+- Doubles as cloud-independence insurance: even if Firebase
+  goes away one day, your data is yours.
+- Small feature, *huge* trust signal — "your stuff is portable."
+- Implementation is mostly serialize/deserialize + a confirm modal;
+  ~200 lines including the import UI.
 
 ---
 

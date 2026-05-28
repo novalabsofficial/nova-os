@@ -22,7 +22,8 @@ import { isAdmin } from "../lib/moderation.js";
 import { doc, deleteDoc, collection, addDoc, query, orderBy, limit, onSnapshot } from "firebase/firestore";
 import { firestoreDb } from "../firebase.js";
 import { getDbUid } from "../lib/db.js";
-import { watchMyThreads, watchThreadMessages, openDmByUsername, sendDm, otherParticipantName } from "../lib/dms.js";
+import { watchMyThreads, watchThreadMessages, openDmByUsername, sendDm, otherParticipantName, setTyping } from "../lib/dms.js";
+import { subscribeAllReactions, aggregateReactions, toggleReaction, REACTION_PRESETS } from "../lib/chat-reactions.js";
 
 export function ChatApp({ user, AC }) {
   const myUid = getDbUid();
@@ -51,6 +52,29 @@ export function ChatApp({ user, AC }) {
   const [sending, setSending] = useState(false);
   const bottomRef = useRef(null);
   const inputRef  = useRef(null);
+
+  // v9.4 — Reactions on global chat. Flat list from the
+  // `nova_chat_reactions` subscription, aggregated per-message at render
+  // time. `pickerOpenFor` = msgId for the message whose "+ react" picker
+  // is currently expanded (only one at a time).
+  const [reactions, setReactions] = useState([]);
+  const [pickerOpenFor, setPickerOpenFor] = useState(null);
+  useEffect(() => subscribeAllReactions(setReactions), []);
+  const reactionMap = aggregateReactions(reactions);
+
+  // v9.4 — DM typing indicator. Each keystroke in the input bumps the
+  // current user's typing field on the active thread doc. Debounced so
+  // we write at most once per 2 s. The other participant's watchMyThreads
+  // subscription sees the update in real time and renders
+  // "@you is typing…" in the header.
+  const lastTypingWriteRef = useRef(0);
+  function bumpTyping() {
+    if (view !== "dm" || !active?.threadId || !myUid) return;
+    const now = Date.now();
+    if (now - lastTypingWriteRef.current < 2000) return;
+    lastTypingWriteRef.current = now;
+    setTyping(active.threadId, myUid, user);
+  }
 
   // ── Subscriptions ────────────────────────────────────────────────────
   // Global chat — single subscription, lives for the component's lifetime.
@@ -194,8 +218,14 @@ export function ChatApp({ user, AC }) {
   const headerTitle  = view === "global" ? "Nova Global Chat"
                      : view === "dm"     ? "@" + (active?.otherUsername || "?")
                      : "New direct message";
+  // v9.4 — if the other DM participant has bumped `typing` in the last
+  // 5 seconds, show that in place of the static DM subtitle.
+  const activeThread = view === "dm" && active?.threadId ? threads.find(t => t.id === active.threadId) : null;
+  const typingNow = activeThread && activeThread.typing
+                    && activeThread.typing.uid !== myUid
+                    && (Date.now() - (activeThread.typing.ts || 0) < 5000);
   const headerSub    = view === "global" ? "All Nova OS users see this chat in real time · be respectful"
-                     : view === "dm"     ? "Direct message · only you two can see this thread"
+                     : view === "dm"     ? (typingNow ? "@" + (activeThread.typing.user || active.otherUsername) + " is typing…" : "Direct message · only you two can see this thread")
                      : "Type a username to start a 1-on-1 conversation";
 
   // ── Render ───────────────────────────────────────────────────────────
@@ -339,53 +369,95 @@ export function ChatApp({ user, AC }) {
               // consecutive messages from the same sender skip the
               // avatar/name header and just render the text body (with a
               // hover timestamp on the left margin).
+              // v9.4 — reactions are global-chat only for now; DM reactions
+              // will follow once the DM thread subcollection rule is in.
+              const showReactions = view === "global";
+              const reactBtn = showReactions ? (
+                <button
+                  className="rowact"
+                  onClick={() => setPickerOpenFor(prev => prev === item.id ? null : item.id)}
+                  title="Add reaction"
+                  style={{ background: "rgba(0,0,0,0.25)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 6, cursor: "pointer", color: "rgba(255,255,255,0.7)", fontSize: 12, padding: "2px 6px", flexShrink: 0, opacity: pickerOpenFor === item.id ? 1 : 0, transition: "opacity 0.12s" }}
+                >🙂</button>
+              ) : null;
+
               if (item.grouped) {
                 return (
-                  <div key={item.id} className="msgrow" style={{ display: "flex", padding: "1px 8px", borderRadius: 4 }}>
-                    {/* avatar gutter — empty for grouped messages; the timestamp appears here on hover */}
-                    <div className="ts-hover" style={{ width: 40, flexShrink: 0, fontFamily: FFM, fontSize: 9.5, color: "transparent", paddingTop: 4, textAlign: "center", transition: "color 0.12s" }}>
-                      {fmtTime(item.ts)}
+                  <div key={item.id} className="msgrow" style={{ display: "flex", padding: "1px 8px", borderRadius: 4, flexDirection: "column" }}>
+                    <div style={{ display: "flex" }}>
+                      {/* avatar gutter — empty for grouped messages; the timestamp appears here on hover */}
+                      <div className="ts-hover" style={{ width: 40, flexShrink: 0, fontFamily: FFM, fontSize: 9.5, color: "transparent", paddingTop: 4, textAlign: "center", transition: "color 0.12s" }}>
+                        {fmtTime(item.ts)}
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "flex-start", gap: 6 }}>
+                        <div style={{ flex: 1, fontSize: 14, color: "var(--nv-text)", lineHeight: 1.55, wordBreak: "break-word", fontFamily: FF }}>{item.text}</div>
+                        {reactBtn}
+                        {(isMe || isMod) && (
+                          <button
+                            className="dl rowact"
+                            onClick={onDelete}
+                            title={isMe ? "Delete message" : "Mod delete — TOS violation"}
+                            style={{ background: "rgba(0,0,0,0.25)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 6, cursor: "pointer", color: isMe ? "rgba(255,80,80,0.6)" : "rgba(255,200,80,0.7)", fontSize: 11, padding: "2px 6px", flexShrink: 0, opacity: 0, transition: "opacity 0.12s" }}
+                          >{isMe ? "✕" : "🛡"}</button>
+                        )}
+                      </div>
                     </div>
-                    <div style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "flex-start", gap: 8 }}>
-                      <div style={{ flex: 1, fontSize: 14, color: "var(--nv-text)", lineHeight: 1.55, wordBreak: "break-word", fontFamily: FF }}>{item.text}</div>
-                      {(isMe || isMod) && (
-                        <button
-                          className="dl rowact"
-                          onClick={onDelete}
-                          title={isMe ? "Delete message" : "Mod delete — TOS violation"}
-                          style={{ background: "rgba(0,0,0,0.25)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 6, cursor: "pointer", color: isMe ? "rgba(255,80,80,0.6)" : "rgba(255,200,80,0.7)", fontSize: 11, padding: "2px 6px", flexShrink: 0, opacity: 0, transition: "opacity 0.12s" }}
-                        >{isMe ? "✕" : "🛡"}</button>
-                      )}
-                    </div>
+                    {showReactions && (
+                      <ReactionsRow
+                        msgId={item.id}
+                        bag={reactionMap[item.id]}
+                        myUid={myUid}
+                        user={user}
+                        pickerOpen={pickerOpenFor === item.id}
+                        onClosePicker={() => setPickerOpenFor(null)}
+                        ac={AC}
+                        gutter={40}
+                      />
+                    )}
                   </div>
                 );
               }
 
               // Fresh message (first of a group) — full avatar + name + timestamp header.
               return (
-                <div key={item.id} className="msgrow" style={{ display: "flex", padding: "5px 8px", borderRadius: 4, marginTop: 8 }}>
-                  <div style={{ width: 40, flexShrink: 0, display: "flex", justifyContent: "center", paddingTop: 1 }}>
-                    <div style={{ width: 32, height: 32, borderRadius: "50%", background: `rgba(${hexRgb(uc)},0.22)`, border: `1.5px solid ${uc}`, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: FFB, fontWeight: 700, fontSize: 13, color: "#fff" }}>
-                      {(item.user || "?")[0].toUpperCase()}
+                <div key={item.id} className="msgrow" style={{ display: "flex", padding: "5px 8px", borderRadius: 4, marginTop: 8, flexDirection: "column" }}>
+                  <div style={{ display: "flex" }}>
+                    <div style={{ width: 40, flexShrink: 0, display: "flex", justifyContent: "center", paddingTop: 1 }}>
+                      <div style={{ width: 32, height: 32, borderRadius: "50%", background: `rgba(${hexRgb(uc)},0.22)`, border: `1.5px solid ${uc}`, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: FFB, fontWeight: 700, fontSize: 13, color: "#fff" }}>
+                        {(item.user || "?")[0].toUpperCase()}
+                      </div>
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+                        <span style={{ fontFamily: FFB, fontWeight: 700, fontSize: 13.5, color: uc }}>@{item.user || "unknown"}</span>
+                        <span style={{ fontFamily: FFM, fontSize: 10.5, color: "var(--nv-text-dim)" }}>{fmtTime(item.ts)}</span>
+                        {isMe && <span style={{ fontFamily: FFB, fontSize: 9, padding: "1px 5px", borderRadius: 3, background: `rgba(${hexRgb(AC)},0.16)`, border: `1px solid rgba(${hexRgb(AC)},0.32)`, color: AC, letterSpacing: 0.5 }}>YOU</span>}
+                        <div style={{ flex: 1 }} />
+                        {reactBtn}
+                        {(isMe || isMod) && (
+                          <button
+                            className="dl rowact"
+                            onClick={onDelete}
+                            title={isMe ? "Delete message" : "Mod delete — TOS violation"}
+                            style={{ background: "rgba(0,0,0,0.25)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 6, cursor: "pointer", color: isMe ? "rgba(255,80,80,0.6)" : "rgba(255,200,80,0.7)", fontSize: 11, padding: "2px 6px", opacity: 0, transition: "opacity 0.12s" }}
+                          >{isMe ? "✕" : "🛡"}</button>
+                        )}
+                      </div>
+                      <div style={{ fontSize: 14, color: "var(--nv-text)", lineHeight: 1.55, wordBreak: "break-word", fontFamily: FF, marginTop: 2 }}>{item.text}</div>
                     </div>
                   </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
-                      <span style={{ fontFamily: FFB, fontWeight: 700, fontSize: 13.5, color: uc }}>@{item.user || "unknown"}</span>
-                      <span style={{ fontFamily: FFM, fontSize: 10.5, color: "var(--nv-text-dim)" }}>{fmtTime(item.ts)}</span>
-                      {isMe && <span style={{ fontFamily: FFB, fontSize: 9, padding: "1px 5px", borderRadius: 3, background: `rgba(${hexRgb(AC)},0.16)`, border: `1px solid rgba(${hexRgb(AC)},0.32)`, color: AC, letterSpacing: 0.5 }}>YOU</span>}
-                      <div style={{ flex: 1 }} />
-                      {(isMe || isMod) && (
-                        <button
-                          className="dl rowact"
-                          onClick={onDelete}
-                          title={isMe ? "Delete message" : "Mod delete — TOS violation"}
-                          style={{ background: "rgba(0,0,0,0.25)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 6, cursor: "pointer", color: isMe ? "rgba(255,80,80,0.6)" : "rgba(255,200,80,0.7)", fontSize: 11, padding: "2px 6px", opacity: 0, transition: "opacity 0.12s" }}
-                        >{isMe ? "✕" : "🛡"}</button>
-                      )}
-                    </div>
-                    <div style={{ fontSize: 14, color: "var(--nv-text)", lineHeight: 1.55, wordBreak: "break-word", fontFamily: FF, marginTop: 2 }}>{item.text}</div>
-                  </div>
+                  {showReactions && (
+                    <ReactionsRow
+                      msgId={item.id}
+                      bag={reactionMap[item.id]}
+                      myUid={myUid}
+                      user={user}
+                      pickerOpen={pickerOpenFor === item.id}
+                      onClosePicker={() => setPickerOpenFor(null)}
+                      ac={AC}
+                      gutter={40}
+                    />
+                  )}
                 </div>
               );
             })}
@@ -399,7 +471,7 @@ export function ChatApp({ user, AC }) {
             <textarea
               ref={inputRef}
               value={input}
-              onChange={e => setInput(e.target.value)}
+              onChange={e => { setInput(e.target.value); bumpTyping(); }}
               onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } }}
               placeholder={
                 view === "global"
@@ -500,5 +572,56 @@ function DmRow({ username, preview, lastTs, active, onClick, AC }) {
         )}
       </div>
     </button>
+  );
+}
+
+// v9.4 — Reactions row for a single message. Renders existing reaction
+// counts (one chip per emoji) and, when the inline picker is open for
+// this message, a row of preset emoji choices. Both clicking an existing
+// chip and clicking a preset call `toggleReaction` — same path, either
+// adds or removes your reaction.
+function ReactionsRow({ msgId, bag, myUid, user, pickerOpen, onClosePicker, ac, gutter = 40 }) {
+  const emojis = bag ? Object.keys(bag) : [];
+  if (emojis.length === 0 && !pickerOpen) return null;
+  return (
+    <div style={{ display: "flex", flexWrap: "wrap", gap: 5, marginTop: 5, marginLeft: gutter + 8, marginRight: 8 }}>
+      {emojis.map(emoji => {
+        const list = bag[emoji] || [];
+        const mine = list.some(u => u.uid === myUid);
+        const names = list.map(u => "@" + (u.user || "?")).join(", ");
+        return (
+          <button
+            key={emoji}
+            onClick={() => toggleReaction(msgId, emoji, myUid, user)}
+            title={names}
+            style={{
+              display: "inline-flex", alignItems: "center", gap: 4,
+              padding: "2px 8px", borderRadius: 12, cursor: "pointer",
+              background: mine ? "rgba(" + hexRgb(ac) + ",0.18)" : "rgba(255,255,255,0.05)",
+              border: "1px solid " + (mine ? "rgba(" + hexRgb(ac) + ",0.42)" : "rgba(255,255,255,0.1)"),
+              color: mine ? ac : "var(--nv-text)",
+              fontFamily: FFM, fontSize: 11.5, lineHeight: 1.2,
+              transition: "background 0.12s, border-color 0.12s",
+            }}
+          >
+            <span style={{ fontSize: 13 }}>{emoji}</span>
+            <span style={{ fontWeight: 600 }}>{list.length}</span>
+          </button>
+        );
+      })}
+      {pickerOpen && (
+        <div style={{ display: "inline-flex", gap: 3, padding: "2px 6px", borderRadius: 14, background: "rgba(0,0,0,0.35)", border: "1px solid rgba(255,255,255,0.12)" }}>
+          {REACTION_PRESETS.map(emoji => (
+            <button
+              key={emoji}
+              onClick={() => { toggleReaction(msgId, emoji, myUid, user); onClosePicker(); }}
+              title={"React with " + emoji}
+              style={{ background: "none", border: "none", cursor: "pointer", fontSize: 16, padding: "2px 4px", lineHeight: 1 }}
+            >{emoji}</button>
+          ))}
+          <button onClick={onClosePicker} title="Close" style={{ background: "none", border: "none", cursor: "pointer", color: "rgba(255,255,255,0.45)", fontSize: 12, padding: "2px 4px" }}>✕</button>
+        </div>
+      )}
+    </div>
   );
 }

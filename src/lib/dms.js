@@ -164,6 +164,27 @@ export async function sendDm(threadId, text, myUid, myUsername) {
 }
 
 /**
+ * v9.4 — Typing indicator. Writes a small `typing` field on the thread doc
+ * with the current user's uid + username + timestamp. The OTHER participant's
+ * watchMyThreads subscription will pick up the change in real time and can
+ * render "@you is typing…" if `ts` is within the last ~5 seconds.
+ *
+ * Callers should debounce — ~2 seconds between writes is plenty. Updating
+ * the thread doc costs one Firestore write per call.
+ *
+ * Existing nova_dm_threads update rule already permits participants to
+ * change any field except participantUids, so no rules change needed.
+ */
+export async function setTyping(threadId, myUid, myUsername) {
+  if (!threadId || !myUid) return;
+  try {
+    await updateDoc(doc(firestoreDb, "nova_dm_threads", threadId), {
+      typing: { uid: myUid, user: myUsername || "", ts: Date.now() },
+    });
+  } catch { /* best-effort; typing is a nice-to-have */ }
+}
+
+/**
  * Given a thread doc + the current user's uid, return the OTHER participant's
  * display name. Used by the sidebar to show "@alice" not your own name.
  */
