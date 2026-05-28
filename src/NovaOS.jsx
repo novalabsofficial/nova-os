@@ -620,6 +620,50 @@ export default function NovaOS(){
   }, [commApps, data?.installedApps]);
 
 
+  // v9.4 — Alarm scheduler. Alarms live under data.settings.alarms as
+  // { id, time:"HH:MM", days:[bool x7], label, sound, enabled }. We check
+  // every 15s whether any enabled alarm matches the current minute bucket
+  // for today's weekday, and fire (sound + notification) at most once per
+  // alarm per minute. The dedup uses a ref keyed by alarmId -> last-fired
+  // minute index (epoch / 60000), so a 4× firing rate inside the same
+  // minute can't ring repeatedly. The scheduler lives at the NovaOS level
+  // so alarms ring even when the Clock app isn't open.
+  const alarmFiredRef = useRef({});
+  useEffect(() => {
+    if (screen !== "desktop") return;
+    function tick() {
+      const list = data?.settings?.alarms || [];
+      if (list.length === 0) return;
+      const now = new Date();
+      const minuteBucket = Math.floor(now.getTime() / 60000);
+      const dow = now.getDay();                 // 0 = Sun
+      const hh = String(now.getHours()).padStart(2, "0");
+      const mm = String(now.getMinutes()).padStart(2, "0");
+      const nowHHMM = hh + ":" + mm;
+      for (const a of list) {
+        if (!a || !a.enabled) continue;
+        if (!Array.isArray(a.days) || !a.days[dow]) continue;
+        if (a.time !== nowHHMM) continue;
+        // Dedup — only fire once per alarm per minute, even if tick races.
+        if (alarmFiredRef.current[a.id] === minuteBucket) continue;
+        alarmFiredRef.current[a.id] = minuteBucket;
+        // Sound + notification. Fall back to alarmSunrise if the chosen
+        // sound id was renamed/removed in a future update.
+        const soundId = ["alarmSunrise","alarmPulse","alarmClassic"].includes(a.sound) ? a.sound : "alarmSunrise";
+        playSound(soundId);
+        pushNotification({
+          title: "⏰ " + (a.label?.trim() || "Alarm"),
+          body: nowHHMM + " · " + (a.label?.trim() || "Alarm is ringing"),
+          kind: "alert",
+        });
+      }
+    }
+    tick();
+    const id = setInterval(tick, 15000);
+    return () => clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data?.settings?.alarms, screen]);
+
   // v8.6 AFK screensaver. settings.screensaverMins: 0 = off, else minutes of
   // idle before it fades in (default 1). Any input dismisses it and re-arms
   // the timer. We use a ref + a single set of passive listeners so the common

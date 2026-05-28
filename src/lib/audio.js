@@ -398,6 +398,59 @@ const SOUND_RECIPES = {
   click: (ctx, t, v, r, d) => {
     _voice(ctx, d, 1480 * r, t + 0.00, 28, 0.05 * v, "sine", 2);
   },
+
+  // ── v9.4 — alarm recipes (Clock app) ─────────────────────────────────
+  // Three distinct alarm voices, all in the same master-bus engine so the
+  // limiter + reverb + lowpass apply (no harsh clipping even at louder
+  // settings). Each is ~3 seconds long so a single firing has enough
+  // sustained attention-grab. NovaOS's alarm scheduler may also fire
+  // playSound() multiple times in a row for a real "ringing" effect.
+
+  // Gentle ascending bell sequence — a Nova-style sunrise wake.
+  alarmSunrise: (ctx, t, v, r, d) => {
+    _chime(ctx, d, t + 0.00, 523.25 * r, 1200, 0.16 * v);  // C5
+    _chime(ctx, d, t + 0.45, 659.25 * r, 1200, 0.16 * v);  // E5
+    _chime(ctx, d, t + 0.90, 783.99 * r, 1400, 0.18 * v);  // G5
+    _chime(ctx, d, t + 1.35, 1046.50 * r, 1600, 0.18 * v); // C6
+    // Second cycle, a major-sixth lift to keep the ear pulling forward
+    _chime(ctx, d, t + 2.00, 880.00 * r, 1400, 0.17 * v);  // A5
+    _chime(ctx, d, t + 2.45, 1318.51 * r, 1600, 0.19 * v); // E6
+  },
+
+  // Pulsing low+high two-tone — urgent but warm, like a hotel alarm.
+  alarmPulse: (ctx, t, v, r, d) => {
+    for (let i = 0; i < 6; i++) {
+      const start = t + i * 0.5;
+      _voice(ctx, d, 220 * r, start, 280, 0.16 * v, "sine", 18); // A3 body
+      _voice(ctx, d, 440 * r, start, 280, 0.13 * v, "sine", 18); // A4 layer
+    }
+  },
+
+  // Classic alarm clock — fast square-wave beeps with a sine layer for body.
+  // The square wave gives it that unmistakable "the alarm is ringing" feel
+  // without being harsh (the master limiter + lowpass tames it).
+  alarmClassic: (ctx, t, v, r, d) => {
+    const er = Math.min(1, r);   // cap transpose so it can't get piercing
+    for (let i = 0; i < 8; i++) {
+      const start = t + i * 0.25;
+      _voice(ctx, d, 880 * er, start, 130, 0.20 * v, "square", 8);
+      _voice(ctx, d, 440 * er, start, 130, 0.10 * v, "sine", 8);  // body
+    }
+  },
+
+  // ── v9.4 — Atmos severe-weather alert ──────────────────────────────
+  // Three-pulse 607 Hz sawtooth — mirrors the classic Weatherscan alarm
+  // cadence (three urgent bursts) using the original NWS alert frequency.
+  // Sawtooth carries the "this is an alert" timbre; the master lowpass
+  // softens the harshness so it grabs attention without piercing.
+  nwsAlert: (ctx, t, v, r, d) => {
+    const er = Math.min(1, r);
+    for (let i = 0; i < 3; i++) {
+      const start = t + i * 0.55;
+      _voice(ctx, d, 607 * er, start, 400, 0.22 * v, "sawtooth", 12);
+      _voice(ctx, d, 303.5 * er, start, 400, 0.10 * v, "sine", 12);   // sub-octave body
+    }
+  },
 };
 
 /** Names of all available system sounds. Useful for Settings UI previews. */
@@ -410,6 +463,8 @@ const SOUND_TAILS = {
   achievement: 1800, focus: 1500, alert: 1100, success: 950,
   error: 700, message: 900, toast: 450, windowOpen: 250,
   windowClose: 300, appLaunch: 300, click: 100,
+  // v9.4 — alarm + NWS recipes ring out longer than typical UI sounds.
+  alarmSunrise: 4200, alarmPulse: 3500, alarmClassic: 2500, nwsAlert: 2200,
 };
 
 // Sounds that skip the reverb send — short UI ticks that should stay crisp
