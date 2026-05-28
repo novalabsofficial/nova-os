@@ -556,11 +556,51 @@ export default function NovaOS(){
   useEffect(()=>{ document.documentElement.setAttribute("data-glass", glass?"on":"off"); },[glass]);
 
   // v9.0 — watch community store apps so installed ones render on the desktop.
+  // DIAGNOSTIC (post-9.0): also stash `_docId` separately so the runtime
+  // logger below can tell whether the doc's data has its own `id` field
+  // overriding the Firestore doc id via the spread. Remove `_docId` + the
+  // diagnostic useEffect once the "newly installed apps don't appear on the
+  // desktop" bug is fixed.
   useEffect(()=>{
     const q=query(collection(firestoreDb,"nova_user_apps"),orderBy("ts","desc"),limit(60));
-    const unsub=onSnapshot(q,snap=>setCommApps(snap.docs.map(d=>({id:d.id,...d.data()}))),()=>{});
+    const unsub=onSnapshot(q,snap=>setCommApps(snap.docs.map(d=>({_docId:d.id, id:d.id, ...d.data()}))),()=>{});
     return ()=>unsub();
   },[]);
+
+  // DIAGNOSTIC — community-apps-on-desktop bug. Logs a table every time
+  // `commApps` or `installedApps` changes so we can see at runtime:
+  //   • docId    — the real Firestore doc id (always stable)
+  //   • spreadId — what `a.id` resolves to after the spread (may differ if
+  //                the doc's data has an explicit `id` field)
+  //   • idOverridden — true means the data is hiding the doc id
+  //   • status / approved — moderation visibility
+  //   • hasTs — whether the doc has a `ts` field (orderBy("ts") excludes
+  //             docs missing it, which could silently drop new apps)
+  //   • installedBySpreadId / installedByDocId — which value (if any) is in
+  //     `data.installedApps`. Tells us whether the install path stored the
+  //     spread id or the doc id.
+  // Once we see one log line for an "installed but missing on desktop" app,
+  // the bug pins itself. Remove this entire effect after the fix lands.
+  useEffect(()=>{
+    if(typeof console==="undefined")return;
+    console.group("[nova-desktop-debug] community apps");
+    console.log("installedApps:", installedApps);
+    console.log("commApps count:", commApps.length);
+    console.table(commApps.map(a=>({
+      docId: a._docId,
+      spreadId: a.id,
+      idOverridden: a._docId !== a.id,
+      name: a.name,
+      status: a.status,
+      hasTs: typeof a.ts !== "undefined",
+      approved: isPubliclyVisible(a),
+      installedBySpreadId: installedApps.includes(a.id),
+      installedByDocId: installedApps.includes(a._docId),
+    })));
+    const passing = commApps.filter(a => isPubliclyVisible(a) && installedApps.includes(a.id));
+    console.log("would render on desktop (passes filter):", passing.map(a=>({docId:a._docId, spreadId:a.id, name:a.name})));
+    console.groupEnd();
+  },[commApps, installedApps]);
 
   // v8.6 AFK screensaver. settings.screensaverMins: 0 = off, else minutes of
   // idle before it fades in (default 1). Any input dismisses it and re-arms

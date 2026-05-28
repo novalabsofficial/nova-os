@@ -677,6 +677,128 @@ mean building and maintaining everything twice forever.
 
 ---
 
+## 17. Custom domain (e.g. `novaoslabs.com`)
+
+Replace the long `*.vercel.app` URL with a real domain (~$10/yr). Two
+motivations: (a) `*.vercel.app` is blocked on most school-managed Chromebooks,
+which is where Nova's actual users are; (b) it's a lot to type. A custom
+domain on `.com` / `.app` / `.dev` is short, professional, and escapes the
+blanket `vercel.app` block.
+
+**Steps when ready**
+- Buy at Porkbun / Cloudflare Registrar / Namecheap (avoid GoDaddy).
+- Vercel → Project → **Settings → Domains → Add**; paste the DNS records
+  Vercel shows at your registrar (typically apex `A → 76.76.21.21`, `www
+  CNAME → cname.vercel-dns.com`), or point nameservers to Vercel.
+- **Firebase Console → Authentication → Settings → Authorized domains → Add
+  the new domain.** Sign-in breaks on the new host otherwise.
+- Set the custom domain as primary in Vercel so the old `vercel.app`
+  redirects.
+
+**Considerations**
+- Codebase needs zero changes — no hardcoded `vercel.app`, manifest paths
+  are relative, `authDomain` is an env var pointing at `firebaseapp.com`.
+- Recurring (~$10/yr); just don't renew if the project ever goes dormant.
+- Won't *guarantee* it's unblocked on managed Chromebooks (a school filter
+  could still block any domain), but it escapes the blanket `*.vercel.app`
+  rule — which is the relevant cause today.
+
+---
+
+## 18. Sandboxed scripting / real terminal
+
+A real code-execution environment inside Nova OS so users can write scripts
+to customize their setup — extend the existing Terminal app and/or add a
+Scripts app — with hard guarantees: can't run anything malicious, can't
+breach data, can't affect other accounts or the site.
+
+**Yes, this is possible.** The design that gives those guarantees:
+- Run user-written JS inside a **Web Worker**. Workers are isolated threads
+  with no DOM, no cookies, no access to the parent page's localStorage /
+  IndexedDB / Firebase SDK / React tree. They can only communicate via
+  `postMessage`. Everything not explicitly exposed is unreachable.
+- Expose a curated **`nova.*` API** (e.g. `nova.wallpaper(id)`,
+  `nova.notes.add(text)`, `nova.toast(msg)`, `nova.theme.accent(hex)`,
+  `nova.onAppOpen(fn)`, …). This API is the *only* thing user code can call,
+  so the surface area = the API surface.
+- **Execution timeouts:** terminate the worker after N ms per run (e.g.
+  3 s); a separate "long-runner" mode requires an explicit user prompt.
+  Mitigates infinite loops + CPU spinning.
+- **All writes go through the existing data layer** (`updateData` /
+  `updateSettings`), which is uid-stamped and already protected by
+  Firestore security rules — so a worker physically cannot write to another
+  user's docs because the rules reject any uid mismatch.
+- A **Scripts app** to save / name / re-run snippets (synced via Firestore
+  the same way Notes are).
+
+**What the security model actually guarantees**
+- ✅ **Can't breach data** — workers have no Firebase SDK, no cookies, no
+  parent storage; only the curated API. The API only writes to the user's
+  own uid-stamped docs.
+- ✅ **Can't affect other accounts** — Firestore rules already enforce uid
+  ownership on every write. A worker calling the API can only write to its
+  own account; cross-account writes are rejected at the rules layer.
+- ✅ **Can't affect the site / other users' sessions** — workers run in
+  isolated threads in the *user's own browser*. Their script can't reach
+  anyone else's tab. Even if it crashes or loops, only the worker dies; the
+  main page is untouched and we just spawn a new worker.
+- ⚠️ *Can* affect the user's **own** account — by design. If their script
+  fills their notes with junk, that's recoverable (clear notes, re-run).
+- ⚠️ Performance abuse — mitigated by per-run timeouts + termination.
+- ⚠️ "Paste this script from a stranger" — same risk as any user-script
+  community; the curated API caps the blast radius at "annoying" not
+  "dangerous." The Store-style moderation pattern could apply to a future
+  script gallery.
+
+**Effort**
+- MVP (extend Terminal with `run <code>` that posts to a worker and prints
+  the result, plus a tiny `nova.*` API): ~a day.
+- Full feature (Scripts app, saved snippets, hooks like `onAppOpen` /
+  `onLogin`, autocomplete, in-app `nova.*` docs panel): about a week of
+  focused work.
+
+**Best fit:** probably **Supernova** — alongside the Paint rework and the
+mobile pass. Medium-size feature; not blocking anything.
+
+---
+
+## 19. File Explorer revamp + apps in folders (v9.1 candidate)
+
+A two-part rework of the Files app, on the same "two-pane Windows-style"
+pattern the v9.0 Settings refresh used.
+
+**Part A — Installed apps live in File Explorer**
+- New virtual **Applications** location showing every installed app as a
+  launchable icon — double-click → `openApp(app.id)`.
+- Built-in apps from the `APPS` constant + community apps the user has
+  installed (`data.installedApps` + the live `commApps` subscription added
+  in v9.0). No new data model, no Firestore changes.
+- Optionally grouped by category using `STORE_CATALOG` categories
+  (`Applications/Games/`, `Applications/Productivity/`, etc.) so it feels
+  like a real "Program Files."
+- Reuse existing app context-menu actions (Open / Pin to taskbar / Add to
+  desktop).
+
+**Part B — Windows-style UI revamp (Nova-flavored)**
+- **Left rail** with monochrome glass glyphs: Home / My Files / Documents
+  / Tasks / Pictures / **Applications** / (maybe This PC).
+- **Top bar:** back / forward / up navigation, breadcrumb path
+  ("Home › Applications › Games"), search input, view toggle (Large
+  icons / List).
+- **Right pane:** icon grid (Win11-style tiles) or list rows depending on
+  view; per-section empty states.
+- Uses theme tokens (`var(--nv-surface)`, etc.) so it adapts to glass
+  on/off like Settings does.
+
+**Effort:** ~1–2 days of focused work. Sized as a clean v9.1 release.
+
+**Worth noting while we're here:** if we ever wire drag-and-drop from File
+Explorer into Chat / DMs (IDEAS #12), the revamp is the right moment to
+make items first-class draggable. Not required for v9.1, just an alignment
+point.
+
+---
+
 ## How to add to this
 
 Edit this file directly, or just mention an idea in conversation and ask
