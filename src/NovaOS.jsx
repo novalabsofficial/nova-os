@@ -555,56 +555,26 @@ export default function NovaOS(){
   // tokens (styles.js) kick in for windows, taskbar, menus and widgets.
   useEffect(()=>{ document.documentElement.setAttribute("data-glass", glass?"on":"off"); },[glass]);
 
-  // v9.0 — watch community store apps so installed ones render on the desktop.
-  // DIAGNOSTIC (post-9.0): also stash `_docId` separately so the runtime
-  // logger below can tell whether the doc's data has its own `id` field
-  // overriding the Firestore doc id via the spread. Remove `_docId` + the
-  // diagnostic useEffect once the "newly installed apps don't appear on the
-  // desktop" bug is fixed.
+  // v9.0/v9.1 — watch community store apps so installed ones render on the
+  // desktop. v9.1: hardened against the "newly installed apps don't appear"
+  // bug from v9.0. Two changes:
+  //   1. Spread is `{...d.data(), id: d.id}` so the Firestore doc id ALWAYS
+  //      wins. Before this, if a doc's data carried its own `id` field, the
+  //      spread overrode `d.id` — leaving callers comparing the wrong value
+  //      against `installedApps`.
+  //   2. We separately keep `legacyId` = whatever the data's `id` field was
+  //      (if any), so any pre-v9.1 entries in `data.installedApps` that
+  //      reference the *data* id (e.g. McDonald's, which predates this fix)
+  //      still match via the legacy fallback in the filter below. New
+  //      installs always use the canonical doc id.
   useEffect(()=>{
     const q=query(collection(firestoreDb,"nova_user_apps"),orderBy("ts","desc"),limit(60));
-    const unsub=onSnapshot(q,snap=>setCommApps(snap.docs.map(d=>({_docId:d.id, id:d.id, ...d.data()}))),()=>{});
+    const unsub=onSnapshot(q,snap=>setCommApps(snap.docs.map(d=>{
+      const x=d.data();
+      return {...x, legacyId: x.id, id: d.id};
+    })),()=>{});
     return ()=>unsub();
   },[]);
-
-  // DIAGNOSTIC — community-apps-on-desktop bug. Logs a table every time
-  // `commApps` or `installedApps` changes so we can see at runtime:
-  //   • docId    — the real Firestore doc id (always stable)
-  //   • spreadId — what `a.id` resolves to after the spread (may differ if
-  //                the doc's data has an explicit `id` field)
-  //   • idOverridden — true means the data is hiding the doc id
-  //   • status / approved — moderation visibility
-  //   • hasTs — whether the doc has a `ts` field (orderBy("ts") excludes
-  //             docs missing it, which could silently drop new apps)
-  //   • installedBySpreadId / installedByDocId — which value (if any) is in
-  //     `data.installedApps`. Tells us whether the install path stored the
-  //     spread id or the doc id.
-  // Once we see one log line for an "installed but missing on desktop" app,
-  // the bug pins itself. Remove this entire effect after the fix lands.
-  useEffect(()=>{
-    if(typeof console==="undefined")return;
-    // Read from `data` directly (declared earlier) — referencing the
-    // memoized `installedApps` const (declared further down the component)
-    // would hit the temporal dead zone and crash the whole render.
-    const inst = data?.installedApps || [];
-    console.group("[nova-desktop-debug] community apps");
-    console.log("installedApps:", inst);
-    console.log("commApps count:", commApps.length);
-    console.table(commApps.map(a=>({
-      docId: a._docId,
-      spreadId: a.id,
-      idOverridden: a._docId !== a.id,
-      name: a.name,
-      status: a.status,
-      hasTs: typeof a.ts !== "undefined",
-      approved: isPubliclyVisible(a),
-      installedBySpreadId: inst.includes(a.id),
-      installedByDocId: inst.includes(a._docId),
-    })));
-    const passing = commApps.filter(a => isPubliclyVisible(a) && inst.includes(a.id));
-    console.log("would render on desktop (passes filter):", passing.map(a=>({docId:a._docId, spreadId:a.id, name:a.name})));
-    console.groupEnd();
-  },[commApps, data?.installedApps]);
 
   // v8.6 AFK screensaver. settings.screensaverMins: 0 = off, else minutes of
   // idle before it fades in (default 1). Any input dismisses it and re-arms
@@ -1185,7 +1155,12 @@ export default function NovaOS(){
   const catalogIcons=STORE_CATALOG.filter(a=>installedApps.includes(a.id)).map(a=>({id:"store_"+a.id,icon:a.icon,label:a.name,desc:a.desc,storeApp:a}));
   // v9.0: installed community apps render on the desktop too (only show ones
   // still publicly visible — a later-rejected/removed app drops off).
-  const commIcons=commApps.filter(a=>isPubliclyVisible(a)&&installedApps.includes(a.id)).map(a=>({id:"store_"+a.id,icon:a.icon,label:a.name,desc:a.desc,storeApp:a}));
+  // v9.1: also match against `legacyId` so pre-v9.1 `installedApps` entries
+  // that referenced the doc's *data* id (rather than the Firestore doc id)
+  // still resolve. New installs use the canonical doc id; this is the
+  // backward-compat path so e.g. McDonald's keeps showing up.
+  const matchesInstalled=a=>installedApps.includes(a.id)||(a.legacyId&&installedApps.includes(a.legacyId));
+  const commIcons=commApps.filter(a=>isPubliclyVisible(a)&&matchesInstalled(a)).map(a=>({id:"store_"+a.id,icon:a.icon,label:a.name,desc:a.desc,storeApp:a}));
   const storeIcons=[...catalogIcons,...commIcons];
   // allApps = every app launcher entry that should appear in the start menu —
   // always the full list, regardless of what's pinned to the desktop.
