@@ -205,12 +205,20 @@ export function getSoundConfig() {
 }
 
 /** Save the user's sound preferences. */
+// v9.3 (issue #22) — let other components (e.g. the taskbar volume icon)
+// react to sound-config changes regardless of who made them. Subscribers
+// are invoked synchronously on every setSoundConfig with the freshly-read
+// config so callers see the merged result, not the patch.
+const _soundSubs = new Set();
+export function subscribeSoundConfig(fn) { _soundSubs.add(fn); return () => _soundSubs.delete(fn); }
+
 export function setSoundConfig(cfg) {
   if (typeof localStorage === "undefined") return;
   try {
     const cur = getSoundConfig();
     const next = { ...cur, ...cfg };
     localStorage.setItem(SOUND_LS_KEY, JSON.stringify(next));
+    _soundSubs.forEach(fn => { try { fn(next); } catch { /* ignore */ } });
   } catch {}
 }
 

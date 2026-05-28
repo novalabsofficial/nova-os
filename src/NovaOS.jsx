@@ -23,7 +23,7 @@ import { dailyWord, scoreGuess, normalizeGuess } from "./lib/wordle.js";
 import { emptyGrid as tetrisEmpty, randomPiece as tetrisRandom, shapeOf, fits as tetrisFits, lockPiece as tetrisLock, clearLines as tetrisClearLines, scoreForLines, tickInterval, PIECE_COLORS, BOARD_W as TETRIS_W, BOARD_H as TETRIS_H } from "./lib/tetris.js";
 import { wmoIcon, wmoLabel, geocodeUrl, parseGeocode, forecastUrl, parseForecast, alertsUrl, parseAlerts, isLikelyUS } from "./lib/weather.js";
 import { PROVIDERS as AI_PROVIDERS, streamResponse as aiStream, deriveTitle as aiDeriveTitle } from "./lib/ai.js";
-import { playTone, speak, cancelSpeech, playSound, getSoundConfig, setSoundConfig, setSoundWallpaper } from "./lib/audio.js";
+import { playTone, speak, cancelSpeech, playSound, getSoundConfig, setSoundConfig, setSoundWallpaper, subscribeSoundConfig } from "./lib/audio.js";
 import { db, setDbUid, getDbUid } from "./lib/db.js";
 import { watchMyThreads } from "./lib/dms.js";
 import { openExternalUrl } from "./lib/openUrl.js";
@@ -695,6 +695,12 @@ export default function NovaOS(){
   // section the Settings app should open to when deep-linked from it.
   const [qsOpen, setQsOpen] = useState(false);
   const [settingsSection, setSettingsSection] = useState(null);
+  // v9.3 (#22) — mirror sound config so the taskbar volume icon's mute
+  // indicator stays in sync no matter which app changed it (Settings,
+  // QuickSettingsPanel, etc.). audio.js fires `subscribeSoundConfig`
+  // synchronously inside setSoundConfig.
+  const [soundCfg, setSoundCfgState] = useState(() => getSoundConfig());
+  useEffect(() => subscribeSoundConfig(setSoundCfgState), []);
   const pushNotification = useCallback((n)=>{
     if(!n || !n.title) return;
     const notif = {
@@ -1884,7 +1890,24 @@ export default function NovaOS(){
           height:44,display:"flex",alignItems:"center",gap:3,padding:"0 4px",
           background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.06)",borderRadius:13,
         }}>
-          {/* v9.0 — Quick settings (network + volume + glass). Opens the flyout. */}
+          {/* v9.3 (#22) — Dedicated volume button so the slider is one click
+              away without opening Settings. Same flyout as the network
+              button; both are at-a-glance indicators that share quick
+              settings. The icon reflects the current mute state. */}
+          {(() => {
+            const muted = !soundCfg.enabled || soundCfg.volume <= 0;
+            return (
+              <button className="sb" onClick={()=>setQsOpen(o=>!o)} title={muted ? "Muted — click to adjust" : "Volume " + Math.round(soundCfg.volume*100) + "%"} style={{
+                width:36,height:36,borderRadius:9,
+                background:qsOpen?fill(AC):"transparent",
+                border:qsOpen?"1px solid "+bdr(AC):"1px solid transparent",
+                cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",
+                color:qsOpen?AC:(muted?"rgba(255,255,255,0.42)":"rgba(255,255,255,0.62)"),
+                transition:"all 0.18s cubic-bezier(0.4,0,0.2,1)",
+              }}><VolumeGlyph size={17} muted={muted}/></button>
+            );
+          })()}
+          {/* v9.0 — Network/quick-settings button. Opens the same flyout. */}
           <button className="sb" onClick={()=>setQsOpen(o=>!o)} title="Quick settings" style={{
             width:36,height:36,borderRadius:9,
             background:qsOpen?fill(AC):"transparent",
