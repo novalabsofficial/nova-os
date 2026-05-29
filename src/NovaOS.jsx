@@ -541,6 +541,11 @@ export default function NovaOS(){
   // motion; cleared once the animation finishes (see markFx).
   const [winFx,      setWinFx]      = useState({});
   const fxTimers = useRef({});
+  // v10.0 — last pointer-down position + per-window launch origin, so a fresh
+  // window can zoom out of the exact spot (icon, taskbar chip, menu item) the
+  // user clicked to open it.
+  const ptrRef = useRef(null);
+  const launchPt = useRef({});
   const [maxZ,       setMaxZ]       = useState(100);
   const [tick,       setTick]       = useState(new Date());
   const [toast,      setToast]      = useState(null);
@@ -571,6 +576,10 @@ export default function NovaOS(){
   const [deskCount, setDeskCount] = useState(1);
   const [curDesk, setCurDesk] = useState(0);
   const [taskViewOpen, setTaskViewOpen] = useState(false);
+  // v10.0 — one-shot staggered reveal of desktop icons when the desktop first
+  // appears (login). Flips true once the reveal finishes so icons stop
+  // carrying the entrance animation on later re-renders (drag/select).
+  const [iconsRevealed, setIconsRevealed] = useState(false);
   const curDeskRef = useRef(0); curDeskRef.current = curDesk;
   const ssActiveRef = useRef(false);
   const idleTimerRef = useRef(null);
@@ -625,7 +634,22 @@ export default function NovaOS(){
   useEffect(()=>{iconPosRef.current=iconPos;},[iconPos]);
   useEffect(()=>{widgetRef.current=widgetState;},[widgetState]);
   useEffect(()=>{winsRef.current=wins;},[wins]);
- 
+  // v10.0 — remember where the pointer last went down so a launched window can
+  // grow out of that point. Capture phase so it lands before click handlers.
+  useEffect(()=>{
+    function onPD(e){ ptrRef.current={x:e.clientX,y:e.clientY}; }
+    window.addEventListener("pointerdown",onPD,true);
+    return ()=>window.removeEventListener("pointerdown",onPD,true);
+  },[]);
+  // v10.0 — kick off the one-shot desktop-icon reveal whenever we (re)enter the
+  // desktop. Settle after the longest stagger so icons drop the animation.
+  useEffect(()=>{
+    if(screen!=="desktop"){ setIconsRevealed(false); return; }
+    setIconsRevealed(false);
+    const t=setTimeout(()=>setIconsRevealed(true), 1050);
+    return ()=>clearTimeout(t);
+  },[screen]);
+
   const settings=data?.settings||{};
   const AC      =settings.accent    ||DEFAULT_AC;
   const use24h  =settings.clock24h  ||false;
@@ -1293,6 +1317,7 @@ export default function NovaOS(){
     fxTimers.current[id]=setTimeout(()=>{
       setWinFx(f=>{ const n={...f}; delete n[id]; return n; });
       delete fxTimers.current[id];
+      delete launchPt.current[id];
     },ms);
   },[]);
   // Restore a minimized window with a pop-up animation, then raise it.
@@ -1339,10 +1364,13 @@ export default function NovaOS(){
       });
       return nz;
     });
-    // v10.0 — animate: a brand-new window zooms in; an existing window that
-    // was minimized pops back from the taskbar.
+    // v10.0 — animate: a brand-new window zooms out of the click point; an
+    // existing window that was minimized pops back from the taskbar.
     if(existing){ if(wasMin) markFx(existing.id,"restoring",300); }
-    else markFx(newId,"entering",320);
+    else {
+      if(ptrRef.current) launchPt.current[newId]={x:ptrRef.current.x,y:ptrRef.current.y};
+      markFx(newId,"entering",340);
+    }
   },[deviceMode,markAppNotificationsRead,markFx]);
   // v10.0 — virtual-desktop operations.
   const addDesktop=useCallback(()=>{
@@ -1406,6 +1434,7 @@ export default function NovaOS(){
       setWins(ws=>ws.filter(w=>w.id!==id));
       setWinFx(f=>{ const n={...f}; delete n[id]; return n; });
       delete fxTimers.current[id];
+      delete launchPt.current[id];
     },190);
   }
   // v10.0 — minimize animates down toward the taskbar, then hides; toggling a
@@ -1720,7 +1749,7 @@ export default function NovaOS(){
     setDbUid(null);
     setUser(null);setUid(null);setData(null);setCustomWp(null);setWins([]);setMaxZ(100);setMenuOpen(false);
     setDeskCount(1);setCurDesk(0);setTaskViewOpen(false);
-    Object.values(fxTimers.current).forEach(t=>clearTimeout(t)); fxTimers.current={}; setWinFx({});
+    Object.values(fxTimers.current).forEach(t=>clearTimeout(t)); fxTimers.current={}; setWinFx({}); launchPt.current={};
     setIconPos({});setIconDrag(null);setWidgetState(DEFAULT_WIDGET_STATE);setWidgetDrag(null);setWidgetResize(null);
     setUname("");setPass("");setAuthErr("");setMode("login");setScreen("login");
   }
@@ -2134,7 +2163,7 @@ export default function NovaOS(){
           the viewport state and recomputes on resize. */}
       {(() => { const positions = layoutIcons(allDesktopIcons, iconPos);
                 void viewport.w; void viewport.h;
-                return allDesktopIcons.map((app) => {
+                return allDesktopIcons.map((app, idx) => {
         const pos = positions[app.id] || { x: 0, y: 0 };
         const isDrg=iconDrag?.id===app.id;
         const isSel=selectedIcons.has(app.id);   // v9.7 B1 drag-select highlight
@@ -2155,6 +2184,8 @@ export default function NovaOS(){
             backdropFilter:isDrg||isSel?"blur(8px)":"none",
             transition:isDrg?"none":"background 0.22s cubic-bezier(0.4,0,0.2,1), border-color 0.22s cubic-bezier(0.4,0,0.2,1), left 0.28s cubic-bezier(0.4,0,0.2,1), top 0.28s cubic-bezier(0.4,0,0.2,1), transform 0.2s cubic-bezier(0.22,1,0.36,1)",
             boxShadow:isDrg?"0 10px 30px rgba(0,0,0,0.5), 0 1px 0 rgba(255,255,255,0.08) inset":"none",
+            // v10.0 — one-shot staggered reveal on login.
+            ...(iconsRevealed?{}:{animation:"icon-pop 0.44s cubic-bezier(0.16,1,0.3,1) both",animationDelay:(Math.min(idx,16)*0.03)+"s"}),
           }}
             className={isDrg?"":"di"} title={app.desc}
             onPointerDown={e=>onIconMouseDown(e,app.id,allDesktopIcons)}
@@ -2317,12 +2348,24 @@ export default function NovaOS(){
         // transient flag picks the keyframe. min/restore collapse toward the
         // taskbar (transform-origin bottom).
         const fx=winFx[win.id];
+        // Launch-from-click: if we recorded where this window was opened, zoom
+        // it out of that point (transform-origin = click position relative to
+        // the window box, clamped inside it).
+        const lp = fx==="entering" ? launchPt.current[win.id] : null;
+        let fxOrigin = (fx==="minimizing"||fx==="restoring") ? "50% 100%" : "50% 50%";
+        let enterAnim = "win-in 0.28s cubic-bezier(0.16,1,0.3,1)";
+        if(lp){
+          const wL=isMax?0:win.x, wT=isMax?0:win.y;
+          const wW=isMax?window.innerWidth:win.width, wH=isMax?(window.innerHeight-TASKBAR_H):win.height;
+          const ox=Math.max(0,Math.min(wW, lp.x-wL)), oy=Math.max(0,Math.min(wH, lp.y-wT));
+          fxOrigin = ox+"px "+oy+"px";
+          enterAnim = "win-launch 0.3s cubic-bezier(0.16,1,0.3,1)";
+        }
         const winAnim = fx==="closing"    ? "win-out 0.19s cubic-bezier(0.4,0,1,1) forwards"
                       : fx==="minimizing" ? "win-min 0.19s cubic-bezier(0.4,0,1,1) forwards"
                       : fx==="restoring"  ? "win-restore 0.3s cubic-bezier(0.22,1,0.36,1)"
-                      : fx==="entering"   ? "win-in 0.28s cubic-bezier(0.16,1,0.3,1)"
+                      : fx==="entering"   ? enterAnim
                       : "none";
-        const fxOrigin = (fx==="minimizing"||fx==="restoring") ? "50% 100%" : "50% 50%";
         const fxBusy = fx==="closing"||fx==="minimizing";
         return(
           <div key={win.id} data-win="1" data-drop={win.app==="profile"?"avatar":"none"} onClick={()=>focusWin(win.id)} style={{...winStyle,...minimizedStyle,pointerEvents:fxBusy?"none":"auto",transformOrigin:fxOrigin,background:"var(--nv-surface-solid)",border:"1px solid rgba(255,255,255,0.09)",boxShadow:winShadow,display:isMin?"none":"flex",flexDirection:"column",animation:winAnim,backdropFilter:"blur("+winBlur+"px) saturate(160%)",WebkitBackdropFilter:"blur("+winBlur+"px) saturate(160%)",transition:isDrg?"box-shadow 0.18s cubic-bezier(0.4,0,0.2,1)":"box-shadow 0.22s cubic-bezier(0.4,0,0.2,1), left 0.28s cubic-bezier(0.4,0,0.2,1), top 0.28s cubic-bezier(0.4,0,0.2,1), width 0.28s cubic-bezier(0.4,0,0.2,1), height 0.28s cubic-bezier(0.4,0,0.2,1)",overflow:"hidden"}}>

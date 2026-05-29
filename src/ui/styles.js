@@ -149,6 +149,11 @@ export const CSS = `
   @keyframes win-out{from{opacity:1;transform:none;}to{opacity:0;transform:scale(0.86) translateY(10px);}}
   @keyframes win-min{from{opacity:1;transform:none;}to{opacity:0;transform:scale(0.45) translateY(34vh);}}
   @keyframes win-restore{from{opacity:0;transform:scale(0.6) translateY(26vh);}to{opacity:1;transform:none;}}
+  /* v10.0 — launch zoom: a window grows out of the point that opened it
+     (transform-origin set inline to the click position). */
+  @keyframes win-launch{from{opacity:0;transform:scale(0.32);}60%{opacity:1;}to{opacity:1;transform:none;}}
+  /* v10.0 — desktop icons fade+rise in on login, staggered by index. */
+  @keyframes icon-pop{from{opacity:0;transform:translateY(12px) scale(0.86);}to{opacity:1;transform:none;}}
   @keyframes menu-up{from{opacity:0;transform:translateY(16px) scale(0.97);}to{opacity:1;transform:none;}}
   @keyframes toast-in{from{opacity:0;transform:translateY(-12px) scale(0.95);}to{opacity:1;transform:none;}}
   @keyframes spin{to{transform:rotate(360deg);}}
