@@ -2150,14 +2150,14 @@ export default function NovaOS(){
                 {win.app==="music"      &&<MusicApp AC={AC} showToast={showToast}/>}
                 {win.app==="pdf"        &&<PdfApp AC={AC} showToast={showToast}/>}
                 {win.app==="atmos"      &&<AtmosApp AC={AC} showToast={showToast} pushNotification={pushNotification} openNovaAi={()=>openApp("novaai")} data={data} updateSettings={updateSettings} onSevereAlert={alert=>setSevereAlert(alert)}/>}
-                {win.app==="minesweeper"&&<MinesweeperApp AC={AC}/>}
+                {win.app==="minesweeper"&&<MinesweeperApp AC={AC} user={user}/>}
                 {win.app==="wordle"     &&<WordleApp AC={AC} showToast={showToast}/>}
                 {win.app==="tetris"     &&<TetrisApp AC={AC}/>}
                 {win.app==="novaai"     &&<NovaAiApp AC={AC} showToast={showToast}/>}
                 {/* v7.4 games */}
                 {win.app==="tictactoe"  &&<TicTacToeApp AC={AC}/>}
                 {win.app==="pong"       &&<PongApp AC={AC}/>}
-                {win.app==="flappy"     &&<FlappyBirdApp AC={AC} data={data} updateSettings={updateSettings}/>}
+                {win.app==="flappy"     &&<FlappyBirdApp AC={AC} data={data} updateSettings={updateSettings} user={user}/>}
                 {win.app==="invaders"   &&<SpaceInvadersApp AC={AC} data={data} updateSettings={updateSettings}/>}
                 {win.app==="pacman"     &&<PacManApp AC={AC} data={data} updateSettings={updateSettings}/>}
                 {win.app==="chess"      &&<ChessApp user={user} AC={AC}/>}

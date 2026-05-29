@@ -2,11 +2,25 @@ import { useState, useEffect, useRef } from "react";
 import { FF, FFB, FFM } from "../ui/styles.js";
 import { fill, bdr } from "../lib/format.js";
 import { createBoard as mineCreateBoard, floodReveal, isWin as mineIsWin, mineTotal, MINE_DIFFICULTIES } from "../lib/minesweeper.js";
+import { submitScore, fetchLeaderboard } from "../lib/scores.js";
+import { getDbUid } from "../lib/db.js";
 
 const MINE_NUM_COLOR = ["", "#4f9eff", "#4cef90", "#ff6b6b", "#cc44ff", "#ff8c44", "#44ddcc", "#fff", "#888"];
 
-export function MinesweeperApp({AC}){
+export function MinesweeperApp({AC, user}){
+  const myUid = getDbUid();
   const [diff,setDiff]=useState("easy");
+  // v9.8 — global best-time leaderboard (lower = better) per difficulty.
+  const [showLeaderboard,setShowLeaderboard]=useState(false);
+  const [leaders,setLeaders]=useState([]);
+  const [loadingLb,setLoadingLb]=useState(false);
+  const [newBest,setNewBest]=useState(false);
+  function loadLeaders(d=diff){
+    setLoadingLb(true);
+    fetchLeaderboard("minesweeper_"+d,"low",10).then(rows=>{ setLeaders(rows); setLoadingLb(false); });
+  }
+  // refresh whenever the difficulty changes while the panel is open
+  useEffect(()=>{ if(showLeaderboard) loadLeaders(diff); /* eslint-disable-next-line */ },[diff,showLeaderboard]);
   const cfg=MINE_DIFFICULTIES[diff];
   const [board,setBoard]=useState(null);             // null until first click
   const [revealed,setRevealed]=useState(()=>new Set());
@@ -39,6 +53,7 @@ export function MinesweeperApp({AC}){
     setFlagged(new Set());
     setStatus("idle");
     setElapsed(0);
+    setNewBest(false);
   }
 
   function reveal(r,c){
@@ -63,7 +78,17 @@ export function MinesweeperApp({AC}){
     const next=new Set(revealed);
     flood.forEach(k=>next.add(k));
     setRevealed(next);
-    if(mineIsWin(b,next))setStatus("won");
+    if(mineIsWin(b,next)){
+      setStatus("won");
+      // v9.8 — submit completion time to the global board (lower = better).
+      const finalTime=Math.max(1,Math.floor((Date.now()-startedAt)/1000));
+      if(myUid){
+        submitScore("minesweeper_"+diff, finalTime, "low", myUid, user).then(improved=>{
+          if(improved) setNewBest(true);
+          if(showLeaderboard) loadLeaders(diff);
+        });
+      }
+    }
   }
 
   function toggleFlag(r,c){
@@ -111,13 +136,41 @@ export function MinesweeperApp({AC}){
           <button key={d} onClick={()=>newGame(d)} style={{padding:"5px 11px",borderRadius:18,cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:11,background:diff===d?fill(AC):"rgba(255,255,255,0.05)",border:"1px solid "+(diff===d?bdr(AC):"rgba(255,255,255,0.1)"),color:diff===d?AC:"rgba(255,255,255,0.55)",textTransform:"capitalize"}}>{d}</button>
         ))}
         <div style={{flex:1}}/>
-        <div style={{fontFamily:FFM,fontSize:13,color:"rgba(255,255,255,0.7)"}}>💣 {minesLeft}</div>
-        <div style={{fontFamily:FFM,fontSize:13,color:"rgba(255,255,255,0.5)"}}>⏱ {elapsed}s</div>
-        <button onClick={()=>newGame(diff)} style={{padding:"5px 11px",borderRadius:7,cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:11,background:"rgba(255,255,255,0.07)",border:"1px solid rgba(255,255,255,0.12)",color:"rgba(255,255,255,0.75)"}}>↻ New</button>
+        {/* Counter pills — classic minesweeper readout styling */}
+        <div style={{fontFamily:FFM,fontSize:13,color:"#ff8b8b",background:"rgba(0,0,0,0.3)",border:"1px solid var(--nv-border)",borderRadius:6,padding:"3px 9px",minWidth:54,textAlign:"center"}}>💣 {minesLeft}</div>
+        <div style={{fontFamily:FFM,fontSize:13,color:"var(--nv-text)",background:"rgba(0,0,0,0.3)",border:"1px solid var(--nv-border)",borderRadius:6,padding:"3px 9px",minWidth:54,textAlign:"center"}}>⏱ {elapsed}s</div>
+        <button onClick={()=>setShowLeaderboard(v=>!v)} title="Global leaderboard" style={{padding:"5px 11px",borderRadius:7,cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:11,background:showLeaderboard?fill(AC):"rgba(255,255,255,0.07)",border:"1px solid "+(showLeaderboard?bdr(AC):"rgba(255,255,255,0.12)"),color:showLeaderboard?AC:"var(--nv-text)"}}>🏆</button>
+        <button onClick={()=>newGame(diff)} style={{padding:"5px 11px",borderRadius:7,cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:11,background:"rgba(255,255,255,0.07)",border:"1px solid rgba(255,255,255,0.12)",color:"var(--nv-text)"}}>↻ New</button>
       </div>
 
-      {status==="won" && <div style={{padding:"8px 12px",background:"rgba(76,239,144,0.1)",border:"1px solid rgba(76,239,144,0.35)",borderRadius:7,fontFamily:FFB,fontWeight:600,fontSize:13,color:"#4cef90",textAlign:"center"}}>🎉 You won in {elapsed}s!</div>}
+      {status==="won" && <div style={{padding:"8px 12px",background:"rgba(76,239,144,0.1)",border:"1px solid rgba(76,239,144,0.35)",borderRadius:7,fontFamily:FFB,fontWeight:600,fontSize:13,color:"#4cef90",textAlign:"center"}}>🎉 You won in {elapsed}s!{newBest && <span style={{marginLeft:8,color:"#ffd060"}}>🏆 New personal best!</span>}</div>}
       {status==="lost" && <div style={{padding:"8px 12px",background:"rgba(255,80,80,0.1)",border:"1px solid rgba(255,80,80,0.35)",borderRadius:7,fontFamily:FFB,fontWeight:600,fontSize:13,color:"#ff7878",textAlign:"center"}}>💥 You hit a mine — try again</div>}
+
+      {/* Global leaderboard panel */}
+      {showLeaderboard && (
+        <div style={{flexShrink:0,background:"var(--nv-elevated)",border:"1px solid var(--nv-border)",borderRadius:9,padding:"10px 12px"}}>
+          <div style={{display:"flex",alignItems:"center",marginBottom:8}}>
+            <div style={{fontFamily:FFB,fontWeight:700,fontSize:12,color:"var(--nv-text-strong)"}}>🏆 Fastest times · <span style={{textTransform:"capitalize",color:AC}}>{diff}</span></div>
+            <div style={{flex:1}}/>
+            <button onClick={()=>loadLeaders(diff)} title="Refresh" style={{background:"none",border:"none",cursor:"pointer",color:"var(--nv-text-dim)",fontSize:12}}>↻</button>
+          </div>
+          {loadingLb ? (
+            <div style={{fontSize:11,color:"var(--nv-text-dim)",fontStyle:"italic",padding:"8px 2px"}}>Loading…</div>
+          ) : leaders.length===0 ? (
+            <div style={{fontSize:11,color:"var(--nv-text-dim)",fontStyle:"italic",padding:"8px 2px"}}>No times yet — win a game to claim the top spot!</div>
+          ) : (
+            <div style={{display:"flex",flexDirection:"column",gap:2}}>
+              {leaders.map((row,i)=>(
+                <div key={row.id} style={{display:"grid",gridTemplateColumns:"24px 1fr auto",gap:8,alignItems:"center",padding:"4px 8px",borderRadius:6,background:row.uid===myUid?fill(AC):"transparent",fontFamily:FF}}>
+                  <span style={{fontFamily:FFB,fontWeight:700,fontSize:12,color:i===0?"#ffd060":i===1?"#cfd3da":i===2?"#d8954e":"var(--nv-text-dim)"}}>{i+1}</span>
+                  <span style={{fontSize:12,color:row.uid===myUid?AC:"var(--nv-text-strong)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>@{row.user||"anon"}{row.uid===myUid&&<span style={{fontSize:9,color:"var(--nv-text-dim)",marginLeft:5,fontFamily:FFM}}>you</span>}</span>
+                  <span style={{fontFamily:FFM,fontSize:12,color:"var(--nv-text)"}}>{row.score}s</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       <div style={{flex:1,overflow:"auto",minHeight:0,display:"flex",alignItems:"flex-start",justifyContent:"center",padding:4}}>
         <div style={{display:"grid",gridTemplateColumns:"repeat("+cfg.cols+",1fr)",gap:2,touchAction:"none"}}>
