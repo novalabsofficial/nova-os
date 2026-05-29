@@ -453,26 +453,29 @@ const SOUND_RECIPES = {
   // ── v9.4 — Atmos severe-weather alert ──────────────────────────────
   // Weatherscan / EAS-style dual-tone attention signal, Nova-branded.
   //
-  // The real EAS attention signal is two pure sawtooth tones at 853 Hz +
-  // 960 Hz played SIMULTANEOUSLY — that's where the iconic "EEE-OOOO"
-  // buzz comes from (a 107 Hz beating between the two carriers). Single
-  // tones can never sound right because the whole identity is the dyad.
+  // The real EAS attention signal is two PURE SINE tones at 853 Hz +
+  // 960 Hz played SIMULTANEOUSLY (FCC §11.31 spec — they're literally
+  // specified as sine waves). The unmistakable "warble" is the beating
+  // between the two close carriers, not sawtooth harmonics — switching
+  // to sawtooth makes it sound like a buzzer rather than the clean
+  // ringing dual-tone Weatherscan used.
   //
   // Nova's twist: keep the 607 Hz signature we've used since v5.3 and
   // pair it with 683 Hz — same 1.125 frequency ratio as the real EAS
-  // pair (853 / 960 ≈ 1.1255), so the beat / "buzzy" character matches
-  // Weatherscan while the absolute pitch stays uniquely Nova.
+  // pair (853 / 960 ≈ 1.1255), so the warble rate matches Weatherscan
+  // while the absolute pitch stays uniquely Nova.
   //
-  // Three sustained 950 ms bursts with ~200 ms gaps = three cycles in
-  // ~3.5 s total, the typical Weatherscan / NWR cadence before the voice
-  // read-out kicks in. Sub-octave sine body keeps it from being piercing.
+  // Three 950 ms sustains with ~100 ms gaps = three cycles in ~3.15 s
+  // total — tighter than the v9.4 first cut for the right Weatherscan
+  // cadence. Gains bumped (sine RMS is lower than sawtooth's at the
+  // same peak), sub-octave sine body keeps it warm rather than piercing.
   nwsAlert: (ctx, t, v, r, d) => {
     const er = Math.min(1, r);
     for (let i = 0; i < 3; i++) {
-      const start = t + i * 1.15;
-      _voice(ctx, d, 607 * er, start, 950, 0.15 * v, "sawtooth", 25);
-      _voice(ctx, d, 683 * er, start, 950, 0.15 * v, "sawtooth", 25);  // partner tone — same 1.125 ratio as EAS 853/960
-      _voice(ctx, d, 303.5 * er, start, 950, 0.07 * v, "sine", 25);    // sub-octave body
+      const start = t + i * 1.05;
+      _voice(ctx, d, 607 * er, start, 950, 0.20 * v, "sine", 20);
+      _voice(ctx, d, 683 * er, start, 950, 0.20 * v, "sine", 20);   // partner tone — same 1.125 ratio as EAS 853/960
+      _voice(ctx, d, 303.5 * er, start, 950, 0.08 * v, "sine", 20); // sub-octave body
     }
   },
 };
@@ -488,7 +491,7 @@ const SOUND_TAILS = {
   error: 700, message: 900, toast: 450, windowOpen: 250,
   windowClose: 300, appLaunch: 300, click: 100,
   // v9.4 — alarm + NWS recipes ring out longer than typical UI sounds.
-  alarmSunrise: 4200, alarmPulse: 3500, alarmClassic: 2500, nwsAlert: 3800,
+  alarmSunrise: 4200, alarmPulse: 3500, alarmClassic: 2500, nwsAlert: 3400,
   // v9.4 — volume preview is a quick chime, no reverb tail (see DRY_SOUNDS).
   volumeSample: 250,
 };
