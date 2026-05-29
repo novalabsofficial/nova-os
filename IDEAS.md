@@ -5,6 +5,37 @@ not committed to. Living document — add to it freely.
 
 ---
 
+# ✅ v9.6 — shipped ("Servers & Social polish")
+
+A focused follow-up to v9.5's servers launch — finishing the social surfaces.
+
+- **Server member list + roles + nicknames.** The 👥 header button opens a
+  roster everyone can see. Roles: **owner / admin / member**. Owner
+  promotes/demotes admins (▲▼) and kicks members (✕); admins can delete any
+  message. **Per-server nicknames** — members set their own (✏️), owner can
+  rename anyone; nicknames show in messages with the real @username beneath
+  in the panel. `nova_servers` gains a `members` map; legacy v9.5 servers
+  auto-backfill when the owner opens them.
+- **Reactions on server messages.** New `nova_server_reactions` collection
+  (mirrors DM reactions). All three surfaces — global / DM / server — now
+  react identically.
+- **@mention highlighting + notifications.** `@username` renders as a pill
+  in every chat view; messages that ping *you* get a yellow accent band.
+  An OS-level global-chat listener pushes a Notification Center entry when
+  you're mentioned — even with Chat closed.
+- **Unread badges.** Red dots on DM rows + a count by "Direct Messages";
+  per-server unread dots in the sidebar; both feed the existing taskbar/
+  desktop app-icon badge. DM read tracked per-thread via `data.lastRead`;
+  servers via a `lastActivityTs`/`lastSenderUid` stamp on the server doc.
+
+**Required Firestore rules update (deploy):** members-map-aware
+join/leave/nickname branches + an activity-bump branch on `nova_servers`,
+admin message-delete, members map required on create, and the new
+`nova_server_reactions` collection. Deploy via the Firebase Console rules
+editor (or `firebase deploy --only firestore:rules`).
+
+---
+
 # ✅ v9.5 — shipped
 
 A two-part release: **part 1** revamped four under-loved apps into real-OS

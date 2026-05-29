@@ -153,3 +153,51 @@ export function subscribeDmReactions(threadId, cb) {
     err => { console.warn("[chat-reactions] DM subscription error:", err?.message || err); cb([]); },
   );
 }
+
+// ── v9.6: server message reactions ──────────────────────────────────────
+// Mirrors DM reactions but keyed by serverId. The rule checks server
+// membership via a get() into the parent server doc using the serverId
+// field on the reaction.
+
+function serverReactionId(serverId, msgId, uid, emoji) {
+  return serverId + "_" + msgId + "_" + uid + "_" + encodeURIComponent(emoji);
+}
+
+/** Toggle a reaction on a server message. ("added" | "removed" | null). */
+export async function toggleServerReaction(serverId, msgId, emoji, myUid, myUsername) {
+  if (!serverId || !msgId || !emoji || !myUid) return null;
+  const rxId = serverReactionId(serverId, msgId, myUid, emoji);
+  const ref = doc(firestoreDb, "nova_server_reactions", rxId);
+  try {
+    const snap = await getDoc(ref);
+    if (snap.exists()) {
+      await deleteDoc(ref);
+      return "removed";
+    }
+    await setDoc(ref, {
+      serverId, msgId,
+      uid: myUid,
+      user: myUsername || "",
+      emoji,
+      ts: Date.now(),
+    });
+    return "added";
+  } catch (err) {
+    console.warn("[chat-reactions] server toggle failed:", err?.message || err);
+    return null;
+  }
+}
+
+/** Subscribe to all reactions for a server (filtered by serverId). */
+export function subscribeServerReactions(serverId, cb) {
+  if (!serverId) { cb([]); return () => {}; }
+  const q = query(
+    collection(firestoreDb, "nova_server_reactions"),
+    where("serverId", "==", serverId),
+    limit(500),
+  );
+  return onSnapshot(q,
+    snap => cb(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
+    err => { console.warn("[chat-reactions] server subscription error:", err?.message || err); cb([]); },
+  );
+}
