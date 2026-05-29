@@ -142,6 +142,13 @@ export const CSS = `
   @keyframes boot-in{from{opacity:0;transform:translateX(-14px);}to{opacity:1;transform:none;}}
   /* Windows: a bit more pronounced rise + slight overshoot scale */
   @keyframes win-in{from{opacity:0;transform:scale(0.92) translateY(16px);}to{opacity:1;transform:none;}}
+  /* v10.0 — window exit/minimize/restore. Close shrinks + fades in place;
+     minimize shrinks down toward the taskbar; restore reverses it. The min/
+     restore pair uses transform-origin:50% 100% (set inline) so it collapses
+     toward the bottom edge where the taskbar lives. */
+  @keyframes win-out{from{opacity:1;transform:none;}to{opacity:0;transform:scale(0.86) translateY(10px);}}
+  @keyframes win-min{from{opacity:1;transform:none;}to{opacity:0;transform:scale(0.45) translateY(34vh);}}
+  @keyframes win-restore{from{opacity:0;transform:scale(0.6) translateY(26vh);}to{opacity:1;transform:none;}}
   @keyframes menu-up{from{opacity:0;transform:translateY(16px) scale(0.97);}to{opacity:1;transform:none;}}
   @keyframes toast-in{from{opacity:0;transform:translateY(-12px) scale(0.95);}to{opacity:1;transform:none;}}
   @keyframes spin{to{transform:rotate(360deg);}}

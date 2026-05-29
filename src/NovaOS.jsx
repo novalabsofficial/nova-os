@@ -536,6 +536,11 @@ export default function NovaOS(){
   const [data,       setData]       = useState(null);
   const [customWp,   setCustomWp]   = useState(null);
   const [wins,       setWins]       = useState([]);
+  // v10.0 — transient per-window animation flags: id → "entering" | "closing"
+  // | "minimizing" | "restoring". Drives the open/close/minimize/restore
+  // motion; cleared once the animation finishes (see markFx).
+  const [winFx,      setWinFx]      = useState({});
+  const fxTimers = useRef({});
   const [maxZ,       setMaxZ]       = useState(100);
   const [tick,       setTick]       = useState(new Date());
   const [toast,      setToast]      = useState(null);
@@ -1280,6 +1285,22 @@ export default function NovaOS(){
     else if(target==="avatar") downsamplePhoto(item.url, 256, 0.85, (u)=>{ updateData({avatar:u}); showToast("Profile picture set ✓"); });
   }
   const focusWin=useCallback((id)=>{setMaxZ(z=>{const nz=z+1;setWins(ws=>ws.map(w=>w.id===id?{...w,z:nz}:w));return nz;});},[]);
+  // v10.0 — tag a window with a transient animation flag, auto-clearing it
+  // after `ms` so the window settles back to its resting (no-animation) style.
+  const markFx=useCallback((id,kind,ms)=>{
+    setWinFx(f=>({...f,[id]:kind}));
+    if(fxTimers.current[id]) clearTimeout(fxTimers.current[id]);
+    fxTimers.current[id]=setTimeout(()=>{
+      setWinFx(f=>{ const n={...f}; delete n[id]; return n; });
+      delete fxTimers.current[id];
+    },ms);
+  },[]);
+  // Restore a minimized window with a pop-up animation, then raise it.
+  const restoreWin=useCallback((id)=>{
+    setWins(ws=>ws.map(x=>x.id===id?{...x,state:"normal"}:x));
+    markFx(id,"restoring",300);
+    focusWin(id);
+  },[markFx,focusWin]);
   // On mobile, every new window opens MAXIMIZED. Default sizes (520x480 etc.)
   // are wider than a ~360px phone and would otherwise spill off the right edge.
   // We still stash the windowed position in prevBounds so toggling out of
@@ -1295,6 +1316,8 @@ export default function NovaOS(){
     const cur=curDeskRef.current;
     const existing=(winsRef.current||[]).find(w=>w.app===appId);
     if(existing && (existing.desk||0)!==cur) setCurDesk(existing.desk||0);
+    const wasMin = existing && existing.state==="minimized";
+    const newId = Date.now()+Math.random();
     setMaxZ(z=>{
       const nz=z+1;
       setWins(ws=>{
@@ -1308,7 +1331,7 @@ export default function NovaOS(){
         const baseX=120+n*28, baseY=36+n*22;
         const mobileFirst = deviceMode==="mobile";
         return [...ws,{
-          id:Date.now()+Math.random(), app:appId, z:nz, desk:cur,
+          id:newId, app:appId, z:nz, desk:cur,
           x:baseX, y:baseY, width:sz.w, height:sz.h,
           state: mobileFirst ? "maximized" : "normal",
           prevBounds: mobileFirst ? {x:baseX,y:baseY,width:sz.w,height:sz.h} : null,
@@ -1316,7 +1339,11 @@ export default function NovaOS(){
       });
       return nz;
     });
-  },[deviceMode,markAppNotificationsRead]);
+    // v10.0 — animate: a brand-new window zooms in; an existing window that
+    // was minimized pops back from the taskbar.
+    if(existing){ if(wasMin) markFx(existing.id,"restoring",300); }
+    else markFx(newId,"entering",320);
+  },[deviceMode,markAppNotificationsRead,markFx]);
   // v10.0 — virtual-desktop operations.
   const addDesktop=useCallback(()=>{
     setDeskCount(c=>{ if(c>=MAX_DESKTOPS) return c; setCurDesk(c); return c+1; });
@@ -1370,8 +1397,31 @@ export default function NovaOS(){
     focusWin(winId);
   }
   function startResize(e,winId,edge){if(e.button!==0)return;e.preventDefault();const w=winsRef.current.find(w=>w.id===winId);if(w){setDrag({type:"resize",winId,edge,sx:e.clientX,sy:e.clientY,wx:w.x,wy:w.y,ww:w.width,wh:w.height});focusWin(winId);}}
-  function closeWin(id){playSound("windowClose");setWins(ws=>ws.filter(w=>w.id!==id));}
-  function minimizeWin(id){setWins(ws=>ws.map(w=>w.id===id?{...w,state:w.state==="minimized"?"normal":"minimized"}:w));}
+  // v10.0 — close plays a shrink-fade, THEN removes the window from state.
+  function closeWin(id){
+    playSound("windowClose");
+    if(fxTimers.current[id]) clearTimeout(fxTimers.current[id]);
+    setWinFx(f=>({...f,[id]:"closing"}));
+    fxTimers.current[id]=setTimeout(()=>{
+      setWins(ws=>ws.filter(w=>w.id!==id));
+      setWinFx(f=>{ const n={...f}; delete n[id]; return n; });
+      delete fxTimers.current[id];
+    },190);
+  }
+  // v10.0 — minimize animates down toward the taskbar, then hides; toggling a
+  // minimized window restores it with the matching pop-up (via restoreWin).
+  function minimizeWin(id){
+    const w=winsRef.current.find(x=>x.id===id);
+    if(!w) return;
+    if(w.state==="minimized"){ restoreWin(id); return; }
+    if(fxTimers.current[id]) clearTimeout(fxTimers.current[id]);
+    setWinFx(f=>({...f,[id]:"minimizing"}));
+    fxTimers.current[id]=setTimeout(()=>{
+      setWins(ws=>ws.map(x=>x.id===id?{...x,state:"minimized"}:x));
+      setWinFx(f=>{ const n={...f}; delete n[id]; return n; });
+      delete fxTimers.current[id];
+    },190);
+  }
   function maximizeWin(id){setWins(ws=>ws.map(w=>{if(w.id!==id)return w;if(w.state==="maximized")return{...w,state:"normal",...(w.prevBounds||{}),prevBounds:null};return{...w,state:"maximized",prevBounds:{x:w.x,y:w.y,width:w.width,height:w.height}};}));}
 
   // ── v8.5 window snap layouts ───────────────────────────────────────────
@@ -1670,6 +1720,7 @@ export default function NovaOS(){
     setDbUid(null);
     setUser(null);setUid(null);setData(null);setCustomWp(null);setWins([]);setMaxZ(100);setMenuOpen(false);
     setDeskCount(1);setCurDesk(0);setTaskViewOpen(false);
+    Object.values(fxTimers.current).forEach(t=>clearTimeout(t)); fxTimers.current={}; setWinFx({});
     setIconPos({});setIconDrag(null);setWidgetState(DEFAULT_WIDGET_STATE);setWidgetDrag(null);setWidgetResize(null);
     setUname("");setPass("");setAuthErr("");setMode("login");setScreen("login");
   }
@@ -1934,7 +1985,7 @@ export default function NovaOS(){
           onAdd={addDesktop}
           onRemove={removeDesktop}
           onMoveWin={moveWinToDesk}
-          onFocusWin={(id)=>{ setWins(ws=>ws.map(w=>w.id===id?{...w,state:w.state==="minimized"?"normal":w.state}:w)); focusWin(id); }}
+          onFocusWin={(id)=>{ const w=(winsRef.current||[]).find(x=>x.id===id); if(w&&w.state==="minimized") restoreWin(id); else focusWin(id); }}
           onClose={()=>setTaskViewOpen(false)}
         />
       )}
@@ -2261,8 +2312,20 @@ export default function NovaOS(){
         // anchor to the transformed track and span every desktop at once.
         const winStyle=isMax?{position:"absolute",top:0,left:0,width:"100vw",bottom:TASKBAR_H+"px",zIndex:win.z,borderRadius:0}:{position:"absolute",left:win.x,top:win.y,width:win.width,height:win.height,zIndex:win.z,borderRadius:winRadius};
         const minimizedStyle=isMin?{display:"none"}:{};
+        // v10.0 — fx-driven open/close/minimize/restore animation. A settled
+        // window has no animation (so it never re-plays on re-render); the
+        // transient flag picks the keyframe. min/restore collapse toward the
+        // taskbar (transform-origin bottom).
+        const fx=winFx[win.id];
+        const winAnim = fx==="closing"    ? "win-out 0.19s cubic-bezier(0.4,0,1,1) forwards"
+                      : fx==="minimizing" ? "win-min 0.19s cubic-bezier(0.4,0,1,1) forwards"
+                      : fx==="restoring"  ? "win-restore 0.3s cubic-bezier(0.22,1,0.36,1)"
+                      : fx==="entering"   ? "win-in 0.28s cubic-bezier(0.16,1,0.3,1)"
+                      : "none";
+        const fxOrigin = (fx==="minimizing"||fx==="restoring") ? "50% 100%" : "50% 50%";
+        const fxBusy = fx==="closing"||fx==="minimizing";
         return(
-          <div key={win.id} data-win="1" data-drop={win.app==="profile"?"avatar":"none"} onClick={()=>focusWin(win.id)} style={{...winStyle,...minimizedStyle,pointerEvents:"auto",background:"var(--nv-surface-solid)",border:"1px solid rgba(255,255,255,0.09)",boxShadow:winShadow,display:isMin?"none":"flex",flexDirection:"column",animation:"win-in 0.28s cubic-bezier(0.16,1,0.3,1)",backdropFilter:"blur("+winBlur+"px) saturate(160%)",WebkitBackdropFilter:"blur("+winBlur+"px) saturate(160%)",transition:isDrg?"box-shadow 0.18s cubic-bezier(0.4,0,0.2,1)":"box-shadow 0.22s cubic-bezier(0.4,0,0.2,1), left 0.28s cubic-bezier(0.4,0,0.2,1), top 0.28s cubic-bezier(0.4,0,0.2,1), width 0.28s cubic-bezier(0.4,0,0.2,1), height 0.28s cubic-bezier(0.4,0,0.2,1)",overflow:"hidden"}}>
+          <div key={win.id} data-win="1" data-drop={win.app==="profile"?"avatar":"none"} onClick={()=>focusWin(win.id)} style={{...winStyle,...minimizedStyle,pointerEvents:fxBusy?"none":"auto",transformOrigin:fxOrigin,background:"var(--nv-surface-solid)",border:"1px solid rgba(255,255,255,0.09)",boxShadow:winShadow,display:isMin?"none":"flex",flexDirection:"column",animation:winAnim,backdropFilter:"blur("+winBlur+"px) saturate(160%)",WebkitBackdropFilter:"blur("+winBlur+"px) saturate(160%)",transition:isDrg?"box-shadow 0.18s cubic-bezier(0.4,0,0.2,1)":"box-shadow 0.22s cubic-bezier(0.4,0,0.2,1), left 0.28s cubic-bezier(0.4,0,0.2,1), top 0.28s cubic-bezier(0.4,0,0.2,1), width 0.28s cubic-bezier(0.4,0,0.2,1), height 0.28s cubic-bezier(0.4,0,0.2,1)",overflow:"hidden"}}>
             {!isMax&&<ResizeHandles winId={win.id} onStartResize={startResize} touchy={touchy}/>}
             {/* v8.3 F1: title bar is now draggable even when maximized —
                 dragging restores the window and tears it off (Windows-style),
@@ -2500,10 +2563,9 @@ export default function NovaOS(){
             const handleClick=()=>{
               if(!hasRunning){openApp(slot.appId);return;}
               if(allMin){
-                setWins(ws=>ws.map(w=>w.id===topWin.id?{...w,state:"normal"}:w));
-                focusWin(topWin.id);
+                restoreWin(topWin.id);
               }else if(isTop){
-                setWins(ws=>ws.map(w=>w.id===topWin.id?{...w,state:"minimized"}:w));
+                minimizeWin(topWin.id);
               }else{
                 focusWin(topWin.id);
               }
@@ -2512,8 +2574,8 @@ export default function NovaOS(){
             const buildMenu=()=>{
               const items=[];
               if(hasRunning){
-                items.push({icon:"▶",label:allMin?"Restore":"Focus",onClick:()=>{setWins(ws=>ws.map(w=>w.id===topWin.id?{...w,state:"normal"}:w));focusWin(topWin.id);}});
-                items.push({icon:"—",label:"Minimize",onClick:()=>setWins(ws=>ws.map(w=>w.id===topWin.id?{...w,state:"minimized"}:w)),disabled:allMin});
+                items.push({icon:"▶",label:allMin?"Restore":"Focus",onClick:()=>{ allMin?restoreWin(topWin.id):focusWin(topWin.id); }});
+                items.push({icon:"—",label:"Minimize",onClick:()=>minimizeWin(topWin.id),disabled:allMin});
                 items.push({icon:"⬜",label:topWin.state==="maximized"?"Restore size":"Maximize",onClick:()=>maximizeWin(topWin.id)});
               }else{
                 items.push({icon:"▶",label:"Open",onClick:()=>openApp(slot.appId)});
