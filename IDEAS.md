@@ -25,6 +25,22 @@ features.
   rename, inline provider picker dropdown, 6 starter-prompt chips on
   empty state, polished message bubbles with per-message copy.
 
+**Part 3 — bonus app revamps (pre-deploy round)**
+- **Calculator** — rebuilt as a real multi-mode app with a sidebar mode
+  picker: **Standard** (with session history), **Scientific** (trig, logs,
+  exponents, factorial, π/e, DEG/RAD toggle), **Programmer** (HEX/DEC/OCT/BIN
+  simultaneous display with AND/OR/XOR/NOT/<</>>), and **Converter**
+  (length, weight, temperature, time, data size, speed). Content stays
+  centered with `max-width` so fullscreen no longer stretches buttons into
+  ugly rectangles. Optional history side-panel.
+- **Browser** — chrome refresh to match the v9.5 OS look. New BrowserNav
+  with a pill URL bar (🔒/🔍 glyph flips based on URL detection), inline
+  bookmarks rail, theme-token everywhere. New home page: centered 540px
+  hero, quick-pick site tiles (Wikipedia / Hacker News / MDN / archive.org /
+  itch.io / YouTube), and a session "Recent" list. Search results got
+  bigger cards with proper section headers. "Site can't be embedded"
+  error now offers a "Search instead" escape hatch.
+
 **Part 2 — new features**
 - **User-created servers (Discord-style).** New `nova_servers` collection.
   Anyone can create a server with custom name + icon; gets a 6-char

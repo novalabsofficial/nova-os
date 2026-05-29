@@ -50,7 +50,11 @@ export const DEFAULT_SIZES = {
   store:{w:680,h:600},terminal:{w:580,h:460},
   settings:{w:480,h:640},profile:{w:440,h:540},chat:{w:480,h:580},
   // 5.1 additions
-  calculator:{w:300,h:460},clock:{w:480,h:520},
+  // v9.5: calculator bumped to 640×620 for the new multi-mode layout with
+  // a sidebar of calculator types (Standard / Scientific / Programmer /
+  // Converter). The content stays max-width-capped so fullscreen doesn't
+  // stretch buttons into ugly rectangles.
+  calculator:{w:640,h:620},clock:{w:480,h:520},
   minesweeper:{w:520,h:600},wordle:{w:430,h:600},tetris:{w:340,h:620},
   pdf:{w:680,h:680},music:{w:480,h:560},calendar:{w:780,h:620},
   atmos:{w:680,h:640},
