@@ -492,6 +492,22 @@ service cloud.firestore {
       );
     }
 
+    // ── game leaderboards (v9.8) ──────────────────────────────────────────
+    // One doc per (game, user): `<gameId>_<uid>` holding that user's best.
+    // Anyone signed-in can read the boards; you may only write your own
+    // uid-stamped doc. Low-stakes — score validation beyond "is a number"
+    // is intentionally light (anti-cheat isn't worth the complexity here).
+    match /nova_scores/{scoreId} {
+      allow read: if signedIn();
+      allow create, update: if willOwnUid('uid') &&
+        request.resource.data.gameId is string &&
+        request.resource.data.gameId.size() > 0 &&
+        request.resource.data.score is number;
+      allow delete: if
+        (signedIn() && resource.data.uid == request.auth.uid) ||
+        isMod();
+    }
+
     // ── catch-all ────────────────────────────────────────────────────────
     // Anything else is denied. New collections need an explicit rule above.
     match /{document=**} {
