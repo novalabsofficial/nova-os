@@ -1,12 +1,16 @@
-// v9.7 — Photos rebuilt into a real photo app (Windows 11 Photos / Apple
-// Photos as references). Two-pane layout: sidebar (Library / Recently
-// Added / Albums) + a grid, a full-screen viewer, and — the headline
-// addition — a canvas-based **editor** (crop, rotate, flip, adjustments,
-// filter presets, auto-enhance), saving edits as a new copy.
+// v9.7 — Photos: a real photo app (Windows 11 Photos / Apple Photos for
+// the gallery, Canva for the editor). Two-pane layout (Library / Recently
+// Added / Albums) + a grid + a full-screen viewer + a layered editor.
 //
-// Storage model unchanged: photos live as blob/data URLs for the session
-// in the shared photoStore (so screenshots + uploads + edited copies all
-// share one gallery). Albums are session-only groupings in the same store.
+// v9.7.1 — the editor is now a **Canva-style compositor**: a canvas with a
+// background (color or transparent), the photo as the first movable layer,
+// and any number of added image layers (from your PC or pasted from the
+// clipboard). Drag layers freely; smart alignment guides snap edges/centers
+// to the canvas and to other layers. Per-layer filters, adjustments,
+// opacity, rotate/flip, and z-order. Export flattens everything to a new
+// copy (PNG when the background is transparent, else JPEG).
+//
+// Storage: photos + albums live session-only in the shared photoStore.
 
 import { useState, useEffect, useRef, useMemo } from "react";
 import { FF, FFB, FFM, INP } from "../ui/styles.js";
@@ -14,7 +18,7 @@ import { fill, bdr } from "../lib/format.js";
 import { playSound } from "../lib/audio.js";
 import {
   getStorePhotos, subscribeStorePhotos, addStorePhoto, removeStorePhoto, updateStorePhoto,
-  getAlbums, subscribeAlbums, createAlbum, renameAlbum, deleteAlbum, setPhotoAlbum,
+  getAlbums, subscribeAlbums, createAlbum, deleteAlbum, setPhotoAlbum,
 } from "../lib/photoStore.js";
 import { startDrag, moveDrag } from "../lib/dragStore.js";
 
@@ -23,27 +27,25 @@ const MAX_PHOTO_SIZE = 20 * 1024 * 1024;  // 20 MB soft cap
 export function PhotosApp({ AC, showToast, onSetWallpaper }) {
   const [photos, setPhotos] = useState([]);
   const [albums, setAlbums] = useState([]);
-  const [view, setView]     = useState({ kind: "library" }); // library | recent | album(id)
+  const [view, setView]     = useState({ kind: "library" });
   const [viewerIdx, setViewerIdx] = useState(-1);
   const [slideshow, setSlideshow] = useState(false);
-  const [editing, setEditing] = useState(null);    // photo object being edited
+  const [editing, setEditing] = useState(null);
   const [newAlbum, setNewAlbum] = useState(false);
   const [newAlbumName, setNewAlbumName] = useState("");
   const inputRef = useRef(null);
   const slideshowRef = useRef(null);
 
-  // Mirror the shared stores.
   useEffect(() => { setPhotos(getStorePhotos()); return subscribeStorePhotos(setPhotos); }, []);
   useEffect(() => { setAlbums(getAlbums()); return subscribeAlbums(setAlbums); }, []);
 
-  // The photo set for the active view.
   const visible = useMemo(() => {
     if (view.kind === "recent") return [...photos].sort((a, b) => (b.addedAt || 0) - (a.addedAt || 0)).slice(0, 30);
     if (view.kind === "album")  return photos.filter(p => p.albumId === view.id);
     return photos;
   }, [photos, view]);
 
-  // ── cross-app drag (set wallpaper / avatar) ──────────────────────────
+  // cross-app drag (set wallpaper / avatar)
   const draggedRef = useRef(false);
   function beginPhotoDrag(e, photo) {
     if (e.button !== 0) return;
@@ -65,14 +67,12 @@ export function PhotosApp({ AC, showToast, onSetWallpaper }) {
     window.addEventListener("pointerup", up);
   }
 
-  // ── slideshow ─────────────────────────────────────────────────────────
   useEffect(() => {
     if (!slideshow || viewerIdx < 0 || visible.length === 0) return;
     slideshowRef.current = setInterval(() => setViewerIdx(i => (i + 1) % visible.length), 4000);
     return () => clearInterval(slideshowRef.current);
   }, [slideshow, viewerIdx, visible.length]);
 
-  // ── viewer keyboard nav ───────────────────────────────────────────────
   useEffect(() => {
     if (viewerIdx < 0 || editing) return;
     function onKey(e) {
@@ -85,7 +85,6 @@ export function PhotosApp({ AC, showToast, onSetWallpaper }) {
     return () => window.removeEventListener("keydown", onKey);
   }, [viewerIdx, visible.length, editing]); // eslint-disable-line
 
-  // ── import ──────────────────────────────────────────────────────────
   function handleFiles(e) {
     const files = Array.from(e.target.files || []);
     const imgs = files.filter(f => f.type.startsWith("image/") || /\.(jpe?g|png|webp|gif|heic|heif|avif|bmp)$/i.test(f.name));
@@ -93,7 +92,7 @@ export function PhotosApp({ AC, showToast, onSetWallpaper }) {
     const tooBig = imgs.filter(f => f.size > MAX_PHOTO_SIZE);
     if (tooBig.length) showToast?.("Skipped " + tooBig.length + " over 20 MB");
     const usable = imgs.filter(f => f.size <= MAX_PHOTO_SIZE);
-    const albumId = view.kind === "album" ? view.id : null;   // import straight into the open album
+    const albumId = view.kind === "album" ? view.id : null;
     const next = usable.map(f => ({
       id: "p-" + Date.now() + "-" + Math.random().toString(36).slice(2, 7),
       name: f.name, url: URL.createObjectURL(f), size: f.size, w: null, h: null,
@@ -119,7 +118,6 @@ export function PhotosApp({ AC, showToast, onSetWallpaper }) {
     else setViewerIdx(i => Math.min(i, visible.length - 2));
   }
 
-  // ── set as wallpaper ──────────────────────────────────────────────────
   function setAsWallpaper(photo) {
     if (!onSetWallpaper || !photo) return;
     const img = new Image();
@@ -138,10 +136,10 @@ export function PhotosApp({ AC, showToast, onSetWallpaper }) {
     img.src = photo.url;
   }
 
-  // ── editor save: a new copy in the same album ─────────────────────────
   function saveEditedCopy(dataUrl, baseName, albumId) {
     const id = "p-" + Date.now() + "-" + Math.random().toString(36).slice(2, 7);
-    const name = baseName.replace(/\.(\w+)$/, "") + " (edited).jpg";
+    const ext = dataUrl.startsWith("data:image/png") ? ".png" : ".jpg";
+    const name = baseName.replace(/\.(\w+)$/, "") + " (edited)" + ext;
     const photo = { id, name, url: dataUrl, size: Math.round(dataUrl.length * 0.75), w: null, h: null, addedAt: Date.now(), albumId: albumId || null };
     addStorePhoto(photo);
     const img = new Image(); img.onload = () => updateStorePhoto(id, { w: img.width, h: img.height }); img.src = dataUrl;
@@ -173,12 +171,11 @@ export function PhotosApp({ AC, showToast, onSetWallpaper }) {
     <div style={{ display: "flex", height: "100%", minHeight: 0, fontFamily: FF }}>
       <input ref={inputRef} type="file" accept="image/*" multiple onChange={handleFiles} style={{ display: "none" }}/>
 
-      {/* ───── SIDEBAR ───── */}
+      {/* SIDEBAR */}
       <div style={{ width: 196, flexShrink: 0, borderRight: "1px solid var(--nv-border)", padding: "16px 10px", overflowY: "auto", display: "flex", flexDirection: "column", gap: 2, background: "rgba(255,255,255,0.02)" }}>
         <div style={{ padding: "2px 10px 12px", fontFamily: FFB, fontWeight: 700, fontSize: 12, letterSpacing: 1.2, color: "var(--nv-text-dim)", textTransform: "uppercase" }}>Photos</div>
         <RailButton ac={AC} active={view.kind === "library"} onClick={() => setView({ kind: "library" })} icon={<LibGlyph />} label="Library" badge={photos.length || null} />
         <RailButton ac={AC} active={view.kind === "recent"}  onClick={() => setView({ kind: "recent" })}  icon={<RecentGlyph />} label="Recently Added" />
-
         <div style={{ padding: "16px 10px 6px", display: "flex", alignItems: "center", gap: 6 }}>
           <span style={{ fontFamily: FFB, fontWeight: 700, fontSize: 10, letterSpacing: 1.1, color: "var(--nv-text-dim)", textTransform: "uppercase" }}>Albums</span>
           <button onClick={() => setNewAlbum(v => !v)} title="New album" style={{ marginLeft: "auto", width: 20, height: 20, borderRadius: 6, background: newAlbum ? fill(AC) : "rgba(255,255,255,0.06)", border: "1px solid " + (newAlbum ? bdr(AC) : "rgba(255,255,255,0.1)"), cursor: "pointer", color: newAlbum ? AC : "var(--nv-text)", fontSize: 13, fontWeight: 700, lineHeight: 1, padding: 0 }}>+</button>
@@ -199,7 +196,7 @@ export function PhotosApp({ AC, showToast, onSetWallpaper }) {
         ))}
       </div>
 
-      {/* ───── MAIN ───── */}
+      {/* MAIN */}
       <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", minHeight: 0 }}>
         <div style={{ padding: "16px 22px 12px", borderBottom: "1px solid var(--nv-border)", flexShrink: 0, display: "flex", alignItems: "center", gap: 10 }}>
           <div style={{ flex: 1, minWidth: 0 }}>
@@ -216,12 +213,8 @@ export function PhotosApp({ AC, showToast, onSetWallpaper }) {
           {visible.length === 0 ? (
             <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "60px 24px", textAlign: "center", color: "var(--nv-text-dim)", height: "100%" }}>
               <div style={{ fontSize: 56, opacity: 0.5, marginBottom: 14, filter: "drop-shadow(0 0 24px " + fill(AC) + ")" }}>🖼️</div>
-              <div style={{ fontFamily: FFB, fontWeight: 700, fontSize: 16, color: "var(--nv-text-strong)", marginBottom: 6 }}>
-                {view.kind === "album" ? "This album is empty" : "Your gallery is empty"}
-              </div>
-              <div style={{ fontSize: 12.5, color: "var(--nv-text-dim)", maxWidth: 320, lineHeight: 1.6, marginBottom: 16 }}>
-                {view.kind === "album" ? "Add photos while this album is open, or move existing photos into it from the viewer." : "Add images from your device — JPG, PNG, WebP, HEIC and more. They stay on your device."}
-              </div>
+              <div style={{ fontFamily: FFB, fontWeight: 700, fontSize: 16, color: "var(--nv-text-strong)", marginBottom: 6 }}>{view.kind === "album" ? "This album is empty" : "Your gallery is empty"}</div>
+              <div style={{ fontSize: 12.5, color: "var(--nv-text-dim)", maxWidth: 320, lineHeight: 1.6, marginBottom: 16 }}>{view.kind === "album" ? "Add photos while this album is open, or move existing photos into it from the viewer." : "Add images from your device — JPG, PNG, WebP, HEIC and more. They stay on your device."}</div>
               <button onClick={() => inputRef.current?.click()} style={{ padding: "10px 20px", background: fill(AC), border: "1px solid " + bdr(AC), borderRadius: 9, cursor: "pointer", fontFamily: FFB, fontWeight: 700, fontSize: 13, color: AC }}>+ Add photos</button>
             </div>
           ) : (
@@ -247,7 +240,7 @@ export function PhotosApp({ AC, showToast, onSetWallpaper }) {
         </div>
       </div>
 
-      {/* ───── viewer overlay ───── */}
+      {/* VIEWER */}
       {current && !editing && (
         <div onClick={closeViewer} style={{ position: "fixed", inset: 0, zIndex: 99998, background: "rgba(0,0,0,0.92)", backdropFilter: "blur(40px)", display: "flex", alignItems: "center", justifyContent: "center", animation: "menu-up 0.2s cubic-bezier(0.16,1,0.3,1)" }}>
           <div onClick={e => e.stopPropagation()} style={{ position: "relative", maxWidth: "92vw", maxHeight: "82vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -258,7 +251,6 @@ export function PhotosApp({ AC, showToast, onSetWallpaper }) {
             <div style={{ width: 1, height: 16, background: "rgba(255,255,255,0.15)" }}/>
             <button onClick={() => setEditing(current)} style={viewerBtn(AC, true)}>✎ Edit</button>
             <button onClick={() => setSlideshow(s => !s)} style={viewerBtn(AC, slideshow)}>{slideshow ? "⏸ Slideshow" : "▶ Slideshow"}</button>
-            {/* Album assignment */}
             {albums.length > 0 && (
               <select value={current.albumId || ""} onChange={e => setPhotoAlbum(current.id, e.target.value || null)} title="Add to album" style={{ ...INP, padding: "4px 8px", fontSize: 11, width: "auto", cursor: "pointer" }}>
                 <option value="">No album</option>
@@ -278,21 +270,15 @@ export function PhotosApp({ AC, showToast, onSetWallpaper }) {
         </div>
       )}
 
-      {/* ───── editor overlay ───── */}
+      {/* EDITOR (Canva-style compositor) */}
       {editing && (
-        <PhotoEditor
-          photo={editing}
-          AC={AC}
-          onClose={() => setEditing(null)}
-          onSave={(dataUrl) => saveEditedCopy(dataUrl, editing.name, editing.albumId)}
-        />
+        <PhotoEditor photo={editing} AC={AC} showToast={showToast} onClose={() => setEditing(null)} onSave={(dataUrl) => saveEditedCopy(dataUrl, editing.name, editing.albumId)} />
       )}
     </div>
   );
 }
 
-// ───────────────────────── Photo editor ─────────────────────────────────
-
+// ───────────────────────── filters ──────────────────────────────────────
 const FILTER_PRESETS = [
   { id: "none",  label: "Original", f: {} },
   { id: "vivid", label: "Vivid",    f: { saturate: 150, contrast: 110 } },
@@ -303,22 +289,12 @@ const FILTER_PRESETS = [
   { id: "cool",  label: "Cool",     f: { saturate: 110, hue: 200 } },
   { id: "warm",  label: "Warm",     f: { sepia: 30, saturate: 115, brightness: 103 } },
 ];
-const ASPECTS = [
-  { id: "free", label: "Free",  ratio: null },
-  { id: "1:1",  label: "1:1",   ratio: 1 },
-  { id: "4:3",  label: "4:3",   ratio: 4 / 3 },
-  { id: "3:2",  label: "3:2",   ratio: 3 / 2 },
-  { id: "16:9", label: "16:9",  ratio: 16 / 9 },
-];
-
-// Compose a CSS/canvas filter string from adjustment sliders + a preset.
 function buildFilter(adj, preset) {
   const pf = preset?.f || {};
-  const brightness = (adj.brightness ?? 0) + (pf.brightness ?? 100);
-  const contrast   = (adj.contrast ?? 0) + (pf.contrast ?? 100);
-  const saturate   = (adj.saturate ?? 0) + (pf.saturate ?? 100);
-  // "Warmth" is faked with a sepia overlay + slight saturation.
-  const warmth     = adj.warmth ?? 0;
+  const brightness = (adj?.brightness ?? 0) + (pf.brightness ?? 100);
+  const contrast   = (adj?.contrast ?? 0) + (pf.contrast ?? 100);
+  const saturate   = (adj?.saturate ?? 0) + (pf.saturate ?? 100);
+  const warmth     = adj?.warmth ?? 0;
   const parts = [
     `brightness(${Math.max(0, brightness)}%)`,
     `contrast(${Math.max(0, contrast)}%)`,
@@ -331,85 +307,146 @@ function buildFilter(adj, preset) {
   return parts.join(" ");
 }
 
-function PhotoEditor({ photo, AC, onClose, onSave }) {
-  const [img, setImg] = useState(null);        // loaded HTMLImageElement
-  const [tab, setTab] = useState("adjust");     // adjust | filters | crop
-  const [adj, setAdj] = useState({ brightness: 0, contrast: 0, saturate: 0, warmth: 0 });
-  const [preset, setPreset] = useState(FILTER_PRESETS[0]);
-  const [rotation, setRotation] = useState(0);  // 0/90/180/270
-  const [flipH, setFlipH] = useState(false);
-  const [flipV, setFlipV] = useState(false);
-  const [aspect, setAspect] = useState(ASPECTS[0]);
-  // Crop rect in fractions (0..1) of the oriented image. null = full frame.
-  const [crop, setCrop] = useState(null);
-  const previewWrapRef = useRef(null);
-  const canvasRef = useRef(null);
-  const [busy, setBusy] = useState(false);
+// ───────────────────────── editor ───────────────────────────────────────
+const BG_SWATCHES = ["#000000", "#ffffff", "#0e1320", "#1a1a1a", "#5b9eff", "#34d399", "#fbbf24", "#f472b6", "#f87171", "#a78bfa"];
+const CHECKER = "repeating-conic-gradient(#3a3a44 0% 25%, #2a2a32 0% 50%) 50% / 22px 22px";
+const SNAP = 0.012;   // alignment threshold (fraction of canvas)
 
-  // Load the source image once.
+let _layerSeq = 0;
+const nextLayerId = () => "ly-" + (++_layerSeq) + "-" + Math.random().toString(36).slice(2, 5);
+
+function loadImage(src) {
+  return new Promise((res, rej) => { const i = new Image(); i.crossOrigin = "anonymous"; i.onload = () => res(i); i.onerror = rej; i.src = src; });
+}
+
+function PhotoEditor({ photo, AC, showToast, onClose, onSave }) {
+  const [base, setBase] = useState(null);     // { src, w, h }
+  const [layers, setLayers] = useState([]);   // [{id, src, ar, x,y,w,h, rotation, flipH, flipV, opacity, adj, preset}]
+  const [bg, setBg] = useState({ transparent: false, color: "#0e1320" });
+  const [selId, setSelId] = useState(null);
+  const [guides, setGuides] = useState([]);   // [{axis:'x'|'y', pos}]
+  const [busy, setBusy] = useState(false);
+  const canvasRef = useRef(null);
+  const fileRef = useRef(null);
+  const layersRef = useRef(layers); layersRef.current = layers;
+
+  const canvasAR = base ? base.w / base.h : 1;   // w/h
+  const sel = layers.find(l => l.id === selId) || null;
+
+  // Load the base photo as layer 0 (fills the canvas).
   useEffect(() => {
-    const i = new Image();
-    i.crossOrigin = "anonymous";
-    i.onload = () => setImg(i);
-    i.src = photo.url;
+    let alive = true;
+    loadImage(photo.url).then(img => {
+      if (!alive) return;
+      setBase({ src: photo.url, w: img.width, h: img.height });
+      const baseLayer = { id: "base", src: photo.url, ar: img.width / img.height, x: 0, y: 0, w: 1, h: 1, rotation: 0, flipH: false, flipV: false, opacity: 100, adj: { brightness: 0, contrast: 0, saturate: 0, warmth: 0 }, preset: FILTER_PRESETS[0] };
+      setLayers([baseLayer]);
+      setSelId("base");
+    }).catch(() => showToast?.("Couldn't open this photo"));
+    return () => { alive = false; };
   }, [photo.url]);
 
-  // Oriented dimensions (after rotation swaps w/h on 90/270).
-  const oriented = useMemo(() => {
-    if (!img) return { w: 0, h: 0 };
-    return (rotation % 180 === 0) ? { w: img.width, h: img.height } : { w: img.height, h: img.width };
-  }, [img, rotation]);
+  // Add an image layer from any src (data URL or blob URL).
+  function addLayer(src) {
+    loadImage(src).then(img => {
+      const ar = img.width / img.height;
+      const w = 0.42;
+      const h = w * canvasAR / ar;            // preserve the image's aspect ratio
+      const id = nextLayerId();
+      const layer = { id, src, ar, x: (1 - w) / 2, y: (1 - h) / 2, w, h, rotation: 0, flipH: false, flipV: false, opacity: 100, adj: { brightness: 0, contrast: 0, saturate: 0, warmth: 0 }, preset: FILTER_PRESETS[0] };
+      setLayers(ls => [...ls, layer]);
+      setSelId(id);
+    }).catch(() => showToast?.("Couldn't load that image"));
+  }
+  function fromFile(e) {
+    const f = e.target.files?.[0]; if (!f) return;
+    const r = new FileReader(); r.onload = () => addLayer(r.result); r.readAsDataURL(f);
+    e.target.value = "";
+  }
 
-  // Render the preview canvas whenever inputs change.
+  // Paste from clipboard → new layer.
   useEffect(() => {
-    const cv = canvasRef.current; if (!cv || !img) return;
-    const ctx = cv.getContext("2d");
-    cv.width = oriented.w; cv.height = oriented.h;
-    ctx.save();
-    ctx.filter = buildFilter(adj, preset);
-    ctx.translate(cv.width / 2, cv.height / 2);
-    ctx.rotate((rotation * Math.PI) / 180);
-    ctx.scale(flipH ? -1 : 1, flipV ? -1 : 1);
-    ctx.drawImage(img, -img.width / 2, -img.height / 2);
-    ctx.restore();
-  }, [img, adj, preset, rotation, flipH, flipV, oriented.w, oriented.h]);
-
-  // When the aspect changes, seed a centered crop rect at that ratio.
-  useEffect(() => {
-    if (!aspect.ratio) { setCrop(null); return; }
-    const fw = oriented.w, fh = oriented.h;
-    if (!fw || !fh) return;
-    let cw = fw, ch = fw / aspect.ratio;
-    if (ch > fh) { ch = fh; cw = fh * aspect.ratio; }
-    setCrop({ x: (fw - cw) / 2 / fw, y: (fh - ch) / 2 / fh, w: cw / fw, h: ch / fh });
-  }, [aspect, oriented.w, oriented.h]);
-
-  // ── crop drag (move + corner resize) in display space ────────────────
-  function startCropDrag(e, mode) {
-    if (!crop || !previewWrapRef.current) return;
-    e.preventDefault(); e.stopPropagation();
-    const rect = previewWrapRef.current.getBoundingClientRect();
-    const start = { x: e.clientX, y: e.clientY, crop: { ...crop } };
-    function mv(ev) {
-      const dx = (ev.clientX - start.x) / rect.width;
-      const dy = (ev.clientY - start.y) / rect.height;
-      let { x, y, w, h } = start.crop;
-      if (mode === "move") {
-        x = Math.min(Math.max(0, x + dx), 1 - w);
-        y = Math.min(Math.max(0, y + dy), 1 - h);
-      } else {
-        // corner resize: mode is "nw"/"ne"/"sw"/"se"
-        if (mode.includes("e")) w = Math.min(Math.max(0.08, start.crop.w + dx), 1 - x);
-        if (mode.includes("s")) h = Math.min(Math.max(0.08, start.crop.h + dy), 1 - y);
-        if (mode.includes("w")) { const nx = Math.min(Math.max(0, start.crop.x + dx), start.crop.x + start.crop.w - 0.08); w = start.crop.x + start.crop.w - nx; x = nx; }
-        if (mode.includes("n")) { const ny = Math.min(Math.max(0, start.crop.y + dy), start.crop.y + start.crop.h - 0.08); h = start.crop.y + start.crop.h - ny; y = ny; }
-        // keep aspect if locked
-        if (aspect.ratio) {
-          const targetH = (w * oriented.w) / aspect.ratio / oriented.h;
-          h = Math.min(targetH, 1 - y);
+    function onPaste(e) {
+      const items = e.clipboardData?.items; if (!items) return;
+      for (const it of items) {
+        if (it.type && it.type.startsWith("image/")) {
+          const f = it.getAsFile(); if (!f) continue;
+          const r = new FileReader(); r.onload = () => addLayer(r.result); r.readAsDataURL(f);
+          e.preventDefault();
+          showToast?.("Pasted image added as a layer");
+          break;
         }
       }
-      setCrop({ x, y, w, h });
+    }
+    window.addEventListener("paste", onPaste);
+    return () => window.removeEventListener("paste", onPaste);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [canvasAR]);
+
+  function patch(id, p) { setLayers(ls => ls.map(l => l.id === id ? { ...l, ...p } : l)); }
+  function delLayer(id) { setLayers(ls => ls.filter(l => l.id !== id)); if (selId === id) setSelId(null); }
+  function dupLayer(id) {
+    const l = layers.find(x => x.id === id); if (!l) return;
+    const copy = { ...l, id: nextLayerId(), x: Math.min(l.x + 0.04, 1 - l.w), y: Math.min(l.y + 0.04, 1 - l.h) };
+    setLayers(ls => { const i = ls.findIndex(x => x.id === id); return [...ls.slice(0, i + 1), copy, ...ls.slice(i + 1)]; });
+    setSelId(copy.id);
+  }
+  function reorder(id, dir) {
+    setLayers(ls => {
+      const i = ls.findIndex(l => l.id === id); const j = i + dir;
+      if (i < 0 || j < 0 || j >= ls.length) return ls;
+      const ns = [...ls]; [ns[i], ns[j]] = [ns[j], ns[i]]; return ns;
+    });
+  }
+
+  // ── move with smart alignment guides ─────────────────────────────────
+  function startMove(e, layer) {
+    e.preventDefault(); e.stopPropagation();
+    setSelId(layer.id);
+    const rect = canvasRef.current.getBoundingClientRect();
+    const start = { x: e.clientX, y: e.clientY, lx: layer.x, ly: layer.y };
+    function mv(ev) {
+      let nx = start.lx + (ev.clientX - start.x) / rect.width;
+      let ny = start.ly + (ev.clientY - start.y) / rect.height;
+      nx = Math.min(Math.max(-layer.w * 0.5, nx), 1 - layer.w * 0.5);
+      ny = Math.min(Math.max(-layer.h * 0.5, ny), 1 - layer.h * 0.5);
+      // candidate snap targets from the canvas + other layers
+      const others = layersRef.current.filter(l => l.id !== layer.id);
+      const xs = [0, 0.5, 1]; const ys = [0, 0.5, 1];
+      others.forEach(o => { xs.push(o.x, o.x + o.w / 2, o.x + o.w); ys.push(o.y, o.y + o.h / 2, o.y + o.h); });
+      const g = [];
+      const sx = snapAxis(nx, layer.w, xs); if (sx) { nx = sx.v; g.push({ axis: "x", pos: sx.guide }); }
+      const sy = snapAxis(ny, layer.h, ys); if (sy) { ny = sy.v; g.push({ axis: "y", pos: sy.guide }); }
+      setGuides(g);
+      patch(layer.id, { x: nx, y: ny });
+    }
+    function up() { window.removeEventListener("pointermove", mv); window.removeEventListener("pointerup", up); setGuides([]); }
+    window.addEventListener("pointermove", mv);
+    window.addEventListener("pointerup", up);
+  }
+  // Snap one axis: tries the layer's near edge / center / far edge against
+  // the targets; returns the snapped origin value + the guide position.
+  function snapAxis(origin, size, targets) {
+    const anchors = [{ off: 0, a: origin }, { off: size / 2, a: origin + size / 2 }, { off: size, a: origin + size }];
+    let best = null;
+    for (const an of anchors) {
+      for (const t of targets) {
+        const d = Math.abs(an.a - t);
+        if (d < SNAP && (!best || d < best.d)) best = { d, v: t - an.off, guide: t };
+      }
+    }
+    return best;
+  }
+
+  function startResize(e, layer) {
+    e.preventDefault(); e.stopPropagation();
+    const rect = canvasRef.current.getBoundingClientRect();
+    const start = { x: e.clientX, lw: layer.w };
+    function mv(ev) {
+      let nw = start.lw + (ev.clientX - start.x) / rect.width;
+      nw = Math.min(Math.max(0.04, nw), 1.5);
+      const nh = nw * canvasAR / layer.ar;     // preserve AR
+      patch(layer.id, { w: nw, h: nh });
     }
     function up() { window.removeEventListener("pointermove", mv); window.removeEventListener("pointerup", up); }
     window.addEventListener("pointermove", mv);
@@ -417,157 +454,180 @@ function PhotoEditor({ photo, AC, onClose, onSave }) {
   }
 
   function reset() {
-    setAdj({ brightness: 0, contrast: 0, saturate: 0, warmth: 0 });
-    setPreset(FILTER_PRESETS[0]); setRotation(0); setFlipH(false); setFlipV(false);
-    setAspect(ASPECTS[0]); setCrop(null);
-  }
-  function autoEnhance() {
-    setAdj({ brightness: 6, contrast: 12, saturate: 14, warmth: 4 });
-    setPreset(FILTER_PRESETS[0]);
+    if (!base) return;
+    setBg({ transparent: false, color: "#0e1320" });
+    setLayers([{ id: "base", src: base.src, ar: base.w / base.h, x: 0, y: 0, w: 1, h: 1, rotation: 0, flipH: false, flipV: false, opacity: 100, adj: { brightness: 0, contrast: 0, saturate: 0, warmth: 0 }, preset: FILTER_PRESETS[0] }]);
+    setSelId("base");
   }
 
-  function doSave() {
-    const src = canvasRef.current; if (!src) return;
+  async function doSave() {
+    if (!base) return;
     setBusy(true);
     try {
-      const cw = src.width, ch = src.height;
-      const cr = crop || { x: 0, y: 0, w: 1, h: 1 };
-      const sx = Math.round(cr.x * cw), sy = Math.round(cr.y * ch);
-      const sw = Math.round(cr.w * cw), sh = Math.round(cr.h * ch);
+      // Export resolution = base photo, capped at 2000px long edge.
+      let W = base.w, H = base.h;
+      const longEdge = Math.max(W, H);
+      if (longEdge > 2000) { const r = 2000 / longEdge; W = Math.round(W * r); H = Math.round(H * r); }
       const out = document.createElement("canvas");
-      out.width = Math.max(1, sw); out.height = Math.max(1, sh);
-      out.getContext("2d").drawImage(src, sx, sy, sw, sh, 0, 0, sw, sh);
-      // Cap exported dimension at 2000px on the long edge to keep doc sizes sane.
-      const MAX = 2000;
-      let final = out;
-      const longEdge = Math.max(out.width, out.height);
-      if (longEdge > MAX) {
-        const r = MAX / longEdge;
-        const scaled = document.createElement("canvas");
-        scaled.width = Math.round(out.width * r); scaled.height = Math.round(out.height * r);
-        scaled.getContext("2d").drawImage(out, 0, 0, scaled.width, scaled.height);
-        final = scaled;
+      out.width = W; out.height = H;
+      const ctx = out.getContext("2d");
+      if (!bg.transparent) { ctx.fillStyle = bg.color; ctx.fillRect(0, 0, W, H); }
+      for (const l of layersRef.current) {
+        const img = await loadImage(l.src).catch(() => null);
+        if (!img) continue;
+        ctx.save();
+        ctx.globalAlpha = (l.opacity ?? 100) / 100;
+        ctx.filter = buildFilter(l.adj, l.preset);
+        const dw = l.w * W, dh = l.h * H, cx = l.x * W + dw / 2, cy = l.y * H + dh / 2;
+        ctx.translate(cx, cy);
+        ctx.rotate((l.rotation * Math.PI) / 180);
+        ctx.scale(l.flipH ? -1 : 1, l.flipV ? -1 : 1);
+        ctx.drawImage(img, -dw / 2, -dh / 2, dw, dh);
+        ctx.restore();
       }
-      onSave(final.toDataURL("image/jpeg", 0.9));
+      onSave(out.toDataURL(bg.transparent ? "image/png" : "image/jpeg", 0.92));
     } catch {
+      showToast?.("Couldn't export — see console");
       setBusy(false);
     }
   }
 
-  const SLIDERS = [
-    { key: "brightness", label: "Brightness" },
-    { key: "contrast",   label: "Contrast" },
-    { key: "saturate",   label: "Saturation" },
-    { key: "warmth",     label: "Warmth" },
-  ];
-
   return (
     <div style={{ position: "fixed", inset: 0, zIndex: 99999, background: "rgba(0,0,0,0.94)", backdropFilter: "blur(30px)", display: "flex", flexDirection: "column", fontFamily: FF, animation: "ss-fade 0.18s" }}>
+      <input ref={fileRef} type="file" accept="image/*" onChange={fromFile} style={{ display: "none" }}/>
       {/* Top bar */}
       <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 18px", borderBottom: "1px solid rgba(255,255,255,0.1)", flexShrink: 0 }}>
-        <div style={{ fontFamily: FFB, fontWeight: 700, fontSize: 14, color: "#fff" }}>✎ Edit Photo</div>
-        <div style={{ fontFamily: FFM, fontSize: 11, color: "rgba(255,255,255,0.45)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1, minWidth: 0 }}>{photo.name}</div>
+        <div style={{ fontFamily: FFB, fontWeight: 700, fontSize: 14, color: "#fff" }}>🎨 Edit Photo</div>
+        <div style={{ fontFamily: FFM, fontSize: 11, color: "rgba(255,255,255,0.45)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1, minWidth: 0 }}>{photo.name} · paste images with Ctrl/⌘+V</div>
         <button onClick={reset} style={editTopBtn(false)}>↺ Reset</button>
-        <button onClick={autoEnhance} style={editTopBtn(false)}>✨ Auto</button>
         <button onClick={onClose} style={editTopBtn(false)}>Cancel</button>
-        <button onClick={doSave} disabled={busy || !img} style={{ ...editTopBtn(true, AC), opacity: busy || !img ? 0.5 : 1 }}>{busy ? "Saving…" : "Save copy"}</button>
+        <button onClick={doSave} disabled={busy || !base} style={{ ...editTopBtn(true, AC), opacity: busy || !base ? 0.5 : 1 }}>{busy ? "Saving…" : "Save copy"}</button>
       </div>
 
       <div style={{ flex: 1, display: "flex", minHeight: 0 }}>
-        {/* Preview */}
-        <div style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "center", justifyContent: "center", padding: 24, position: "relative" }}>
-          <div ref={previewWrapRef} style={{ position: "relative", maxWidth: "100%", maxHeight: "100%", display: "inline-block", lineHeight: 0 }}>
-            <canvas ref={canvasRef} style={{ maxWidth: "min(60vw, 800px)", maxHeight: "72vh", objectFit: "contain", borderRadius: 6, boxShadow: "0 20px 60px rgba(0,0,0,0.6)", display: "block" }}/>
-            {/* Crop overlay */}
-            {tab === "crop" && crop && (
-              <>
-                <div style={{ position: "absolute", inset: 0, boxShadow: "0 0 0 9999px rgba(0,0,0,0.5)", clipPath: `polygon(0 0, 100% 0, 100% 100%, 0 100%, 0 ${crop.y * 100}%, ${crop.x * 100}% ${crop.y * 100}%, ${crop.x * 100}% ${(crop.y + crop.h) * 100}%, ${(crop.x + crop.w) * 100}% ${(crop.y + crop.h) * 100}%, ${(crop.x + crop.w) * 100}% ${crop.y * 100}%, 0 ${crop.y * 100}%)`, pointerEvents: "none" }}/>
-                <div
-                  onPointerDown={e => startCropDrag(e, "move")}
-                  style={{ position: "absolute", left: crop.x * 100 + "%", top: crop.y * 100 + "%", width: crop.w * 100 + "%", height: crop.h * 100 + "%", border: "1.5px solid #fff", boxShadow: "0 0 0 1px rgba(0,0,0,0.4)", cursor: "move" }}>
-                  {["nw", "ne", "sw", "se"].map(c => (
-                    <div key={c} onPointerDown={e => startCropDrag(e, c)} style={{
-                      position: "absolute", width: 14, height: 14, background: "#fff", borderRadius: 3, border: "1px solid rgba(0,0,0,0.4)",
-                      cursor: c + "-resize",
-                      left: c.includes("w") ? -7 : undefined, right: c.includes("e") ? -7 : undefined,
-                      top: c.includes("n") ? -7 : undefined, bottom: c.includes("s") ? -7 : undefined,
-                    }}/>
-                  ))}
-                </div>
-              </>
-            )}
-          </div>
+        {/* Canvas */}
+        <div style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }} onPointerDown={() => setSelId(null)}>
+          {base && (
+            <div ref={canvasRef} onPointerDown={e => e.stopPropagation()} style={{ position: "relative", width: "min(58vw, 760px)", maxHeight: "74vh", aspectRatio: canvasAR, background: bg.transparent ? CHECKER : bg.color, borderRadius: 6, boxShadow: "0 20px 60px rgba(0,0,0,0.6)", overflow: "hidden" }}>
+              {layers.map(l => {
+                const isSel = l.id === selId;
+                return (
+                  <div key={l.id} onPointerDown={e => startMove(e, l)} style={{ position: "absolute", left: l.x * 100 + "%", top: l.y * 100 + "%", width: l.w * 100 + "%", height: l.h * 100 + "%", cursor: "move", outline: isSel ? "2px solid " + AC : "none", outlineOffset: 0 }}>
+                    <img src={l.src} alt="" draggable={false} style={{ width: "100%", height: "100%", objectFit: l.id === "base" ? "cover" : "contain", opacity: (l.opacity ?? 100) / 100, filter: buildFilter(l.adj, l.preset), transform: `rotate(${l.rotation}deg) scale(${l.flipH ? -1 : 1}, ${l.flipV ? -1 : 1})`, pointerEvents: "none", display: "block" }}/>
+                    {isSel && l.id !== "base" && <div onPointerDown={e => startResize(e, l)} style={{ position: "absolute", right: -7, bottom: -7, width: 14, height: 14, background: AC, border: "2px solid #fff", borderRadius: 3, cursor: "se-resize" }}/>}
+                    {isSel && l.id === "base" && <div onPointerDown={e => startResize(e, l)} style={{ position: "absolute", right: -7, bottom: -7, width: 14, height: 14, background: AC, border: "2px solid #fff", borderRadius: 3, cursor: "se-resize" }}/>}
+                  </div>
+                );
+              })}
+              {/* alignment guides */}
+              {guides.map((g, i) => g.axis === "x"
+                ? <div key={i} style={{ position: "absolute", left: g.pos * 100 + "%", top: 0, bottom: 0, width: 1, background: "#ff3b9a", boxShadow: "0 0 4px #ff3b9a", pointerEvents: "none" }}/>
+                : <div key={i} style={{ position: "absolute", top: g.pos * 100 + "%", left: 0, right: 0, height: 1, background: "#ff3b9a", boxShadow: "0 0 4px #ff3b9a", pointerEvents: "none" }}/>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Controls */}
-        <div style={{ width: 280, flexShrink: 0, borderLeft: "1px solid rgba(255,255,255,0.1)", display: "flex", flexDirection: "column", minHeight: 0, background: "rgba(255,255,255,0.02)" }}>
-          {/* Tabs */}
-          <div style={{ display: "flex", gap: 2, padding: 10, borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
-            {[{ id: "adjust", label: "Adjust" }, { id: "filters", label: "Filters" }, { id: "crop", label: "Crop" }].map(t => (
-              <button key={t.id} onClick={() => setTab(t.id)} style={{ flex: 1, padding: "7px 0", borderRadius: 7, cursor: "pointer", background: tab === t.id ? fill(AC) : "transparent", border: "1px solid " + (tab === t.id ? bdr(AC) : "transparent"), color: tab === t.id ? AC : "var(--nv-text)", fontFamily: FFB, fontWeight: 600, fontSize: 12 }}>{t.label}</button>
-            ))}
+        <div style={{ width: 284, flexShrink: 0, borderLeft: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.02)", overflowY: "auto", minHeight: 0, padding: "14px 16px", display: "flex", flexDirection: "column", gap: 18 }}>
+          {/* Background */}
+          <div>
+            <SecHdr>Background</SecHdr>
+            <label style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10, cursor: "pointer", fontSize: 12, color: "var(--nv-text)" }}>
+              <input type="checkbox" checked={bg.transparent} onChange={e => setBg(b => ({ ...b, transparent: e.target.checked }))} style={{ accentColor: AC }}/>
+              Transparent (exports PNG)
+            </label>
+            {!bg.transparent && (
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
+                {BG_SWATCHES.map(c => (
+                  <button key={c} onClick={() => setBg(b => ({ ...b, color: c }))} title={c} style={{ width: 22, height: 22, borderRadius: 5, background: c, cursor: "pointer", border: "2px solid " + (bg.color === c ? "#fff" : "transparent"), boxShadow: "0 0 0 1px rgba(255,255,255,0.15)", padding: 0 }}/>
+                ))}
+                <label style={{ width: 22, height: 22, borderRadius: 5, cursor: "pointer", overflow: "hidden", border: "1px solid var(--nv-border)", display: "flex" }}>
+                  <input type="color" value={bg.color} onChange={e => setBg(b => ({ ...b, color: e.target.value }))} style={{ width: 28, height: 28, border: "none", padding: 0, cursor: "pointer", transform: "translate(-3px,-3px)" }}/>
+                </label>
+              </div>
+            )}
           </div>
 
-          <div style={{ flex: 1, overflowY: "auto", padding: "16px 16px", minHeight: 0 }}>
-            {tab === "adjust" && (
-              <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-                {SLIDERS.map(s => (
-                  <div key={s.key}>
-                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
-                      <span style={{ fontFamily: FFB, fontWeight: 600, fontSize: 11.5, color: "var(--nv-text)" }}>{s.label}</span>
-                      <span style={{ fontFamily: FFM, fontSize: 10.5, color: "var(--nv-text-dim)" }}>{adj[s.key] > 0 ? "+" : ""}{adj[s.key]}</span>
-                    </div>
-                    <input type="range" min={-50} max={50} value={adj[s.key]} onChange={e => setAdj(a => ({ ...a, [s.key]: +e.target.value }))} style={{ width: "100%", accentColor: AC }}/>
-                  </div>
-                ))}
-                <div style={{ display: "flex", gap: 6, marginTop: 4 }}>
-                  <button onClick={() => setRotation(r => (r + 270) % 360)} style={editCtlBtn()}>↶ Rotate</button>
-                  <button onClick={() => setRotation(r => (r + 90) % 360)} style={editCtlBtn()}>↷ Rotate</button>
-                </div>
-                <div style={{ display: "flex", gap: 6 }}>
-                  <button onClick={() => setFlipH(v => !v)} style={editCtlBtn(flipH, AC)}>⇋ Flip H</button>
-                  <button onClick={() => setFlipV(v => !v)} style={editCtlBtn(flipV, AC)}>⇅ Flip V</button>
+          {/* Add */}
+          <div>
+            <SecHdr>Add image</SecHdr>
+            <button onClick={() => fileRef.current?.click()} style={{ ...editCtlBtn(), width: "100%", marginBottom: 6 }}>⤓ From your PC</button>
+            <div style={{ fontSize: 10.5, color: "var(--nv-text-dim)", lineHeight: 1.5 }}>…or copy any image and press <strong style={{ color: "var(--nv-text)" }}>Ctrl/⌘ + V</strong> to drop it on the canvas. Drag layers to move; pink lines show when they align.</div>
+          </div>
+
+          {/* Layers list */}
+          <div>
+            <SecHdr>Layers</SecHdr>
+            <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+              {[...layers].reverse().map(l => (
+                <button key={l.id} onClick={() => setSelId(l.id)} style={{ display: "flex", alignItems: "center", gap: 8, padding: "5px 8px", borderRadius: 7, cursor: "pointer", background: selId === l.id ? fill(AC) : "var(--nv-elevated)", border: "1px solid " + (selId === l.id ? bdr(AC) : "var(--nv-border)"), textAlign: "left" }}>
+                  <img src={l.src} alt="" style={{ width: 26, height: 26, borderRadius: 4, objectFit: "cover", flexShrink: 0 }}/>
+                  <span style={{ flex: 1, fontFamily: FF, fontSize: 11.5, color: selId === l.id ? AC : "var(--nv-text)" }}>{l.id === "base" ? "Base photo" : "Image layer"}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Selected-layer controls */}
+          {sel && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 14, borderTop: "1px solid var(--nv-border)", paddingTop: 14 }}>
+              <div style={{ display: "flex", alignItems: "center" }}>
+                <SecHdr>{sel.id === "base" ? "Base photo" : "Selected layer"}</SecHdr>
+                <div style={{ marginLeft: "auto", display: "flex", gap: 4 }}>
+                  <button onClick={() => reorder(sel.id, 1)} title="Bring forward" style={miniCtl()}>▲</button>
+                  <button onClick={() => reorder(sel.id, -1)} title="Send back" style={miniCtl()}>▼</button>
+                  {sel.id !== "base" && <button onClick={() => dupLayer(sel.id)} title="Duplicate" style={miniCtl()}>⧉</button>}
+                  {sel.id !== "base" && <button onClick={() => delLayer(sel.id)} className="dl" title="Delete layer" style={{ ...miniCtl(), color: "rgba(255,80,80,0.6)" }}>✕</button>}
                 </div>
               </div>
-            )}
 
-            {tab === "filters" && (
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-                {FILTER_PRESETS.map(p => (
-                  <button key={p.id} onClick={() => setPreset(p)} style={{
-                    padding: "10px 6px", borderRadius: 9, cursor: "pointer",
-                    background: preset.id === p.id ? fill(AC) : "var(--nv-elevated)",
-                    border: "1px solid " + (preset.id === p.id ? bdr(AC) : "var(--nv-border)"),
-                    color: preset.id === p.id ? AC : "var(--nv-text)",
-                    fontFamily: FFB, fontWeight: 600, fontSize: 11.5,
-                  }}>{p.label}</button>
-                ))}
+              <div>
+                <SliderRow label="Opacity" value={sel.opacity} min={10} max={100} onChange={v => patch(sel.id, { opacity: v })} AC={AC} suffix="%" />
               </div>
-            )}
 
-            {tab === "crop" && (
-              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                <div style={{ fontFamily: FFB, fontSize: 11, color: "var(--nv-text-dim)", letterSpacing: 0.5 }}>Aspect ratio</div>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 6 }}>
-                  {ASPECTS.map(a => (
-                    <button key={a.id} onClick={() => setAspect(a)} style={{ padding: "8px 0", borderRadius: 8, cursor: "pointer", background: aspect.id === a.id ? fill(AC) : "var(--nv-elevated)", border: "1px solid " + (aspect.id === a.id ? bdr(AC) : "var(--nv-border)"), color: aspect.id === a.id ? AC : "var(--nv-text)", fontFamily: FFB, fontWeight: 600, fontSize: 11 }}>{a.label}</button>
+              <div style={{ display: "flex", gap: 6 }}>
+                <button onClick={() => patch(sel.id, { rotation: (sel.rotation + 270) % 360 })} style={editCtlBtn()}>↶</button>
+                <button onClick={() => patch(sel.id, { rotation: (sel.rotation + 90) % 360 })} style={editCtlBtn()}>↷</button>
+                <button onClick={() => patch(sel.id, { flipH: !sel.flipH })} style={editCtlBtn(sel.flipH, AC)}>⇋</button>
+                <button onClick={() => patch(sel.id, { flipV: !sel.flipV })} style={editCtlBtn(sel.flipV, AC)}>⇅</button>
+              </div>
+
+              {/* Adjustments */}
+              <SliderRow label="Brightness" value={sel.adj.brightness} min={-50} max={50} onChange={v => patch(sel.id, { adj: { ...sel.adj, brightness: v } })} AC={AC} />
+              <SliderRow label="Contrast"   value={sel.adj.contrast}   min={-50} max={50} onChange={v => patch(sel.id, { adj: { ...sel.adj, contrast: v } })} AC={AC} />
+              <SliderRow label="Saturation" value={sel.adj.saturate}   min={-50} max={50} onChange={v => patch(sel.id, { adj: { ...sel.adj, saturate: v } })} AC={AC} />
+              <SliderRow label="Warmth"     value={sel.adj.warmth}     min={-50} max={50} onChange={v => patch(sel.id, { adj: { ...sel.adj, warmth: v } })} AC={AC} />
+
+              {/* Filter presets */}
+              <div>
+                <SecHdr>Filter</SecHdr>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
+                  {FILTER_PRESETS.map(p => (
+                    <button key={p.id} onClick={() => patch(sel.id, { preset: p })} style={{ padding: "8px 6px", borderRadius: 8, cursor: "pointer", background: sel.preset.id === p.id ? fill(AC) : "var(--nv-elevated)", border: "1px solid " + (sel.preset.id === p.id ? bdr(AC) : "var(--nv-border)"), color: sel.preset.id === p.id ? AC : "var(--nv-text)", fontFamily: FFB, fontWeight: 600, fontSize: 11 }}>{p.label}</button>
                   ))}
                 </div>
-                <div style={{ fontSize: 11, color: "var(--nv-text-dim)", lineHeight: 1.6 }}>
-                  {crop ? "Drag the box to move it, or pull the corners to resize. Save bakes the crop into a new copy." : "Pick an aspect ratio (or Free) to start cropping. Drag the corners of the box on the preview."}
-                </div>
-                {aspect.id === "free" && !crop && (
-                  <button onClick={() => setCrop({ x: 0.1, y: 0.1, w: 0.8, h: 0.8 })} style={editCtlBtn()}>Start free crop</button>
-                )}
-                {crop && <button onClick={() => { setCrop(null); setAspect(ASPECTS[0]); }} style={editCtlBtn()}>Clear crop</button>}
               </div>
-            )}
-          </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
   );
 }
+
+function SliderRow({ label, value, min, max, onChange, AC, suffix }) {
+  return (
+    <div>
+      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 5 }}>
+        <span style={{ fontFamily: FFB, fontWeight: 600, fontSize: 11, color: "var(--nv-text)" }}>{label}</span>
+        <span style={{ fontFamily: FFM, fontSize: 10, color: "var(--nv-text-dim)" }}>{value > 0 && !suffix ? "+" : ""}{value}{suffix || ""}</span>
+      </div>
+      <input type="range" min={min} max={max} value={value} onChange={e => onChange(+e.target.value)} style={{ width: "100%", accentColor: AC }}/>
+    </div>
+  );
+}
+function SecHdr({ children }) { return <div style={{ fontFamily: FFB, fontSize: 10.5, color: "var(--nv-text-dim)", letterSpacing: 0.6, marginBottom: 8, textTransform: "uppercase" }}>{children}</div>; }
 
 // ── small styles ─────────────────────────────────────────────────────────
 function thumbBtn() {
@@ -580,7 +640,10 @@ function editTopBtn(primary, AC) {
   return { padding: "7px 14px", borderRadius: 8, cursor: "pointer", background: primary ? fill(AC) : "rgba(255,255,255,0.06)", border: "1px solid " + (primary ? bdr(AC) : "rgba(255,255,255,0.14)"), color: primary ? AC : "rgba(255,255,255,0.82)", fontFamily: FFB, fontWeight: 600, fontSize: 12 };
 }
 function editCtlBtn(active, AC) {
-  return { flex: 1, padding: "8px 0", borderRadius: 8, cursor: "pointer", background: active ? fill(AC) : "var(--nv-elevated)", border: "1px solid " + (active ? bdr(AC) : "var(--nv-border)"), color: active ? AC : "var(--nv-text)", fontFamily: FFB, fontWeight: 600, fontSize: 11.5 };
+  return { flex: 1, padding: "8px 0", borderRadius: 8, cursor: "pointer", background: active ? fill(AC) : "var(--nv-elevated)", border: "1px solid " + (active ? bdr(AC) : "var(--nv-border)"), color: active ? AC : "var(--nv-text)", fontFamily: FFB, fontWeight: 600, fontSize: 12 };
+}
+function miniCtl() {
+  return { width: 24, height: 22, borderRadius: 5, background: "var(--nv-elevated)", border: "1px solid var(--nv-border)", cursor: "pointer", color: "var(--nv-text-dim)", fontSize: 10, display: "flex", alignItems: "center", justifyContent: "center", padding: 0 };
 }
 
 // ── rail bits ─────────────────────────────────────────────────────────────
