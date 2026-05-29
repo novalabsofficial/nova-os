@@ -5,6 +5,26 @@ not committed to. Living document — add to it freely.
 
 ---
 
+# ✅ v9.8 — shipped ("Game revamps + leaderboards")
+
+- **Snake — Google Snake style.** Input buffering (queues up to 2 turns) so
+  fast double-turns register; constant fast tempo; checkerboard grass board;
+  rounded connected body. Settings: board size (S/M/L) + apple count (1/3/5).
+- **Minesweeper — global best-time leaderboard** per difficulty (lower =
+  better) + cleaner readout/UI polish.
+- **Flappy Bird — graphics overhaul** (parallax sky/clouds/hills, classic
+  shaded pipes with caps, rounder animated bird, scrolling ground) + global
+  high-score leaderboard.
+- **Leaderboards (#28)** — new `nova_scores` collection: one tiny doc per
+  (game, user), written only on a personal best, top-N read with a single
+  index-free query. Very low Firestore footprint.
+
+**Required Firestore rules update (deploy):** the new `nova_scores` block.
+Deploy via the Firebase Console rules editor (or `firebase deploy --only
+firestore:rules`).
+
+---
+
 # ✅ v9.7 — shipped ("Creative tools + polish")
 
 Two big app builds plus a batch of fixes.
@@ -1274,7 +1294,12 @@ system as the "you earned this!" surface.
 
 ---
 
-## 28. High-score leaderboards for the games
+## 28. High-score leaderboards for the games — ✅ SHIPPED in v9.8 (Minesweeper + Flappy)
+
+Shipped the `nova_scores` infrastructure + leaderboards for Minesweeper
+(best time) and Flappy (high score) in v9.8. Wiring the same `submitScore`/
+`fetchLeaderboard` helpers into the other games (Snake, Tetris, 2048,
+Invaders, Pac-Man) is now a trivial follow-up whenever wanted.
 
 Snake, Tetris, 2048, Space Invaders, Pac-Man, Flappy Bird, Minesweeper
 (fastest-time) — each has a clear scoring model but no public leaderboard.
