@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { FF, FFB, FFM, INP, SEC } from "../ui/styles.js";
 import { fill, bdr } from "../lib/format.js";
 import { AiAssist } from "../ui/AiAssist.jsx";
+import { renderMarkdown, applyMarkdownAction } from "../lib/markdown.jsx";
 
 // v9.2 — Notes rebuilt as a professional three-pane app (Apple Notes /
 // Bear / Obsidian as references). Folder rail + note list + editor, all
@@ -32,6 +33,11 @@ export function NotesApp({ data, updateData, showToast, AC, openNovaAi }) {
   // "New folder" inline form state.
   const [showNewFolder, setShowNewFolder] = useState(false);
   const [newFolderName, setNewFolderName] = useState("");
+
+  // v9.5 — Markdown preview mode + body textarea ref so the toolbar
+  // can read/restore the user's selection when inserting markdown.
+  const [previewMode, setPreviewMode] = useState(false);
+  const bodyRef = useRef(null);
 
   // Derived view: the notes that belong in the middle column right now.
   const viewNotes = (() => {
@@ -112,6 +118,39 @@ export function NotesApp({ data, updateData, showToast, AC, openNovaAi }) {
 
   // Selected note (for the editor / AI context).
   const selected = selectedId != null ? notes.find(n => n.id === selectedId) : null;
+
+  // ── Markdown toolbar action ────────────────────────────────────────
+  // Pulls the current selection from the textarea, asks the markdown
+  // helper to compute the new value + cursor, and writes it back. We do
+  // this imperatively (instead of via React state alone) so we can
+  // restore the cursor selection in the same paint — otherwise the
+  // textarea reverts to caret-at-end after every keystroke.
+  function applyAction(action) {
+    if (previewMode) setPreviewMode(false);   // editing only makes sense in edit mode
+    const ta = bodyRef.current;
+    if (!ta) return;
+    const { value, selectionStart, selectionEnd } =
+      applyMarkdownAction(action, editBody, ta.selectionStart, ta.selectionEnd);
+    setEditBody(value);
+    // Re-apply selection after React re-renders — defer to next tick.
+    requestAnimationFrame(() => {
+      if (bodyRef.current) {
+        bodyRef.current.focus();
+        bodyRef.current.setSelectionRange(selectionStart, selectionEnd);
+      }
+    });
+  }
+
+  // ── Markdown keyboard shortcuts ────────────────────────────────────
+  // Ctrl/Cmd-B / I / K for bold / italic / link. Anything else falls
+  // through. Bound to the textarea so it doesn't fight global shortcuts.
+  function onBodyKeyDown(e) {
+    if (!(e.ctrlKey || e.metaKey) || e.shiftKey || e.altKey) return;
+    const key = e.key.toLowerCase();
+    if (key === "b") { e.preventDefault(); applyAction("bold"); }
+    else if (key === "i") { e.preventDefault(); applyAction("italic"); }
+    else if (key === "k") { e.preventDefault(); applyAction("link"); }
+  }
 
   // Display title fallback (the editor stays empty-friendly).
   const titleFallback = "Untitled";
@@ -243,6 +282,19 @@ export function NotesApp({ data, updateData, showToast, AC, openNovaAi }) {
                 <option value="">📂 No folder</option>
                 {folders.map(f => <option key={f.id} value={f.id}>📁 {f.name}</option>)}
               </select>
+              {/* v9.5 — markdown preview toggle */}
+              <button
+                onClick={() => setPreviewMode(p => !p)}
+                title={previewMode ? "Switch to edit" : "Markdown preview"}
+                style={{
+                  padding: "5px 10px", borderRadius: 7, cursor: "pointer",
+                  background: previewMode ? fill(AC) : "var(--nv-elevated)",
+                  border: "1px solid " + (previewMode ? bdr(AC) : "var(--nv-border)"),
+                  color: previewMode ? AC : "var(--nv-text)",
+                  fontFamily: FFB, fontWeight: 600, fontSize: 11,
+                  display: "inline-flex", alignItems: "center", gap: 5,
+                }}
+              >{previewMode ? "✎ Edit" : "👁 Preview"}</button>
               <AiAssist AC={AC} openNovaAi={openNovaAi} actions={[
                 { icon: "✍", label: "Improve writing", prompt: "Improve the writing of the following text without changing its meaning. Output ONLY the rewritten text, no commentary:" },
                 { icon: "📝", label: "Summarize in 2–3 sentences", prompt: "Summarize the following text in 2–3 concise sentences:" },
@@ -257,6 +309,32 @@ export function NotesApp({ data, updateData, showToast, AC, openNovaAi }) {
               <button onClick={() => deleteNote(selected.id)} className="dl" title="Delete note" style={{ background: "rgba(255,80,80,0.08)", border: "1px solid rgba(255,80,80,0.25)", borderRadius: 7, cursor: "pointer", color: "#ff8b8b", fontSize: 12, fontFamily: FFB, fontWeight: 600, padding: "5px 10px" }}>Delete</button>
             </div>
 
+            {/* v9.5 — Markdown toolbar. Only shows in edit mode. */}
+            {!previewMode && (
+              <div style={{
+                display: "flex", alignItems: "center", gap: 2, flexWrap: "wrap",
+                padding: "4px 18px", borderBottom: "1px solid var(--nv-border)",
+                background: "rgba(255,255,255,0.02)", flexShrink: 0,
+              }}>
+                <MdBtn label="H1" title="Heading 1"     onClick={() => applyAction("h1")} />
+                <MdBtn label="H2" title="Heading 2"     onClick={() => applyAction("h2")} />
+                <MdBtn label="H3" title="Heading 3"     onClick={() => applyAction("h3")} />
+                <Sep />
+                <MdBtn label={<strong>B</strong>}   title="Bold (Ctrl+B)"   onClick={() => applyAction("bold")} />
+                <MdBtn label={<em>I</em>}          title="Italic (Ctrl+I)" onClick={() => applyAction("italic")} />
+                <MdBtn label={<code style={{fontFamily:FFM, fontSize:11}}>{`<>`}</code>} title="Inline code" onClick={() => applyAction("code")} />
+                <Sep />
+                <MdBtn label="•"     title="Bullet list"   onClick={() => applyAction("bullet")} />
+                <MdBtn label="1."    title="Numbered list" onClick={() => applyAction("numbered")} />
+                <MdBtn label="❝"     title="Quote"         onClick={() => applyAction("quote")} />
+                <Sep />
+                <MdBtn label="🔗"    title="Link (Ctrl+K)" onClick={() => applyAction("link")} />
+                <MdBtn label="―"     title="Horizontal rule" onClick={() => applyAction("hr")} />
+                <span style={{ flex: 1 }} />
+                <span style={{ fontFamily: FFM, fontSize: 10, color: "var(--nv-text-dim)", letterSpacing: 0.4 }}>Markdown · Ctrl+B/I/K</span>
+              </div>
+            )}
+
             {/* Title input */}
             <input
               value={editTitle}
@@ -270,18 +348,32 @@ export function NotesApp({ data, updateData, showToast, AC, openNovaAi }) {
               }}
             />
 
-            {/* Body */}
-            <textarea
-              value={editBody}
-              onChange={e => setEditBody(e.target.value)}
-              placeholder="Start writing…"
-              style={{
-                flex: 1, margin: "12px 24px 18px", padding: "0",
-                background: "transparent", border: "none", outline: "none", resize: "none",
+            {/* Body — edit or preview */}
+            {previewMode ? (
+              <div style={{
+                flex: 1, margin: "12px 24px 18px", overflowY: "auto",
                 fontFamily: FF, fontSize: 14, lineHeight: 1.65, color: "var(--nv-text)",
                 minHeight: 0,
-              }}
-            />
+              }}>
+                {editBody.trim()
+                  ? renderMarkdown(editBody)
+                  : <div style={{ color: "var(--nv-text-dim)", fontStyle: "italic" }}>Nothing to preview yet — switch back to Edit to start writing.</div>}
+              </div>
+            ) : (
+              <textarea
+                ref={bodyRef}
+                value={editBody}
+                onChange={e => setEditBody(e.target.value)}
+                onKeyDown={onBodyKeyDown}
+                placeholder="Start writing… (Markdown supported — toolbar above)"
+                style={{
+                  flex: 1, margin: "12px 24px 18px", padding: "0",
+                  background: "transparent", border: "none", outline: "none", resize: "none",
+                  fontFamily: FF, fontSize: 14, lineHeight: 1.65, color: "var(--nv-text)",
+                  minHeight: 0,
+                }}
+              />
+            )}
           </>
         ) : (
           <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", padding: 32 }}>
@@ -326,6 +418,33 @@ function DocsGlyph() {
     </svg>
   );
 }
+// v9.5 — Toolbar button + separator for the markdown toolbar.
+function MdBtn({ label, title, onClick }) {
+  return (
+    <button
+      onClick={onClick}
+      title={title}
+      // onMouseDown preventDefault keeps the textarea's selection alive
+      // through the click — otherwise the click would steal focus + the
+      // selection collapses before we can wrap it.
+      onMouseDown={e => e.preventDefault()}
+      style={{
+        minWidth: 28, height: 26, padding: "0 8px",
+        background: "transparent", border: "1px solid transparent",
+        borderRadius: 5, cursor: "pointer",
+        color: "var(--nv-text)", fontFamily: FF, fontSize: 12, fontWeight: 500,
+        display: "inline-flex", alignItems: "center", justifyContent: "center",
+        transition: "background 0.12s, border-color 0.12s",
+      }}
+      onMouseEnter={e => { e.currentTarget.style.background = "var(--nv-hover)"; e.currentTarget.style.borderColor = "var(--nv-border)"; }}
+      onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.borderColor = "transparent"; }}
+    >{label}</button>
+  );
+}
+function Sep() {
+  return <span style={{ width: 1, height: 16, background: "var(--nv-border)", margin: "0 4px" }}/>;
+}
+
 function FolderGlyph() {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" style={{ display: "block" }}>

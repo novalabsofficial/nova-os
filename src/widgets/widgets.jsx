@@ -480,3 +480,166 @@ export function BatteryWidgetContent({ state, AC }) {
     </div>
   );
 }
+
+// ──────────────────────────────────────────────────────────────────────
+// v9.5 — Pomodoro widget
+// ──────────────────────────────────────────────────────────────────────
+// Classic 25/5/15 cycle: four 25-minute "focus" rounds with 5-minute
+// short breaks between, then a 15-minute long break. The user can
+// pause, skip (advance to the next phase), or reset. The current phase
+// ends with a soft chime — we reuse the existing `playSound("notify")`
+// recipe so it matches the rest of the OS's audio palette.
+//
+// State lives entirely in component state. Persistence across page
+// refreshes isn't worth the storage cost — pomodoros are a "right now"
+// kind of timer.
+//
+// Why not useEffect with setInterval? We do use one, but we anchor the
+// remaining time to a *target wall-clock timestamp* (`endsAt`). That
+// way: (a) the displayed countdown stays accurate even after the
+// browser throttles the tab in the background, and (b) pausing is a
+// matter of swapping `endsAt` ⇄ `remainingMs`.
+
+import { playSound } from "../lib/audio.js";
+
+const PHASES = {
+  focus: { label: "Focus",       durMs: 25 * 60 * 1000, color: "#fb7185" },
+  short: { label: "Short break", durMs:  5 * 60 * 1000, color: "#34d399" },
+  long:  { label: "Long break",  durMs: 15 * 60 * 1000, color: "#60a5fa" },
+};
+// Cycle: 4 focus rounds, with shorts between, then long after the 4th.
+function nextPhase(phase, completedFocus) {
+  if (phase === "focus") {
+    return (completedFocus % 4 === 0) ? "long" : "short";
+  }
+  return "focus";
+}
+
+export function PomodoroWidgetContent({ state, AC }) {
+  // Phase + timing — endsAt is the absolute ms timestamp when the current
+  // phase ends; remainingMs is only used while paused.
+  const [phase, setPhase] = useState("focus");
+  const [completedFocus, setCompletedFocus] = useState(0);
+  const [endsAt, setEndsAt] = useState(null);            // null = paused
+  const [remainingMs, setRemainingMs] = useState(PHASES.focus.durMs);
+  const [now, setNow] = useState(Date.now());
+
+  // Tick. Anchor to wall clock so a throttled tab still shows the right
+  // time when you come back to it.
+  useEffect(() => {
+    if (endsAt == null) return;          // paused — no ticking
+    const id = setInterval(() => setNow(Date.now()), 250);
+    return () => clearInterval(id);
+  }, [endsAt]);
+
+  // End-of-phase handler: chime, swap to the next phase, auto-start the
+  // break (most pomodoro apps do this; the user can pause if they want).
+  useEffect(() => {
+    if (endsAt == null) return;
+    if (now >= endsAt) {
+      try { playSound("notify"); } catch {}
+      const justFinished = phase;
+      const nextFocusCount = phase === "focus" ? completedFocus + 1 : completedFocus;
+      const nextP = nextPhase(justFinished, nextFocusCount);
+      setCompletedFocus(nextFocusCount);
+      setPhase(nextP);
+      setEndsAt(Date.now() + PHASES[nextP].durMs);
+      setRemainingMs(PHASES[nextP].durMs);
+    }
+  }, [now, endsAt, phase, completedFocus]);
+
+  function start() {
+    setEndsAt(Date.now() + remainingMs);
+  }
+  function pause() {
+    if (endsAt == null) return;
+    setRemainingMs(Math.max(0, endsAt - Date.now()));
+    setEndsAt(null);
+  }
+  function reset() {
+    setEndsAt(null);
+    setPhase("focus");
+    setCompletedFocus(0);
+    setRemainingMs(PHASES.focus.durMs);
+  }
+  function skip() {
+    const next = nextPhase(phase, phase === "focus" ? completedFocus + 1 : completedFocus);
+    if (phase === "focus") setCompletedFocus(c => c + 1);
+    setPhase(next);
+    const dur = PHASES[next].durMs;
+    setRemainingMs(dur);
+    setEndsAt(endsAt == null ? null : Date.now() + dur);   // preserve running/paused state
+  }
+
+  const running = endsAt != null;
+  const msLeft = running ? Math.max(0, endsAt - now) : remainingMs;
+  const totalMs = PHASES[phase].durMs;
+  const pct = Math.max(0, Math.min(1, 1 - msLeft / totalMs));
+  const color = PHASES[phase].color;
+
+  function fmt(ms) {
+    const totalSec = Math.ceil(ms / 1000);
+    const m = Math.floor(totalSec / 60), s = totalSec % 60;
+    return m + ":" + String(s).padStart(2, "0");
+  }
+
+  // Sizing: the timer text + dots scale with widget height so it stays
+  // readable when the user shrinks it.
+  const h = state.h - 28;
+  const timeSize = Math.max(28, Math.min(h * 0.34, 48));
+
+  return (
+    <div style={{ width: "100%", height: "100%", padding: "12px 14px", display: "flex", flexDirection: "column", gap: 8 }}>
+      {/* Phase chip */}
+      <div style={{ display: "flex", alignItems: "center", gap: 7, flexShrink: 0 }}>
+        <span style={{
+          padding: "2px 9px", borderRadius: 12,
+          background: color + "22", border: "1px solid " + color + "55", color: color,
+          fontFamily: FFB, fontWeight: 700, fontSize: 9.5, letterSpacing: 0.6, textTransform: "uppercase",
+        }}>{PHASES[phase].label}</span>
+        <div style={{ flex: 1 }}/>
+        {/* Cycle dots — show completed focus rounds. */}
+        <div style={{ display: "flex", gap: 4 }}>
+          {[0, 1, 2, 3].map(i => {
+            const filled = i < (completedFocus % 4) || (completedFocus % 4 === 0 && completedFocus > 0 && i < 4);
+            return <div key={i} style={{ width: 6, height: 6, borderRadius: "50%", background: filled ? color : "var(--nv-border-strong)", transition: "background 0.18s" }}/>;
+          })}
+        </div>
+      </div>
+
+      {/* Big time */}
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: 0 }}>
+        <div style={{ fontFamily: FFM, fontSize: timeSize, color: "#fff", letterSpacing: 1.5, lineHeight: 1 }}>{fmt(msLeft)}</div>
+        {/* Progress arc — pure-CSS, no SVG needed */}
+        <div style={{ width: "100%", height: 4, background: "rgba(255,255,255,0.06)", borderRadius: 2, marginTop: 10, overflow: "hidden" }}>
+          <div style={{ width: pct * 100 + "%", height: "100%", background: color, transition: "width 0.4s linear", boxShadow: `0 0 8px ${color}88` }}/>
+        </div>
+      </div>
+
+      {/* Controls */}
+      <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+        {!running ? (
+          <button onClick={start} style={pomoBtn(color, true)}>▶ Start</button>
+        ) : (
+          <button onClick={pause} style={pomoBtn(color, true)}>⏸ Pause</button>
+        )}
+        <button onClick={skip}  title="Skip to next phase" style={pomoBtn(color, false)}>⏭</button>
+        <button onClick={reset} title="Reset cycle" style={pomoBtn(color, false)}>↺</button>
+      </div>
+    </div>
+  );
+}
+function pomoBtn(color, primary) {
+  return {
+    flex: primary ? 1 : "0 0 36px",
+    height: 30,
+    background: primary ? color + "22" : "transparent",
+    border: "1px solid " + (primary ? color + "55" : "var(--nv-border)"),
+    borderRadius: 7,
+    cursor: "pointer",
+    color: primary ? color : "var(--nv-text-dim)",
+    fontFamily: FFB, fontWeight: 600, fontSize: 11.5,
+    display: "flex", alignItems: "center", justifyContent: "center",
+    transition: "all 0.15s",
+  };
+}

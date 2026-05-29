@@ -1,20 +1,23 @@
 // v9.4 — Emoji reactions on global-chat messages.
+// v9.5 — Extended to also handle DM reactions (separate collection,
+//        nova_dm_reactions, since the DM message lookup needs the
+//        threadId in the doc for the rule's membership check).
 //
-// Stored in their own top-level collection (`nova_chat_reactions`) so we
-// don't have to relax the append-only `update` rule on `nova_chat`.
-// Doc id format is deterministic: `<msgId>_<uid>_<emoji>` — exactly one
-// doc per (message, user, emoji). Clicking the same emoji again deletes
-// the doc; clicking a different one creates a second doc (a user can
-// react with multiple emojis on the same message, just not the same one
-// twice).
+// Stored in their own top-level collection so we don't have to relax the
+// append-only `update` rule on the parent message collection.
 //
-// Why a top-level collection (vs. a subcollection of nova_chat)?
-//   - Subscribers can listen to ALL recent reactions in one onSnapshot
-//     and filter client-side per visible message, which is simpler than
-//     spinning up N subscriptions for N visible messages.
-//   - Rules stay flat and easy to reason about (no nested matchers).
+// Doc id formats:
+//   global chat: `<msgId>_<uid>_<emoji>`
+//   DM:          `<threadId>_<msgId>_<uid>_<emoji>`
+// Exactly one doc per (message, user, emoji). Clicking the same emoji
+// again deletes; clicking a different one creates a second doc.
+//
+// Why top-level collections (vs. subcollections)?
+//   - One onSnapshot can stream all recent reactions; the renderer
+//     filters per visible message. Cheaper than N subscriptions.
+//   - Rules stay flat and easy to reason about.
 
-import { collection, doc, getDoc, setDoc, deleteDoc, query, onSnapshot, limit } from "firebase/firestore";
+import { collection, doc, getDoc, setDoc, deleteDoc, query, onSnapshot, limit, where } from "firebase/firestore";
 import { firestoreDb } from "../firebase.js";
 
 /**
@@ -94,3 +97,59 @@ export function aggregateReactions(reactions) {
 
 /** Reaction emojis offered in the picker per message. Kept small + universal. */
 export const REACTION_PRESETS = ["👍", "❤️", "😂", "😮", "😢"];
+
+// ── v9.5: DM reactions ──────────────────────────────────────────────────
+// Same shape + ergonomics, just gated to nova_dm_reactions which lives in
+// its own collection so the rule can check thread membership via the
+// threadId field in the reaction doc.
+
+function dmReactionId(threadId, msgId, uid, emoji) {
+  return threadId + "_" + msgId + "_" + uid + "_" + encodeURIComponent(emoji);
+}
+
+/**
+ * Toggle a DM reaction. Same return semantics as `toggleReaction`
+ * ("added" | "removed" | null on error).
+ */
+export async function toggleDmReaction(threadId, msgId, emoji, myUid, myUsername) {
+  if (!threadId || !msgId || !emoji || !myUid) return null;
+  const rxId = dmReactionId(threadId, msgId, myUid, emoji);
+  const ref = doc(firestoreDb, "nova_dm_reactions", rxId);
+  try {
+    const snap = await getDoc(ref);
+    if (snap.exists()) {
+      await deleteDoc(ref);
+      return "removed";
+    }
+    await setDoc(ref, {
+      threadId, msgId,
+      uid: myUid,
+      user: myUsername || "",
+      emoji,
+      ts: Date.now(),
+    });
+    return "added";
+  } catch (err) {
+    console.warn("[chat-reactions] DM toggle failed:", err?.message || err);
+    return null;
+  }
+}
+
+/**
+ * Subscribe to all DM reactions for a specific thread. Caller provides
+ * threadId; we filter the subscription server-side via where(). Capped at
+ * 500 — at typical chat scale, plenty for a single thread's recent
+ * messages.
+ */
+export function subscribeDmReactions(threadId, cb) {
+  if (!threadId) { cb([]); return () => {}; }
+  const q = query(
+    collection(firestoreDb, "nova_dm_reactions"),
+    where("threadId", "==", threadId),
+    limit(500),
+  );
+  return onSnapshot(q,
+    snap => cb(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
+    err => { console.warn("[chat-reactions] DM subscription error:", err?.message || err); cb([]); },
+  );
+}
