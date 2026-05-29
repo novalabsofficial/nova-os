@@ -313,6 +313,8 @@ service cloud.firestore {
       );
 
       // Create: caller must be the owner *and* the sole initial member.
+      // v9.6: the members map must seed the owner's entry with the
+      // "owner" role.
       allow create: if signedIn() &&
         request.resource.data.ownerUid == request.auth.uid &&
         request.resource.data.memberUids.size() == 1 &&
@@ -321,29 +323,38 @@ service cloud.firestore {
         request.resource.data.name.size() > 0 &&
         request.resource.data.name.size() <= 60 &&
         request.resource.data.channels.size() >= 1 &&
-        request.resource.data.channels.size() <= 30;
+        request.resource.data.channels.size() <= 30 &&
+        request.resource.data.members[request.auth.uid].role == 'owner';
 
       // Update:
-      //   • Owner can change anything except ownerUid (no transfer).
-      //   • Non-member can ADD only themselves to memberUids (join).
+      //   • Owner can change anything except ownerUid (no transfer) —
+      //     covers rename, channels, invite regen, role changes, kicks,
+      //     and setting anyone's nickname.
+      //   • Non-member can ADD only themselves to memberUids (join), and
+      //     only their own members entry, with role "member".
       //   • Member (non-owner) can REMOVE only themselves (leave).
-      //   The "join" + "leave" branches enforce immutability on every
-      //   other field via explicit equality checks.
+      //   • Member can edit ONLY their own members entry's nickname — not
+      //     their own role (no self-promotion), and nothing else moves.
+      //
+      // v9.6 uses `.get('members', {})` so the diff checks also work on
+      // legacy v9.5 servers that predate the members map.
       allow update: if signedIn() && (
         // 1) Owner edits — everything goes except ownership transfer.
         (resource.data.ownerUid == request.auth.uid &&
          request.resource.data.ownerUid == resource.data.ownerUid) ||
 
-        // 2) Self-join (non-member adds themselves)
+        // 2) Self-join (non-member adds only themselves + own member entry)
         (!(request.auth.uid in resource.data.memberUids) &&
          request.auth.uid in request.resource.data.memberUids &&
          request.resource.data.memberUids.size() == resource.data.memberUids.size() + 1 &&
          request.resource.data.ownerUid == resource.data.ownerUid &&
          request.resource.data.name == resource.data.name &&
          request.resource.data.channels == resource.data.channels &&
-         request.resource.data.inviteCode == resource.data.inviteCode) ||
+         request.resource.data.inviteCode == resource.data.inviteCode &&
+         request.resource.data.get('members', {}).diff(resource.data.get('members', {})).affectedKeys().hasOnly([request.auth.uid]) &&
+         request.resource.data.members[request.auth.uid].role == 'member') ||
 
-        // 3) Self-leave (member, non-owner removes themselves)
+        // 3) Self-leave (member, non-owner removes only themselves)
         (request.auth.uid in resource.data.memberUids &&
          resource.data.ownerUid != request.auth.uid &&
          !(request.auth.uid in request.resource.data.memberUids) &&
@@ -351,7 +362,20 @@ service cloud.firestore {
          request.resource.data.ownerUid == resource.data.ownerUid &&
          request.resource.data.name == resource.data.name &&
          request.resource.data.channels == resource.data.channels &&
-         request.resource.data.inviteCode == resource.data.inviteCode)
+         request.resource.data.inviteCode == resource.data.inviteCode &&
+         request.resource.data.get('members', {}).diff(resource.data.get('members', {})).affectedKeys().hasOnly([request.auth.uid])) ||
+
+        // 4) Self-nickname (member edits only their own entry; role frozen)
+        (request.auth.uid in resource.data.memberUids &&
+         request.auth.uid in resource.data.get('members', {}) &&
+         request.resource.data.memberUids == resource.data.memberUids &&
+         request.resource.data.memberUsernames == resource.data.memberUsernames &&
+         request.resource.data.ownerUid == resource.data.ownerUid &&
+         request.resource.data.name == resource.data.name &&
+         request.resource.data.channels == resource.data.channels &&
+         request.resource.data.inviteCode == resource.data.inviteCode &&
+         request.resource.data.members.diff(resource.data.members).affectedKeys().hasOnly([request.auth.uid]) &&
+         request.resource.data.members[request.auth.uid].role == resource.data.members[request.auth.uid].role)
       );
 
       // Delete: owner only (cascades client-side via the messages cleanup).
@@ -373,9 +397,13 @@ service cloud.firestore {
           request.resource.data.text.size() > 0 &&
           request.resource.data.text.size() <= 500;
         allow update: if false;
+        // v9.6: server admins (members with role "admin") can delete any
+        // message, alongside the author, the owner, and global mods.
         allow delete: if signedIn() && (
           resource.data.uid == request.auth.uid ||
           srv().ownerUid == request.auth.uid ||
+          (request.auth.uid in srv().get('members', {}) &&
+           srv().get('members', {})[request.auth.uid].role == 'admin') ||
           isMod()
         );
       }
@@ -421,6 +449,30 @@ service cloud.firestore {
         request.resource.data.uid == request.auth.uid &&
         request.resource.data.threadId is string &&
         request.auth.uid in thread(request.resource.data.threadId).participantUids &&
+        request.resource.data.msgId is string &&
+        request.resource.data.msgId.size() > 0 &&
+        request.resource.data.emoji is string &&
+        request.resource.data.emoji.size() > 0 &&
+        request.resource.data.emoji.size() < 12;
+      allow update: if false;
+      allow delete: if signedIn() && (
+        resource.data.uid == request.auth.uid || isMod()
+      );
+    }
+
+    // ── server message reactions (v9.6) ──────────────────────────────────
+    // Mirrors nova_dm_reactions but for server messages. Membership is
+    // checked via a get() into the parent server doc's memberUids using
+    // the serverId field on the reaction.
+    match /nova_server_reactions/{rxId} {
+      function serverMembers(serverId) {
+        return get(/databases/$(database)/documents/nova_servers/$(serverId)).data.memberUids;
+      }
+      allow read: if signedIn();
+      allow create: if signedIn() &&
+        request.resource.data.uid == request.auth.uid &&
+        request.resource.data.serverId is string &&
+        request.auth.uid in serverMembers(request.resource.data.serverId) &&
         request.resource.data.msgId is string &&
         request.resource.data.msgId.size() > 0 &&
         request.resource.data.emoji is string &&

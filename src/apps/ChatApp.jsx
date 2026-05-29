@@ -25,6 +25,7 @@ import { watchMyThreads, watchThreadMessages, openDmByUsername, sendDm, otherPar
 import {
   subscribeAllReactions, aggregateReactions, toggleReaction,
   toggleDmReaction, subscribeDmReactions,
+  toggleServerReaction, subscribeServerReactions,
   REACTION_PRESETS,
 } from "../lib/chat-reactions.js";
 import {
@@ -32,9 +33,12 @@ import {
   createServer, joinServer, leaveServer, deleteServer,
   renameServer, addChannel, removeChannel, regenerateInvite,
   sendServerMessage, deleteServerMessage, resolveInvite,
+  setNickname, setMemberRole, kickMember, ensureMembersMap,
+  memberDisplayName, memberRole,
+  ROLE_OWNER, ROLE_ADMIN, ROLE_MEMBER,
 } from "../lib/servers.js";
 
-export function ChatApp({ user, AC }) {
+export function ChatApp({ user, AC, data, updateData }) {
   const myUid = getDbUid();
   const isMod = isAdmin(user);
 
@@ -90,6 +94,14 @@ export function ChatApp({ user, AC }) {
     return subscribeDmReactions(active.threadId, setDmReactions);
   }, [view, active?.threadId]);
   const dmReactionMap = aggregateReactions(dmReactions);
+
+  // Server reactions — subscription per active server. v9.6.
+  const [serverReactions, setServerReactions] = useState([]);
+  useEffect(() => {
+    if (view !== "server" || !active?.serverId) { setServerReactions([]); return; }
+    return subscribeServerReactions(active.serverId, setServerReactions);
+  }, [view, active?.serverId]);
+  const serverReactionMap = aggregateReactions(serverReactions);
 
   // ── DM typing indicator ──────────────────────────────────────────────
   const lastTypingWriteRef = useRef(0);
@@ -154,6 +166,37 @@ export function ChatApp({ user, AC }) {
       setView("global"); setActive(null);
     }
   }, [servers, view, active?.serverId]);
+
+  // v9.6 — when the OWNER opens a legacy (v9.5) server with no members
+  // map, backfill it so roles + nicknames work. No-op otherwise.
+  useEffect(() => {
+    if (view !== "server" || !active?.serverId) return;
+    const s = servers.find(x => x.id === active.serverId);
+    if (s) ensureMembersMap(s, myUid);
+  }, [view, active?.serverId, servers, myUid]);
+
+  // ── v9.6 — unread tracking for DMs ───────────────────────────────────
+  // `data.lastRead` maps a conversation key → last-read timestamp. We mark
+  // the active DM thread read whenever its messages change while it's open.
+  const lastRead = data?.lastRead || {};
+  useEffect(() => {
+    if (view !== "dm" || !active?.threadId) return;
+    const t = threads.find(x => x.id === active.threadId);
+    const newest = t?.lastTs || 0;
+    if (newest && (lastRead["dm:" + active.threadId] || 0) < newest) {
+      updateData?.(p => ({ ...p, lastRead: { ...(p.lastRead || {}), ["dm:" + active.threadId]: Date.now() } }));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view, active?.threadId, dmMessages, threads]);
+
+  // Is a DM thread unread? Unread = it has a newer message than we've read
+  // AND the last message wasn't sent by us.
+  function isThreadUnread(t) {
+    if (!t || !t.lastTs) return false;
+    if (t.lastSenderUid === myUid) return false;
+    return (lastRead["dm:" + t.id] || 0) < t.lastTs;
+  }
+  const unreadDmCount = threads.filter(isThreadUnread).length;
 
   // ── Active context shortcuts ─────────────────────────────────────────
   const activeServer = view === "server" && active?.serverId
@@ -293,22 +336,38 @@ export function ChatApp({ user, AC }) {
     : view === "server" ? () => deleteServerMsg(item.id, item.user)
     : () => {};
 
-  // Show reactions everywhere except the "new"/setup forms
+  // Show reactions everywhere except the "new"/setup forms.
+  // v9.6: server messages now react too (nova_server_reactions).
   const reactionsEnabled = view === "global" || view === "dm" || view === "server";
   function toggleReact(msgId, emoji) {
     if (view === "global") return toggleReaction(msgId, emoji, myUid, user);
     if (view === "dm")     return toggleDmReaction(active.threadId, msgId, emoji, myUid, user);
-    // Server reactions: not yet (would need a 3rd reactions collection).
-    // For v9.5 we just don't surface the picker on server messages — handled below.
+    if (view === "server") return toggleServerReaction(active.serverId, msgId, emoji, myUid, user);
     return null;
   }
-  // For v9.5, reactions on server messages are deferred (extra collection +
-  // rules would push us past the part 2 scope). Only global + DM for now.
-  const reactionsAvailable = view === "global" || view === "dm";
+  const reactionsAvailable = view === "global" || view === "dm" || view === "server";
   const reactionsBagFor = (msgId) =>
     view === "global" ? reactionMap[msgId]
     : view === "dm"   ? dmReactionMap[msgId]
+    : view === "server" ? serverReactionMap[msgId]
     : null;
+
+  // v9.6 — @mention awareness. A message "mentions me" if it contains
+  // @myusername (case-insensitive, allowing a trailing word boundary).
+  function textMentionsMe(text) {
+    if (!text || !user) return false;
+    const re = new RegExp("@" + user.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\b", "i");
+    return re.test(text);
+  }
+
+  // My role in the active server (for delete powers + member-panel UI).
+  const myServerRole = activeServer ? memberRole(activeServer, myUid) : null;
+  const canModerateServer = view === "server" && (isServerOwner || myServerRole === ROLE_ADMIN);
+
+  // Display name within the active server: nickname if set, else username.
+  function serverNameFor(uid, fallbackUser) {
+    return activeServer ? memberDisplayName(activeServer, uid, fallbackUser) : fallbackUser;
+  }
 
   // ── Render ───────────────────────────────────────────────────────────
   return (
@@ -410,10 +469,13 @@ export function ChatApp({ user, AC }) {
         {/* DMs section */}
         <div style={{ padding: "12px 12px 4px", display: "flex", alignItems: "center", gap: 6 }}>
           <span style={{ ...SEC, marginBottom: 0, fontSize: 9 }}>Direct Messages</span>
+          {unreadDmCount > 0 && (
+            <span style={{ minWidth: 16, height: 16, padding: "0 4px", borderRadius: 8, background: "#ff5a5a", color: "#fff", fontFamily: FFB, fontWeight: 700, fontSize: 9.5, display: "inline-flex", alignItems: "center", justifyContent: "center" }}>{unreadDmCount}</span>
+          )}
           <button
             onClick={() => { setView("new"); setActive(null); setNewDmError(""); }}
             title="Start a new DM"
-            style={pillIconBtn(view === "new", AC)}
+            style={{ ...pillIconBtn(view === "new", AC), marginLeft: "auto" }}
           >+</button>
         </div>
 
@@ -433,6 +495,7 @@ export function ChatApp({ user, AC }) {
                 preview={t.lastMessage}
                 lastTs={t.lastTs}
                 active={isActive}
+                unread={isThreadUnread(t)}
                 onClick={() => { setView("dm"); setActive({ threadId: t.id, otherUsername: other }); setPickerOpenFor(null); }}
                 AC={AC}
               />
@@ -458,9 +521,9 @@ export function ChatApp({ user, AC }) {
             {view === "server" && activeServer && (
               <button
                 onClick={() => setShowOwnerPanel(p => !p)}
-                title={isServerOwner ? "Manage server" : "Server info"}
-                style={{ background: showOwnerPanel ? fill(AC) : "var(--nv-elevated)", border: "1px solid " + (showOwnerPanel ? bdr(AC) : "var(--nv-border)"), borderRadius: 7, padding: "4px 10px", cursor: "pointer", fontFamily: FFB, fontWeight: 600, fontSize: 11, color: showOwnerPanel ? AC : "var(--nv-text)" }}
-              >⚙</button>
+                title="Members & server info"
+                style={{ background: showOwnerPanel ? fill(AC) : "var(--nv-elevated)", border: "1px solid " + (showOwnerPanel ? bdr(AC) : "var(--nv-border)"), borderRadius: 7, padding: "4px 10px", cursor: "pointer", fontFamily: FFB, fontWeight: 600, fontSize: 11, color: showOwnerPanel ? AC : "var(--nv-text)", display: "inline-flex", alignItems: "center", gap: 5 }}
+              >👥 {activeServer.memberUids?.length || 1}</button>
             )}
             {view === "global" && (
               <span style={{ fontSize: 11, color: "rgba(255,255,255,0.3)" }}>
@@ -471,11 +534,12 @@ export function ChatApp({ user, AC }) {
           <div style={{ fontSize: 10.5, color: "rgba(255,255,255,0.32)", marginTop: 3 }}>{headerSub}</div>
         </div>
 
-        {/* Owner / info panel slides down inside the main pane */}
+        {/* Members + server info panel slides down inside the main pane */}
         {view === "server" && showOwnerPanel && activeServer && (
           <ServerOwnerPanel
             server={activeServer}
             isOwner={isServerOwner}
+            myRole={myServerRole}
             myUid={myUid}
             myUsername={user}
             AC={AC}
@@ -523,8 +587,10 @@ export function ChatApp({ user, AC }) {
               const isMe = item.user === user;
               const uc = userColor(item.user || "");
               const onDelete = deleteForRow(item);
-              // Owner of a server gets the mod-like delete-anyone power.
-              const canDelete = isMe || isMod || (view === "server" && isServerOwner);
+              // Owner + admins of a server get the mod-like delete-anyone power.
+              const canDelete = isMe || isMod || canModerateServer;
+              // v9.6: does this message ping me? (for the highlight band)
+              const pingsMe = !isMe && textMentionsMe(item.text);
 
               const showReact = reactionsAvailable;
               const reactBtn = showReact ? (
@@ -538,11 +604,11 @@ export function ChatApp({ user, AC }) {
 
               if (item.grouped) {
                 return (
-                  <div key={item.id} className="msgrow" style={{ display: "flex", padding: "1px 8px", borderRadius: 4, flexDirection: "column" }}>
+                  <div key={item.id} className="msgrow" style={{ display: "flex", padding: "1px 8px", borderRadius: 4, flexDirection: "column", background: pingsMe ? "rgba(255,200,80,0.07)" : "transparent", borderLeft: pingsMe ? "2px solid rgba(255,200,80,0.6)" : "2px solid transparent" }}>
                     <div style={{ display: "flex" }}>
                       <div className="ts-hover" style={{ width: 40, flexShrink: 0, fontFamily: FFM, fontSize: 9.5, color: "transparent", paddingTop: 4, textAlign: "center", transition: "color 0.12s" }}>{fmtTime(item.ts)}</div>
                       <div style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "flex-start", gap: 6 }}>
-                        <div style={{ flex: 1, fontSize: 14, color: "var(--nv-text)", lineHeight: 1.55, wordBreak: "break-word", fontFamily: FF }}>{item.text}</div>
+                        <div style={{ flex: 1, fontSize: 14, color: "var(--nv-text)", lineHeight: 1.55, wordBreak: "break-word", fontFamily: FF }}><MessageText text={item.text} myName={user} ac={AC}/></div>
                         {reactBtn}
                         {canDelete && (
                           <button
@@ -569,21 +635,28 @@ export function ChatApp({ user, AC }) {
                 );
               }
 
+              // v9.6: in servers, show the member's nickname (falls back to
+              // username); the avatar letter follows the displayed name.
+              const displayName = view === "server" ? serverNameFor(item.uid, item.user) : (item.user || "unknown");
+              const itemRole = view === "server" && activeServer ? memberRole(activeServer, item.uid) : null;
               return (
-                <div key={item.id} className="msgrow" style={{ display: "flex", padding: "5px 8px", borderRadius: 4, marginTop: 8, flexDirection: "column" }}>
+                <div key={item.id} className="msgrow" style={{ display: "flex", padding: "5px 8px", borderRadius: 4, marginTop: 8, flexDirection: "column", background: pingsMe ? "rgba(255,200,80,0.07)" : "transparent", borderLeft: pingsMe ? "2px solid rgba(255,200,80,0.6)" : "2px solid transparent" }}>
                   <div style={{ display: "flex" }}>
                     <div style={{ width: 40, flexShrink: 0, display: "flex", justifyContent: "center", paddingTop: 1 }}>
                       <div style={{ width: 32, height: 32, borderRadius: "50%", background: `rgba(${hexRgb(uc)},0.22)`, border: `1.5px solid ${uc}`, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: FFB, fontWeight: 700, fontSize: 13, color: "#fff" }}>
-                        {(item.user || "?")[0].toUpperCase()}
+                        {(displayName || "?")[0].toUpperCase()}
                       </div>
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
-                        <span style={{ fontFamily: FFB, fontWeight: 700, fontSize: 13.5, color: uc }}>@{item.user || "unknown"}</span>
+                        <span style={{ fontFamily: FFB, fontWeight: 700, fontSize: 13.5, color: uc }}>{view === "server" ? displayName : "@" + displayName}</span>
                         <span style={{ fontFamily: FFM, fontSize: 10.5, color: "var(--nv-text-dim)" }}>{fmtTime(item.ts)}</span>
                         {isMe && <span style={{ fontFamily: FFB, fontSize: 9, padding: "1px 5px", borderRadius: 3, background: `rgba(${hexRgb(AC)},0.16)`, border: `1px solid rgba(${hexRgb(AC)},0.32)`, color: AC, letterSpacing: 0.5 }}>YOU</span>}
-                        {view === "server" && activeServer && item.uid === activeServer.ownerUid && !isMe && (
+                        {itemRole === ROLE_OWNER && !isMe && (
                           <span style={{ fontFamily: FFB, fontSize: 9, padding: "1px 5px", borderRadius: 3, background: "rgba(168,85,247,0.18)", border: "1px solid rgba(168,85,247,0.5)", color: "#c4a8ff", letterSpacing: 0.5 }}>OWNER</span>
+                        )}
+                        {itemRole === ROLE_ADMIN && (
+                          <span style={{ fontFamily: FFB, fontSize: 9, padding: "1px 5px", borderRadius: 3, background: "rgba(80,200,255,0.16)", border: "1px solid rgba(80,200,255,0.45)", color: "#8fd3ff", letterSpacing: 0.5 }}>ADMIN</span>
                         )}
                         <div style={{ flex: 1 }} />
                         {reactBtn}
@@ -596,7 +669,7 @@ export function ChatApp({ user, AC }) {
                           >{isMe ? "✕" : "🛡"}</button>
                         )}
                       </div>
-                      <div style={{ fontSize: 14, color: "var(--nv-text)", lineHeight: 1.55, wordBreak: "break-word", fontFamily: FF, marginTop: 2 }}>{item.text}</div>
+                      <div style={{ fontSize: 14, color: "var(--nv-text)", lineHeight: 1.55, wordBreak: "break-word", fontFamily: FF, marginTop: 2 }}><MessageText text={item.text} myName={user} ac={AC}/></div>
                     </div>
                   </div>
                   {showReact && reactionsEnabled && (
@@ -696,7 +769,7 @@ function SidebarRow({ icon, label, active, onClick, AC }) {
   );
 }
 
-function DmRow({ username, preview, active, onClick, AC }) {
+function DmRow({ username, preview, active, unread, onClick, AC }) {
   const palette = ["#4f9eff","#ff6b6b","#4cef90","#ffcc44","#cc44ff","#ff8c44","#44ddcc","#ff44aa","#f97316","#06b6d4"];
   let h = 0; for (let i = 0; i < (username || "").length; i++) h = (h * 31 + username.charCodeAt(i)) & 0xffffffff;
   const uc = palette[Math.abs(h) % palette.length];
@@ -715,15 +788,18 @@ function DmRow({ username, preview, active, onClick, AC }) {
       }}
     >
       <div style={{
-        width: 32, height: 32, borderRadius: "50%", flexShrink: 0,
+        width: 32, height: 32, borderRadius: "50%", flexShrink: 0, position: "relative",
         background: `rgba(${hexRgb(uc)},0.22)`, border: `1.5px solid ${uc}`,
         display: "flex", alignItems: "center", justifyContent: "center",
         fontFamily: FFB, fontWeight: 700, fontSize: 13, color: "#fff",
-      }}>{(username || "?")[0].toUpperCase()}</div>
+      }}>
+        {(username || "?")[0].toUpperCase()}
+        {unread && <span style={{ position: "absolute", top: -2, right: -2, width: 11, height: 11, borderRadius: "50%", background: "#ff5a5a", border: "2px solid var(--nv-surface-solid)" }}/>}
+      </div>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontFamily: FFB, fontWeight: 600, fontSize: 12.5, color: active ? AC : "var(--nv-text-strong)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>@{username}</div>
+        <div style={{ fontFamily: FFB, fontWeight: unread ? 700 : 600, fontSize: 12.5, color: unread ? "var(--nv-text-strong)" : (active ? AC : "var(--nv-text-strong)"), overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>@{username}</div>
         {preview && (
-          <div style={{ fontSize: 10.5, color: "var(--nv-text-dim)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", lineHeight: 1.35, marginTop: 1 }}>{preview}</div>
+          <div style={{ fontSize: 10.5, color: unread ? "var(--nv-text)" : "var(--nv-text-dim)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", lineHeight: 1.35, marginTop: 1 }}>{preview}</div>
         )}
       </div>
     </button>
@@ -767,12 +843,43 @@ function NewDmForm({ newDmInput, setNewDmInput, startNewDm, opening, newDmError,
 
 // ───────────────────────── Server owner / info panel ────────────────────
 
-function ServerOwnerPanel({ server, isOwner, myUid, myUsername, AC, onClose, onSwitchView }) {
+function ServerOwnerPanel({ server, isOwner, myRole, myUid, myUsername, AC, onClose, onSwitchView }) {
   const [newChan, setNewChan] = useState("");
   const [renaming, setRenaming] = useState(false);
   const [renameDraft, setRenameDraft] = useState(server.name);
   const [err, setErr] = useState("");
   const [copied, setCopied] = useState(false);
+  // v9.6 — inline nickname editing { uid, draft }
+  const [editingNick, setEditingNick] = useState(null);
+
+  // Build the member roster from the members map, falling back to the
+  // legacy memberUids/memberUsernames arrays for v9.5 servers.
+  const roster = (server.memberUids || []).map((uid, i) => {
+    const meta = (server.members || {})[uid] || {};
+    const username = meta.user || (server.memberUsernames || [])[i] || "?";
+    const role = uid === server.ownerUid ? ROLE_OWNER : (meta.role || ROLE_MEMBER);
+    return { uid, username, role, nick: meta.nick || "" };
+  });
+  // Sort: owner, then admins, then members; alphabetical within a tier.
+  const roleRank = { [ROLE_OWNER]: 0, [ROLE_ADMIN]: 1, [ROLE_MEMBER]: 2 };
+  roster.sort((a, b) => (roleRank[a.role] - roleRank[b.role]) || a.username.localeCompare(b.username));
+
+  async function doNick(uid) {
+    setErr("");
+    try { await setNickname(server.id, uid, editingNick?.draft || ""); setEditingNick(null); }
+    catch (e) { setErr(e?.message || "Couldn't set nickname"); }
+  }
+  async function doSetRole(uid, role) {
+    setErr("");
+    try { await setMemberRole(server.id, uid, role); }
+    catch (e) { setErr(e?.message || "Couldn't change role"); }
+  }
+  async function doKick(uid, username) {
+    if (!window.confirm("Remove @" + username + " from the server? They'll need a new invite to rejoin.")) return;
+    setErr("");
+    try { await kickMember(server.id, uid, username); }
+    catch (e) { setErr(e?.message || "Couldn't remove member"); }
+  }
 
   async function doRename() {
     setErr("");
@@ -870,6 +977,74 @@ function ServerOwnerPanel({ server, isOwner, myUid, myUsername, AC, onClose, onS
         </div>
       )}
 
+      {/* Members (v9.6) — visible to everyone; controls gated by role */}
+      <div>
+        <div style={{ ...SEC, marginBottom: 5 }}>Members — {roster.length}</div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+          {roster.map(m => {
+            const isSelf = m.uid === myUid;
+            const display = m.nick && m.nick.trim() ? m.nick.trim() : m.username;
+            // Owner can edit anyone's nick; members can edit only their own.
+            const canEditNick = isOwner || isSelf;
+            // Owner can promote/demote anyone who isn't the owner.
+            const canManageRole = isOwner && m.role !== ROLE_OWNER;
+            // Owner can kick anyone who isn't the owner.
+            const canKick = isOwner && m.role !== ROLE_OWNER;
+            return (
+              <div key={m.uid} style={{ display: "flex", alignItems: "center", gap: 9, padding: "6px 9px", background: "var(--nv-elevated)", border: "1px solid var(--nv-border)", borderRadius: 7 }}>
+                <div style={{ width: 26, height: 26, borderRadius: "50%", flexShrink: 0, background: "rgba(255,255,255,0.06)", border: "1px solid var(--nv-border)", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: FFB, fontWeight: 700, fontSize: 11, color: "var(--nv-text)" }}>
+                  {(display || "?")[0].toUpperCase()}
+                </div>
+                {editingNick?.uid === m.uid ? (
+                  <input
+                    autoFocus
+                    value={editingNick.draft}
+                    onChange={e => setEditingNick({ uid: m.uid, draft: e.target.value })}
+                    onKeyDown={e => { if (e.key === "Enter") doNick(m.uid); if (e.key === "Escape") setEditingNick(null); }}
+                    onBlur={() => doNick(m.uid)}
+                    placeholder={m.username}
+                    maxLength={24}
+                    style={{ ...INP, flex: 1, padding: "3px 8px", fontSize: 12 }}
+                  />
+                ) : (
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      <span style={{ fontFamily: FFB, fontWeight: 600, fontSize: 12.5, color: "var(--nv-text-strong)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{display}</span>
+                      {m.role === ROLE_OWNER && <RoleTag color="#c4a8ff" bg="rgba(168,85,247,0.18)" bd="rgba(168,85,247,0.5)">OWNER</RoleTag>}
+                      {m.role === ROLE_ADMIN && <RoleTag color="#8fd3ff" bg="rgba(80,200,255,0.16)" bd="rgba(80,200,255,0.45)">ADMIN</RoleTag>}
+                      {isSelf && <span style={{ fontSize: 9.5, color: "var(--nv-text-dim)", fontFamily: FFM }}>you</span>}
+                    </div>
+                    {/* If they have a nick, show the real @username underneath */}
+                    {m.nick && m.nick.trim() && <div style={{ fontSize: 9.5, color: "var(--nv-text-dim)", fontFamily: FFM, marginTop: 1 }}>@{m.username}</div>}
+                  </div>
+                )}
+                {/* Controls */}
+                {editingNick?.uid !== m.uid && (
+                  <div style={{ display: "flex", gap: 3, flexShrink: 0 }}>
+                    {canEditNick && (
+                      <button onClick={() => setEditingNick({ uid: m.uid, draft: m.nick || "" })} title="Set nickname" style={memberCtlBtn()}>✏️</button>
+                    )}
+                    {canManageRole && (
+                      m.role === ROLE_ADMIN
+                        ? <button onClick={() => doSetRole(m.uid, ROLE_MEMBER)} title="Demote to member" style={memberCtlBtn()}>▼</button>
+                        : <button onClick={() => doSetRole(m.uid, ROLE_ADMIN)} title="Promote to admin" style={memberCtlBtn()}>▲</button>
+                    )}
+                    {canKick && (
+                      <button onClick={() => doKick(m.uid, m.username)} className="dl" title="Remove from server" style={{ ...memberCtlBtn(), color: "rgba(255,80,80,0.5)" }}>✕</button>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+        <div style={{ fontSize: 10, color: "var(--nv-text-dim)", marginTop: 6, lineHeight: 1.5 }}>
+          {isOwner
+            ? "You can rename anyone (✏️), promote/demote admins (▲▼), and remove members (✕). Admins can delete messages."
+            : "Tap ✏️ on your own row to set a per-server nickname."}
+        </div>
+      </div>
+
       {err && <div style={{ color: "#ff8b8b", fontSize: 12, padding: "7px 10px", background: "rgba(255,80,80,0.08)", border: "1px solid rgba(255,80,80,0.25)", borderRadius: 6 }}>⚠ {err}</div>}
 
       {/* Danger zone */}
@@ -892,6 +1067,48 @@ function miniBtn(AC, ok) {
     cursor: "pointer", color: ok ? "#4cef90" : "var(--nv-text)",
     fontFamily: FFB, fontWeight: 600, fontSize: 11, whiteSpace: "nowrap",
   };
+}
+function memberCtlBtn() {
+  return {
+    width: 24, height: 24, borderRadius: 5,
+    background: "transparent", border: "1px solid var(--nv-border)",
+    cursor: "pointer", color: "var(--nv-text-dim)", fontSize: 10,
+    display: "flex", alignItems: "center", justifyContent: "center", padding: 0,
+  };
+}
+function RoleTag({ children, color, bg, bd }) {
+  return (
+    <span style={{ fontFamily: FFB, fontWeight: 700, fontSize: 8.5, padding: "1px 5px", borderRadius: 3, background: bg, border: "1px solid " + bd, color, letterSpacing: 0.5, flexShrink: 0 }}>{children}</span>
+  );
+}
+
+// ───────────────────────── @mention-aware message text ──────────────────
+// Splits a message body on @mentions and renders each mention as a pill.
+// The pill that matches MY username gets a brighter "you" treatment.
+function MessageText({ text, myName, ac }) {
+  if (!text) return null;
+  // Match @ followed by word chars (usernames are alphanumeric + _/-).
+  const parts = String(text).split(/(@[A-Za-z0-9_-]+)/g);
+  return (
+    <>
+      {parts.map((part, i) => {
+        if (part[0] === "@") {
+          const name = part.slice(1);
+          const isMe = myName && name.toLowerCase() === myName.toLowerCase();
+          return (
+            <span key={i} style={{
+              fontFamily: FFB, fontWeight: 600, fontSize: 13,
+              padding: "0 4px", borderRadius: 4,
+              background: isMe ? "rgba(255,200,80,0.22)" : "rgba(" + hexRgb(ac) + ",0.18)",
+              color: isMe ? "#ffd060" : ac,
+              border: "1px solid " + (isMe ? "rgba(255,200,80,0.4)" : "rgba(" + hexRgb(ac) + ",0.3)"),
+            }}>@{name}</span>
+          );
+        }
+        return <span key={i}>{part}</span>;
+      })}
+    </>
+  );
 }
 
 // ───────────────────────── Create / Join modal ──────────────────────────

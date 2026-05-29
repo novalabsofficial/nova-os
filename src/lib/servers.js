@@ -31,9 +31,36 @@
 import {
   collection, doc, getDoc, setDoc, deleteDoc, updateDoc,
   addDoc, query, where, orderBy, limit, onSnapshot,
-  arrayUnion, arrayRemove, writeBatch, getDocs,
+  arrayUnion, arrayRemove, writeBatch, getDocs, deleteField,
 } from "firebase/firestore";
 import { firestoreDb } from "../firebase.js";
+
+// v9.6 — role constants. Owner is immutable (the creator). Admins get
+// moderation powers (delete any message); members are the default.
+export const ROLE_OWNER = "owner";
+export const ROLE_ADMIN = "admin";
+export const ROLE_MEMBER = "member";
+
+/** Clean a per-server nickname. Empty string clears it (falls back to username). */
+export function cleanNick(raw, maxLen = 24) {
+  return (raw || "").toString().trim().replace(/\s+/g, " ").slice(0, maxLen);
+}
+
+/**
+ * Resolve a member's display name within a server: their nickname if set,
+ * otherwise their username. `server.members[uid]` holds the metadata.
+ */
+export function memberDisplayName(server, uid, fallbackUser) {
+  const m = server?.members?.[uid];
+  if (m && m.nick && m.nick.trim()) return m.nick.trim();
+  return (m && m.user) || fallbackUser || "?";
+}
+
+/** A member's role in a server (defaults to "member" for legacy/missing entries). */
+export function memberRole(server, uid) {
+  if (server?.ownerUid === uid) return ROLE_OWNER;
+  return server?.members?.[uid]?.role || ROLE_MEMBER;
+}
 
 // ── helpers ─────────────────────────────────────────────────────────────
 
@@ -157,6 +184,9 @@ export async function createServer({ name, icon, myUid, myUsername }) {
     ownerUsername: myUsername,
     memberUids: [myUid],
     memberUsernames: [myUsername],
+    // v9.6: per-member metadata. The query + read-gating still use the
+    // memberUids array; this map carries role + nickname.
+    members: { [myUid]: { role: ROLE_OWNER, nick: "", user: myUsername } },
     inviteCode: code,
     channels: [{ id: "general", name: "general" }],
     createdAt: now,
@@ -192,6 +222,9 @@ export async function joinServer(serverId, myUid, myUsername) {
   await updateDoc(doc(firestoreDb, "nova_servers", serverId), {
     memberUids: arrayUnion(myUid),
     memberUsernames: arrayUnion(myUsername || ""),
+    // v9.6: seed the member entry with the default role. The rules verify
+    // this is the joiner's own key and role === "member".
+    ["members." + myUid]: { role: ROLE_MEMBER, nick: "", user: myUsername || "" },
   });
 }
 
@@ -204,7 +237,79 @@ export async function leaveServer(serverId, myUid, myUsername) {
   await updateDoc(doc(firestoreDb, "nova_servers", serverId), {
     memberUids: arrayRemove(myUid),
     memberUsernames: arrayRemove(myUsername || ""),
+    ["members." + myUid]: deleteField(),
   });
+}
+
+// ── v9.6: roles, nicknames, kicks, backfill ─────────────────────────────
+
+/**
+ * Set a member's per-server nickname. Allowed for the member themselves
+ * (their own uid) or the owner (any uid). Empty string clears it.
+ */
+export async function setNickname(serverId, targetUid, nick) {
+  if (!serverId || !targetUid) return;
+  await updateDoc(doc(firestoreDb, "nova_servers", serverId), {
+    ["members." + targetUid + ".nick"]: cleanNick(nick),
+  });
+}
+
+/**
+ * Owner-only: change a member's role. Can't target the owner's own entry
+ * (ownership isn't a role you toggle — it's the ownerUid field). Pass
+ * ROLE_ADMIN or ROLE_MEMBER.
+ */
+export async function setMemberRole(serverId, targetUid, role) {
+  if (!serverId || !targetUid) return;
+  if (role !== ROLE_ADMIN && role !== ROLE_MEMBER) throw new Error("Invalid role.");
+  await updateDoc(doc(firestoreDb, "nova_servers", serverId), {
+    ["members." + targetUid + ".role"]: role,
+  });
+}
+
+/**
+ * Owner-only: remove a member from the server (kick). Strips them from
+ * memberUids/memberUsernames and deletes their members entry. The owner
+ * can't be kicked. (Admins-kicking-members is intentionally deferred to
+ * keep the rules surface small — owners do all kicking for now.)
+ */
+export async function kickMember(serverId, targetUid, targetUsername) {
+  if (!serverId || !targetUid) return;
+  await updateDoc(doc(firestoreDb, "nova_servers", serverId), {
+    memberUids: arrayRemove(targetUid),
+    memberUsernames: arrayRemove(targetUsername || ""),
+    ["members." + targetUid]: deleteField(),
+  });
+}
+
+/**
+ * Migration helper: servers created in v9.5 have no `members` map. When
+ * the OWNER opens such a server, backfill the map from memberUids +
+ * memberUsernames so roles/nicknames work. Only the owner can do this
+ * (the owner-edit rule branch permits it). No-op if the map already
+ * exists or the caller isn't the owner. Returns true if it wrote.
+ */
+export async function ensureMembersMap(server, myUid) {
+  if (!server || !server.id) return false;
+  if (server.members && Object.keys(server.members).length > 0) return false;
+  if (server.ownerUid !== myUid) return false;   // only the owner can backfill
+  const uids = server.memberUids || [];
+  const names = server.memberUsernames || [];
+  const members = {};
+  uids.forEach((uid, i) => {
+    members[uid] = {
+      role: uid === server.ownerUid ? ROLE_OWNER : ROLE_MEMBER,
+      nick: "",
+      user: names[i] || "",
+    };
+  });
+  try {
+    await updateDoc(doc(firestoreDb, "nova_servers", server.id), { members });
+    return true;
+  } catch (e) {
+    console.warn("[servers] members backfill failed:", e?.message || e);
+    return false;
+  }
 }
 
 /**
