@@ -9,19 +9,24 @@
 // callbacks. A window's `desk` field (int, default 0) says which desktop it
 // belongs to.
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { FF, FFB, FFM } from "./styles.js";
 import { fill, bdr, hexRgb } from "../lib/format.js";
 
 const MINI_RATIO = 0.6;       // preview height = width * ratio
 
 export function TaskView({ AC, deskCount, curDesk, wins, apps, onSwitch, onAdd, onRemove, onMoveWin, onFocusWin, onClose }) {
+  const activeRef = useRef(null);
   // Esc closes (capture so it beats the global handler).
   useEffect(() => {
     function onKey(e) { if (e.key === "Escape") { e.stopPropagation(); onClose(); } }
     window.addEventListener("keydown", onKey, true);
     return () => window.removeEventListener("keydown", onKey, true);
   }, [onClose]);
+  // Keep the active desktop preview in view when arrowing through several.
+  useEffect(() => {
+    activeRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
+  }, [curDesk]);
 
   const appOf = (id) => apps.find(a => a.id === id) || { icon: "▦", label: id };
   const sw = typeof window !== "undefined" ? window.innerWidth : 1280;
@@ -45,11 +50,37 @@ export function TaskView({ AC, deskCount, curDesk, wins, apps, onSwitch, onAdd, 
         animation: "ss-fade 0.16s",
       }}
     >
+      {/* Prev / next desktop arrows — live INSIDE Task View. Stepping them
+          changes the active desktop (so closing lands you there) without
+          leaving the overview, so you can flip through desktops here. */}
+      {curDesk > 0 && (
+        <button
+          className="nv-desk-arrow"
+          onPointerDown={e => e.stopPropagation()}
+          onClick={() => onSwitch(curDesk - 1)}
+          title="Previous desktop"
+          style={{ position: "fixed", left: 20, top: "50%", transform: "translateY(-50%)", zIndex: 6, width: 56, height: 104, borderRadius: 16, background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.18)", cursor: "pointer", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 10px 30px rgba(0,0,0,0.4)" }}
+        >
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none"><path d="M15 5l-7 7 7 7" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" /></svg>
+        </button>
+      )}
+      {curDesk < deskCount - 1 && (
+        <button
+          className="nv-desk-arrow"
+          onPointerDown={e => e.stopPropagation()}
+          onClick={() => onSwitch(curDesk + 1)}
+          title="Next desktop"
+          style={{ position: "fixed", right: 20, top: "50%", transform: "translateY(-50%)", zIndex: 6, width: 56, height: 104, borderRadius: 16, background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.18)", cursor: "pointer", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 10px 30px rgba(0,0,0,0.4)" }}
+        >
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none"><path d="M9 5l7 7-7 7" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" /></svg>
+        </button>
+      )}
+
       {/* Heading */}
       <div style={{ textAlign: "center" }}>
         <div style={{ fontFamily: FFB, fontWeight: 800, fontSize: 19, color: "#fff", letterSpacing: 0.2 }}>Task View</div>
         <div style={{ fontFamily: FFM, fontSize: 11, color: "rgba(255,255,255,0.5)", marginTop: 4 }}>
-          Ctrl+Alt+← → switch · Ctrl+Alt+↑ toggle · Esc to close
+          Use the ‹ › arrows or click a desktop to switch · Esc to close
         </div>
       </div>
 
@@ -59,7 +90,7 @@ export function TaskView({ AC, deskCount, curDesk, wins, apps, onSwitch, onAdd, 
           const dWins = wins.filter(w => (w.desk || 0) === idx);
           const active = idx === curDesk;
           return (
-            <div key={idx} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8 }}>
+            <div key={idx} ref={active ? activeRef : null} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8 }}>
               <div
                 onPointerDown={e => e.stopPropagation()}
                 onClick={() => { onSwitch(idx); onClose(); }}

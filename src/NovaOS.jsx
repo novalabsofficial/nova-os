@@ -2346,19 +2346,9 @@ export default function NovaOS(){
       ))}
       </div>
 
-      {/* v10.0 — on-screen desktop-switch arrows. Appear at the screen edges
-          when an adjacent virtual desktop exists; clicking slides to it. */}
-      {curDesk>0 && (
-        <button onClick={()=>setCurDesk(c=>Math.max(0,c-1))} title="Previous desktop (Ctrl+Alt+←)" className="nv-desk-arrow" style={{position:"fixed",left:14,top:"50%",transform:"translateY(-50%)",zIndex:9996,width:46,height:74,borderRadius:14,background:"rgba(16,18,28,0.42)",border:"1px solid rgba(255,255,255,0.14)",backdropFilter:"blur(12px)",WebkitBackdropFilter:"blur(12px)",cursor:"pointer",color:"rgba(255,255,255,0.85)",display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 8px 26px rgba(0,0,0,0.4)",transition:"background 0.15s, transform 0.15s"}}>
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M15 5l-7 7 7 7" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/></svg>
-        </button>
-      )}
-      {curDesk<deskCount-1 && (
-        <button onClick={()=>setCurDesk(c=>Math.min(deskCount-1,c+1))} title="Next desktop (Ctrl+Alt+→)" className="nv-desk-arrow" style={{position:"fixed",right:14,top:"50%",transform:"translateY(-50%)",zIndex:9996,width:46,height:74,borderRadius:14,background:"rgba(16,18,28,0.42)",border:"1px solid rgba(255,255,255,0.14)",backdropFilter:"blur(12px)",WebkitBackdropFilter:"blur(12px)",cursor:"pointer",color:"rgba(255,255,255,0.85)",display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 8px 26px rgba(0,0,0,0.4)",transition:"background 0.15s, transform 0.15s"}}>
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M9 5l7 7-7 7" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/></svg>
-        </button>
-      )}
-      {/* v10.0 — desktop pager dots, bottom-center above the taskbar. */}
+      {/* v10.0 — desktop pager dots, bottom-center above the taskbar. The
+          "slider" stays on the base desktop; the prev/next arrow bars live in
+          Task View (the overview), not on the live desktop. */}
       {deskCount>1 && (
         <div style={{position:"fixed",left:"50%",bottom:TASKBAR_H+14,transform:"translateX(-50%)",zIndex:9996,display:"flex",gap:8,padding:"7px 12px",borderRadius:20,background:"rgba(16,18,28,0.42)",border:"1px solid rgba(255,255,255,0.12)",backdropFilter:"blur(12px)",WebkitBackdropFilter:"blur(12px)",boxShadow:"0 8px 26px rgba(0,0,0,0.4)"}}>
           {Array.from({length:deskCount},(_,di)=>(
