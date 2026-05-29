@@ -38,6 +38,7 @@ import {
   WALLPAPERS, WMO, HAS_SVG_ICON, NOVA_VERSION,
 } from "./ui/constants.js";
 import { Wallpaper, NovaBg, BlissBg, AuroraBg, MeshBg } from "./ui/wallpapers.jsx";
+import { CommandBar } from "./ui/CommandBar.jsx";
 import { NovaSvgIcon, AppIconDisplay, NovaLogo, WindowControlIcon, UserAvatar } from "./ui/icons.jsx";
 import { subscribeDrag, moveDrag, endDrag, getDrag } from "./lib/dragStore.js";
 import { Toggle } from "./ui/Toggle.jsx";
@@ -555,6 +556,8 @@ export default function NovaOS(){
   // Search button or by Ctrl/Cmd+K. Searches across apps, notes, tasks,
   // folders, store apps, and Settings panes.
   const [spotlightOpen, setSpotlightOpen] = useState(false);
+  // v10.0 Supernova — AI command bar (Ctrl/Cmd+J). Natural-language → actions.
+  const [commandOpen, setCommandOpen] = useState(false);
   const ssActiveRef = useRef(false);
   const idleTimerRef = useRef(null);
   // v8.6 cross-app drag-and-drop — mirrors the shared dragStore so we can
@@ -1199,6 +1202,59 @@ export default function NovaOS(){
   const updateData    =useCallback((patch)=>{setData(prev=>{const next=typeof patch==="function"?patch(prev):{...prev,...patch};saveData(next);return next;});},[saveData]);
   const updateSettings=useCallback((patch)=>{updateData(prev=>({...prev,settings:{...(prev.settings||{}),...patch}}));},[updateData]);
   const handleCustomWallpaper=useCallback(async(url)=>{setCustomWp(url);await db.set("user:"+user+":wpimg",url);updateSettings({wallpaper:"custom"});showToast("Custom wallpaper set ✓");},[user,updateSettings,showToast]);
+
+  // v10.0 Supernova — AI command-bar executor. Maps a planned {tool, args}
+  // step to a real OS action and returns a short result string (or null for
+  // no-op steps like "answer"). Throws on bad input so the command bar can
+  // show a per-step ⚠. Every action here is safe + reversible.
+  const runCommand = useCallback(async (tool, args = {}) => {
+    switch (tool) {
+      case "openApp": {
+        const id = String(args.appId || "").toLowerCase().trim();
+        const app = APPS.find(a => a.id === id);
+        if (!app) throw new Error("No app called \"" + (args.appId || "?") + "\"");
+        kbHandlersRef.current?.openApp(id);
+        return "Opened " + app.label;
+      }
+      case "createNote": {
+        const title = (args.title || "Untitled").toString().slice(0, 120);
+        const body = (args.body || "").toString();
+        const id = Date.now();
+        updateData(p => ({ ...p, notes: [{ id, title, body, ts: id, folderId: null }, ...(p.notes || [])] }));
+        return "Created note “" + title + "”";
+      }
+      case "createTask": {
+        const text = (args.text || "").toString().trim();
+        if (!text) throw new Error("No task text given");
+        updateData(p => ({ ...p, tasks: [{ id: Date.now(), text, done: false, ts: Date.now() }, ...(p.tasks || [])] }));
+        return "Added task “" + text + "”";
+      }
+      case "setWallpaper": {
+        const id = String(args.id || "").toLowerCase().trim();
+        if (!WALLPAPERS[id]) throw new Error("No wallpaper called \"" + (args.id || "?") + "\"");
+        updateSettings({ wallpaper: id });
+        return "Wallpaper changed to " + id;
+      }
+      case "setAccent": {
+        let hex = String(args.hex || "").trim();
+        if (!/^#?[0-9a-fA-F]{6}$/.test(hex)) throw new Error("Not a valid color");
+        if (hex[0] !== "#") hex = "#" + hex;
+        updateSettings({ accent: hex });
+        return "Accent color updated";
+      }
+      case "setVolume": {
+        let lvl = Number(args.level);
+        if (!Number.isFinite(lvl)) throw new Error("Invalid volume");
+        lvl = Math.max(0, Math.min(100, lvl));
+        setSoundConfig({ ...getSoundConfig(), volume: lvl / 100 });
+        return "Volume set to " + Math.round(lvl) + "%";
+      }
+      case "answer":
+        return null; // pure reply — nothing to do
+      default:
+        throw new Error("I can't do \"" + tool + "\" yet");
+    }
+  }, [updateData, updateSettings]);
   // v8.6 — downsample a (blob/data) image URL then hand the JPEG data URL to cb.
   function downsamplePhoto(url, max, quality, cb){
     const img=new Image();
@@ -1349,7 +1405,7 @@ export default function NovaOS(){
   // still reading the latest handler functions. Re-binding the listener
   // on every render would work too, just slightly noisier.
   const kbHandlersRef = useRef(null);
-  kbHandlersRef.current = { openApp, closeWin, minimizeWin, setMenuOpen, setSpotlightOpen, screen, applySnap, snapDown };
+  kbHandlersRef.current = { openApp, closeWin, minimizeWin, setMenuOpen, setSpotlightOpen, setCommandOpen, screen, applySnap, snapDown };
   useEffect(()=>{
     function onKey(e){
       const h = kbHandlersRef.current;
@@ -1369,6 +1425,13 @@ export default function NovaOS(){
       if(mod && (e.key === "k" || e.key === "K") && !isTyping){
         e.preventDefault();
         h.setSpotlightOpen(o => !o);
+        return;
+      }
+      // Cmd/Ctrl + J — AI command bar (v10.0 Supernova). Works even while
+      // typing in an app, since it's an explicit modifier combo.
+      if(mod && (e.key === "j" || e.key === "J")){
+        e.preventDefault();
+        h.setCommandOpen(o => !o);
         return;
       }
       // Cmd/Ctrl + , — Settings
@@ -1776,6 +1839,22 @@ export default function NovaOS(){
           openExternalUrl={openExternalUrl}
           openSettingsSection={(id) => { setSettingsSection(id); openApp("settings"); }}
           onClose={() => setSpotlightOpen(false)}
+        />
+      )}
+      {/* v10.0 Supernova — AI command bar (Cmd/Ctrl+J). Natural language
+          → OS actions, powered by the same BYOK Nova AI key. */}
+      {commandOpen && (
+        <CommandBar
+          AC={AC}
+          context={{
+            appIds: APPS.map(a => a.id),
+            appLabels: Object.fromEntries(APPS.map(a => [a.id, a.label])),
+            wallpaperIds: Object.keys(WALLPAPERS),
+            accents: ACCENT_PRESETS,
+          }}
+          onExecute={runCommand}
+          onOpenNovaAi={() => openApp("novaai")}
+          onClose={() => setCommandOpen(false)}
         />
       )}
       {/* v9.4 — Atmos severe-weather lock-screen alert. Fires above
