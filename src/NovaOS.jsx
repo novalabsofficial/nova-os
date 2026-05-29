@@ -2316,6 +2316,18 @@ export default function NovaOS(){
             <span style={{fontFamily:FFM,fontSize:10,padding:"1px 6px",background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.09)",borderRadius:4,marginLeft:4,letterSpacing:0.3}}>Ctrl+K</span>
           </button>
         )}
+        {/* v10.0 Supernova — Nova AI command bar launcher. Accent-tinted so it
+            stands out; opens the natural-language command palette (Ctrl/Cmd+J). */}
+        <button className="sb" onClick={()=>setCommandOpen(o=>!o)} title="Nova AI command bar (Ctrl+J)" style={{
+          height:42,display:"flex",alignItems:"center",gap:7,padding:deviceMode==="mobile"?"0 11px":"0 13px",borderRadius:12,
+          background:fill(AC),border:"1px solid "+bdr(AC),
+          cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:12.5,color:AC,
+          transition:"all 0.18s cubic-bezier(0.4,0,0.2,1)",flexShrink:0,
+        }}>
+          <span style={{fontSize:14,lineHeight:1,filter:"drop-shadow(0 0 8px rgba("+hexRgb(AC)+",0.5))"}}>✨</span>
+          {deviceMode!=="mobile" && <span>Ask Nova</span>}
+          {deviceMode!=="mobile" && <span style={{fontFamily:FFM,fontSize:10,padding:"1px 6px",background:"rgba("+hexRgb(AC)+",0.18)",border:"1px solid "+bdr(AC),borderRadius:4,marginLeft:2,letterSpacing:0.3}}>Ctrl+J</span>}
+        </button>
         {/* v9.0 — Windows 11-style weather pill in the bottom-left corner. */}
         {deviceMode!=="mobile" && <TaskbarWeather data={data} onClick={()=>openApp("atmos")} />}
         </div>
