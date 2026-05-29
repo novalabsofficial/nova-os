@@ -193,15 +193,21 @@ function Display({ value, sub, AC, large = false, mono = true }) {
 //   • accent  — = button
 //   • danger  — AC
 //   • muted   — subtle (scientific extras, etc.)
+//
+// IMPORTANT: only the accent + danger variants need `AC` — and we only
+// evaluate those when the matching variant is requested. Building all
+// variant styles eagerly would crash (TypeError in `hexRgb`) for any
+// KeyBtn rendered without an `AC` prop, since digit buttons skip it.
 function KeyBtn({ children, onClick, variant, span, AC, height, fontSize, title }) {
-  const styles = {
-    default: { background: "var(--nv-elevated)", border: "1px solid var(--nv-border)", color: "var(--nv-text-strong)" },
-    op:      { background: "rgba(255,255,255,0.10)", border: "1px solid var(--nv-border-strong)", color: "var(--nv-text-strong)" },
-    accent:  { background: AC, border: "1px solid " + AC, color: "#fff" },
-    danger:  { background: fill(AC), border: "1px solid " + bdr(AC), color: AC },
-    muted:   { background: "transparent", border: "1px solid var(--nv-border)", color: "var(--nv-text-dim)" },
-  };
-  const s = styles[variant || "default"];
+  const v = variant || "default";
+  let s;
+  switch (v) {
+    case "op":      s = { background: "rgba(255,255,255,0.10)", border: "1px solid var(--nv-border-strong)", color: "var(--nv-text-strong)" }; break;
+    case "accent":  s = { background: AC, border: "1px solid " + AC, color: "#fff" }; break;
+    case "danger":  s = { background: fill(AC), border: "1px solid " + bdr(AC), color: AC }; break;
+    case "muted":   s = { background: "transparent", border: "1px solid var(--nv-border)", color: "var(--nv-text-dim)" }; break;
+    default:        s = { background: "var(--nv-elevated)", border: "1px solid var(--nv-border)", color: "var(--nv-text-strong)" };
+  }
   return (
     <button
       onClick={onClick}
