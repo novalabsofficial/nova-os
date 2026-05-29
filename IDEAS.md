@@ -919,7 +919,12 @@ point.
 
 ---
 
-## 20. Photos — real editor + better browsing
+## 20. Photos — real editor + better browsing — 🚧 BUILT in v9.7 (feature/v9.7)
+
+Shipped on the branch: two-pane sidebar (Library / Recently Added / Albums),
+a canvas editor (crop + aspect presets, rotate, flip, brightness / contrast /
+saturation / warmth sliders, filter presets, auto-enhance, save-as-new-copy),
+and session albums. "Memories / On this day" + slideshow music deferred.
 
 Lift the Photos app from "gallery viewer" to a genuine competitor to the
 Windows 11 Photos app / Apple Photos.
@@ -1011,7 +1016,14 @@ Calculator app.
 
 ---
 
-## 23. Slides — a free, exportable PowerPoint competitor
+## 23. Slides — a free, exportable PowerPoint competitor — 🚧 BUILT (v1) in v9.7 (feature/v9.7)
+
+Shipped a v1 on the branch: deck home, editor (slide rail + 16:9 canvas +
+properties panel), text / rect / ellipse / line / image elements with
+drag-move + corner-resize, six themes, presenter fullscreen mode (arrow
+keys), decks saved to `data.slides` on the user doc, and **.pptx export**
+via lazy-loaded `pptxgenjs`. Deferred: PDF export, speaker notes, drag-to-
+reorder beyond the ↑↓ buttons, more templates.
 
 A new presentation app: build slide decks, edit text/images/shapes per
 slide, present in fullscreen, and **export to a real `.pptx`** file that
