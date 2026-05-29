@@ -5,6 +5,46 @@ not committed to. Living document — add to it freely.
 
 ---
 
+# ✅ v9.7 — shipped ("Creative tools + polish")
+
+Two big app builds plus a batch of fixes.
+
+**Photos — overhaul + Canva-style editor (#20)**
+- Two-pane Library / Recently Added / Albums sidebar; session albums.
+- The editor became a **layered compositor**: configurable background (color
+  or transparent → PNG export), the photo as a movable layer, add more image
+  layers from your PC or by **pasting** (Ctrl/⌘+V). Drag layers freely with
+  **smart alignment guides** that snap to the canvas + other layers. Per-layer
+  opacity, rotate, flip, brightness/contrast/saturation/warmth, 8 filter
+  presets, z-order. Exports a flattened new copy.
+
+**Slides — new presentation app (#23)**
+- Deck home + editor (slide rail + 16:9 canvas + properties). Text / rect /
+  ellipse / line / image elements, drag-move + resize, 6 themes, presenter
+  fullscreen mode. Decks save to `data.slides` on the user doc. **.pptx
+  export** via lazy-loaded `pptxgenjs` (opens in PowerPoint / Google Slides).
+
+**Calculator — Canva-era reuse:** N/A (calc shipped in 9.5).
+
+**Bug-fix / polish batches**
+- Screenshot: region-snip is the primary action with a full-screen
+  Snipping-Tool-style overlay (dim, crosshair, live W×H badge, Esc).
+- Calculator hold-backspace now repeats via pointer press-and-hold (works on
+  ChromeOS/PWA where physical key-repeat is suppressed).
+- Community-app desktop query hardened (no silent doc-drop).
+- **Desktop drag-select** — left-drag empty desktop draws a Windows-style
+  selection box that highlights icons (fixed the surface-layer bug).
+- **Pong** — local 2-player hot-seat (P1 = W/S, P2 = ↑/↓), no networking.
+- **Chess — chess.com-style revamp:** consistent solid pieces (fixed the
+  mixed outline/filled glyphs), green/cream board with coordinates +
+  last-move highlight, captured-piece trays with material lead, and a
+  numbered move-history list.
+
+**Dependency added:** `pptxgenjs` (lazy-loaded, export-only).
+**Firebase:** no rules change for v9.7.
+
+---
+
 # ✅ v9.6 — shipped ("Servers & Social polish")
 
 A focused follow-up to v9.5's servers launch — finishing the social surfaces.
@@ -919,7 +959,12 @@ point.
 
 ---
 
-## 20. Photos — real editor + better browsing
+## 20. Photos — real editor + better browsing — 🚧 BUILT in v9.7 (feature/v9.7)
+
+Shipped on the branch: two-pane sidebar (Library / Recently Added / Albums),
+a canvas editor (crop + aspect presets, rotate, flip, brightness / contrast /
+saturation / warmth sliders, filter presets, auto-enhance, save-as-new-copy),
+and session albums. "Memories / On this day" + slideshow music deferred.
 
 Lift the Photos app from "gallery viewer" to a genuine competitor to the
 Windows 11 Photos app / Apple Photos.
@@ -1011,7 +1056,14 @@ Calculator app.
 
 ---
 
-## 23. Slides — a free, exportable PowerPoint competitor
+## 23. Slides — a free, exportable PowerPoint competitor — 🚧 BUILT (v1) in v9.7 (feature/v9.7)
+
+Shipped a v1 on the branch: deck home, editor (slide rail + 16:9 canvas +
+properties panel), text / rect / ellipse / line / image elements with
+drag-move + corner-resize, six themes, presenter fullscreen mode (arrow
+keys), decks saved to `data.slides` on the user doc, and **.pptx export**
+via lazy-loaded `pptxgenjs`. Deferred: PDF export, speaker notes, drag-to-
+reorder beyond the ↑↓ buttons, more templates.
 
 A new presentation app: build slide decks, edit text/images/shapes per
 slide, present in fullscreen, and **export to a real `.pptx`** file that

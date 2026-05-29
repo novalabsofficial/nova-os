@@ -44,6 +44,14 @@ export function ScreenshotApp({ AC, showToast, onSetWallpaper }) {
   const cropImgRef = useRef(null);
   const cropDragRef = useRef(false);
 
+  // v9.7 B1 — Esc cancels the snip overlay.
+  useEffect(() => {
+    if (shot || !rawShot) return;
+    function onKey(e) { if (e.key === "Escape") { setSel(null); setRawShot(null); } }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [shot, rawShot]);
+
   // Load the captured image onto the canvas whenever a new shot arrives.
   useEffect(() => {
     if (!shot) return;
@@ -227,13 +235,18 @@ export function ScreenshotApp({ AC, showToast, onSetWallpaper }) {
             Capture your whole screen, or <strong style={{ color: "rgba(255,255,255,0.7)" }}>snip a region</strong>, then draw arrows, boxes, text and blur over it — save it to Photos or set it as your wallpaper.
           </div>
           {supported ? (
-            <div style={{ display: "flex", gap: 10, flexWrap: "wrap", justifyContent: "center" }}>
-              <button onClick={() => capture(false)} disabled={capturing} style={{ padding: "11px 24px", borderRadius: 10, cursor: "pointer", fontFamily: FFB, fontWeight: 700, fontSize: 14, background: fill(AC), border: "1px solid " + bdr(AC), color: AC, opacity: capturing ? 0.5 : 1 }}>
-                {capturing ? "Waiting…" : "📸 Capture full"}
-              </button>
-              <button onClick={() => capture(true)} disabled={capturing} style={{ padding: "11px 24px", borderRadius: 10, cursor: "pointer", fontFamily: FFB, fontWeight: 700, fontSize: 14, background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.14)", color: "rgba(255,255,255,0.8)", opacity: capturing ? 0.5 : 1 }}>
-                ✂ Snip a region
-              </button>
+            <div style={{ display: "flex", flexDirection: "column", gap: 10, alignItems: "center" }}>
+              <div style={{ display: "flex", gap: 10, flexWrap: "wrap", justifyContent: "center" }}>
+                <button onClick={() => capture(true)} disabled={capturing} style={{ padding: "11px 24px", borderRadius: 10, cursor: "pointer", fontFamily: FFB, fontWeight: 700, fontSize: 14, background: fill(AC), border: "1px solid " + bdr(AC), color: AC, opacity: capturing ? 0.5 : 1 }}>
+                  {capturing ? "Waiting…" : "✂ Snip a region"}
+                </button>
+                <button onClick={() => capture(false)} disabled={capturing} style={{ padding: "11px 24px", borderRadius: 10, cursor: "pointer", fontFamily: FFB, fontWeight: 700, fontSize: 14, background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.14)", color: "rgba(255,255,255,0.8)", opacity: capturing ? 0.5 : 1 }}>
+                  📸 Capture full
+                </button>
+              </div>
+              <div style={{ fontSize: 10.5, color: "rgba(255,255,255,0.35)", maxWidth: 360, lineHeight: 1.55 }}>
+                Your browser will ask which screen/window to share — pick one, then drag a box over the part you want. (Browsers can't read the screen without that one-time prompt.)
+              </div>
             </div>
           ) : (
             <div style={{ fontSize: 12, color: "rgba(255,180,80,0.8)", maxWidth: 320, lineHeight: 1.6 }}>Screen capture isn't available in this browser/runtime. Try the web app in Chrome or Edge.</div>
@@ -241,19 +254,33 @@ export function ScreenshotApp({ AC, showToast, onSetWallpaper }) {
         </div>
       )}
       {!shot && rawShot && (
-        <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", gap: 10 }}>
-          <div style={{ fontSize: 12.5, color: "rgba(255,255,255,0.62)", textAlign: "center", flexShrink: 0 }}>✂ Drag to select the region to keep</div>
-          <div style={{ flex: 1, minHeight: 0, overflow: "auto", display: "flex", alignItems: "flex-start", justifyContent: "center", background: "rgba(0,0,0,0.4)", borderRadius: 10, border: "1px solid rgba(255,255,255,0.07)", padding: 10 }}>
-            <div style={{ position: "relative", lineHeight: 0, touchAction: "none" }} onPointerDown={cropDown} onPointerMove={cropMove} onPointerUp={cropUp} onPointerCancel={cropUp}>
-              <img ref={cropImgRef} src={rawShot} alt="" draggable={false} style={{ maxWidth: "100%", height: "auto", borderRadius: 6, display: "block", cursor: "crosshair", userSelect: "none" }}/>
-              {sel && (() => { const x = Math.min(sel.x0, sel.x1), y = Math.min(sel.y0, sel.y1), w = Math.abs(sel.x1 - sel.x0), h = Math.abs(sel.y1 - sel.y0); return (
-                <div style={{ position: "absolute", left: x, top: y, width: w, height: h, border: "2px solid " + AC, boxShadow: "0 0 0 9999px rgba(0,0,0,0.5)", pointerEvents: "none" }}/>
+        // v9.7 B1 — full-screen Snipping-Tool-style overlay. The captured
+        // frame fills the viewport dimmed; drag a crosshair box over the
+        // part to keep, with a live W×H badge. Esc / Back cancels.
+        <div style={{ position: "fixed", inset: 0, zIndex: 99998, background: "rgba(0,0,0,0.88)", backdropFilter: "blur(6px)", display: "flex", flexDirection: "column", animation: "ss-fade 0.16s" }}>
+          <div style={{ flexShrink: 0, textAlign: "center", padding: "14px 16px 8px", fontFamily: FFB, fontWeight: 600, fontSize: 13, color: "#fff" }}>
+            ✂ Drag to select the area to keep
+            <span style={{ fontFamily: FF, fontWeight: 400, fontSize: 11, color: "rgba(255,255,255,0.5)", marginLeft: 8 }}>· Esc to cancel</span>
+          </div>
+          <div style={{ flex: 1, minHeight: 0, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 16px 12px" }}>
+            <div style={{ position: "relative", lineHeight: 0, touchAction: "none", maxWidth: "100%", maxHeight: "100%" }} onPointerDown={cropDown} onPointerMove={cropMove} onPointerUp={cropUp} onPointerCancel={cropUp}>
+              <img ref={cropImgRef} src={rawShot} alt="" draggable={false} style={{ maxWidth: "92vw", maxHeight: "76vh", width: "auto", height: "auto", borderRadius: 4, display: "block", cursor: "crosshair", userSelect: "none", boxShadow: "0 10px 50px rgba(0,0,0,0.6)" }}/>
+              {sel && (() => { const x = Math.min(sel.x0, sel.x1), y = Math.min(sel.y0, sel.y1), w = Math.abs(sel.x1 - sel.x0), h = Math.abs(sel.y1 - sel.y0);
+                const img = cropImgRef.current; const r = img ? img.getBoundingClientRect() : null;
+                const realW = r ? Math.round(w * (img.naturalWidth / r.width)) : Math.round(w);
+                const realH = r ? Math.round(h * (img.naturalHeight / r.height)) : Math.round(h);
+                return (
+                <>
+                  <div style={{ position: "absolute", left: x, top: y, width: w, height: h, border: "2px solid " + AC, boxShadow: "0 0 0 9999px rgba(0,0,0,0.55)", pointerEvents: "none" }}/>
+                  {w > 10 && h > 10 && (
+                    <div style={{ position: "absolute", left: x, top: Math.max(2, y - 24), background: AC, color: "#04122b", fontFamily: FFM, fontWeight: 700, fontSize: 11, padding: "2px 7px", borderRadius: 5, pointerEvents: "none", whiteSpace: "nowrap" }}>{realW} × {realH}</div>
+                  )}
+                </>
               ); })()}
             </div>
           </div>
-          <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
-            <button onClick={() => { setSel(null); setRawShot(null); }} style={actBtn}>← Back</button>
-            <div style={{ flex: 1 }}/>
+          <div style={{ display: "flex", gap: 8, flexShrink: 0, padding: "0 16px 16px", justifyContent: "center" }}>
+            <button onClick={() => { setSel(null); setRawShot(null); }} style={actBtn}>← Cancel</button>
             <button onClick={() => { setSel(null); setShot(rawShot); setRawShot(null); }} style={actBtn}>Use full image</button>
           </div>
         </div>
@@ -277,7 +304,7 @@ export function ScreenshotApp({ AC, showToast, onSetWallpaper }) {
 
           {/* Actions */}
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", flexShrink: 0 }}>
-            <button onClick={capture} style={actBtn}>📸 Recapture</button>
+            <button onClick={() => { setShot(null); capture(true); }} style={actBtn}>📸 Recapture</button>
             <div style={{ flex: 1 }}/>
             <button onClick={saveToPhotos} style={actBtn}>🖼 Save to Photos</button>
             {onSetWallpaper && <button onClick={setWallpaper} style={actBtn}>🖥 Set as wallpaper</button>}

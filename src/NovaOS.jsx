@@ -90,6 +90,7 @@ const ChessApp        = lazy(() => import("./apps/ChessApp.jsx").then(m        =
 // v8.0 round-3
 const PhotosApp       = lazy(() => import("./apps/PhotosApp.jsx").then(m       => ({default: m.PhotosApp})));
 const ScreenshotApp   = lazy(() => import("./apps/ScreenshotApp.jsx").then(m   => ({default: m.ScreenshotApp})));
+const SlidesApp       = lazy(() => import("./apps/SlidesApp.jsx").then(m       => ({default: m.SlidesApp})));
 
 // ─── v9.0 taskbar glyphs ────────────────────────────────────────────────
 // Monochrome line-glyphs for the system tray, replacing the old emoji
@@ -569,6 +570,11 @@ export default function NovaOS(){
   // and the desktop icon grid recomputes (fixes #21).
   const [viewport,   setViewport]   = useState(() => ({ w: typeof window !== "undefined" ? window.innerWidth : 1280, h: typeof window !== "undefined" ? window.innerHeight : 800 }));
   const [iconDrag,   setIconDrag]   = useState(null);
+  // v9.7 B1 — Windows-style drag-select. `marquee` is the live selection
+  // rectangle (desktop-local px) while dragging on empty desktop;
+  // `selectedIcons` is the set of icon ids currently highlighted.
+  const [marquee, setMarquee] = useState(null);
+  const [selectedIcons, setSelectedIcons] = useState(() => new Set());
   const [widgetState,setWidgetState]= useState(DEFAULT_WIDGET_STATE);
   const [widgetDrag, setWidgetDrag] = useState(null);
   const [widgetResize,setWidgetResize]=useState(null);
@@ -818,11 +824,20 @@ export default function NovaOS(){
   // here: if this query ever errors, no community store apps render and
   // the user has no way to know why. A console line is a cheap insurance.
   useEffect(()=>{
-    const q=query(collection(firestoreDb,"nova_user_apps"),orderBy("ts","desc"),limit(60));
-    const unsub=onSnapshot(q,snap=>setCommApps(snap.docs.map(d=>{
-      const x=d.data();
-      return {...x, legacyId: x.id, id: d.id};
-    })),err=>{ console.warn("[nova_user_apps] snapshot error:", err?.message || err); });
+    // v9.7 B1: dropped `orderBy("ts","desc")` from this query. Firestore's
+    // orderBy SILENTLY EXCLUDES any doc missing the ordered field — so a
+    // community app submitted without a `ts` (older docs, or any future
+    // submission path that forgets it) would never load, and thus never
+    // appear on the desktop even after install. We sort client-side now
+    // (the set is capped at 60, so it's free), guaranteeing every doc
+    // loads regardless of its fields. Same class of fix as the v9.2 DM
+    // and v8.3 chess composite-index bugs.
+    const q=query(collection(firestoreDb,"nova_user_apps"),limit(60));
+    const unsub=onSnapshot(q,snap=>{
+      const list=snap.docs.map(d=>{ const x=d.data(); return {...x, legacyId: x.id, id: d.id}; });
+      list.sort((a,b)=>(b.ts||0)-(a.ts||0));
+      setCommApps(list);
+    },err=>{ console.warn("[nova_user_apps] snapshot error:", err?.message || err); });
     return ()=>unsub();
   },[]);
 
@@ -1554,6 +1569,45 @@ export default function NovaOS(){
   const hiddenFromDesktop=data?.hiddenFromDesktop||[];
   const hiddenSet=new Set(hiddenFromDesktop);
   const allDesktopIcons=allApps.filter(a=>!hiddenSet.has(a.id));
+
+  // v9.7 B1 — Windows-style drag-select marquee. Starts on a left-drag over
+  // the empty-desktop surface; while dragging we intersect the box with each
+  // icon's hit-rect and highlight the ones inside. A plain click (no drag)
+  // clears the selection. Coordinates are desktop-local (the desktop root
+  // sits at the viewport origin, but we measure against the surface rect to
+  // be safe).
+  function startMarquee(e){
+    if(e.button!==0)return;
+    const surface=e.currentTarget;
+    const rect=surface.getBoundingClientRect();
+    const positions=layoutIcons(allDesktopIcons,iconPosRef.current);
+    const x0=e.clientX-rect.left, y0=e.clientY-rect.top;
+    let moved=false;
+    setSelectedIcons(new Set());      // clear on press; re-fill as we drag
+    function mv(ev){
+      const x1=ev.clientX-rect.left, y1=ev.clientY-rect.top;
+      if(!moved && (Math.abs(x1-x0)>4||Math.abs(y1-y0)>4)) moved=true;
+      if(!moved) return;
+      const box={x:Math.min(x0,x1),y:Math.min(y0,y1),w:Math.abs(x1-x0),h:Math.abs(y1-y0)};
+      setMarquee(box);
+      const hit=new Set();
+      allDesktopIcons.forEach(app=>{
+        const p=positions[app.id]; if(!p)return;
+        // icon hit-rect ≈ ICON_W × ICON_H at its grid position
+        const ix=p.x, iy=p.y, iw=ICON_W, ih=ICON_H;
+        if(box.x<ix+iw && box.x+box.w>ix && box.y<iy+ih && box.y+box.h>iy) hit.add(app.id);
+      });
+      setSelectedIcons(hit);
+    }
+    function up(){
+      window.removeEventListener("pointermove",mv);
+      window.removeEventListener("pointerup",up);
+      setMarquee(null);   // box disappears; selection highlight persists
+    }
+    window.addEventListener("pointermove",mv);
+    window.addEventListener("pointerup",up);
+  }
+
   function hideAppFromDesktop(appId){
     if(hiddenSet.has(appId))return;
     const next=[...hiddenFromDesktop,appId];
@@ -1674,6 +1728,19 @@ export default function NovaOS(){
       }}>
       <style>{CSS}</style>
       <Wallpaper id={wpId} customUrl={customWp} animate={!!settings.wallpaperAnimated}/>
+      {/* v9.7 B2 — empty-desktop surface. Sits above the wallpaper (which
+          covers the root and would otherwise swallow clicks) but below the
+          icons (zIndex 2), so it reliably catches empty-space pointerdowns
+          for the drag-select marquee. The `di-empty-space` class lets the
+          root's onContextMenu allow right-click here (wallpaper menu). */}
+      <div className="di-empty-space"
+        style={{position:"absolute",inset:0,zIndex:1}}
+        onPointerDown={e=>{ if(e.button!==0)return; if(selectedIcons.size) setSelectedIcons(new Set()); startMarquee(e); }}
+      />
+      {/* v9.7 B1 — drag-select marquee box */}
+      {marquee && (
+        <div style={{position:"absolute",left:marquee.x,top:marquee.y,width:marquee.w,height:marquee.h,zIndex:3,pointerEvents:"none",background:"rgba("+hexRgb(AC)+",0.14)",border:"1px solid rgba("+hexRgb(AC)+",0.7)",borderRadius:2}}/>
+      )}
       {/* v8.5 snap-layout preview ghost — shows where a dragged window will land */}
       {snap && drag && drag.type==="move" && (()=>{ const r=snapZoneRect(snap); if(!r) return null; return (
         <div style={{position:"fixed",left:r.x,top:r.y,width:r.width,height:r.height,borderRadius:12,background:fill(AC),border:"2px solid "+AC,boxShadow:"0 10px 40px rgba(0,0,0,0.35)",pointerEvents:"none",zIndex:9990,transition:"left 0.12s ease,top 0.12s ease,width 0.12s ease,height 0.12s ease"}}/>
@@ -1859,6 +1926,7 @@ export default function NovaOS(){
                 return allDesktopIcons.map((app) => {
         const pos = positions[app.id] || { x: 0, y: 0 };
         const isDrg=iconDrag?.id===app.id;
+        const isSel=selectedIcons.has(app.id);   // v9.7 B1 drag-select highlight
         function launch(){if(app.storeApp){if(app.storeApp.newTab)openExternalUrl(app.storeApp.url);else openApp("browser");}else openApp(app.id);}
         return(
           <div key={app.id} style={{
@@ -1871,9 +1939,9 @@ export default function NovaOS(){
             // v8.0: lighter resting background, accent-tinged shadow during
             // drag for a more lifted feel. The .di hover class adds a brighter
             // background + soft outline ring (see styles.js).
-            background:isDrg?"rgba(20,22,40,0.5)":"rgba(0,0,0,0.08)",
-            border:"1px solid "+(isDrg?"rgba(255,255,255,0.16)":"transparent"),
-            backdropFilter:isDrg?"blur(8px)":"none",
+            background:isDrg?"rgba(20,22,40,0.5)":isSel?"rgba("+hexRgb(AC)+",0.22)":"rgba(0,0,0,0.08)",
+            border:"1px solid "+(isDrg?"rgba(255,255,255,0.16)":isSel?"rgba("+hexRgb(AC)+",0.6)":"transparent"),
+            backdropFilter:isDrg||isSel?"blur(8px)":"none",
             transition:isDrg?"none":"background 0.22s cubic-bezier(0.4,0,0.2,1), border-color 0.22s cubic-bezier(0.4,0,0.2,1), left 0.28s cubic-bezier(0.4,0,0.2,1), top 0.28s cubic-bezier(0.4,0,0.2,1)",
             boxShadow:isDrg?"0 10px 30px rgba(0,0,0,0.5), 0 1px 0 rgba(255,255,255,0.08) inset":"none",
           }}
@@ -2096,6 +2164,7 @@ export default function NovaOS(){
                 {/* v8.0 round-3 */}
                 {win.app==="photos"     &&<PhotosApp AC={AC} showToast={showToast} onSetWallpaper={handleCustomWallpaper}/>}
                 {win.app==="screenshot" &&<ScreenshotApp AC={AC} showToast={showToast} onSetWallpaper={handleCustomWallpaper}/>}
+                {win.app==="slides"     &&<SlidesApp AC={AC} data={data} updateData={updateData} showToast={showToast}/>}
               </Suspense>
             </div>
           </div>

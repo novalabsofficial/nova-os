@@ -8,7 +8,7 @@ export const COLL = "nova_storage";
 // header. Update this when you do a version sweep — package.json /
 // tauri.conf.json still need their own bumps but at least *display* text
 // won't drift again. Format: "<major>.<minor>".
-export const NOVA_VERSION = "9.6";
+export const NOVA_VERSION = "9.7";
 
 // Widget metadata: label/emoji + minimum size constraints used by WidgetShell.
 export const WIDGET_CONFIGS = {
@@ -69,6 +69,8 @@ export const DEFAULT_SIZES = {
   chess:{w:740,h:680},
   // v8.0 round-3
   photos:{w:760,h:600},
+  // v9.7
+  slides:{w:880,h:620},
 };
 
 // The master app list — drives the desktop, start menu, and store icons.
@@ -108,6 +110,8 @@ export const APPS = [
   {id:"photos",     icon:"📷",label:"Photos",      desc:"Browse photos from your device"},
   // v8.6
   {id:"screenshot", icon:"📸",label:"Screenshot",  desc:"Capture & annotate your screen"},
+  // v9.7
+  {id:"slides",     icon:"📊",label:"Slides",      desc:"Build & present slide decks"},
 ];
 
 // Curated catalog of external apps shown in the Store's "Official" tab.
