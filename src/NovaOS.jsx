@@ -1714,13 +1714,6 @@ export default function NovaOS(){
   // ── DESKTOP ──────────────────────────────────────────────────────────────
   return(
     <div data-drop="wallpaper" style={{width:"100%",height:"100vh",position:"relative",overflow:"hidden",cursor:dragCursor,fontSize:largeFnt?15:13}}
-      onPointerDown={e=>{
-        // v9.7 B1: left-drag on empty desktop draws a selection marquee.
-        // Guard on target===currentTarget so icon/window/widget pointerdowns
-        // (which land on children) don't start a marquee. A plain click here
-        // also clears any existing selection.
-        if(e.target===e.currentTarget && e.button===0){ if(selectedIcons.size) setSelectedIcons(new Set()); startMarquee(e); }
-      }}
       onContextMenu={e=>{
         // Only fire if the click is on the desktop itself, not on a child
         // (icons + windows have their own onContextMenu that stopPropagation).
@@ -1735,6 +1728,15 @@ export default function NovaOS(){
       }}>
       <style>{CSS}</style>
       <Wallpaper id={wpId} customUrl={customWp} animate={!!settings.wallpaperAnimated}/>
+      {/* v9.7 B2 — empty-desktop surface. Sits above the wallpaper (which
+          covers the root and would otherwise swallow clicks) but below the
+          icons (zIndex 2), so it reliably catches empty-space pointerdowns
+          for the drag-select marquee. The `di-empty-space` class lets the
+          root's onContextMenu allow right-click here (wallpaper menu). */}
+      <div className="di-empty-space"
+        style={{position:"absolute",inset:0,zIndex:1}}
+        onPointerDown={e=>{ if(e.button!==0)return; if(selectedIcons.size) setSelectedIcons(new Set()); startMarquee(e); }}
+      />
       {/* v9.7 B1 — drag-select marquee box */}
       {marquee && (
         <div style={{position:"absolute",left:marquee.x,top:marquee.y,width:marquee.w,height:marquee.h,zIndex:3,pointerEvents:"none",background:"rgba("+hexRgb(AC)+",0.14)",border:"1px solid rgba("+hexRgb(AC)+",0.7)",borderRadius:2}}/>

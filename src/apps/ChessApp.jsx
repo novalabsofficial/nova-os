@@ -25,17 +25,57 @@ import {
   describeGameFromUser, describeStatus,
 } from "../lib/chess-game.js";
 
-// Unicode pieces — far simpler than image assets, and they look great.
-const PIECE_GLYPH = {
-  // White
-  K: "♔", Q: "♕", R: "♖", B: "♗", N: "♘", P: "♙",
-  // Black
-  k: "♚", q: "♛", r: "♜", b: "♝", n: "♞", p: "♟",
-};
+// v9.7 B2 — use the SOLID filled glyphs for BOTH colors (the old set mixed
+// outline white pieces ♔ with filled black pieces ♚, which looked
+// inconsistent and rendered differently across fonts). Same silhouette for
+// both colors; we distinguish purely by fill + outline, the chess.com way.
+const PIECE_SOLID = { k: "♚", q: "♛", r: "♜", b: "♝", n: "♞", p: "♟" };
+const PIECE_VALUE = { q: 9, r: 5, b: 3, n: 3, p: 1, k: 0 };
+
+// chess.com board palette.
+const SQ_LIGHT = "#eeeed2";
+const SQ_DARK  = "#769656";
+const LASTMOVE_LIGHT = "#f6f680";   // yellow last-move tint
+const LASTMOVE_DARK  = "#bbcb45";
 
 // Convert a chess.js board() row/col to a square name like "e4".
 function rcToSquare(r, c) {
   return "abcdefgh"[c] + (8 - r);
+}
+
+// A piece glyph styled like a solid chess.com piece: light fill + dark
+// outline for white, dark fill + light outline for black. Rendered in a
+// serif face where the chess glyphs are weightiest.
+function pieceStyle(color, sizeCss) {
+  const white = color === "w";
+  return {
+    fontFamily: "'Georgia','Times New Roman',serif",
+    fontSize: sizeCss,
+    lineHeight: 1,
+    color: white ? "#f7f7f5" : "#262421",
+    textShadow: white
+      ? "0 0 1px #1f1f1f,1px 1px 0 #1f1f1f,-1px 1px 0 #1f1f1f,1px -1px 0 #1f1f1f,-1px -1px 0 #1f1f1f"
+      : "0 0 1px rgba(255,255,255,0.55),0.5px 0.5px 0 rgba(255,255,255,0.35)",
+    userSelect: "none",
+    pointerEvents: "none",
+  };
+}
+
+// Tally captured pieces + material advantage from the live board.
+//   capByWhite = black pieces white has taken; capByBlack = vice-versa.
+function computeCaptured(chess) {
+  const remain = { w: {}, b: {} };
+  chess.board().flat().forEach(sq => { if (sq) remain[sq.color][sq.type] = (remain[sq.color][sq.type] || 0) + 1; });
+  const start = { p: 8, n: 2, b: 2, r: 2, q: 1 };
+  const capByWhite = [], capByBlack = [];
+  let adv = 0;
+  for (const t of ["q", "r", "b", "n", "p"]) {
+    const missB = (start[t] || 0) - (remain.b[t] || 0);
+    const missW = (start[t] || 0) - (remain.w[t] || 0);
+    for (let i = 0; i < missB; i++) { capByWhite.push(t); adv += PIECE_VALUE[t]; }
+    for (let i = 0; i < missW; i++) { capByBlack.push(t); adv -= PIECE_VALUE[t]; }
+  }
+  return { capByWhite, capByBlack, adv };
 }
 
 export function ChessApp({ user, AC }) {
@@ -167,29 +207,22 @@ export function ChessApp({ user, AC }) {
     const flipped = myColor === "b";
     const rows = flipped ? [...board].reverse() : board;
     const indices = flipped ? [7,6,5,4,3,2,1,0] : [0,1,2,3,4,5,6,7];
+    // last-move squares (yellow tint, chess.com style)
+    const hist = (() => { try { return chess.history({ verbose: true }); } catch { return []; } })();
+    const last = hist.length ? hist[hist.length - 1] : null;
 
     return (
       <div style={{
         display: "grid",
-        // v7.6 explicitly sized both axes to 8 tracks of `1fr`. That should
-        // produce equal cells but in practice didn't: `1fr` resolves to
-        // `minmax(auto, 1fr)`, and the `auto` minimum is the row/column's
-        // min-content size. Rows with a piece have min-content = the piece
-        // glyph's height; rows with no pieces have min-content ≈ 0. When
-        // those minima differ, the `1fr` distribution honors them first
-        // and only spreads the leftover — so empty rows ended up smaller
-        // than rows with pieces. v9.3 (issue: chess board sizing still
-        // off) uses the standard `minmax(0, 1fr)` pattern that forces a
-        // 0 minimum, so every cell is genuinely boardSize/8 regardless of
-        // whether it has a piece on it.
+        // minmax(0,1fr) forces equal cells regardless of contents (see the
+        // v9.3 board-sizing fix).
         gridTemplateColumns: "repeat(8, minmax(0, 1fr))",
         gridTemplateRows: "repeat(8, minmax(0, 1fr))",
         width: "min(440px, 80vmin)",
         aspectRatio: "1/1",
-        border: "2px solid #2a2a3a",
         borderRadius: 6,
         overflow: "hidden",
-        boxShadow: "0 8px 30px rgba(0,0,0,0.4)",
+        boxShadow: "0 10px 36px rgba(0,0,0,0.45)",
       }}>
         {rows.map((rowArr, ri) => {
           const actualRow = indices[ri];
@@ -201,40 +234,56 @@ export function ChessApp({ user, AC }) {
             const isLight = (actualRow + actualCol) % 2 === 0;
             const isSelected = selected === sqName;
             const isLegal = legalMoves.includes(sqName);
-            const piece = square ? PIECE_GLYPH[square.color === "w" ? square.type.toUpperCase() : square.type] : "";
-            // King in check highlight
+            const isLast = last && (last.from === sqName || last.to === sqName);
+            const piece = square ? PIECE_SOLID[square.type] : "";
             const isCheckedKing = chess.inCheck() && square && square.type === "k" && square.color === chess.turn();
+            // coordinate labels: file on the bottom row, rank on the first column
+            const showFile = ri === 7;
+            const showRank = ci === 0;
+            const labelColor = isLight ? "rgba(90,110,70,0.9)" : "rgba(235,238,210,0.85)";
+            let bg = isLight ? SQ_LIGHT : SQ_DARK;
+            if (isLast) bg = isLight ? LASTMOVE_LIGHT : LASTMOVE_DARK;
+            if (isSelected) bg = isLight ? "#f4f67e" : "#b9cb45";
+            if (isCheckedKing) bg = "radial-gradient(circle, rgba(255,70,70,0.95) 30%, rgba(220,40,40,0.55) 75%)";
             return (
               <div key={sqName}
                 onClick={() => onSquareClick(sqName)}
                 style={{
-                  background: isCheckedKing
-                    ? "rgba(255,80,80,0.5)"
-                    : isSelected
-                      ? "rgba("+hexRgb(AC)+",0.55)"
-                      : isLegal
-                        ? (isLight ? "rgba(120,220,140,0.4)" : "rgba(120,220,140,0.5)")
-                        : isLight ? "#ebd9b4" : "#7a553a",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
+                  background: bg,
+                  display: "flex", alignItems: "center", justifyContent: "center",
                   cursor: isMyTurn ? "pointer" : "default",
-                  fontSize: "clamp(20px, 5.5vmin, 38px)",
-                  color: square && square.color === "w" ? "#fff" : "#1a1014",
-                  textShadow: square && square.color === "w" ? "0 1px 2px rgba(0,0,0,0.5)" : "none",
                   position: "relative",
-                  userSelect: "none",
                 }}
                 title={sqName}
               >
-                {piece}
+                {piece && <span style={pieceStyle(square.color, "clamp(20px, 5.5vmin, 40px)")}>{piece}</span>}
+                {/* legal-move dot (empty square) or capture ring (occupied) */}
                 {isLegal && !square && (
-                  <div style={{ position:"absolute", width:14, height:14, borderRadius:"50%", background:"rgba(40,160,80,0.55)", pointerEvents:"none" }} />
+                  <div style={{ position:"absolute", width:"30%", height:"30%", borderRadius:"50%", background:"rgba(0,0,0,0.22)", pointerEvents:"none" }} />
                 )}
+                {isLegal && square && (
+                  <div style={{ position:"absolute", inset:"6%", borderRadius:"50%", border:"4px solid rgba(0,0,0,0.22)", pointerEvents:"none" }} />
+                )}
+                {showFile && <span style={{ position:"absolute", right:2, bottom:1, fontSize:"clamp(7px,1.5vmin,10px)", fontFamily:FFB, fontWeight:700, color:labelColor, pointerEvents:"none" }}>{"abcdefgh"[actualCol]}</span>}
+                {showRank && <span style={{ position:"absolute", left:2, top:1, fontSize:"clamp(7px,1.5vmin,10px)", fontFamily:FFB, fontWeight:700, color:labelColor, pointerEvents:"none" }}>{8 - actualRow}</span>}
               </div>
             );
           });
         })}
+      </div>
+    );
+  }
+
+  // Captured-pieces tray for one player (chess.com style). `pieces` is an
+  // array of piece-type chars; `adv` (when > 0) shows the material lead.
+  function CapturedTray({ pieces, color, adv }) {
+    return (
+      <div style={{ display:"flex", alignItems:"center", gap:1, minHeight:18, flexWrap:"wrap" }}>
+        {pieces.length === 0 && <span style={{ fontSize:10, color:"rgba(255,255,255,0.2)", fontFamily:FFM }}>—</span>}
+        {pieces.map((t, i) => (
+          <span key={i} style={{ ...pieceStyle(color, "16px"), marginRight:-3 }}>{PIECE_SOLID[t]}</span>
+        ))}
+        {adv > 0 && <span style={{ marginLeft:6, fontFamily:FFM, fontSize:11, color:"rgba(255,255,255,0.55)" }}>+{adv}</span>}
       </div>
     );
   }
@@ -333,44 +382,74 @@ export function ChessApp({ user, AC }) {
           </div>
         )}
 
-        {view === "game" && game && (
-          <div style={{ flex:1, display:"flex", flexDirection:"column", alignItems:"center", gap:14, minHeight:0 }}>
-            {/* Status banner */}
-            <div style={{ width:"100%", maxWidth:440, padding:"10px 14px", background:"rgba(255,255,255,0.04)", border:"1px solid rgba(255,255,255,0.08)", borderRadius:8, display:"flex", alignItems:"center", gap:10 }}>
-              <span style={{ fontSize:18 }}>{myColor === "w" ? "♔" : "♚"}</span>
-              <div style={{ flex:1, minWidth:0 }}>
-                <div style={{ fontFamily:FFB, fontWeight:600, fontSize:13, color:"#fff", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
-                  vs @{opponentName}
-                </div>
-                <div style={{ fontFamily:FFM, fontSize:11, color: isMyTurn && game.status === "active" ? "#4cef90" : "rgba(255,255,255,0.5)" }}>
-                  {describeStatus(game, myColor)}
-                  {chessRef.current.inCheck() && game.status === "active" && <span style={{ color:"#ff8b8b", marginLeft:8 }}>· Check!</span>}
-                </div>
+        {view === "game" && game && (() => {
+          const cap = computeCaptured(chessRef.current);
+          const oppColor = myColor === "w" ? "b" : "w";
+          // Tray for a player: the glyphs they've captured (opponent's color),
+          // plus their material lead if any.
+          const trayFor = (playerColor) => playerColor === "w"
+            ? { pieces: cap.capByWhite, glyphColor: "b", adv: cap.adv > 0 ? cap.adv : 0 }
+            : { pieces: cap.capByBlack, glyphColor: "w", adv: cap.adv < 0 ? -cap.adv : 0 };
+          const myTray = trayFor(myColor), oppTray = trayFor(oppColor);
+          const moves = (() => { try { return chessRef.current.history(); } catch { return []; } })();
+          // Pair up SAN moves into [white, black] rows for the move list.
+          const pairs = [];
+          for (let i = 0; i < moves.length; i += 2) pairs.push([moves[i], moves[i + 1]]);
+          const playerRow = (name, color, tray, youTag) => (
+            <div style={{ width:"100%", maxWidth:440, display:"flex", alignItems:"center", gap:10, padding:"6px 4px" }}>
+              <div style={{ width:30, height:30, borderRadius:7, flexShrink:0, background: color==="w"?"#f0f0ec":"#2b2926", border:"1px solid rgba(255,255,255,0.12)", display:"flex", alignItems:"center", justifyContent:"center" }}>
+                <span style={pieceStyle(color, "18px")}>♚</span>
               </div>
-              {game.status === "active" && (
-                <button onClick={handleResign} title="Resign"
-                  style={{ padding:"4px 10px", background:"rgba(255,80,80,0.1)", border:"1px solid rgba(255,80,80,0.3)", borderRadius:5, cursor:"pointer", fontFamily:FFB, fontWeight:600, fontSize:10, color:"#ff8b8b" }}>
-                  Resign
-                </button>
-              )}
-              {game.status !== "active" && (
-                <button onClick={handleDelete} title="Remove game from list"
-                  style={{ padding:"4px 10px", background:"rgba(255,255,255,0.06)", border:"1px solid rgba(255,255,255,0.12)", borderRadius:5, cursor:"pointer", fontFamily:FFB, fontWeight:600, fontSize:10, color:"rgba(255,255,255,0.6)" }}>
-                  Clear
-                </button>
-              )}
+              <div style={{ minWidth:0 }}>
+                <div style={{ fontFamily:FFB, fontWeight:600, fontSize:12.5, color:"#fff", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>@{name}{youTag && <span style={{ marginLeft:6, fontSize:9, color:AC, fontFamily:FFM }}>YOU</span>}</div>
+                <CapturedTray pieces={tray.pieces} color={tray.glyphColor} adv={tray.adv} />
+              </div>
+            </div>
+          );
+          return (
+          <div style={{ flex:1, display:"flex", gap:16, minHeight:0, flexWrap:"wrap", justifyContent:"center", alignItems:"flex-start" }}>
+            {/* Board column */}
+            <div style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:4 }}>
+              {playerRow(opponentName, oppColor, oppTray, false)}
+              {renderBoard()}
+              {playerRow(user, myColor, myTray, true)}
             </div>
 
-            {renderBoard()}
-
-            {/* PGN (move list) — collapsed by default in tight spaces */}
-            {game.pgn && (
-              <div style={{ width:"100%", maxWidth:440, padding:"8px 12px", background:"rgba(255,255,255,0.03)", border:"1px solid rgba(255,255,255,0.06)", borderRadius:6, fontFamily:FFM, fontSize:11, color:"rgba(255,255,255,0.5)", maxHeight:80, overflowY:"auto", lineHeight:1.6, wordBreak:"break-word" }}>
-                {game.pgn}
+            {/* Right panel: status + move history + actions */}
+            <div style={{ width:220, maxWidth:"100%", display:"flex", flexDirection:"column", gap:10 }}>
+              <div style={{ padding:"10px 12px", background:"rgba(255,255,255,0.04)", border:"1px solid rgba(255,255,255,0.08)", borderRadius:9 }}>
+                <div style={{ fontFamily:FFB, fontWeight:700, fontSize:13, color:"#fff" }}>{describeStatus(game, myColor)}</div>
+                <div style={{ fontFamily:FFM, fontSize:11, color: isMyTurn && game.status==="active" ? "#4cef90" : "rgba(255,255,255,0.5)", marginTop:2 }}>
+                  {game.status === "active" ? (isMyTurn ? "Your move" : "Waiting…") : "Game over"}
+                  {chessRef.current.inCheck() && game.status === "active" && <span style={{ color:"#ff8b8b", marginLeft:6 }}>Check!</span>}
+                </div>
               </div>
-            )}
+
+              {/* Move history — chess.com-style two-column list */}
+              <div style={{ flex:1, minHeight:120, maxHeight:300, overflowY:"auto", background:"rgba(255,255,255,0.03)", border:"1px solid rgba(255,255,255,0.07)", borderRadius:9, padding:"4px 0" }}>
+                <div style={{ fontFamily:FFB, fontWeight:700, fontSize:9.5, color:"rgba(255,255,255,0.35)", letterSpacing:1, textTransform:"uppercase", padding:"6px 12px 4px" }}>Moves</div>
+                {pairs.length === 0 ? (
+                  <div style={{ padding:"8px 12px", fontSize:11, color:"rgba(255,255,255,0.3)", fontStyle:"italic" }}>No moves yet</div>
+                ) : pairs.map((pr, i) => (
+                  <div key={i} style={{ display:"grid", gridTemplateColumns:"28px 1fr 1fr", gap:4, padding:"3px 12px", background: i%2 ? "transparent" : "rgba(255,255,255,0.025)", fontFamily:FFM, fontSize:12 }}>
+                    <span style={{ color:"rgba(255,255,255,0.35)" }}>{i+1}.</span>
+                    <span style={{ color:"rgba(255,255,255,0.88)" }}>{pr[0]}</span>
+                    <span style={{ color:"rgba(255,255,255,0.88)" }}>{pr[1] || ""}</span>
+                  </div>
+                ))}
+              </div>
+
+              <div style={{ display:"flex", gap:8 }}>
+                {game.status === "active" ? (
+                  <button onClick={handleResign} style={{ flex:1, padding:"8px 10px", background:"rgba(255,80,80,0.1)", border:"1px solid rgba(255,80,80,0.3)", borderRadius:7, cursor:"pointer", fontFamily:FFB, fontWeight:600, fontSize:11.5, color:"#ff8b8b" }}>Resign</button>
+                ) : (
+                  <button onClick={handleDelete} style={{ flex:1, padding:"8px 10px", background:"rgba(255,255,255,0.06)", border:"1px solid rgba(255,255,255,0.12)", borderRadius:7, cursor:"pointer", fontFamily:FFB, fontWeight:600, fontSize:11.5, color:"rgba(255,255,255,0.6)" }}>Clear game</button>
+                )}
+              </div>
+            </div>
           </div>
-        )}
+          );
+        })()}
 
         {view === "game" && !game && activeGameId && (
           <div style={{ flex:1, display:"flex", alignItems:"center", justifyContent:"center" }}>
