@@ -87,6 +87,11 @@ export const CSS = `
      the T helper in styles.js. */
   :root{
     color-scheme:dark;
+    /* v10.0 — shared motion curves. --nv-ease is the smooth ease-out-quint
+       used by the desktop slide; --nv-spring adds a touch of overshoot for
+       playful pops. Reuse these everywhere for a consistent feel. */
+    --nv-ease:cubic-bezier(0.22,1,0.36,1);
+    --nv-spring:cubic-bezier(0.34,1.56,0.64,1);
     --nv-body-bg:#07080f;
     --nv-surface:rgba(15,17,32,0.72);
     --nv-surface-solid:rgba(10,12,24,0.92);
@@ -200,6 +205,31 @@ export const CSS = `
   .ws{transition:border-color 0.2s cubic-bezier(0.4,0,0.2,1),transform 0.2s cubic-bezier(0.4,0,0.2,1);}.ws:hover{border-color:rgba(255,255,255,0.55)!important;transform:scale(1.02);}
   .sc{transition:background 0.18s cubic-bezier(0.4,0,0.2,1);}.sc:hover{background:rgba(255,255,255,0.07)!important;}
   .wgt{transition:border-color 0.22s cubic-bezier(0.4,0,0.2,1),box-shadow 0.22s cubic-bezier(0.4,0,0.2,1);}.wgt:hover{border-color:rgba(255,255,255,0.24)!important;}
+
+  /* ── v10.0 Supernova — tactile micro-interactions ──────────────────────
+     Press feedback (scale-down) + gentle hover lifts using the same smooth
+     ease-out-quint family as the desktop slide, so the whole OS feels alive
+     and consistent under the hand. Press states are !important so they win
+     over the base hover rule's transform. All transform/opacity → GPU-cheap. */
+  .sb:hover{transform:translateY(-1px);}
+  .sb:active,.bp:active{transform:scale(0.95)!important;}
+  .tb:active{transform:translateY(-1px) scale(0.95)!important;}
+  .ma:active{transform:translateY(-1px) scale(0.96)!important;}
+  .di:hover{transform:translateY(-2px)!important;}
+  .di:active{transform:scale(0.95)!important;}
+  .bp{transition:background 0.18s cubic-bezier(0.4,0,0.2,1),transform 0.2s var(--nv-ease);}
+  /* window controls gain a satisfying press */
+  .wx,.wm,.wn{transition:background 0.18s cubic-bezier(0.4,0,0.2,1),color 0.18s cubic-bezier(0.4,0,0.2,1),transform 0.16s var(--nv-ease);}
+  .wx:active,.wm:active,.wn:active{transform:scale(0.86);}
+  /* sidebar/list rows ease their background instead of snapping */
+  .sr,.fr,.sc{transition:background 0.16s var(--nv-ease)!important;}
+  /* generic pop-in for popovers/dialogs that want it inline */
+  @keyframes pop-in{from{opacity:0;transform:scale(0.94) translateY(8px);}to{opacity:1;transform:none;}}
+  @keyframes panel-in-right{from{opacity:0;transform:translateX(26px);}to{opacity:1;transform:none;}}
+  /* respect reduced-motion: drop all the extra movement */
+  @media (prefers-reduced-motion: reduce){
+    *{animation-duration:0.01ms!important;transition-duration:0.01ms!important;}
+  }
 
   /* Focus rings — only visible from keyboard navigation, never from mouse clicks */
   button:focus-visible,input:focus-visible,textarea:focus-visible{

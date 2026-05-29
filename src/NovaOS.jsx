@@ -2102,7 +2102,7 @@ export default function NovaOS(){
             background:isDrg?"rgba(20,22,40,0.5)":isSel?"rgba("+hexRgb(AC)+",0.22)":"rgba(0,0,0,0.08)",
             border:"1px solid "+(isDrg?"rgba(255,255,255,0.16)":isSel?"rgba("+hexRgb(AC)+",0.6)":"transparent"),
             backdropFilter:isDrg||isSel?"blur(8px)":"none",
-            transition:isDrg?"none":"background 0.22s cubic-bezier(0.4,0,0.2,1), border-color 0.22s cubic-bezier(0.4,0,0.2,1), left 0.28s cubic-bezier(0.4,0,0.2,1), top 0.28s cubic-bezier(0.4,0,0.2,1)",
+            transition:isDrg?"none":"background 0.22s cubic-bezier(0.4,0,0.2,1), border-color 0.22s cubic-bezier(0.4,0,0.2,1), left 0.28s cubic-bezier(0.4,0,0.2,1), top 0.28s cubic-bezier(0.4,0,0.2,1), transform 0.2s cubic-bezier(0.22,1,0.36,1)",
             boxShadow:isDrg?"0 10px 30px rgba(0,0,0,0.5), 0 1px 0 rgba(255,255,255,0.08) inset":"none",
           }}
             className={isDrg?"":"di"} title={app.desc}
@@ -2719,7 +2719,7 @@ export default function NovaOS(){
             borderRadius:16,
             boxShadow:"0 8px 16px rgba(0,0,0,0.35), 0 30px 80px rgba(0,0,0,0.55), 0 1px 0 rgba(255,255,255,0.08) inset",
             zIndex:9998,display:"flex",flexDirection:"column",
-            animation:"menu-up 0.26s cubic-bezier(0.16,1,0.3,1)",
+            animation:"panel-in-right 0.3s cubic-bezier(0.22,1,0.36,1)",
             overflow:"hidden",
           }}>
             <div style={{padding:"16px 18px",borderBottom:"1px solid rgba(255,255,255,0.06)",display:"flex",alignItems:"center",gap:10,flexShrink:0,background:"linear-gradient(180deg, rgba(255,255,255,0.03), transparent)"}}>
