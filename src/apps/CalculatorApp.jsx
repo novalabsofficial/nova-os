@@ -198,7 +198,13 @@ function Display({ value, sub, AC, large = false, mono = true }) {
 // evaluate those when the matching variant is requested. Building all
 // variant styles eagerly would crash (TypeError in `hexRgb`) for any
 // KeyBtn rendered without an `AC` prop, since digit buttons skip it.
-function KeyBtn({ children, onClick, variant, span, AC, height, fontSize, title }) {
+// v9.7 B1: `onHold` enables press-and-hold auto-repeat (used by the ⌫
+// keys). It's pointer-driven, so it works identically on Windows, ChromeOS,
+// and PWA installs — unlike physical-key auto-repeat, which ChromeOS
+// sometimes suppresses (the reported "holding backspace doesn't continue
+// deleting" bug). pointerdown fires once immediately then repeats every
+// 90ms after a 300ms initial delay; pointerup/leave/cancel stop it.
+function KeyBtn({ children, onClick, onHold, variant, span, AC, height, fontSize, title }) {
   const v = variant || "default";
   let s;
   switch (v) {
@@ -208,9 +214,30 @@ function KeyBtn({ children, onClick, variant, span, AC, height, fontSize, title 
     case "muted":   s = { background: "transparent", border: "1px solid var(--nv-border)", color: "var(--nv-text-dim)" }; break;
     default:        s = { background: "var(--nv-elevated)", border: "1px solid var(--nv-border)", color: "var(--nv-text-strong)" };
   }
+  const holdRef = useRef({ to: null, iv: null });
+  function stopHold() {
+    const h = holdRef.current;
+    if (h.to) { clearTimeout(h.to); h.to = null; }
+    if (h.iv) { clearInterval(h.iv); h.iv = null; }
+  }
+  useEffect(() => () => stopHold(), []);
+  const holdHandlers = onHold ? {
+    onPointerDown: e => {
+      e.currentTarget.style.transform = "scale(0.97)";
+      onHold();                                  // fire once immediately
+      holdRef.current.to = setTimeout(() => { holdRef.current.iv = setInterval(onHold, 90); }, 300);
+    },
+    onPointerUp:    e => { e.currentTarget.style.transform = "scale(1)"; stopHold(); },
+    onPointerLeave: e => { e.currentTarget.style.transform = "scale(1)"; stopHold(); },
+    onPointerCancel: () => stopHold(),
+  } : {
+    onClick,
+    onMouseDown: e => e.currentTarget.style.transform = "scale(0.97)",
+    onMouseUp:   e => e.currentTarget.style.transform = "scale(1)",
+    onMouseLeave:e => e.currentTarget.style.transform = "scale(1)",
+  };
   return (
     <button
-      onClick={onClick}
       title={title}
       style={{
         height: height || 52,
@@ -224,9 +251,7 @@ function KeyBtn({ children, onClick, variant, span, AC, height, fontSize, title 
         userSelect: "none",
         ...s,
       }}
-      onMouseDown={e => e.currentTarget.style.transform = "scale(0.97)"}
-      onMouseUp={e => e.currentTarget.style.transform = "scale(1)"}
-      onMouseLeave={e => e.currentTarget.style.transform = "scale(1)"}
+      {...holdHandlers}
     >{children}</button>
   );
 }
@@ -293,7 +318,7 @@ function StandardCalc({ AC, pushHistory }) {
   }
 
   return (
-    <div ref={wrapRef} tabIndex={0} onKeyDown={onKeyDown} onKeyUp={stopRepeat} onBlur={stopRepeat}
+    <div ref={wrapRef} tabIndex={0} onKeyDown={onKeyDown} onKeyUp={e => { if (e.key === "Backspace") stopRepeat(); }} onBlur={stopRepeat}
       style={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0, outline: "none" }}>
       <Display value={display} sub={pending ? formatDisplay(pending.prev) + " " + pending.op : ""} AC={AC}/>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8, flex: 1 }}>
@@ -321,7 +346,7 @@ function StandardCalc({ AC, pushHistory }) {
         <KeyBtn onClick={() => pressDigit(".")}>.</KeyBtn>
         <KeyBtn variant="accent" AC={AC} onClick={pressEquals}>=</KeyBtn>
 
-        <KeyBtn span={4} height={38} fontSize={13} onClick={pressBackspace}>⌫</KeyBtn>
+        <KeyBtn span={4} height={38} fontSize={13} onHold={pressBackspace}>⌫</KeyBtn>
       </div>
     </div>
   );
@@ -633,7 +658,7 @@ function ProgrammerCalc({ AC, pushHistory }) {
       <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 6, flex: 1 }}>
         {progDigitBtn("D")}{progDigitBtn("E")}{progDigitBtn("F")}
         <KeyBtn variant="danger" AC={AC} fontSize={13} height={44} onClick={pressClear}>AC</KeyBtn>
-        <KeyBtn fontSize={13} height={44} onClick={pressBackspace}>⌫</KeyBtn>
+        <KeyBtn fontSize={13} height={44} onHold={pressBackspace}>⌫</KeyBtn>
         <KeyBtn variant="op" fontSize={14} height={44} onClick={() => pressOp("÷")}>÷</KeyBtn>
         <KeyBtn variant="op" fontSize={14} height={44} onClick={() => pressOp("×")}>×</KeyBtn>
 
