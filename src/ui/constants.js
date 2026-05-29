@@ -45,7 +45,7 @@ export const DEFAULT_SIZES = {
   // v9.5: tasks bumped to 660×560 for the new two-pane (rail + main) layout.
   // Calendar bumped to 760×620 to fit the new mini-month + agenda sidebar.
   notes:{w:500,h:520},tasks:{w:660,h:560},files:{w:540,h:520},
-  paint:{w:700,h:560},browser:{w:760,h:620},screenshot:{w:740,h:600},
+  paint:{w:940,h:660},browser:{w:760,h:620},screenshot:{w:740,h:600},
   snake:{w:460,h:560},"2048":{w:480,h:580},
   store:{w:680,h:600},terminal:{w:580,h:460},
   settings:{w:480,h:640},profile:{w:440,h:540},chat:{w:480,h:580},
