@@ -39,6 +39,7 @@ import {
 } from "./ui/constants.js";
 import { Wallpaper, NovaBg, BlissBg, AuroraBg, MeshBg } from "./ui/wallpapers.jsx";
 import { CommandBar } from "./ui/CommandBar.jsx";
+import { TaskView } from "./ui/TaskView.jsx";
 import { NovaSvgIcon, AppIconDisplay, NovaLogo, WindowControlIcon, UserAvatar } from "./ui/icons.jsx";
 import { subscribeDrag, moveDrag, endDrag, getDrag } from "./lib/dragStore.js";
 import { Toggle } from "./ui/Toggle.jsx";
@@ -558,6 +559,14 @@ export default function NovaOS(){
   const [spotlightOpen, setSpotlightOpen] = useState(false);
   // v10.0 Supernova — AI command bar (Ctrl/Cmd+J). Natural-language → actions.
   const [commandOpen, setCommandOpen] = useState(false);
+  // v10.0 Supernova — virtual desktops. Each window carries a `desk` index
+  // (default 0); only windows on `curDesk` render. Task View (Ctrl+Alt+↑) is
+  // the overview for switching/adding/removing desktops + moving windows.
+  const MAX_DESKTOPS = 6;
+  const [deskCount, setDeskCount] = useState(1);
+  const [curDesk, setCurDesk] = useState(0);
+  const [taskViewOpen, setTaskViewOpen] = useState(false);
+  const curDeskRef = useRef(0); curDeskRef.current = curDesk;
   const ssActiveRef = useRef(false);
   const idleTimerRef = useRef(null);
   // v8.6 cross-app drag-and-drop — mirrors the shared dragStore so we can
@@ -1281,6 +1290,11 @@ export default function NovaOS(){
     // for "chat" inside markAppNotificationsRead (bumps lastChatOpenTs
     // so the DM unread badge clears as well).
     markAppNotificationsRead(appId);
+    // v10.0: if a window for this app already exists on another virtual
+    // desktop, jump to that desktop so focusing it actually shows it.
+    const cur=curDeskRef.current;
+    const existing=(winsRef.current||[]).find(w=>w.app===appId);
+    if(existing && (existing.desk||0)!==cur) setCurDesk(existing.desk||0);
     setMaxZ(z=>{
       const nz=z+1;
       setWins(ws=>{
@@ -1294,7 +1308,7 @@ export default function NovaOS(){
         const baseX=120+n*28, baseY=36+n*22;
         const mobileFirst = deviceMode==="mobile";
         return [...ws,{
-          id:Date.now()+Math.random(), app:appId, z:nz,
+          id:Date.now()+Math.random(), app:appId, z:nz, desk:cur,
           x:baseX, y:baseY, width:sz.w, height:sz.h,
           state: mobileFirst ? "maximized" : "normal",
           prevBounds: mobileFirst ? {x:baseX,y:baseY,width:sz.w,height:sz.h} : null,
@@ -1303,6 +1317,34 @@ export default function NovaOS(){
       return nz;
     });
   },[deviceMode,markAppNotificationsRead]);
+  // v10.0 — virtual-desktop operations.
+  const addDesktop=useCallback(()=>{
+    setDeskCount(c=>{ if(c>=MAX_DESKTOPS) return c; setCurDesk(c); return c+1; });
+  },[]);
+  const removeDesktop=useCallback((idx)=>{
+    setDeskCount(c=>{
+      if(c<=1) return c;
+      // Windows on the removed desktop fall back to the one before it;
+      // anything on a higher desktop shifts down to keep indices contiguous.
+      setWins(ws=>ws.map(w=>{
+        const d=w.desk||0;
+        if(d===idx) return {...w,desk:Math.max(0,idx-1)};
+        if(d>idx)   return {...w,desk:d-1};
+        return w;
+      }));
+      const nc=c-1;
+      setCurDesk(cd=>{
+        let n=cd;
+        if(cd===idx) n=Math.max(0,idx-1);
+        else if(cd>idx) n=cd-1;
+        return Math.min(n,nc-1);
+      });
+      return nc;
+    });
+  },[]);
+  const moveWinToDesk=useCallback((winId,idx)=>{
+    setWins(ws=>ws.map(w=>w.id===winId?{...w,desk:idx}:w));
+  },[]);
   function startDrag(e,winId){
     if(e.button!==0)return;
     e.preventDefault();
@@ -1405,7 +1447,8 @@ export default function NovaOS(){
   // still reading the latest handler functions. Re-binding the listener
   // on every render would work too, just slightly noisier.
   const kbHandlersRef = useRef(null);
-  kbHandlersRef.current = { openApp, closeWin, minimizeWin, setMenuOpen, setSpotlightOpen, setCommandOpen, screen, applySnap, snapDown };
+  kbHandlersRef.current = { openApp, closeWin, minimizeWin, setMenuOpen, setSpotlightOpen, setCommandOpen, setTaskViewOpen, screen, applySnap, snapDown,
+    switchDeskBy:(d)=>setCurDesk(c=>Math.max(0,Math.min(deskCount-1,c+d))) };
   useEffect(()=>{
     function onKey(e){
       const h = kbHandlersRef.current;
@@ -1440,18 +1483,21 @@ export default function NovaOS(){
         h.openApp("settings");
         return;
       }
+      // v10.0: "active window" helpers operate on the CURRENT virtual desktop
+      // only — the global top-z window may live on a hidden desktop.
+      const topOnDesk = () => [...(winsRef.current || [])].filter(w => w.state !== "minimized" && (w.desk||0) === curDeskRef.current).sort((a,b) => (b.z||0) - (a.z||0))[0];
       // Alt + W — close active window. Excludes minimized so Alt+W when
       // everything is hidden in the taskbar doesn't surprise-close the wrong thing.
       if(e.altKey && (e.key === "w" || e.key === "W") && !isTyping){
         e.preventDefault();
-        const top = [...(winsRef.current || [])].filter(w => w.state !== "minimized").sort((a,b) => (b.z||0) - (a.z||0))[0];
+        const top = topOnDesk();
         if(top) h.closeWin(top.id);
         return;
       }
       // Alt + M — minimize active window
       if(e.altKey && (e.key === "m" || e.key === "M") && !isTyping){
         e.preventDefault();
-        const top = [...(winsRef.current || [])].filter(w => w.state !== "minimized").sort((a,b) => (b.z||0) - (a.z||0))[0];
+        const top = topOnDesk();
         if(top) h.minimizeWin(top.id);
         return;
       }
@@ -1464,13 +1510,26 @@ export default function NovaOS(){
         toggleFullscreen();
         return;
       }
+      // v10.0 — Ctrl/Cmd+Alt+Arrow drives virtual desktops (checked BEFORE the
+      // plain Alt+Arrow snap below so the two combos don't collide).
+      // Left/Right switch desktops; Up toggles Task View.
+      if(mod && e.altKey && (e.key==="ArrowLeft"||e.key==="ArrowRight")){
+        e.preventDefault();
+        h.switchDeskBy(e.key==="ArrowRight"?1:-1);
+        return;
+      }
+      if(mod && e.altKey && e.key==="ArrowUp"){
+        e.preventDefault();
+        h.setTaskViewOpen(o=>!o);
+        return;
+      }
       // v8.5 — Alt + Arrow snaps the active window (the web-safe stand-in for
       // Win+Arrow, which the OS itself intercepts). Left/Right → halves,
       // Up → maximize, Down → un-maximize or minimize. preventDefault stops
       // Alt+Left/Right from triggering browser back/forward navigation.
-      if(e.altKey && !isTyping && (e.key==="ArrowLeft"||e.key==="ArrowRight"||e.key==="ArrowUp"||e.key==="ArrowDown")){
+      if(e.altKey && !mod && !isTyping && (e.key==="ArrowLeft"||e.key==="ArrowRight"||e.key==="ArrowUp"||e.key==="ArrowDown")){
         e.preventDefault();
-        const top=[...(winsRef.current||[])].filter(w=>w.state!=="minimized").sort((a,b)=>(b.z||0)-(a.z||0))[0];
+        const top=topOnDesk();
         if(!top)return;
         if(e.key==="ArrowLeft")      h.applySnap(top.id,"left");
         else if(e.key==="ArrowRight")h.applySnap(top.id,"right");
@@ -1589,6 +1648,11 @@ export default function NovaOS(){
           setWins(valid);
           const topZ = valid.reduce((max,w) => Math.max(max, w.z||100), 100);
           setMaxZ(topZ + 1);
+          // v10.0: rebuild the virtual-desktop count from restored windows so
+          // any windows saved on desktop 2+ have a desktop to live on.
+          const maxDesk = valid.reduce((m,w) => Math.max(m, w.desk||0), 0);
+          setDeskCount(Math.max(1, Math.min(MAX_DESKTOPS, maxDesk + 1)));
+          setCurDesk(0);
         }
       }
       setScreen("desktop");playSound("login");
@@ -1605,6 +1669,7 @@ export default function NovaOS(){
     await authLogout();
     setDbUid(null);
     setUser(null);setUid(null);setData(null);setCustomWp(null);setWins([]);setMaxZ(100);setMenuOpen(false);
+    setDeskCount(1);setCurDesk(0);setTaskViewOpen(false);
     setIconPos({});setIconDrag(null);setWidgetState(DEFAULT_WIDGET_STATE);setWidgetDrag(null);setWidgetResize(null);
     setUname("");setPass("");setAuthErr("");setMode("login");setScreen("login");
   }
@@ -1855,6 +1920,22 @@ export default function NovaOS(){
           onExecute={runCommand}
           onOpenNovaAi={() => openApp("novaai")}
           onClose={() => setCommandOpen(false)}
+        />
+      )}
+      {/* v10.0 Supernova — Task View overlay (virtual desktops). */}
+      {taskViewOpen && (
+        <TaskView
+          AC={AC}
+          deskCount={deskCount}
+          curDesk={curDesk}
+          wins={wins}
+          apps={APPS}
+          onSwitch={(idx)=>setCurDesk(idx)}
+          onAdd={addDesktop}
+          onRemove={removeDesktop}
+          onMoveWin={moveWinToDesk}
+          onFocusWin={(id)=>{ setWins(ws=>ws.map(w=>w.id===id?{...w,state:w.state==="minimized"?"normal":w.state}:w)); focusWin(id); }}
+          onClose={()=>setTaskViewOpen(false)}
         />
       )}
       {/* v9.4 — Atmos severe-weather lock-screen alert. Fires above
@@ -2145,7 +2226,7 @@ export default function NovaOS(){
       </div>)}
  
       {/* Windows */}
-      {wins.map(win=>{
+      {wins.filter(w=>(w.desk||0)===curDesk).map(win=>{
         const app=APPS.find(a=>a.id===win.app);
         const isMax=win.state==="maximized",isMin=win.state==="minimized",isDrg=drag&&drag.winId===win.id;
         // v7.5: keep minimized windows mounted (display:none) so background
@@ -2329,6 +2410,22 @@ export default function NovaOS(){
           {deviceMode!=="mobile" && <span>Ask Nova</span>}
           {deviceMode!=="mobile" && <span style={{fontFamily:FFM,fontSize:10,padding:"1px 6px",background:commandOpen?"rgba("+hexRgb(AC)+",0.18)":"rgba(255,255,255,0.06)",border:"1px solid "+(commandOpen?bdr(AC):"rgba(255,255,255,0.09)"),borderRadius:4,marginLeft:2,letterSpacing:0.3}}>Ctrl+J</span>}
         </button>
+        {/* v10.0 Supernova — Task View launcher (virtual desktops). Shows the
+            current/total desktop count; opens the Task View overview. */}
+        <button className="sb" onClick={()=>setTaskViewOpen(o=>!o)} title="Task View — virtual desktops (Ctrl+Alt+↑)" style={{
+          height:42,display:"flex",alignItems:"center",gap:8,padding:deviceMode==="mobile"?"0 11px":"0 13px",borderRadius:12,
+          background:taskViewOpen?fill(AC):"rgba(255,255,255,0.04)",
+          border:"1px solid "+(taskViewOpen?bdr(AC):"rgba(255,255,255,0.07)"),
+          cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:12.5,color:taskViewOpen?AC:"var(--nv-text-dim)",
+          transition:"all 0.18s cubic-bezier(0.4,0,0.2,1)",flexShrink:0,
+        }}>
+          {/* stacked-windows glyph */}
+          <svg width="15" height="15" viewBox="0 0 16 16" fill="none" style={{flexShrink:0}}>
+            <rect x="3.5" y="3.5" width="9" height="7.5" rx="1.5" stroke="currentColor" strokeWidth="1.4"/>
+            <path d="M5.5 13.2h7" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
+          </svg>
+          {deviceMode!=="mobile" && <span style={{fontFamily:FFM,fontSize:11.5,letterSpacing:0.3}}>{curDesk+1}/{deskCount}</span>}
+        </button>
         {/* v9.0 — Windows 11-style weather pill in the bottom-left corner. */}
         {deviceMode!=="mobile" && <TaskbarWeather data={data} onClick={()=>openApp("atmos")} />}
         </div>
@@ -2345,22 +2442,25 @@ export default function NovaOS(){
         {(()=>{
           const slots=[];
           const seenApp=new Set();
+          // v10.0: the taskbar shows only the CURRENT virtual desktop's
+          // windows (Windows 11 default). Pinned launchers still show always.
+          const dwins=wins.filter(w=>(w.desk||0)===curDesk);
           // Pinned slots first, in pin order. Each pinned slot represents
           // ALL running windows of that app aggregated into one chip.
           pinnedToTaskbar.forEach(appId=>{
             if(seenApp.has(appId))return;
             seenApp.add(appId);
-            const running=wins.filter(w=>w.app===appId);
+            const running=dwins.filter(w=>w.app===appId);
             slots.push({key:"pin-"+appId,appId,running,pinned:true});
           });
           // Then any running windows that aren't in the pinned list, one
           // chip per window so multiple windows of an app show separately.
-          wins.forEach(win=>{
+          dwins.forEach(win=>{
             if(pinnedSet.has(win.app))return;
             slots.push({key:"win-"+win.id,appId:win.app,running:[win],pinned:false});
           });
           // Determine global top-z so we can highlight the focused chip.
-          const topZ=wins.length>0?Math.max(...wins.map(w=>w.z)):-Infinity;
+          const topZ=dwins.length>0?Math.max(...dwins.map(w=>w.z)):-Infinity;
           return slots.map(slot=>{
             const app=APPS.find(a=>a.id===slot.appId);
             if(!app)return null;
