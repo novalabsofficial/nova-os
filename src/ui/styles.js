@@ -78,6 +78,10 @@ export const CSS = `
   *{box-sizing:border-box;}
   body{margin:0;background:var(--nv-body-bg,#07080f);}
 
+  /* v10.0 — virtual-desktop edge arrows: brighten + nudge outward on hover */
+  .nv-desk-arrow:hover{background:rgba(28,31,46,0.7)!important;}
+  .nv-desk-arrow:active{transform:translateY(-50%) scale(0.94)!important;}
+
   /* ── v9.0 theme tokens. Dark is the default (:root); light overrides via
      html[data-theme="light"]. A single root attribute reskins the OS — see
      the T helper in styles.js. */

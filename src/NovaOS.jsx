@@ -2225,8 +2225,17 @@ export default function NovaOS(){
         </div>
       </div>)}
  
-      {/* Windows */}
-      {wins.filter(w=>(w.desk||0)===curDesk).map(win=>{
+      {/* Windows — wrapped in a sliding "desktop track" (v10.0). Each virtual
+          desktop is a full-viewport-wide panel laid out left-to-right; the
+          track translates horizontally to switch desktops with a smooth
+          animation. pointerEvents:none on the track + panels lets empty space
+          fall through to the icons / marquee surface behind; each window
+          re-enables pointer events for itself. Windows stay mounted across
+          desktops so app state (music, typing, games) survives a switch. */}
+      <div className="nv-desk-track" style={{position:"absolute",top:0,left:0,bottom:0,width:(deskCount*100)+"vw",zIndex:5,pointerEvents:"none",transform:"translateX(-"+(curDesk*100)+"vw)",transition:"transform 0.46s cubic-bezier(0.22,1,0.36,1)"}}>
+      {Array.from({length:deskCount},(_,di)=>(
+      <div key={"deskpanel-"+di} className="nv-desk-panel" style={{position:"absolute",top:0,left:(di*100)+"vw",width:"100vw",bottom:0,pointerEvents:"none"}}>
+      {wins.filter(w=>(w.desk||0)===di).map(win=>{
         const app=APPS.find(a=>a.id===win.app);
         const isMax=win.state==="maximized",isMin=win.state==="minimized",isDrg=drag&&drag.winId===win.id;
         // v7.5: keep minimized windows mounted (display:none) so background
@@ -2247,10 +2256,13 @@ export default function NovaOS(){
         const winShadow = isDrg
           ? "0 14px 28px rgba(0,0,0,0.45), 0 40px 100px rgba(0,0,0,0.7), 0 1px 0 rgba(255,255,255,0.1) inset"
           : "0 4px 8px rgba(0,0,0,0.25), 0 18px 60px rgba(0,0,0,0.5), 0 1px 0 rgba(255,255,255,0.08) inset";
-        const winStyle=isMax?{position:"fixed",top:0,left:0,right:0,bottom:TASKBAR_H+"px",zIndex:win.z,borderRadius:0}:{position:"absolute",left:win.x,top:win.y,width:win.width,height:win.height,zIndex:win.z,borderRadius:winRadius};
+        // v10.0: maximized windows are position:absolute (not fixed) so they
+        // stay confined to their virtual-desktop panel — a fixed element would
+        // anchor to the transformed track and span every desktop at once.
+        const winStyle=isMax?{position:"absolute",top:0,left:0,width:"100vw",bottom:TASKBAR_H+"px",zIndex:win.z,borderRadius:0}:{position:"absolute",left:win.x,top:win.y,width:win.width,height:win.height,zIndex:win.z,borderRadius:winRadius};
         const minimizedStyle=isMin?{display:"none"}:{};
         return(
-          <div key={win.id} data-win="1" data-drop={win.app==="profile"?"avatar":"none"} onClick={()=>focusWin(win.id)} style={{...winStyle,...minimizedStyle,background:"var(--nv-surface-solid)",border:"1px solid rgba(255,255,255,0.09)",boxShadow:winShadow,display:isMin?"none":"flex",flexDirection:"column",animation:"win-in 0.28s cubic-bezier(0.16,1,0.3,1)",backdropFilter:"blur("+winBlur+"px) saturate(160%)",WebkitBackdropFilter:"blur("+winBlur+"px) saturate(160%)",transition:isDrg?"box-shadow 0.18s cubic-bezier(0.4,0,0.2,1)":"box-shadow 0.22s cubic-bezier(0.4,0,0.2,1), left 0.28s cubic-bezier(0.4,0,0.2,1), top 0.28s cubic-bezier(0.4,0,0.2,1), width 0.28s cubic-bezier(0.4,0,0.2,1), height 0.28s cubic-bezier(0.4,0,0.2,1)",overflow:"hidden"}}>
+          <div key={win.id} data-win="1" data-drop={win.app==="profile"?"avatar":"none"} onClick={()=>focusWin(win.id)} style={{...winStyle,...minimizedStyle,pointerEvents:"auto",background:"var(--nv-surface-solid)",border:"1px solid rgba(255,255,255,0.09)",boxShadow:winShadow,display:isMin?"none":"flex",flexDirection:"column",animation:"win-in 0.28s cubic-bezier(0.16,1,0.3,1)",backdropFilter:"blur("+winBlur+"px) saturate(160%)",WebkitBackdropFilter:"blur("+winBlur+"px) saturate(160%)",transition:isDrg?"box-shadow 0.18s cubic-bezier(0.4,0,0.2,1)":"box-shadow 0.22s cubic-bezier(0.4,0,0.2,1), left 0.28s cubic-bezier(0.4,0,0.2,1), top 0.28s cubic-bezier(0.4,0,0.2,1), width 0.28s cubic-bezier(0.4,0,0.2,1), height 0.28s cubic-bezier(0.4,0,0.2,1)",overflow:"hidden"}}>
             {!isMax&&<ResizeHandles winId={win.id} onStartResize={startResize} touchy={touchy}/>}
             {/* v8.3 F1: title bar is now draggable even when maximized —
                 dragging restores the window and tears it off (Windows-style),
@@ -2330,7 +2342,31 @@ export default function NovaOS(){
           </div>
         );
       })}
- 
+      </div>
+      ))}
+      </div>
+
+      {/* v10.0 — on-screen desktop-switch arrows. Appear at the screen edges
+          when an adjacent virtual desktop exists; clicking slides to it. */}
+      {curDesk>0 && (
+        <button onClick={()=>setCurDesk(c=>Math.max(0,c-1))} title="Previous desktop (Ctrl+Alt+←)" className="nv-desk-arrow" style={{position:"fixed",left:14,top:"50%",transform:"translateY(-50%)",zIndex:9996,width:46,height:74,borderRadius:14,background:"rgba(16,18,28,0.42)",border:"1px solid rgba(255,255,255,0.14)",backdropFilter:"blur(12px)",WebkitBackdropFilter:"blur(12px)",cursor:"pointer",color:"rgba(255,255,255,0.85)",display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 8px 26px rgba(0,0,0,0.4)",transition:"background 0.15s, transform 0.15s"}}>
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M15 5l-7 7 7 7" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+        </button>
+      )}
+      {curDesk<deskCount-1 && (
+        <button onClick={()=>setCurDesk(c=>Math.min(deskCount-1,c+1))} title="Next desktop (Ctrl+Alt+→)" className="nv-desk-arrow" style={{position:"fixed",right:14,top:"50%",transform:"translateY(-50%)",zIndex:9996,width:46,height:74,borderRadius:14,background:"rgba(16,18,28,0.42)",border:"1px solid rgba(255,255,255,0.14)",backdropFilter:"blur(12px)",WebkitBackdropFilter:"blur(12px)",cursor:"pointer",color:"rgba(255,255,255,0.85)",display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 8px 26px rgba(0,0,0,0.4)",transition:"background 0.15s, transform 0.15s"}}>
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M9 5l7 7-7 7" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+        </button>
+      )}
+      {/* v10.0 — desktop pager dots, bottom-center above the taskbar. */}
+      {deskCount>1 && (
+        <div style={{position:"fixed",left:"50%",bottom:TASKBAR_H+14,transform:"translateX(-50%)",zIndex:9996,display:"flex",gap:8,padding:"7px 12px",borderRadius:20,background:"rgba(16,18,28,0.42)",border:"1px solid rgba(255,255,255,0.12)",backdropFilter:"blur(12px)",WebkitBackdropFilter:"blur(12px)",boxShadow:"0 8px 26px rgba(0,0,0,0.4)"}}>
+          {Array.from({length:deskCount},(_,di)=>(
+            <button key={"dot-"+di} onClick={()=>setCurDesk(di)} title={"Desktop "+(di+1)} style={{width:di===curDesk?22:9,height:9,borderRadius:5,border:"none",cursor:"pointer",padding:0,background:di===curDesk?AC:"rgba(255,255,255,0.32)",transition:"width 0.25s cubic-bezier(0.22,1,0.36,1), background 0.2s"}}/>
+          ))}
+        </div>
+      )}
+
       {/* Taskbar — v7.7 visual overhaul.
           Frosted-glass background with a subtle top-edge highlight, slightly
           taller for breathing room, and an inset shadow that gives the bar a

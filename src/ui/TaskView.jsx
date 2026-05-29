@@ -13,7 +13,6 @@ import { useEffect } from "react";
 import { FF, FFB, FFM } from "./styles.js";
 import { fill, bdr, hexRgb } from "../lib/format.js";
 
-const MINI_W = 196;           // desktop preview width (px)
 const MINI_RATIO = 0.6;       // preview height = width * ratio
 
 export function TaskView({ AC, deskCount, curDesk, wins, apps, onSwitch, onAdd, onRemove, onMoveWin, onFocusWin, onClose }) {
@@ -27,6 +26,9 @@ export function TaskView({ AC, deskCount, curDesk, wins, apps, onSwitch, onAdd, 
   const appOf = (id) => apps.find(a => a.id === id) || { icon: "▦", label: id };
   const sw = typeof window !== "undefined" ? window.innerWidth : 1280;
   const sh = typeof window !== "undefined" ? window.innerHeight : 800;
+  // Big previews: one fills ~64% of the screen, two fit side-by-side at ~46%.
+  // They shrink to fit when there are more desktops so the row never overflows.
+  const MINI_W = Math.round(Math.max(240, Math.min(sw * (deskCount <= 1 ? 0.64 : deskCount === 2 ? 0.46 : 0.3), 760)));
   const miniH = MINI_W * MINI_RATIO;
   const deskList = Array.from({ length: deskCount }, (_, i) => i);
   const curWins = wins.filter(w => (w.desk || 0) === curDesk);
