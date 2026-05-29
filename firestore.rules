@@ -375,7 +375,15 @@ service cloud.firestore {
          request.resource.data.channels == resource.data.channels &&
          request.resource.data.inviteCode == resource.data.inviteCode &&
          request.resource.data.members.diff(resource.data.members).affectedKeys().hasOnly([request.auth.uid]) &&
-         request.resource.data.members[request.auth.uid].role == resource.data.members[request.auth.uid].role)
+         request.resource.data.members[request.auth.uid].role == resource.data.members[request.auth.uid].role) ||
+
+        // 5) Activity bump (v9.6) — any member may change ONLY
+        //    lastActivityTs + lastSenderUid (drives unread badges), and
+        //    must stamp themselves as the sender. hasOnly tolerates the
+        //    first-ever bump where these fields are newly added.
+        (request.auth.uid in resource.data.memberUids &&
+         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastActivityTs', 'lastSenderUid']) &&
+         request.resource.data.lastSenderUid == request.auth.uid)
       );
 
       // Delete: owner only (cascades client-side via the messages cleanup).

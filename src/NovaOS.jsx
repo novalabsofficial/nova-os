@@ -26,6 +26,7 @@ import { PROVIDERS as AI_PROVIDERS, streamResponse as aiStream, deriveTitle as a
 import { playTone, speak, cancelSpeech, playSound, getSoundConfig, setSoundConfig, setSoundWallpaper, subscribeSoundConfig } from "./lib/audio.js";
 import { db, setDbUid, getDbUid } from "./lib/db.js";
 import { watchMyThreads } from "./lib/dms.js";
+import { watchMyServers } from "./lib/servers.js";
 import { openExternalUrl } from "./lib/openUrl.js";
 import { login as authLogin, register as authRegister, logoutUser as authLogout, normalizeUsername } from "./lib/auth.js";
 import { aiLoad, aiSave, AI_LS_KEYS, AI_LS_CONFIG, AI_LS_CHATS } from "./lib/ai-storage.js";
@@ -1106,12 +1107,66 @@ export default function NovaOS(){
     return watchMyThreads(uid, setDmThreads);
   }, [user]); // re-subscribe when the username changes (login → logout → login as someone else)
 
+  // v9.6 — watch joined servers for the unread badge. Server-level unread
+  // uses each server's lastActivityTs (bumped on every message) vs. the
+  // per-server `data.lastRead["server:<id>"]` stamp ChatApp writes when
+  // you view the server. Sender-is-me activity never counts.
+  const [chatServers, setChatServers] = useState([]);
+  useEffect(() => {
+    const uid = getDbUid();
+    if (!uid) { setChatServers([]); return; }
+    return watchMyServers(uid, setChatServers);
+  }, [user]);
+
+  // v9.6 — @mention notifications. A lightweight OS-level subscription to
+  // recent global chat: when a NEW message (after this listener mounts)
+  // mentions @<myusername> and isn't from me, push a Notification Center
+  // entry — so you get pinged even with the Chat app closed. We skip the
+  // first snapshot (historical backlog) so old @mentions don't re-fire on
+  // every login, and dedupe by message id.
+  useEffect(() => {
+    const uid = getDbUid();
+    if (!uid || !user) return;
+    const mentionRe = new RegExp("@" + user.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\b", "i");
+    const seen = new Set();
+    let first = true;
+    const q = query(collection(firestoreDb, "nova_chat"), orderBy("ts", "asc"), limit(40));
+    const unsub = onSnapshot(q, snap => {
+      if (first) {
+        // Record the backlog ids so a later edit/re-add doesn't notify.
+        snap.docs.forEach(d => seen.add(d.id));
+        first = false;
+        return;
+      }
+      snap.docChanges().forEach(ch => {
+        if (ch.type !== "added") return;
+        if (seen.has(ch.doc.id)) return;
+        seen.add(ch.doc.id);
+        const m = ch.doc.data();
+        if (!m || m.uid === uid) return;            // not my own message
+        if (!mentionRe.test(m.text || "")) return;   // must mention me
+        pushNotification({
+          appId: "chat",
+          kind: "info",
+          title: "@" + (m.user || "someone") + " mentioned you",
+          body: (m.text || "").slice(0, 140),
+        });
+      });
+    }, () => {});
+    return () => unsub();
+  }, [user, pushNotification]);
+
   // Compute badge counts. The map is { appId: count } so the renderer
   // can look up by app id with O(1).
   const lastChatOpenTs = data?.settings?.lastChatOpenTs || 0;
   const myUid = getDbUid();
+  const chatLastRead = data?.lastRead || {};
   const chatUnread = dmThreads.filter(t =>
     t.lastSenderUid && t.lastSenderUid !== myUid && (t.lastTs || 0) > lastChatOpenTs
+  ).length;
+  const serverUnread = chatServers.filter(s =>
+    s.lastActivityTs && s.lastSenderUid && s.lastSenderUid !== myUid &&
+    (chatLastRead["server:" + s.id] || 0) < s.lastActivityTs
   ).length;
   const appBadgeCounts = {};
   notifications.forEach(n => {
@@ -1119,6 +1174,7 @@ export default function NovaOS(){
     appBadgeCounts[n.appId] = (appBadgeCounts[n.appId] || 0) + 1;
   });
   if (chatUnread > 0) appBadgeCounts.chat = (appBadgeCounts.chat || 0) + chatUnread;
+  if (serverUnread > 0) appBadgeCounts.chat = (appBadgeCounts.chat || 0) + serverUnread;
   // When the panel opens, mark everything read after a tick — avoids visual flash
   useEffect(()=>{
     if(!notifsOpen) return;

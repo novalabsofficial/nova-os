@@ -393,6 +393,16 @@ export async function sendServerMessage(serverId, channelId, text, myUid, myUser
     ts: Date.now(),
     channelId: channelId || "general",
   });
+  // v9.6: bump the server's activity stamp so other members' unread badges
+  // light up. Best-effort + non-atomic with the message write — if it
+  // fails the message still landed, only the badge lags. The rules allow
+  // any member to change ONLY lastActivityTs + lastSenderUid.
+  try {
+    await updateDoc(doc(firestoreDb, "nova_servers", serverId), {
+      lastActivityTs: Date.now(),
+      lastSenderUid: myUid,
+    });
+  } catch { /* badge bump is best-effort */ }
 }
 
 /** Delete a server message (own message, or any if you're the owner). */

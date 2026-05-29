@@ -198,6 +198,26 @@ export function ChatApp({ user, AC, data, updateData }) {
   }
   const unreadDmCount = threads.filter(isThreadUnread).length;
 
+  // v9.6 — server unread: a server has unread activity if its
+  // lastActivityTs is newer than we've read AND the last message wasn't
+  // ours. (Channel-level granularity is deferred — server-level is the
+  // useful signal.)
+  function isServerUnread(s) {
+    if (!s || !s.lastActivityTs) return false;
+    if (s.lastSenderUid === myUid) return false;
+    return (lastRead["server:" + s.id] || 0) < s.lastActivityTs;
+  }
+  // Mark the active server read while we're viewing any of its channels.
+  useEffect(() => {
+    if (view !== "server" || !active?.serverId) return;
+    const s = servers.find(x => x.id === active.serverId);
+    const newest = s?.lastActivityTs || 0;
+    if (newest && (lastRead["server:" + active.serverId] || 0) < newest) {
+      updateData?.(p => ({ ...p, lastRead: { ...(p.lastRead || {}), ["server:" + active.serverId]: Date.now() } }));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view, active?.serverId, serverMsgs, servers]);
+
   // ── Active context shortcuts ─────────────────────────────────────────
   const activeServer = view === "server" && active?.serverId
     ? servers.find(s => s.id === active.serverId) || null
@@ -412,6 +432,7 @@ export function ChatApp({ user, AC, data, updateData }) {
           {servers.map(s => {
             const open = !!serverOpen[s.id] || (view === "server" && active?.serverId === s.id);
             const channels = s.channels || [];
+            const unread = isServerUnread(s) && !(view === "server" && active?.serverId === s.id);
             return (
               <div key={s.id} style={{ marginBottom: 2 }}>
                 <button
@@ -425,13 +446,16 @@ export function ChatApp({ user, AC, data, updateData }) {
                     padding: "6px 9px", borderRadius: 7, cursor: "pointer",
                     background: (view === "server" && active?.serverId === s.id) ? "rgba(255,255,255,0.05)" : "transparent",
                     border: "1px solid transparent", textAlign: "left",
-                    fontFamily: FFB, fontWeight: 600, fontSize: 12, color: "var(--nv-text)",
+                    fontFamily: FFB, fontWeight: unread ? 700 : 600, fontSize: 12, color: unread ? "var(--nv-text-strong)" : "var(--nv-text)",
                   }}
                   onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,0.05)"}
                   onMouseLeave={e => { if (!(view === "server" && active?.serverId === s.id)) e.currentTarget.style.background = "transparent"; }}
                   title={s.name}
                 >
-                  <span style={{ fontSize: 14, flexShrink: 0 }}>{s.icon || "💬"}</span>
+                  <span style={{ fontSize: 14, flexShrink: 0, position: "relative" }}>
+                    {s.icon || "💬"}
+                    {unread && <span style={{ position: "absolute", top: -3, right: -4, width: 9, height: 9, borderRadius: "50%", background: "#ff5a5a", border: "2px solid var(--nv-surface-solid)" }}/>}
+                  </span>
                   <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.name}</span>
                   <span style={{ fontSize: 8, opacity: 0.5, transform: open ? "rotate(90deg)" : "none", transition: "transform 0.18s" }}>▶</span>
                 </button>
