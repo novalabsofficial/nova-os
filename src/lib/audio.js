@@ -451,31 +451,42 @@ const SOUND_RECIPES = {
   },
 
   // ── v9.4 — Atmos severe-weather alert ──────────────────────────────
-  // Weatherscan / EAS-style dual-tone attention signal, Nova-branded.
+  // EAS attention signal — the real one. Three 1-second bursts of harsh
+  // digital noise: dual-tone 853 Hz + 960 Hz played SIMULTANEOUSLY, hard
+  // sawtooth waves, flat-line gain envelope (no attack/decay/release).
+  // Reverbless (see DRY_SOUNDS) so the abrupt cutoffs actually ARE abrupt.
   //
-  // The real EAS attention signal is two PURE SINE tones at 853 Hz +
-  // 960 Hz played SIMULTANEOUSLY (FCC §11.31 spec — they're literally
-  // specified as sine waves). The unmistakable "warble" is the beating
-  // between the two close carriers, not sawtooth harmonics — switching
-  // to sawtooth makes it sound like a buzzer rather than the clean
-  // ringing dual-tone Weatherscan used.
+  // Earlier v9.4 cuts pitched it at 607 + 683 Hz for "Nova branding" and
+  // used sine waves through the full ADSR path — both made it sound like
+  // a car chime instead of a severe-weather alarm. The actual EAS spec
+  // (FCC §11.31) is 853 + 960 Hz, and the iconic harshness comes from
+  // sawtooth harmonics PLUS the hard-edged envelope, not just the dyad.
+  // No frequency transpose (pitch is the signal's identity here).
   //
-  // Nova's twist: keep the 607 Hz signature we've used since v5.3 and
-  // pair it with 683 Hz — same 1.125 frequency ratio as the real EAS
-  // pair (853 / 960 ≈ 1.1255), so the warble rate matches Weatherscan
-  // while the absolute pitch stays uniquely Nova.
-  //
-  // Three 950 ms sustains with ~100 ms gaps = three cycles in ~3.15 s
-  // total — tighter than the v9.4 first cut for the right Weatherscan
-  // cadence. Gains bumped (sine RMS is lower than sawtooth's at the
-  // same peak), sub-octave sine body keeps it warm rather than piercing.
+  // The flat envelope is scheduled directly with setValueAtTime — we
+  // don't use the _voice helper because its exponential attack/decay
+  // ramps are the opposite of what's wanted here.
   nwsAlert: (ctx, t, v, r, d) => {
-    const er = Math.min(1, r);
+    function flatTone(freq, startSec, durSec, peak, type) {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = type;
+      osc.frequency.value = freq;
+      // ADSR 0 / 0 / 100% / 0 — flat-line at peak from start to end.
+      gain.gain.setValueAtTime(peak, startSec);
+      gain.gain.setValueAtTime(peak, startSec + durSec - 0.001);
+      gain.gain.setValueAtTime(0,    startSec + durSec);
+      osc.connect(gain).connect(d);
+      osc.start(startSec);
+      osc.stop(startSec + durSec + 0.01);
+    }
+    const dur = 1.0;          // 1 s per burst
+    const gap = 0.10;         // short gap between bursts
+    const peak = 0.18 * v;    // per-tone peak; two tones simultaneously
     for (let i = 0; i < 3; i++) {
-      const start = t + i * 1.05;
-      _voice(ctx, d, 607 * er, start, 950, 0.20 * v, "sine", 20);
-      _voice(ctx, d, 683 * er, start, 950, 0.20 * v, "sine", 20);   // partner tone — same 1.125 ratio as EAS 853/960
-      _voice(ctx, d, 303.5 * er, start, 950, 0.08 * v, "sine", 20); // sub-octave body
+      const start = t + i * (dur + gap);
+      flatTone(853, start, dur, peak, "sawtooth");
+      flatTone(960, start, dur, peak, "sawtooth");
     }
   },
 };
@@ -491,14 +502,16 @@ const SOUND_TAILS = {
   error: 700, message: 900, toast: 450, windowOpen: 250,
   windowClose: 300, appLaunch: 300, click: 100,
   // v9.4 — alarm + NWS recipes ring out longer than typical UI sounds.
-  alarmSunrise: 4200, alarmPulse: 3500, alarmClassic: 2500, nwsAlert: 3400,
+  alarmSunrise: 4200, alarmPulse: 3500, alarmClassic: 2500, nwsAlert: 3500,
   // v9.4 — volume preview is a quick chime, no reverb tail (see DRY_SOUNDS).
   volumeSample: 250,
 };
 
 // Sounds that skip the reverb send — short UI ticks that should stay crisp
 // and cheap (no impulse generation, no lingering tail).
-const DRY_SOUNDS = new Set(["click", "windowOpen", "windowClose", "appLaunch", "toast", "volumeSample"]);
+// `nwsAlert` is dry on purpose — its 0 ms release envelope is the whole
+// point of the EAS recipe, and a reverb tail would defeat it.
+const DRY_SOUNDS = new Set(["click", "windowOpen", "windowClose", "appLaunch", "toast", "volumeSample", "nwsAlert"]);
 
 // Build a decaying-white-noise impulse response — a cheap, plausible "small
 // room" reverb tail. Stereo so the space feels wide.
