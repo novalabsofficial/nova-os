@@ -50,6 +50,7 @@ import {
   ClockWidgetContent, WeatherWidgetContent, NotesWidgetContent,
   TasksWidgetContent, CalendarWidgetContent, SysInfoWidgetContent,
   BatteryWidgetContent,
+  PomodoroWidgetContent,
 } from "./widgets/widgets.jsx";
 // Apps — lazy-loaded via React.lazy so each app ships in its own chunk.
 // Vite splits these into separate JS files; the first time you open Notes,
@@ -1785,6 +1786,7 @@ export default function NovaOS(){
             {id==="calendar"&&<CalendarWidgetContent state={s} tick={tick} AC={AC}/>}
             {id==="sysinfo" &&<SysInfoWidgetContent  state={s}/>}
             {id==="battery" &&<BatteryWidgetContent  state={s} AC={AC}/>}
+            {id==="pomodoro" &&<PomodoroWidgetContent state={s} AC={AC}/>}
           </WidgetShell>
         );
       })}

@@ -8,7 +8,7 @@ export const COLL = "nova_storage";
 // header. Update this when you do a version sweep — package.json /
 // tauri.conf.json still need their own bumps but at least *display* text
 // won't drift again. Format: "<major>.<minor>".
-export const NOVA_VERSION = "9.4";
+export const NOVA_VERSION = "9.5";
 
 // Widget metadata: label/emoji + minimum size constraints used by WidgetShell.
 export const WIDGET_CONFIGS = {
@@ -22,6 +22,10 @@ export const WIDGET_CONFIGS = {
   // where it's unsupported or always shows 100%+charging (no battery
   // present), the widget renders a one-line "no battery" message.
   battery:  { label:"Battery",      emoji:"🔋", minW:180, minH:90  },
+  // v9.5: Pomodoro — 25/5 focus timer. State is local to the widget
+  // (no Firestore round-trip needed) so it survives a re-render but not
+  // a refresh. Soft chime plays at the end of each interval.
+  pomodoro: { label:"Pomodoro",     emoji:"🍅", minW:220, minH:200 },
 };
 
 // Initial widget positions/sizes for a freshly-registered account.
@@ -33,11 +37,14 @@ export const DEFAULT_WIDGET_STATE = {
   calendar: { x:200, y:220, w:280, h:264 },
   sysinfo:  { x:490, y:220, w:220, h:140 },
   battery:  { x:730, y:80,  w:200, h:100 },
+  pomodoro: { x:730, y:200, w:240, h:240 },
 };
 
 // Default open size per app type. App ids that aren't listed get {w:520,h:480}.
 export const DEFAULT_SIZES = {
-  notes:{w:500,h:520},tasks:{w:460,h:520},files:{w:540,h:520},
+  // v9.5: tasks bumped to 660×560 for the new two-pane (rail + main) layout.
+  // Calendar bumped to 760×620 to fit the new mini-month + agenda sidebar.
+  notes:{w:500,h:520},tasks:{w:660,h:560},files:{w:540,h:520},
   paint:{w:700,h:560},browser:{w:760,h:620},screenshot:{w:740,h:600},
   snake:{w:460,h:560},"2048":{w:480,h:580},
   store:{w:680,h:600},terminal:{w:580,h:460},
@@ -45,7 +52,7 @@ export const DEFAULT_SIZES = {
   // 5.1 additions
   calculator:{w:300,h:460},clock:{w:480,h:520},
   minesweeper:{w:520,h:600},wordle:{w:430,h:600},tetris:{w:340,h:620},
-  pdf:{w:680,h:680},music:{w:480,h:560},calendar:{w:560,h:560},
+  pdf:{w:680,h:680},music:{w:480,h:560},calendar:{w:780,h:620},
   atmos:{w:680,h:640},
   // 5.2
   novaai:{w:760,h:640},

@@ -5,35 +5,58 @@ not committed to. Living document — add to it freely.
 
 ---
 
-# 🚧 v9.4 — planned
+# ✅ v9.5 — shipped
 
-Focused feature release on top of the v9.3 bug-fix pass. Four items,
-each well-bounded, each elevates a daily-use surface.
+A two-part release: **part 1** revamped four under-loved apps into real-OS
+two-pane experiences, **part 2** added the long-requested social + workflow
+features.
 
-**Planned**
-- **Spotlight — global search in the taskbar.** A search bar embedded in
-  the taskbar (Windows-style) that searches across notes, tasks, files,
-  folders, photos, apps, Store entries, even Settings panes. Type
-  anything → instant filtered results → Enter to open. The single
-  highest-utility navigation upgrade.
-- **Alarms (Clock app).** Fourth tab in the Clock app alongside World /
-  Stopwatch / Timer. Real scheduled alarms with `{time, days, label,
-  enabled}` storage and three built-in alarm sounds designed in the same
-  master-bus sound engine: gentle/sunrise, pulse, and a classic alarm
-  beep. Pairs with the existing notification + sound stack as the ringer.
-- **Chat — reactions + typing indicators.** Discord-style emoji reactions
-  on messages (per-message reactions sub-doc) and "@alice is typing…"
-  presence via a TTL'd Firestore field. Makes the most-used social
-  surface feel real.
-- **Atmos — lock-screen severe-weather alert + new tone.** When a Severe
-  or Extreme NWS alert hits the pinned location, the screensaver
-  overlay turns into a full-screen warning card. Replace the single
-  607 Hz sine tone with a **three-pulse 607 Hz sawtooth** that mirrors
-  the classic Weatherscan alarm cadence.
+**Part 1 — app revamps**
+- **Tasks** — full rewrite into a Todoist-style two-pane app. Smart views
+  (Today / Upcoming / No date / All / Completed), user-created Lists with
+  color tags, per-task due dates + priorities + notes, inline detail
+  editor. Backwards-compatible data shape.
+- **Calendar** — Apple/Google Calendar-style. Sidebar with mini-month +
+  "Up next" agenda, main pane toggles between Month / Week / Agenda. Event
+  color tags, full-screen event editor, notes per event.
+- **PDF Viewer** — sidebar with session recents, drag-and-drop drop zone,
+  iframe-rendered viewer with download + close toolbar.
+- **Nova AI** — sidebar with chats grouped by recency, double-click to
+  rename, inline provider picker dropdown, 6 starter-prompt chips on
+  empty state, polished message bubbles with per-message copy.
+
+**Part 2 — new features**
+- **User-created servers (Discord-style).** New `nova_servers` collection.
+  Anyone can create a server with custom name + icon; gets a 6-char
+  invite code. Owner can add/remove channels (`#general`, `#bots`, …),
+  rename, regenerate the invite, kick (via deletion), or delete the whole
+  server. Members join by code, send messages per channel, and can leave.
+  Server messages support delete-own + delete-by-owner. Rules-enforced
+  membership + invite-code gating.
+- **DM reactions.** Mirrors the v9.4 global-chat reactions but for direct
+  messages. New `nova_dm_reactions` collection with membership rules
+  matching the parent thread. Same 5-emoji preset.
+- **Music — shuffle / repeat / queue.** Real play queue (separate from
+  library order). Shuffle reshuffles the *unplayed* tail so the current
+  track stays put. Repeat off / all / one. New Queue view in the sidebar
+  shows the order, lets you reorder/remove/jump.
+- **Notes — markdown shortcuts.** Live preview toggle, full markdown
+  toolbar (H1/H2/H3, bold, italic, inline code, lists, quote, link, hr),
+  Ctrl+B / Ctrl+I / Ctrl+K keyboard shortcuts. Custom <200 line markdown
+  renderer (no library bloat).
+- **Pomodoro widget.** New desktop widget. 25/5/15 cycle (Focus → Short
+  break × 3 → Focus → Long break), wall-clock-anchored countdown so
+  background-throttled tabs stay accurate. Soft chime at end of each
+  phase. Cycle dots show progress.
+
+**Required Firestore rules update (deploy):** `nova_servers/{serverId}`
+(+ messages subcollection), `nova_server_invites/{code}`, and
+`nova_dm_reactions/{rxId}`. Deploy via `firebase deploy --only firestore:rules`
+or the Firebase Console rules editor.
 
 ---
 
-# ✅ v9.0 + v9.1 + v9.2 + v9.3 — shipped
+# ✅ v9.0 + v9.1 + v9.2 + v9.3 + v9.4 — shipped
 
 **v9.0 — "Liquid Glass" release**
 - Liquid Glass surface toggle + full colorless glass icon set; light mode
@@ -76,6 +99,20 @@ each well-bounded, each elevates a daily-use surface.
 - Community-app install bug — surfaced silent snapshot errors via
   console.warn + added a runtime [nova-install-debug] diagnostic to pin
   the cause if it still recurs.
+
+**v9.4 — Alarms / Reactions / Severe Alerts / Spotlight**
+- Spotlight (Ctrl+K) — global search across apps, notes, tasks, folders,
+  photos, Store, Settings panes. Taskbar button + keybind.
+- Alarms — fourth tab in Clock app with recurring schedule, three built-in
+  alarm sounds (sunrise / pulse / classic), OS-level scheduler poller.
+- Chat — emoji reactions on global chat (new `nova_chat_reactions`
+  collection) + DM typing indicators via TTL'd `typing` field on the
+  thread doc.
+- Atmos — lock-screen severe-weather card on Severe/Extreme NWS alerts,
+  with new EAS-style 853+960 Hz dual-tone sawtooth alarm (FCC §11.31 spec,
+  flat envelope, dry path).
+- Volume preview chime — soft two-note plays when adjusting the volume
+  slider so you can hear the level.
 
 ---
 
@@ -1100,48 +1137,19 @@ to stand on its own.
 
 ---
 
-## 25. Music — shuffle, repeat, queue
+## 25. Music — shuffle, repeat, queue — ✅ SHIPPED in v9.5
 
-Today's Music app plays the playlist in order, end-of-list-stops. Missing
-the table-stakes controls a real music player has.
-
-- **Shuffle** — randomize the order of unplayed tracks. Persist a
-  per-session shuffled order so going back/forward stays consistent.
-- **Repeat** — three states (off / repeat-all / repeat-one), Spotify-style
-  cycle button in the now-playing bar.
-- **Queue** — explicit "Add to queue" action that puts a track after the
-  current one without replacing the playlist. Sidebar view to see /
-  reorder the queue.
-
-**Considerations**
-- All session-state (matches the v9.2 model — local-file persistence is
-  the bigger follow-up that depends on the File System Access API).
-- Small additions to MusicApp.jsx's existing `idx` / `tracks` model;
-  shuffle is a separate ordered list, queue is a separate array consulted
-  before falling back to the playlist's next track.
+Shipped with a play-queue separate from library order, shuffle that
+reshuffles the unplayed tail (current track stays put), three-state
+repeat (off / all / one), and a Queue view with reorder/remove/jump.
 
 ---
 
-## 26. Notes — light markdown shortcuts
+## 26. Notes — light markdown shortcuts — ✅ SHIPPED in v9.5
 
-The v9.2 Notes editor takes plain text. A light-touch markdown layer would
-add real formatting without becoming a heavy WYSIWYG.
-
-- `# `, `## `, `### ` at the start of a line → header sizes on render.
-- `**bold**`, `*italic*` → inline emphasis.
-- `- ` / `1. ` → bulleted / numbered lists.
-- Backtick wrapping → inline code.
-- Live-preview in the editor (not a separate "render" mode) — typing
-  `**word**` renders bold immediately, while the asterisks stay visible
-  and editable. Same trick Bear and iA Writer use.
-
-**Considerations**
-- Use a small library like `marked` for parsing OR write a tiny custom
-  tokenizer (the syntax set is small — probably 100 lines of code).
-- Editor stays a `<textarea>` for simplicity; overlay a styled `<div>`
-  layer with the rendered markdown that the textarea overlays
-  transparently. (Alternatively, use a contenteditable rich editor —
-  more code but better UX.)
+Shipped with a preview toggle, full markdown toolbar (H1/H2/H3, bold,
+italic, code, lists, quote, link, hr), Ctrl+B/I/K keyboard shortcuts,
+and a <200-line custom renderer (no library dep).
 
 ---
 
@@ -1191,22 +1199,13 @@ Snake, Tetris, 2048, Space Invaders, Pac-Man, Flappy Bird, Minesweeper
 
 ---
 
-## 29. Pomodoro / focus-timer widget
+## 29. Pomodoro / focus-timer widget — ✅ SHIPPED in v9.5
 
-A small desktop widget that runs Pomodoro cycles (25 work / 5 break) or
-a custom interval. Ties into the Clock app philosophically but lives on
-the desktop as a glance-able countdown.
-
-- Configurable work/break durations.
-- Cycle counter ("Round 3 of 4").
-- Audio cue at each transition (reuse the v9.0 alert recipe).
-- Optional "do not disturb" — silences other Nova notifications during a
-  focus block.
-
-**Considerations**
-- New widget in `widgets.jsx`, registered in `WIDGET_CONFIGS`.
-- State persists across page reloads (localStorage) so a refresh
-  doesn't kill an in-progress session.
+Shipped as a desktop widget with the classic 25/5/15 cycle (4 focus
+rounds with short breaks, then a long break). Wall-clock-anchored
+countdown stays accurate under tab throttling. Cycle dots show
+progress; soft chime fires at every phase transition. Future polish
+(custom durations, DND mode) deferred.
 
 ---
 

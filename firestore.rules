@@ -293,6 +293,145 @@ service cloud.firestore {
       );
     }
 
+    // ── user-created servers (v9.5) ──────────────────────────────────────
+    // Discord-style servers. Each server has a member list, channels, and
+    // a messages subcollection. Reads are members-only; the server doc
+    // also gates the subcollection via get(). Joining is permitted from a
+    // non-member who already knows the serverId — but in practice they
+    // only learn the serverId via the invite collection (which requires
+    // the code), so the doors stay invite-only in practice.
+    //
+    // Owners can edit anything except their own ownerUid. Non-owner
+    // members can update *only* to add/remove themselves from memberUids
+    // / memberUsernames — every other field is locked.
+    match /nova_servers/{serverId} {
+
+      allow read: if signedIn() && (
+        resource == null ||
+        request.auth.uid in resource.data.memberUids ||
+        isMod()
+      );
+
+      // Create: caller must be the owner *and* the sole initial member.
+      allow create: if signedIn() &&
+        request.resource.data.ownerUid == request.auth.uid &&
+        request.resource.data.memberUids.size() == 1 &&
+        request.resource.data.memberUids[0] == request.auth.uid &&
+        request.resource.data.name is string &&
+        request.resource.data.name.size() > 0 &&
+        request.resource.data.name.size() <= 60 &&
+        request.resource.data.channels.size() >= 1 &&
+        request.resource.data.channels.size() <= 30;
+
+      // Update:
+      //   • Owner can change anything except ownerUid (no transfer).
+      //   • Non-member can ADD only themselves to memberUids (join).
+      //   • Member (non-owner) can REMOVE only themselves (leave).
+      //   The "join" + "leave" branches enforce immutability on every
+      //   other field via explicit equality checks.
+      allow update: if signedIn() && (
+        // 1) Owner edits — everything goes except ownership transfer.
+        (resource.data.ownerUid == request.auth.uid &&
+         request.resource.data.ownerUid == resource.data.ownerUid) ||
+
+        // 2) Self-join (non-member adds themselves)
+        (!(request.auth.uid in resource.data.memberUids) &&
+         request.auth.uid in request.resource.data.memberUids &&
+         request.resource.data.memberUids.size() == resource.data.memberUids.size() + 1 &&
+         request.resource.data.ownerUid == resource.data.ownerUid &&
+         request.resource.data.name == resource.data.name &&
+         request.resource.data.channels == resource.data.channels &&
+         request.resource.data.inviteCode == resource.data.inviteCode) ||
+
+        // 3) Self-leave (member, non-owner removes themselves)
+        (request.auth.uid in resource.data.memberUids &&
+         resource.data.ownerUid != request.auth.uid &&
+         !(request.auth.uid in request.resource.data.memberUids) &&
+         request.resource.data.memberUids.size() == resource.data.memberUids.size() - 1 &&
+         request.resource.data.ownerUid == resource.data.ownerUid &&
+         request.resource.data.name == resource.data.name &&
+         request.resource.data.channels == resource.data.channels &&
+         request.resource.data.inviteCode == resource.data.inviteCode)
+      );
+
+      // Delete: owner only (cascades client-side via the messages cleanup).
+      allow delete: if signedIn() && resource.data.ownerUid == request.auth.uid;
+
+      // Messages subcollection. Member-gated reads + writes; deletes
+      // allowed for the author or the server's owner. No edits.
+      match /messages/{msgId} {
+        function srv() {
+          return get(/databases/$(database)/documents/nova_servers/$(serverId)).data;
+        }
+        allow read: if signedIn() && (
+          request.auth.uid in srv().memberUids || isMod()
+        );
+        allow create: if signedIn() &&
+          request.auth.uid in srv().memberUids &&
+          request.resource.data.uid == request.auth.uid &&
+          request.resource.data.text is string &&
+          request.resource.data.text.size() > 0 &&
+          request.resource.data.text.size() <= 500;
+        allow update: if false;
+        allow delete: if signedIn() && (
+          resource.data.uid == request.auth.uid ||
+          srv().ownerUid == request.auth.uid ||
+          isMod()
+        );
+      }
+    }
+
+    // ── server invites (v9.5) ────────────────────────────────────────────
+    // Doc id = invite code (e.g. ABC123). The doc holds a denormalized
+    // {serverId, name, icon, ownerUsername} preview so the "join by code"
+    // flow can show the user what they're joining before they commit.
+    //
+    // `get` is open to any signed-in user (they have to know the code).
+    // `list` is denied so codes can't be enumerated.
+    // Create/update/delete are gated to the owner of the referenced
+    // server — verified via a get() into nova_servers.
+    match /nova_server_invites/{code} {
+      allow get: if signedIn();
+      allow list: if false;
+      allow create: if signedIn() &&
+        request.resource.data.serverId is string &&
+        exists(/databases/$(database)/documents/nova_servers/$(request.resource.data.serverId)) &&
+        get(/databases/$(database)/documents/nova_servers/$(request.resource.data.serverId)).data.ownerUid == request.auth.uid;
+      allow update: if signedIn() &&
+        get(/databases/$(database)/documents/nova_servers/$(resource.data.serverId)).data.ownerUid == request.auth.uid;
+      // Delete: the linked-server owner OR if the server is already gone
+      // (so deleteServer's cleanup doesn't get stuck on a dangling invite).
+      allow delete: if signedIn() && (
+        !exists(/databases/$(database)/documents/nova_servers/$(resource.data.serverId)) ||
+        get(/databases/$(database)/documents/nova_servers/$(resource.data.serverId)).data.ownerUid == request.auth.uid
+      );
+    }
+
+    // ── DM reactions (v9.5) ──────────────────────────────────────────────
+    // Mirrors nova_chat_reactions but for DM messages. The msgId here is
+    // the message doc id under nova_dm_threads/{threadId}/messages.
+    // Membership check uses a get() into the parent thread doc, same
+    // pattern as the messages subcollection.
+    match /nova_dm_reactions/{rxId} {
+      function thread(threadId) {
+        return get(/databases/$(database)/documents/nova_dm_threads/$(threadId)).data;
+      }
+      allow read: if signedIn();
+      allow create: if signedIn() &&
+        request.resource.data.uid == request.auth.uid &&
+        request.resource.data.threadId is string &&
+        request.auth.uid in thread(request.resource.data.threadId).participantUids &&
+        request.resource.data.msgId is string &&
+        request.resource.data.msgId.size() > 0 &&
+        request.resource.data.emoji is string &&
+        request.resource.data.emoji.size() > 0 &&
+        request.resource.data.emoji.size() < 12;
+      allow update: if false;
+      allow delete: if signedIn() && (
+        resource.data.uid == request.auth.uid || isMod()
+      );
+    }
+
     // ── catch-all ────────────────────────────────────────────────────────
     // Anything else is denied. New collections need an explicit rule above.
     match /{document=**} {
