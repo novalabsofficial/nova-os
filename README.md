@@ -1,16 +1,33 @@
-# Nova OS - Supernova Edition (v10.2)
+# Nova OS - Supernova Edition (v10.3)
 
 A browser-based operating system, built with React + Vite, backed by Firebase,
-and shippable three ways: boot it in a tab, **install it on your phone** as an
-app, or run it as a native desktop app with Tauri. Windows, a taskbar, a start
-menu, real multitasking, a shelf of built-in apps, cross-device accounts, an AI
-command bar, virtual desktops, a real tabbed browser, a sandboxed shell - and a
-full, polished iOS-style mobile edition.
+and shippable four ways: boot it in a tab, **install it on your phone** (PWA),
+get the **native Android app** (free APK), or run it as a native desktop app
+with Tauri. Windows, a taskbar, a start menu, real multitasking, a shelf of
+built-in apps, cross-device accounts, an AI command bar, virtual desktops, a
+real tabbed browser, a sandboxed shell - and a full, polished iOS-style mobile
+edition.
 
-v10.1 delivered the Mobile edition; **v10.2 polishes it** into something that
-feels like a real phone OS. **Next up, v10.3 turns it into a working Google Play
-Store app** (a native shell via Capacitor, with real device haptics/hardware).
-Still on the long-term horizon: a bootable Linux distribution.
+v10.1 delivered the Mobile edition, v10.2 polished it, and **v10.3 ships a real
+native Android app** (via Capacitor) distributed as a free APK on GitHub
+Releases - no app-store fee - with reliable on-device haptics. Still on the
+long-term horizon: a bootable Linux distribution.
+
+---
+
+## What's new in 10.3 (native Android app)
+
+- **Native Android app** - Nova OS wrapped with [Capacitor](https://capacitorjs.com/)
+  and shipped as a **free APK** attached to each GitHub Release. Install it from
+  the release page or the in-app **Download Android app** button (Control Center,
+  on Android). No Google Play account or fee required.
+- **Reliable haptics** - the native app uses the real OS haptic engine, so the
+  tactile feedback that the web Vibration API couldn't deliver now works
+  properly (taps, drags, toggles).
+- **Automated APK builds** - pushing a `vX.Y.Z` tag builds the APK on CI
+  (`android-release.yml`) and attaches `nova-os.apk` to the same release as the
+  desktop installers. No local Android SDK needed.
+- The PWA, desktop, and web builds are all unchanged - this is purely additive.
 
 ---
 
@@ -120,14 +137,15 @@ npm run build        # outputs to dist/
 npm run preview      # preview the production build locally
 ```
 
-### Install on a phone (PWA)
-Open the deployed (HTTPS) URL on your phone:
-- **Android (Chrome):** swipe down for Control Center -> "Install Nova OS", or
-  the Chrome menu -> "Install app".
-- **iPhone (Safari):** Share -> "Add to Home Screen".
+### Install on a phone
+- **Android - native app (recommended):** download `nova-os.apk` from the latest
+  GitHub Release (or the in-app **Download Android app** button in Control
+  Center) and install it. Gets you reliable native haptics.
+- **Android / iPhone - PWA:** open the deployed (HTTPS) URL and install it from
+  the browser. Android (Chrome): Control Center -> "Install Nova OS", or menu ->
+  "Install app". iPhone (Safari): Share -> "Add to Home Screen".
 
-See MOBILE-APP.md for the full install guide and the Google Play Store (TWA)
-publishing recipe.
+See MOBILE-APP.md for the full Capacitor / APK build + distribution guide.
 
 ### Desktop (Tauri)
 Requires the Rust toolchain plus the Tauri prerequisites for your OS.
@@ -148,10 +166,9 @@ npm run test:run     # vitest (single run)
 
 1. **Nova OS Mobile** - shipped in 10.1, polished in 10.2 (touch-first phone
    edition + installable PWA, app folders, lock screen, notifications, landscape).
-2. **v10.3 - Working Play Store app** - wrap the app in a native shell with
-   Capacitor and publish to the Google Play Store, unlocking reliable device
-   haptics, real hardware access, and a true in-app browser. This is the next
-   release. (See MOBILE-APP.md for the publishing path.)
+2. **Native Android app** - shipped in 10.3 (Capacitor + free APK on GitHub
+   Releases, reliable haptics). Publishing to the Google Play Store later is an
+   optional, additive step (one-time $25); see MOBILE-APP.md.
 3. **Nova Linux** - a bootable Linux distribution for PC/laptop.
 
 ---
