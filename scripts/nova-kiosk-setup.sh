@@ -28,6 +28,9 @@ sudo tee /etc/gdm3/custom.conf >/dev/null <<CONF
 [daemon]
 AutomaticLoginEnable=true
 AutomaticLogin=$ME
+# Xorg session: VirtualBox handles it far better than Wayland (auto-resize,
+# smoother), and it's more reliable on most real GPUs too.
+WaylandEnable=false
 CONF
 
 echo ">> Adding the Nova OS kiosk autostart (Firefox kiosk) ..."
