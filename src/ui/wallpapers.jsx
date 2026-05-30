@@ -751,5 +751,5 @@ export function Wallpaper({ id, customUrl, animate }) {
   );
 }
 
-// Also export the individual backgrounds — the login screen uses MeshBg directly.
-export { NovaBg, BlissBg, AuroraBg, MeshBg };
+// Also export the individual backgrounds — the login screen uses one directly.
+export { NovaBg, BlissBg, AuroraBg, MeshBg, SupernovaBg, NebulaBg };

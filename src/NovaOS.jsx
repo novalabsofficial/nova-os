@@ -37,7 +37,7 @@ import {
   STORE_CATALOG, STORE_CATS, BOOT_MSGS, ACCENT_PRESETS, BOOKMARKS, PAINT_COLORS,
   WALLPAPERS, WMO, HAS_SVG_ICON, NOVA_VERSION,
 } from "./ui/constants.js";
-import { Wallpaper, NovaBg, BlissBg, AuroraBg, MeshBg } from "./ui/wallpapers.jsx";
+import { Wallpaper, NovaBg, BlissBg, AuroraBg, MeshBg, SupernovaBg } from "./ui/wallpapers.jsx";
 import { CommandBar } from "./ui/CommandBar.jsx";
 import { TaskView } from "./ui/TaskView.jsx";
 import { NovaSvgIcon, AppIconDisplay, NovaLogo, WindowControlIcon, UserAvatar } from "./ui/icons.jsx";
@@ -1670,7 +1670,7 @@ export default function NovaOS(){
 
     // v6.3: auth goes through Firebase Auth. The new auth.js handles both
     // greenfield accounts and silent migration of pre-6.3 plaintext accounts.
-    const initData={notes:[],tasks:[],wallpaper:"mesh",bio:"",joined:Date.now(),settings:{},installedApps:[],folders:[],hiddenFromDesktop:[],pinnedToTaskbar:[],migratedTo41:true,migratedTo52:true};
+    const initData={notes:[],tasks:[],wallpaper:"supernova",bio:"",joined:Date.now(),settings:{},installedApps:[],folders:[],hiddenFromDesktop:[],pinnedToTaskbar:[],migratedTo41:true,migratedTo52:true};
 
     if(mode==="register"){
       try {
@@ -1887,11 +1887,12 @@ export default function NovaOS(){
   // floating ambient orbs behind the mesh backdrop. More confident typography
   // and inner highlight border to lift the card off the background.
   if(screen==="login")return(
-    // v9.0: macOS-lock-screen style — blurred Mesh wallpaper, a large clock up
-    // top, and a minimal frosted sign-in column with subtle input bars.
+    // v10.0: macOS-lock-screen style — blurred Supernova wallpaper (the
+    // edition signature), a large clock up top, and a minimal frosted sign-in
+    // column with subtle input bars.
     <div style={{width:"100%",height:"100vh",position:"relative",overflow:"hidden"}}>
       <style>{CSS}</style>
-      <MeshBg/>
+      <SupernovaBg/>
       {/* Frosted blur over the wallpaper */}
       <div style={{position:"absolute",inset:0,backdropFilter:"blur(30px) saturate(1.1)",WebkitBackdropFilter:"blur(30px) saturate(1.1)",background:"rgba(8,10,22,0.34)"}}/>
       {/* Clock — top center, like the macOS lock screen */}
