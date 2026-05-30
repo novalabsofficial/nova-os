@@ -9,7 +9,7 @@
 // Control Center (swipe down from top, swipe up to close) · App Library
 // (swipe up / down from the middle, search).
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, Component } from "react";
 import { FF, FFB, FFM } from "./styles.js";
 import { fill, bdr } from "../lib/format.js";
 import { Wallpaper } from "./wallpapers.jsx";
@@ -35,6 +35,24 @@ const pt = (e) => (e.touches && e.touches[0]) || (e.changedTouches && e.changedT
 // browser fires ~0-300ms after a touch release (which would otherwise dismiss
 // a menu the moment you lift the finger that opened it).
 let lastTouchAt = 0;
+
+// Stops a single crashing app from black-screening the whole mobile shell.
+// Resets when the shown app changes (appKey).
+class AppErrorBoundary extends Component {
+  constructor(p) { super(p); this.state = { err: null }; }
+  static getDerivedStateFromError(err) { return { err }; }
+  componentDidUpdate(prev) { if (prev.appKey !== this.props.appKey && this.state.err) this.setState({ err: null }); }
+  render() {
+    if (this.state.err) return (
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100%", gap: 10, padding: 24, textAlign: "center", color: "var(--nv-text)", fontFamily: FF }}>
+        <div style={{ fontSize: 34 }}>😵</div>
+        <div style={{ fontFamily: FFB, fontWeight: 700, fontSize: 15, color: "var(--nv-text-strong)" }}>This app hit an error</div>
+        <div style={{ fontSize: 12, color: "var(--nv-text-dim)", fontFamily: FFM, wordBreak: "break-word", maxWidth: 320 }}>{String(this.state.err?.message || this.state.err)}</div>
+      </div>
+    );
+    return this.props.children;
+  }
+}
 
 function SignalGlyph() { return <svg width="17" height="11" viewBox="0 0 17 11" fill="#fff">{[0,1,2,3].map(i=><rect key={i} x={i*4.4} y={8-i*2.4} width="3" height={3+i*2.4} rx="0.7"/>)}</svg>; }
 function WifiGlyph() { return <svg width="16" height="12" viewBox="0 0 16 12" fill="none" stroke="#fff" strokeWidth="1.4" strokeLinecap="round"><path d="M1.6 3.8a10 10 0 0 1 12.8 0"/><path d="M4 6.5a6 6 0 0 1 8 0"/><path d="M6.4 9.1a2.4 2.4 0 0 1 3.2 0"/></svg>; }
@@ -228,7 +246,7 @@ export function MobileShell({ AC, user, data, apps, wallpaperId, customWp, setti
       {openId && (
         <div style={{ position: "absolute", inset: 0, zIndex: 20, display: "flex", flexDirection: "column", background: "var(--nv-surface-solid)", animation: "win-launch 0.26s cubic-bezier(0.16,1,0.3,1)" }}>
           <div style={{ height: "calc(" + SAT + " + 40px)", flexShrink: 0 }} />
-          <div style={{ flex: 1, minHeight: 0, overflowY: "auto", overflowX: "hidden", padding: "12px 14px calc(" + SAB + " + 54px)" }}>{renderApp(openId)}</div>
+          <div style={{ flex: 1, minHeight: 0, overflowY: "auto", overflowX: "hidden", padding: "12px 14px calc(" + SAB + " + 54px)" }}><AppErrorBoundary appKey={openId}>{renderApp(openId)}</AppErrorBoundary></div>
         </div>
       )}
 
@@ -394,7 +412,7 @@ function SwitcherCard({ app, glass, renderApp, onOpen, onClose }) {
       {/* live, shrunken running app */}
       <div style={{ width: W, height: H, borderRadius: 22, overflow: "hidden", position: "relative", background: "var(--nv-surface-solid)", border: "1px solid rgba(255,255,255,0.16)", boxShadow: "0 18px 46px rgba(0,0,0,0.55)" }}>
         <div style={{ position: "absolute", top: 0, left: 0, width: vw, height: Math.round(H / scale), transform: "scale(" + scale + ")", transformOrigin: "top left", pointerEvents: "none", padding: "14px 16px", boxSizing: "border-box" }}>
-          {renderApp(app.id)}
+          <AppErrorBoundary appKey={app.id}>{renderApp(app.id)}</AppErrorBoundary>
         </div>
       </div>
       <div style={{ display: "flex", alignItems: "center", gap: 8, justifyContent: "center" }}>
