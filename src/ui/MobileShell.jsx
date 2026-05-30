@@ -129,9 +129,13 @@ export function MobileShell({ AC, user, data, apps, wallpaperId, customWp, setti
   const [editOrder, setEditOrder] = useState([]);
   const [dragId, setDragId] = useState(null);      // which app is being dragged (renders the floating clone)
   const [addPicker, setAddPicker] = useState(false);
+  const [openFolder, setOpenFolder] = useState(null);   // folderId currently open
+  const [mergeFolder, setMergeFolder] = useState(null); // folder highlighted as a drop target mid-drag
   const editOrderRef = useRef([]);
-  const dragRef = useRef(null);       // id currently dragged
+  const dragRef = useRef(null);       // id/token currently dragged
   const dragFrom = useRef(null);      // dock slot the drag started from (null = from Home grid)
+  const dragMoved = useRef(false);    // did this drag actually move (vs a tap)?
+  const mergeRef = useRef(null);      // folderId under the finger at drop time
   const dragPt = useRef({ x: 0, y: 0 });  // last finger point (drives the clone via ref, no re-render)
   const dragCloneRef = useRef(null);  // the floating clone DOM node
 
@@ -139,21 +143,29 @@ export function MobileShell({ AC, user, data, apps, wallpaperId, customWp, setti
   const dockSet = new Set(dock);
   const appById = useCallback((id) => apps.find(a => a.id === id), [apps]);
 
-  // ── customization: hidden set + custom order ──────────────────────────────
-  // Home shows non-hidden, non-dock apps in `mobileOrder` first, then any new
-  // apps appended. The App Library (drawer) always shows everything.
+  // ── customization: hidden set + custom order + folders ─────────────────────
+  // Home shows non-hidden, non-dock, non-foldered apps in `mobileOrder` first,
+  // then any new apps appended. Order entries may be app ids OR folder tokens
+  // ("folder:<id>"). Folders live in settings.mobileFolders.
   const hidden = new Set(settings?.mobileHidden || []);
   const order = settings?.mobileOrder || [];
+  const folders = settings?.mobileFolders || {};
+  const folderApp = useCallback((tok) => tok && tok.indexOf("folder:") === 0 ? tok.slice(7) : null, []);
+  const inFolder = new Set();
+  Object.values(folders).forEach(f => (f?.apps || []).forEach(id => inFolder.add(id)));
+  const validFolderTok = (tok) => { const fid = folderApp(tok); return fid && folders[fid] && (folders[fid].apps || []).some(id => appById(id)); };
+  const tokenLive = (tok) => folderApp(tok) ? validFolderTok(tok) : (apps.some(a => a.id === tok) && !hidden.has(tok) && !dockSet.has(tok) && !inFolder.has(tok));
   const homeIds = [
-    ...order.filter(id => apps.some(a => a.id === id) && !hidden.has(id) && !dockSet.has(id)),
-    ...apps.filter(a => !hidden.has(a.id) && !dockSet.has(a.id) && !order.includes(a.id)).map(a => a.id),
+    ...order.filter(tokenLive),
+    ...Object.keys(folders).map(fid => "folder:" + fid).filter(t => validFolderTok(t) && !order.includes(t)),
+    ...apps.filter(a => !hidden.has(a.id) && !dockSet.has(a.id) && !inFolder.has(a.id) && !order.includes(a.id)).map(a => a.id),
   ];
   // In edit mode the grid renders from the live working order (editOrder).
-  const baseIds = editMode ? editOrder : homeIds;
-  const homeApps = baseIds.map(id => appById(id)).filter(Boolean);
+  // Empty folder tokens stay visible in edit mode so you can drag apps into them.
+  const baseIds = (editMode ? editOrder : homeIds).filter(tok => folderApp(tok) ? (editMode || validFolderTok(tok)) : appById(tok));
   const hasWidgets = widgets && widgets.length > 0 && !editMode;
   const cap0 = hasWidgets ? 8 : PER_PAGE;
-  const pages = [homeApps.slice(0, cap0), ...chunk(homeApps.slice(cap0), PER_PAGE)].filter((p, i) => i === 0 || p.length);
+  const pages = [baseIds.slice(0, cap0), ...chunk(baseIds.slice(cap0), PER_PAGE)].filter((p, i) => i === 0 || p.length);
   if (pages.length === 0) pages.push([]);
   const curPage = Math.min(page, pages.length - 1);
 
@@ -162,6 +174,52 @@ export function MobileShell({ AC, user, data, apps, wallpaperId, customWp, setti
   const addToHome = (id) => updateSettings?.({ mobileHidden: (settings?.mobileHidden || []).filter(x => x !== id) });
   const moveHome = (id, dir) => { const ids = [...homeIds]; const i = ids.indexOf(id), j = i + dir; if (i < 0 || j < 0 || j >= ids.length) return; [ids[i], ids[j]] = [ids[j], ids[i]]; updateSettings?.({ mobileOrder: ids }); };
   const pinToDock = (id, slot) => { const next = [...dock]; const prev = next[slot], at = next.indexOf(id); next[slot] = id; if (at >= 0 && at !== slot) next[at] = prev; updateSettings?.({ mobileDock: next }); };
+
+  // ── folder actions ─────────────────────────────────────────────────────────
+  const newFolderId = () => "f" + Date.now().toString(36) + Math.floor(Math.random() * 1e4).toString(36);
+  const createFolder = () => {
+    const fid = newFolderId();
+    const nf = { ...folders, [fid]: { name: "Folder", apps: [] } };
+    const a = ["folder:" + fid, ...editOrderRef.current];
+    editOrderRef.current = a; setEditOrder(a);
+    updateSettings?.({ mobileFolders: nf, mobileOrder: a });
+  };
+  const addToFolder = (fid, appId) => {
+    if (!folders[fid] || folderApp(appId)) return;            // never nest folders
+    const f = folders[fid];
+    if ((f.apps || []).includes(appId)) return;
+    const nf = { ...folders, [fid]: { ...f, apps: [...(f.apps || []), appId] } };
+    const a = editOrderRef.current.filter(x => x !== appId);  // app leaves the home grid
+    editOrderRef.current = a; setEditOrder(a);
+    updateSettings?.({ mobileFolders: nf, mobileOrder: a });
+  };
+  const removeFromFolder = (fid, appId) => {
+    const f = folders[fid]; if (!f) return;
+    const remaining = (f.apps || []).filter(x => x !== appId);
+    const nf = { ...folders };
+    let nextOrder = (settings?.mobileOrder || []).slice();
+    if (remaining.length <= 1) {
+      // dissolve: surviving app + the removed one go back to the home grid
+      delete nf[fid];
+      const back = [...remaining, appId].filter(Boolean);
+      nextOrder = nextOrder.filter(t => t !== "folder:" + fid);
+      back.forEach(id => { if (!nextOrder.includes(id)) nextOrder.push(id); });
+    } else {
+      nf[fid] = { ...f, apps: remaining };
+      if (!nextOrder.includes(appId)) nextOrder.push(appId);
+    }
+    updateSettings?.({ mobileFolders: nf, mobileOrder: nextOrder });
+  };
+  const renameFolder = (fid, name) => { if (!folders[fid]) return; updateSettings?.({ mobileFolders: { ...folders, [fid]: { ...folders[fid], name: name || "Folder" } } }); };
+  // drop any empty folders (created but never filled) when leaving edit mode
+  const pruneEmptyFolders = () => {
+    const empties = Object.keys(folders).filter(fid => !(folders[fid].apps || []).length);
+    if (!empties.length) return;
+    const nf = { ...folders }; empties.forEach(fid => delete nf[fid]);
+    const a = editOrderRef.current.filter(t => !empties.includes(folderApp(t)));
+    editOrderRef.current = a;
+    updateSettings?.({ mobileFolders: nf, mobileOrder: a });
+  };
 
   // Wallpaper is expensive (animated canvas/SVG) — memoize so it doesn't
   // re-render on every clock tick, page-drag or reorder.
@@ -208,6 +266,7 @@ export function MobileShell({ AC, user, data, apps, wallpaperId, customWp, setti
         const dk = el.getAttribute("data-dock");
         dragRef.current = el.getAttribute("data-app");
         dragFrom.current = dk != null ? +dk : null;
+        dragMoved.current = false;
         dragPt.current = { x: p.clientX, y: p.clientY };
         setDragId(dragRef.current);
         gest.current = { drag: true };
@@ -228,6 +287,7 @@ export function MobileShell({ AC, user, data, apps, wallpaperId, customWp, setti
       // drag gesture, so motion after the long-press did nothing.)
       dragRef.current = g.app;
       dragFrom.current = g.dock != null ? +g.dock : null;
+      dragMoved.current = false;
       dragPt.current = { x: g.x0, y: g.y0 };
       setDragId(g.app);
       gest.current = { drag: true };
@@ -242,19 +302,29 @@ export function MobileShell({ AC, user, data, apps, wallpaperId, customWp, setti
     const p = pt(e);
     if (g.drag) {
       if (!dragRef.current) return;
+      if (Math.abs(p.clientX - dragPt.current.x) > 3 || Math.abs(p.clientY - dragPt.current.y) > 3) dragMoved.current = true;
       dragPt.current = { x: p.clientX, y: p.clientY };
       moveClone();
-      // Live reorder only while dragging a Home-grid app (dock apps swap on drop).
+      // Live reorder only while dragging a Home-grid item (dock apps swap on drop).
       if (dragFrom.current == null) {
         const t = document.elementFromPoint(p.clientX, p.clientY);
         const tEl = t && t.closest ? t.closest("[data-app]") : null;
         const tid = tEl && tEl.getAttribute("data-dock") == null ? tEl.getAttribute("data-app") : null;
-        if (tid && tid !== dragRef.current) {
+        const draggingApp = !folderApp(dragRef.current);
+        const tFid = folderApp(tid);
+        if (tid && tid !== dragRef.current && draggingApp && tFid) {
+          // hovering a folder while dragging an app → drop will go INTO it
+          if (mergeRef.current !== tFid) { mergeRef.current = tFid; setMergeFolder(tFid); haptic("move"); }
+        } else if (tid && tid !== dragRef.current) {
+          // reorder (app over app, or folder over anything)
+          if (mergeRef.current) { mergeRef.current = null; setMergeFolder(null); }
           const a = editOrderRef.current.filter(x => x !== dragRef.current);
           let i = a.indexOf(tid); if (i < 0) i = a.length;
           a.splice(i, 0, dragRef.current);
           applyOrder(a);
           haptic("move");
+        } else if (!tid || tid === dragRef.current) {
+          if (mergeRef.current) { mergeRef.current = null; setMergeFolder(null); }
         }
       }
       return;
@@ -265,15 +335,21 @@ export function MobileShell({ AC, user, data, apps, wallpaperId, customWp, setti
     if (g.axis === "x") { let nx = dx; if ((curPage === 0 && dx > 0) || (curPage === pages.length - 1 && dx < 0)) nx = dx * 0.35; setDragX(nx); }
   }
   function onUp(e) {
+    if (e.type && e.type.indexOf("touch") === 0) lastTouchAt = Date.now();   // ghost-click guard for overlays opened here (e.g. folders)
     const g = gest.current; gest.current = null; if (!g) return;
     if (g.remove) { const id = g.remove; haptic("remove"); applyOrder(editOrderRef.current.filter(x => x !== id)); hideFromHome(id); return; }
     if (g.drag) {
-      const id = dragRef.current, from = dragFrom.current;
-      dragRef.current = null; dragFrom.current = null; setDragId(null);
+      const id = dragRef.current, from = dragFrom.current, merge = mergeRef.current, moved = dragMoved.current;
+      const isFolderTok = !!folderApp(id);
+      dragRef.current = null; dragFrom.current = null; mergeRef.current = null; setDragId(null); setMergeFolder(null);
+      // tap (no real movement) on a folder → open it
+      if (!moved && isFolderTok) { setOpenFolder(folderApp(id)); return; }
+      // dropped onto a folder → file the app inside it
+      if (merge && !isFolderTok && folders[merge]) { addToFolder(merge, id); haptic("drop"); return; }
       const p = pt(e);
       const t = document.elementFromPoint(p.clientX, p.clientY);
       const zone = t && t.closest ? t.closest("[data-dockzone]") : null;
-      if (zone && id) {
+      if (zone && id && !isFolderTok) {   // folders can't live in the dock
         // dropped on the dock → which of the 4 slots (by x position)
         const r = zone.getBoundingClientRect();
         const slot = Math.max(0, Math.min(3, Math.floor(((p.clientX - r.left) / r.width) * 4)));
@@ -286,13 +362,13 @@ export function MobileShell({ AC, user, data, apps, wallpaperId, customWp, setti
         haptic("drop");
         return;
       }
-      // dropped on the Home grid: a Home app was reordered live → commit;
+      // dropped on the Home grid: a Home item was reordered live → commit;
       // a dock app dropped on Home just snaps back (dock stays full at 4).
       if (from == null) commitOrder();
       haptic("drop");
       return;
     }
-    if (g.exit) { commitOrder(); setEditMode(false); return; }
+    if (g.exit) { pruneEmptyFolders(); commitOrder(); setEditMode(false); return; }
     if (g.hold && g.hold !== "fired") clearTimeout(g.hold);
     if (g.hold === "fired") { setDragX(0); return; }
     const p = pt(e); const dx = p.clientX - g.x0, dy = p.clientY - g.y0;
@@ -310,7 +386,7 @@ export function MobileShell({ AC, user, data, apps, wallpaperId, customWp, setti
         haptic("toggle");
       }
       setDragX(0);
-    } else if (g.app) { openApp(g.app); }
+    } else if (g.app) { const fid = folderApp(g.app); if (fid) setOpenFolder(fid); else openApp(g.app); }
   }
   const padEvents = { onTouchStart: onDown, onTouchMove: onMove, onTouchEnd: onUp, onTouchCancel: () => { gest.current = null; setDragX(0); }, onMouseDown: onDown, onMouseMove: onMove, onMouseUp: onUp };
 
@@ -354,12 +430,25 @@ export function MobileShell({ AC, user, data, apps, wallpaperId, customWp, setti
                     </div>
                   )}
                   <div style={{ padding: "4px 18px 0", display: "grid", gridTemplateColumns: "repeat(" + COLS + ",1fr)", gridAutoRows: "min-content", gap: "20px 8px", alignContent: "start" }}>
-                    {pg.map(a => (
-                      <div key={a.id} data-app={a.id} className={editMode ? undefined : "mb-ic"} style={{ position: "relative", opacity: dragId === a.id ? 0 : 1, animation: editMode ? "icon-jiggle 0.34s ease-in-out infinite" : undefined, animationDelay: editMode ? "-" + ((a.id.length % 5) * 0.05) + "s" : undefined }}>
-                        <IconVisual app={a} glass={glass} />
-                        {editMode && <div data-remove={a.id} style={{ position: "absolute", top: -3, left: "calc(50% - 30px)", width: 22, height: 22, borderRadius: "50%", background: "#3a3a3c", border: "1.5px solid rgba(255,255,255,0.55)", color: "#fff", fontSize: 19, lineHeight: "17px", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 1px 4px rgba(0,0,0,0.45)" }}>−</div>}
-                      </div>
-                    ))}
+                    {pg.map(tok => {
+                      const fid = folderApp(tok);
+                      const jig = { animation: editMode ? "icon-jiggle 0.34s ease-in-out infinite" : undefined, animationDelay: editMode ? "-" + ((tok.length % 5) * 0.05) + "s" : undefined };
+                      if (fid) {
+                        const f = folders[fid] || { name: "Folder", apps: [] };
+                        return (
+                          <div key={tok} data-app={tok} className={editMode ? undefined : "mb-ic"} style={{ position: "relative", opacity: dragId === tok ? 0 : 1, transform: mergeFolder === fid ? "scale(1.18)" : undefined, transition: "transform 0.16s var(--nv-ease)", ...jig }}>
+                            <FolderTile folder={f} appById={appById} glass={glass} highlight={mergeFolder === fid} />
+                          </div>
+                        );
+                      }
+                      const a = appById(tok); if (!a) return null;
+                      return (
+                        <div key={tok} data-app={tok} className={editMode ? undefined : "mb-ic"} style={{ position: "relative", opacity: dragId === tok ? 0 : 1, ...jig }}>
+                          <IconVisual app={a} glass={glass} />
+                          {editMode && <div data-remove={tok} style={{ position: "absolute", top: -3, left: "calc(50% - 30px)", width: 22, height: 22, borderRadius: "50%", background: "#3a3a3c", border: "1.5px solid rgba(255,255,255,0.55)", color: "#fff", fontSize: 19, lineHeight: "17px", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 1px 4px rgba(0,0,0,0.45)" }}>−</div>}
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               ))}
@@ -367,9 +456,10 @@ export function MobileShell({ AC, user, data, apps, wallpaperId, customWp, setti
           </div>
 
           {editMode ? (
-            <div style={{ display: "flex", justifyContent: "center", gap: 10, padding: "6px 16px 8px" }}>
-              <button onClick={() => setAddPicker(true)} style={{ padding: "8px 16px", borderRadius: 20, background: "rgba(255,255,255,0.14)", border: "1px solid rgba(255,255,255,0.18)", color: "#fff", fontFamily: FFB, fontWeight: 600, fontSize: 13, cursor: "pointer" }}>＋ Add apps</button>
-              <button onClick={() => { commitOrder(); setEditMode(false); }} style={{ padding: "8px 22px", borderRadius: 20, background: fill(AC), border: "1px solid " + bdr(AC), color: AC, fontFamily: FFB, fontWeight: 700, fontSize: 13, cursor: "pointer" }}>Done</button>
+            <div style={{ display: "flex", justifyContent: "center", gap: 8, padding: "6px 12px 8px" }}>
+              <button onClick={() => setAddPicker(true)} style={{ padding: "8px 14px", borderRadius: 20, background: "rgba(255,255,255,0.14)", border: "1px solid rgba(255,255,255,0.18)", color: "#fff", fontFamily: FFB, fontWeight: 600, fontSize: 12.5, cursor: "pointer" }}>＋ Add</button>
+              <button onClick={createFolder} style={{ padding: "8px 14px", borderRadius: 20, background: "rgba(255,255,255,0.14)", border: "1px solid rgba(255,255,255,0.18)", color: "#fff", fontFamily: FFB, fontWeight: 600, fontSize: 12.5, cursor: "pointer" }}>📁 Folder</button>
+              <button onClick={() => { pruneEmptyFolders(); commitOrder(); setEditMode(false); }} style={{ padding: "8px 20px", borderRadius: 20, background: fill(AC), border: "1px solid " + bdr(AC), color: AC, fontFamily: FFB, fontWeight: 700, fontSize: 12.5, cursor: "pointer" }}>Done</button>
             </div>
           ) : pages.length > 1 ? (
             <div style={{ display: "flex", justifyContent: "center", gap: 7, padding: "8px 0 6px" }}>
@@ -403,6 +493,7 @@ export function MobileShell({ AC, user, data, apps, wallpaperId, customWp, setti
 
       {control && <ControlCenter AC={AC} vol={vol} setVolume={setVolume} bright={bright} setBrightness={setBrightness} battery={battery} settings={settings} updateSettings={updateSettings} onLock={() => { setControl(false); setLocked(true); }} onClose={() => setControl(false)} />}
       {notif && <NotificationCenter AC={AC} notifications={notifications} appById={appById} glass={glass} onOpenApp={openApp} onDismiss={onDismissNotification} onClear={onClearNotifications} onClose={() => setNotif(false)} />}
+      {openFolder && folders[openFolder] && <FolderView folder={folders[openFolder]} appById={appById} glass={glass} onOpenApp={(id) => { setOpenFolder(null); openApp(id); }} onRemove={(id) => removeFromFolder(openFolder, id)} onRename={(name) => renameFolder(openFolder, name)} onClose={() => setOpenFolder(null)} />}
 
       {/* Lock screen — shows on launch / when locked; swipe up to enter */}
       {locked && <LockScreen now={now} battery={battery} onUnlock={() => { haptic("unlock"); setLocked(false); }} />}
@@ -439,7 +530,7 @@ export function MobileShell({ AC, user, data, apps, wallpaperId, customWp, setti
             <div style={{ textAlign: "center", color: "#fff", fontFamily: FFB, fontWeight: 700, fontSize: 14, paddingBottom: 12 }}>Add to Home</div>
             <div style={{ flex: 1, overflowY: "auto", padding: "4px 18px 24px" }}>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: "20px 8px", alignContent: "start" }}>
-                {hiddenApps.map(a => <IconTile key={a.id} app={a} glass={glass} onOpen={() => { addToHome(a.id); setEditOrder(prev => [...prev, a.id]); }} />)}
+                {hiddenApps.map(a => <IconTile key={a.id} app={a} glass={glass} onOpen={() => { addToHome(a.id); applyOrder([...editOrderRef.current, a.id]); }} />)}
                 {hiddenApps.length === 0 && <div style={{ gridColumn: "span 4", textAlign: "center", color: "rgba(255,255,255,0.5)", padding: "40px 0", fontStyle: "italic" }}>Every app is already on your Home Screen</div>}
               </div>
             </div>
@@ -616,6 +707,47 @@ function LockScreen({ now, onUnlock }) {
         <div style={{ width: 124, height: 5, borderRadius: 3, background: "rgba(255,255,255,0.7)", animation: "ls-hint 1.9s ease-in-out infinite" }} />
         <div style={{ fontSize: 12.5, fontFamily: FFM, color: "rgba(255,255,255,0.8)" }}>swipe up to unlock</div>
       </div>
+    </div>
+  );
+}
+
+// ── App folders ─────────────────────────────────────────────────────────────
+// Springboard tile: rounded glass square with a 2x2 mini-grid of the first 4
+// member icons, label below. (visual only — parent owns the gesture)
+function FolderTile({ folder, appById, glass, highlight }) {
+  const members = (folder.apps || []).map(id => appById(id)).filter(Boolean).slice(0, 4);
+  return (
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6, width: "100%" }}>
+      <div style={{ width: 60, height: 60, borderRadius: 16, background: "rgba(255,255,255,0.16)", backdropFilter: "blur(10px)", WebkitBackdropFilter: "blur(10px)", border: "1px solid rgba(255,255,255,0.22)", boxShadow: "0 4px 10px rgba(0,0,0,0.3)" + (highlight ? ", 0 0 0 3px rgba(255,255,255,0.7)" : ""), display: "grid", gridTemplateColumns: "1fr 1fr", gridTemplateRows: "1fr 1fr", gap: 4, padding: 7, boxSizing: "border-box" }}>
+        {members.map(m => <div key={m.id} style={{ lineHeight: 0, display: "flex", alignItems: "center", justifyContent: "center" }}><MobileIcon app={m} size={19} glass={glass} /></div>)}
+        {Array.from({ length: Math.max(0, 4 - members.length) }).map((_, i) => <div key={"e" + i} />)}
+      </div>
+      <span style={{ fontSize: 11, color: "#fff", textShadow: "0 1px 3px rgba(0,0,0,0.55)", maxWidth: 74, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontWeight: 500 }}>{folder.name || "Folder"}</span>
+    </div>
+  );
+}
+// Open-folder overlay: rename, launch an app, or remove one (folder dissolves
+// back to Home when it drops to a single app).
+function FolderView({ folder, appById, glass, onOpenApp, onRemove, onRename, onClose }) {
+  const [name, setName] = useState(folder.name || "Folder");
+  const members = (folder.apps || []).map(id => appById(id)).filter(Boolean);
+  const close = () => { onRename((name || "").trim() || "Folder"); onClose(); };
+  return (
+    <div onClick={e => { if (Date.now() - lastTouchAt < 700) return; if (e.target === e.currentTarget) close(); }}
+      onTouchEnd={e => { lastTouchAt = Date.now(); if (e.target === e.currentTarget) close(); }}
+      style={{ position: "absolute", inset: 0, zIndex: 65, background: "rgba(6,8,18,0.6)", backdropFilter: "blur(28px) saturate(140%)", WebkitBackdropFilter: "blur(28px) saturate(140%)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "calc(" + SAT + " + 40px) 22px", animation: "pop-in 0.24s cubic-bezier(0.22,1,0.36,1)" }}>
+      <input value={name} onChange={e => setName(e.target.value)} onBlur={() => onRename((name || "").trim() || "Folder")} spellCheck={false}
+        style={{ background: "none", border: "none", outline: "none", textAlign: "center", color: "#fff", fontFamily: FFB, fontWeight: 700, fontSize: 20, marginBottom: 20, width: "80%" }} />
+      <div style={{ width: "100%", maxWidth: 360, background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 28, padding: "22px 16px", display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: "22px 6px", maxHeight: "60vh", overflowY: "auto" }}>
+        {members.map(m => (
+          <div key={m.id} onClick={() => onOpenApp(m.id)} style={{ position: "relative", display: "flex", flexDirection: "column", alignItems: "center", gap: 6, cursor: "pointer" }}>
+            <div style={{ lineHeight: 0, filter: "drop-shadow(0 4px 10px rgba(0,0,0,0.34))" }}><MobileIcon app={m} size={54} glass={glass} /></div>
+            <span style={{ fontSize: 11, color: "#fff", maxWidth: 70, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.label}</span>
+            <button onClick={e => { e.stopPropagation(); onRemove(m.id); }} style={{ position: "absolute", top: -8, left: "calc(50% - 32px)", width: 20, height: 20, borderRadius: "50%", background: "#3a3a3c", border: "1.5px solid rgba(255,255,255,0.5)", color: "#fff", fontSize: 15, lineHeight: "15px", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>−</button>
+          </div>
+        ))}
+      </div>
+      <div style={{ marginTop: 20, color: "rgba(255,255,255,0.55)", fontSize: 12, fontFamily: FFM }}>tap outside to close · − removes an app</div>
     </div>
   );
 }
