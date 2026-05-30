@@ -68,6 +68,18 @@ function IconTile({ app, glass, onOpen, onHold, hideLabel, size = 60 }) {
   );
 }
 
+// Visual-only icon for the springboard (the parent owns all gestures). The
+// data-app / data-dock attributes let the springboard's pointer handler know
+// which app was tapped / long-pressed.
+function IconVisual({ app, glass, hideLabel, size = 60, ...rest }) {
+  return (
+    <div {...rest} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6, width: "100%" }}>
+      <div style={{ lineHeight: 0, filter: "drop-shadow(0 4px 10px rgba(0,0,0,0.34))" }}><MobileIcon app={app} size={size} glass={glass} /></div>
+      {!hideLabel && <span style={{ fontSize: 11, color: "#fff", textShadow: "0 1px 3px rgba(0,0,0,0.55)", maxWidth: 74, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontWeight: 500 }}>{app.label}</span>}
+    </div>
+  );
+}
+
 export function MobileShell({ AC, user, data, apps, wallpaperId, customWp, settings, updateSettings, renderApp, onAppOpen, widgets }) {
   const glass = !!settings?.glass;
   const [now, setNow] = useState(() => new Date());
@@ -113,28 +125,40 @@ export function MobileShell({ AC, user, data, apps, wallpaperId, customWp, setti
   function setVolume(v) { setVol(v); setSoundConfig({ ...getSoundConfig(), volume: v }); }
 
   // ── springboard gestures ──────────────────────────────────────────────────
+  // The springboard CAPTURES the pointer and owns every gesture (tap to open,
+  // long-press a dock slot to edit, horizontal swipe = page, vertical swipe =
+  // Control Center / App Library). Icons are visual-only (data-app / data-dock)
+  // so they can't intercept the swipe.
   const gest = useRef(null);
-  const swallow = useRef(false);
-  function onDown(e) { gest.current = { x0: e.clientX, y0: e.clientY, axis: null }; swallow.current = false; }
+  function onDown(e) {
+    try { e.currentTarget.setPointerCapture?.(e.pointerId); } catch {}
+    const el = e.target.closest ? e.target.closest("[data-app]") : null;
+    const g = { x0: e.clientX, y0: e.clientY, axis: null, app: el?.getAttribute("data-app") || null, dock: el?.getAttribute("data-dock"), hold: null };
+    if (g.dock != null) g.hold = setTimeout(() => { if (gest.current === g) { g.hold = "fired"; setPickSlot(+g.dock); setLibrary(true); } }, 470);
+    gest.current = g;
+  }
   function onMove(e) {
     const g = gest.current; if (!g) return;
     const dx = e.clientX - g.x0, dy = e.clientY - g.y0;
-    if (!g.axis && (Math.abs(dx) > 10 || Math.abs(dy) > 10)) { g.axis = Math.abs(dx) > Math.abs(dy) ? "x" : "y"; swallow.current = true; }
+    if (!g.axis && (Math.abs(dx) > 10 || Math.abs(dy) > 10)) { g.axis = Math.abs(dx) > Math.abs(dy) ? "x" : "y"; if (g.hold && g.hold !== "fired") { clearTimeout(g.hold); g.hold = null; } }
     if (g.axis === "x") { let nx = dx; if ((curPage === 0 && dx > 0) || (curPage === pages.length - 1 && dx < 0)) nx = dx * 0.35; setDragX(nx); }
   }
   function onUp(e) {
     const g = gest.current; gest.current = null; if (!g) return;
+    if (g.hold && g.hold !== "fired") clearTimeout(g.hold);
+    if (g.hold === "fired") { setDragX(0); return; }       // dock-edit already triggered
     const dx = e.clientX - g.x0, dy = e.clientY - g.y0;
     if (g.axis === "x") {
-      const w = window.innerWidth || 390;
-      if (dx < -w * 0.2 && curPage < pages.length - 1) setPage(curPage + 1);
-      else if (dx > w * 0.2 && curPage > 0) setPage(curPage - 1);
+      if (dx <= -45 && curPage < pages.length - 1) setPage(curPage + 1);
+      else if (dx >= 45 && curPage > 0) setPage(curPage - 1);
       setDragX(0);
     } else if (g.axis === "y") {
-      if (dy > 55 && g.y0 < 80) setControl(true);     // pull down from top → Control Center
-      else if (dy < -55) setLibrary(true);            // swipe up → App Library (drawer)
+      if (dy > 50 && g.y0 < 80) setControl(true);          // down from the top edge → Control Center
+      else if (Math.abs(dy) > 50) setLibrary(true);        // up OR down from the body → App Library
+      setDragX(0);
+    } else if (g.app) {
+      openApp(g.app);                                      // tap → open
     }
-    setTimeout(() => { swallow.current = false; }, 30);
   }
 
   // ── persistent bottom bar (home indicator) gestures ──────────────────────
@@ -177,7 +201,7 @@ export function MobileShell({ AC, user, data, apps, wallpaperId, customWp, setti
                     </div>
                   )}
                   <div style={{ padding: "4px 18px 0", display: "grid", gridTemplateColumns: "repeat(" + COLS + ",1fr)", gridAutoRows: "min-content", gap: "20px 8px", alignContent: "start" }}>
-                    {pg.map(a => <IconTile key={a.id} app={a} glass={glass} onOpen={() => { if (!swallow.current) openApp(a.id); }} />)}
+                    {pg.map(a => <IconVisual key={a.id} app={a} glass={glass} data-app={a.id} />)}
                   </div>
                 </div>
               ))}
@@ -192,7 +216,7 @@ export function MobileShell({ AC, user, data, apps, wallpaperId, customWp, setti
 
           {/* dock */}
           <div style={{ margin: "4px 12px 6px", padding: "12px 14px", borderRadius: 30, background: "rgba(255,255,255,0.13)", backdropFilter: "blur(28px) saturate(160%)", WebkitBackdropFilter: "blur(28px) saturate(160%)", border: "1px solid rgba(255,255,255,0.14)", display: "flex", justifyContent: "space-around" }}>
-            {dock.map((id, i) => { const a = appById(id); if (!a) return <div key={i} style={{ width: 60 }} />; return <IconTile key={id} app={a} glass={glass} hideLabel onOpen={() => { if (!swallow.current) openApp(id); }} onHold={() => { setPickSlot(i); setLibrary(true); }} />; })}
+            {dock.map((id, i) => { const a = appById(id); if (!a) return <div key={i} style={{ width: 60 }} />; return <IconVisual key={id} app={a} glass={glass} hideLabel data-app={id} data-dock={i} />; })}
           </div>
         </div>
       )}
@@ -234,7 +258,7 @@ function ControlCenter({ AC, vol, setVolume, onClose }) {
   const sy = useRef(0);
   const tile = (on) => ({ flex: 1, aspectRatio: "1", borderRadius: 18, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 6, cursor: "pointer", border: "1px solid rgba(255,255,255,0.12)", background: on ? fill(AC) : "rgba(255,255,255,0.1)", color: on ? AC : "rgba(255,255,255,0.85)", fontFamily: FFB, fontWeight: 600, fontSize: 11 });
   return (
-    <div onPointerDown={e => { sy.current = e.clientY; }} onPointerUp={e => { if (sy.current - e.clientY > 38) onClose(); }} onClick={e => { if (e.target === e.currentTarget) onClose(); }}
+    <div onPointerDownCapture={e => { sy.current = e.clientY; }} onPointerUpCapture={e => { if (sy.current - e.clientY > 36) onClose(); }} onClick={e => { if (e.target === e.currentTarget) onClose(); }}
       style={{ position: "absolute", inset: 0, zIndex: 60, padding: "30px 16px 0", background: "rgba(6,8,18,0.5)", backdropFilter: "blur(34px) saturate(150%)", WebkitBackdropFilter: "blur(34px) saturate(150%)", animation: "panel-down 0.3s cubic-bezier(0.22,1,0.36,1)" }}>
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         <div style={{ display: "flex", justifyContent: "center", paddingBottom: 4 }}><div style={{ width: 38, height: 5, borderRadius: 3, background: "rgba(255,255,255,0.5)" }} /></div>
@@ -273,7 +297,7 @@ function AppLibrary({ AC, apps, glass, search, setSearch, pickMode, onPick, onCl
         {pickMode && <div style={{ textAlign: "center", color: AC, fontFamily: FFB, fontWeight: 700, fontSize: 12, marginBottom: 8 }}>Choose an app for the dock</div>}
         <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "0 14px", height: 42, background: "rgba(255,255,255,0.14)", borderRadius: 12 }}>
           <span style={{ fontSize: 14, opacity: 0.7 }}>🔍</span>
-          <input autoFocus value={search} onChange={e => setSearch(e.target.value)} placeholder="Search apps" style={{ flex: 1, background: "none", border: "none", outline: "none", color: "#fff", fontFamily: FF, fontSize: 15 }} />
+          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search apps" style={{ flex: 1, background: "none", border: "none", outline: "none", color: "#fff", fontFamily: FF, fontSize: 15 }} />
           <button onClick={onClose} style={{ background: "none", border: "none", color: "rgba(255,255,255,0.75)", fontFamily: FFB, fontWeight: 600, fontSize: 13, cursor: "pointer" }}>Done</button>
         </div>
       </div>
