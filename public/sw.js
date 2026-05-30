@@ -20,7 +20,7 @@
  * Kill switch: replacing this file's body with `self.registration.unregister()`
  * cleanly removes the worker for all clients.
  */
-const CACHE = "nova-os-v1";
+const CACHE = "nova-os-v2";
 const SHELL = "/index.html";
 
 self.addEventListener("install", (e) => {
@@ -43,6 +43,10 @@ self.addEventListener("fetch", (e) => {
   let url;
   try { url = new URL(req.url); } catch { return; }
   if (url.origin !== self.location.origin) return;  // never touch Firebase / APIs / fonts
+
+  // The manifest must always be read fresh so install metadata changes apply
+  // immediately (never serve a stale cached manifest).
+  if (url.pathname === "/manifest.webmanifest") return;
 
   // App navigations: network-first (fresh deploys win), offline → cached shell.
   if (req.mode === "navigate") {
