@@ -743,10 +743,18 @@ export function Wallpaper({ id, customUrl, animate }) {
     return () => clearInterval(t);
   }, [id]);
   const realId = id === "auto" ? autoId : id;
+  // Lite mode (?kiosk=1): the SVG-blur wallpapers are by far the most expensive
+  // thing to rasterize in software, so on a GPU-less host (Nova OS as the Linux
+  // desktop in a VM) skip them entirely and paint a flat gradient instead. A
+  // custom photo wallpaper is a single cheap image, so that one is kept.
+  if (isLiteMode()) {
+    if (realId === "custom" && customUrl) {
+      return <div style={{position:"absolute",inset:0,background:'url("'+customUrl+'") center/cover no-repeat'}}/>;
+    }
+    return <div style={{position:"absolute",inset:0,background:"radial-gradient(120% 90% at 50% 32%, #14315f 0%, #0b1c3e 44%, #050a16 100%)"}}/>;
+  }
   const bg = renderBg(realId, customUrl);
-  // Lite mode (?kiosk=1): never run the drift — re-compositing a huge
-  // gaussian-blurred SVG every frame is the worst offender on a GPU-less host.
-  if (!animate || isLiteMode()) return bg;
+  if (!animate) return bg;
   return (
     <div style={{position:"absolute",inset:0,overflow:"hidden"}}>
       <div style={{position:"absolute",inset:0,transformOrigin:"center",animation:"wp-drift 26s ease-in-out infinite",willChange:"transform"}}>{bg}</div>
