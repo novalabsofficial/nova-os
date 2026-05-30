@@ -127,8 +127,10 @@ export function MobileShell({ AC, user, data, apps, wallpaperId, customWp, setti
       else if (dx >= 40 && curPage > 0) setPage(curPage - 1);
       setDragX(0);
     } else if (g.axis === "y") {
-      if (dy > 48 && g.y0 < 90) setControl(true);
-      else if (Math.abs(dy) > 48) setLibrary(true);
+      // direction-pure so up/down never get confused: UP → App Drawer,
+      // DOWN → Control Center (from anywhere on the home screen).
+      if (dy < -46) setLibrary(true);
+      else if (dy > 46) setControl(true);
       setDragX(0);
     } else if (g.app) { openApp(g.app); }
   }
@@ -258,6 +260,10 @@ function AppLibrary({ AC, apps, glass, search, setSearch, pickMode, onPick, onCl
   const sy = useRef(null);
   const down = (e) => { sy.current = pt(e).clientY; };
   const upClose = (e) => { if (sy.current != null && pt(e).clientY - sy.current > 34) onClose(); sy.current = null; };
+  // swipe down anywhere in the grid (when it's scrolled to the top) → close
+  const listSt = useRef(null);
+  const listDown = (e) => { listSt.current = { y: pt(e).clientY, top: e.currentTarget.scrollTop }; };
+  const listUp = (e) => { const s = listSt.current; listSt.current = null; if (s && s.top <= 2 && pt(e).clientY - s.y > 48) onClose(); };
   return (
     <div style={{ position: "absolute", inset: 0, zIndex: 60, paddingTop: 48, background: "rgba(6,8,18,0.66)", backdropFilter: "blur(36px) saturate(150%)", WebkitBackdropFilter: "blur(36px) saturate(150%)", display: "flex", flexDirection: "column", animation: "panel-up 0.3s cubic-bezier(0.22,1,0.36,1)" }}>
       <div onTouchStart={down} onTouchEnd={upClose} onMouseDown={down} onMouseUp={upClose} style={{ padding: "6px 18px 12px", touchAction: "none" }}>
@@ -269,7 +275,7 @@ function AppLibrary({ AC, apps, glass, search, setSearch, pickMode, onPick, onCl
           <button onClick={onClose} style={{ background: "none", border: "none", color: "rgba(255,255,255,0.75)", fontFamily: FFB, fontWeight: 600, fontSize: 13, cursor: "pointer" }}>Done</button>
         </div>
       </div>
-      <div style={{ flex: 1, overflowY: "auto", padding: "4px 18px 28px" }}>
+      <div onTouchStart={listDown} onTouchEnd={listUp} style={{ flex: 1, overflowY: "auto", padding: "4px 18px 28px" }}>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: "20px 8px", alignContent: "start" }}>
           {list.map(a => <IconTile key={a.id} app={a} glass={glass} onOpen={() => onPick(a.id)} />)}
           {list.length === 0 && <div style={{ gridColumn: "span 4", textAlign: "center", color: "rgba(255,255,255,0.5)", padding: "40px 0", fontStyle: "italic" }}>No apps found</div>}
