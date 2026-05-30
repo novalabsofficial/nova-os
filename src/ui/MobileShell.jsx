@@ -379,7 +379,7 @@ export function MobileShell({ AC, user, data, apps, wallpaperId, customWp, setti
 
       {control && <ControlCenter AC={AC} vol={vol} setVolume={setVolume} onClose={() => setControl(false)} />}
       {library && <AppLibrary AC={AC} apps={apps} glass={glass} search={search} setSearch={setSearch} onPick={openApp} onLong={(id) => setSheet({ id })} onClose={() => { setLibrary(false); setSearch(""); }} />}
-      {switcher && <AppSwitcher openApps={openApps} appById={appById} glass={glass} renderApp={renderApp} onPick={openApp} onCloseApp={closeApp} onDismiss={() => setSwitcher(false)} />}
+      {switcher && <AppSwitcher openApps={openApps} appById={appById} glass={glass} renderApp={renderApp} onPick={openApp} onCloseApp={closeApp} onDismiss={() => { setSwitcher(false); goHome(); }} />}
       {sheet && (() => {
         const a = appById(sheet.id); if (!a) return null;
         return <ActionSheet AC={AC} app={a} glass={glass} onHome={homeIds.includes(sheet.id)} isHidden={hidden.has(sheet.id)} dockSlot={dock.indexOf(sheet.id)}
