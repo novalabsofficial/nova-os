@@ -19,8 +19,8 @@ import { getSoundConfig, setSoundConfig } from "../lib/audio.js";
 import { canPromptInstall, promptInstall, onInstallChange, isStandalone, isIOS } from "../lib/pwa.js";
 import { haptic, hapticsEnabled, setHapticsEnabled } from "../lib/haptics.js";
 
-const COLS = 4;
-const PER_PAGE = 16;
+// columns + page size are now computed responsively from the viewport (see MobileShell)
+const PER_PAGE = 16;   // fallback page size
 // Capped top inset: keeps the status bar near the very top edge (in the notch
 // "ear" area, iOS-style) instead of dropping it below the full notch height.
 const SAT = "min(env(safe-area-inset-top, 0px), 14px)";
@@ -123,6 +123,7 @@ export function MobileShell({ AC, user, data, apps, wallpaperId, customWp, setti
   const [bright, setBright] = useState(getBrightness);
   const setBrightness = (v) => { const c = Math.max(0.2, Math.min(1, v)); setBright(c); saveBrightness(c); };
   const [locked, setLocked] = useState(true);   // lock screen shows on launch; swipe up to enter
+  const [vp, setVp] = useState(() => ({ w: typeof window !== "undefined" ? window.innerWidth : 390, h: typeof window !== "undefined" ? window.innerHeight : 800 }));
   const [dragX, setDragX] = useState(0);
   // iOS-style jiggle/edit mode + drag-and-drop reorder
   const [editMode, setEditMode] = useState(false);
@@ -163,9 +164,14 @@ export function MobileShell({ AC, user, data, apps, wallpaperId, customWp, setti
   // In edit mode the grid renders from the live working order (editOrder).
   // Empty folder tokens stay visible in edit mode so you can drag apps into them.
   const baseIds = (editMode ? editOrder : homeIds).filter(tok => folderApp(tok) ? (editMode || validFolderTok(tok)) : appById(tok));
-  const hasWidgets = widgets && widgets.length > 0 && !editMode;
-  const cap0 = hasWidgets ? 8 : PER_PAGE;
-  const pages = [baseIds.slice(0, cap0), ...chunk(baseIds.slice(cap0), PER_PAGE)].filter((p, i) => i === 0 || p.length);
+  // ── responsive grid: columns + rows scale with the viewport / orientation ──
+  const landscape = vp.w > vp.h;
+  const cols = Math.max(4, Math.min(8, Math.round(vp.w / 112)));
+  const rowsFull = Math.max(2, Math.min(8, Math.floor((vp.h - 250) / 92)));
+  const perPage = cols * rowsFull;
+  const hasWidgets = widgets && widgets.length > 0 && !editMode && vp.h >= 520;
+  const cap0 = hasWidgets ? Math.max(cols, (rowsFull - 2) * cols) : perPage;
+  const pages = [baseIds.slice(0, cap0), ...chunk(baseIds.slice(cap0), perPage)].filter((p, i) => i === 0 || p.length);
   if (pages.length === 0) pages.push([]);
   const curPage = Math.min(page, pages.length - 1);
 
@@ -228,6 +234,12 @@ export function MobileShell({ AC, user, data, apps, wallpaperId, customWp, setti
     [wallpaperId, customWp, settings?.wallpaperAnimated]
   );
 
+  useEffect(() => {
+    const onResize = () => setVp({ w: window.innerWidth, h: window.innerHeight });
+    window.addEventListener("resize", onResize);
+    window.addEventListener("orientationchange", onResize);
+    return () => { window.removeEventListener("resize", onResize); window.removeEventListener("orientationchange", onResize); };
+  }, []);
   useEffect(() => { const t = setInterval(() => setNow(new Date()), 15000); return () => clearInterval(t); }, []);
   useEffect(() => { let dead = false; if (navigator.getBattery) navigator.getBattery().then(b => { if (dead) return; const upd = () => setBattery(b.level); upd(); b.addEventListener("levelchange", upd); }).catch(() => {}); return () => { dead = true; }; }, []);
 
@@ -423,13 +435,13 @@ export function MobileShell({ AC, user, data, apps, wallpaperId, customWp, setti
               {pages.map((pg, pi) => (
                 <div key={pi} style={{ width: (100 / pages.length) + "%", flexShrink: 0, display: "flex", flexDirection: "column", minHeight: 0 }}>
                   {pi === 0 && hasWidgets && (
-                    <div style={{ display: "flex", gap: 12, overflowX: "hidden", padding: "4px 18px 14px" }}>
-                      {widgets.slice(0, 2).map(w => (
+                    <div style={{ display: "flex", gap: 12, overflowX: "hidden", padding: "4px 18px 14px", maxWidth: 760, width: "100%", margin: "0 auto" }}>
+                      {widgets.slice(0, landscape ? 3 : 2).map(w => (
                         <div key={w.id} style={{ flex: 1, minWidth: 0, height: 150, borderRadius: 20, overflow: "hidden", padding: 12, background: "rgba(255,255,255,0.12)", backdropFilter: "blur(16px) saturate(140%)", WebkitBackdropFilter: "blur(16px) saturate(140%)", border: "1px solid rgba(255,255,255,0.14)", boxShadow: "0 8px 22px rgba(0,0,0,0.3)" }}>{w.content}</div>
                       ))}
                     </div>
                   )}
-                  <div style={{ padding: "4px 18px 0", display: "grid", gridTemplateColumns: "repeat(" + COLS + ",1fr)", gridAutoRows: "min-content", gap: "20px 8px", alignContent: "start" }}>
+                  <div style={{ padding: "4px 18px 0", maxWidth: 760, width: "100%", margin: "0 auto", display: "grid", gridTemplateColumns: "repeat(" + cols + ",1fr)", gridAutoRows: "min-content", gap: (landscape ? 14 : 20) + "px 8px", alignContent: "start" }}>
                     {pg.map(tok => {
                       const fid = folderApp(tok);
                       const jig = { animation: editMode ? "icon-jiggle 0.34s ease-in-out infinite" : undefined, animationDelay: editMode ? "-" + ((tok.length % 5) * 0.05) + "s" : undefined };
@@ -467,7 +479,7 @@ export function MobileShell({ AC, user, data, apps, wallpaperId, customWp, setti
             </div>
           ) : null}
 
-          <div data-dockzone style={{ margin: "4px 12px 6px", padding: "12px 14px", borderRadius: 30, background: editMode ? "rgba(255,255,255,0.18)" : "rgba(255,255,255,0.13)", backdropFilter: "blur(20px) saturate(150%)", WebkitBackdropFilter: "blur(20px) saturate(150%)", border: "1px solid " + (editMode ? "rgba(255,255,255,0.32)" : "rgba(255,255,255,0.14)"), display: "flex", justifyContent: "space-around", transition: "background 0.2s, border-color 0.2s" }}>
+          <div data-dockzone style={{ margin: "4px auto 6px", maxWidth: 480, width: "calc(100% - 24px)", padding: "12px 14px", borderRadius: 30, background: editMode ? "rgba(255,255,255,0.18)" : "rgba(255,255,255,0.13)", backdropFilter: "blur(20px) saturate(150%)", WebkitBackdropFilter: "blur(20px) saturate(150%)", border: "1px solid " + (editMode ? "rgba(255,255,255,0.32)" : "rgba(255,255,255,0.14)"), display: "flex", justifyContent: "space-around", transition: "background 0.2s, border-color 0.2s" }}>
             {dock.map((id, i) => { const a = appById(id); if (!a) return <div key={i} style={{ width: 60 }} />; return (
               <div key={id} data-app={id} data-dock={i} className={editMode ? undefined : "mb-ic"} style={{ opacity: dragId === id ? 0 : 1, animation: editMode ? "icon-jiggle 0.34s ease-in-out infinite" : undefined, animationDelay: editMode ? "-" + ((id.length % 5) * 0.05) + "s" : undefined }}>
                 <IconVisual app={a} glass={glass} hideLabel />
@@ -500,7 +512,7 @@ export function MobileShell({ AC, user, data, apps, wallpaperId, customWp, setti
 
       {/* software brightness dimmer — sits above everything, never blocks touch */}
       {bright < 0.999 && <div style={{ position: "fixed", inset: 0, background: "#000", opacity: (1 - bright) * 0.82, pointerEvents: "none", zIndex: 95, transition: "opacity 0.12s linear" }} />}
-      {library && <AppLibrary AC={AC} apps={apps} glass={glass} search={search} setSearch={setSearch} onPick={openApp} onLong={(id) => setSheet({ id })} onClose={() => { setLibrary(false); setSearch(""); }} />}
+      {library && <AppLibrary AC={AC} apps={apps} glass={glass} cols={cols} search={search} setSearch={setSearch} onPick={openApp} onLong={(id) => setSheet({ id })} onClose={() => { setLibrary(false); setSearch(""); }} />}
       {switcher && <AppSwitcher openApps={openApps} appById={appById} glass={glass} renderApp={renderApp} onPick={openApp} onCloseApp={closeApp} onDismiss={() => { setSwitcher(false); goHome(); }} />}
       {sheet && (() => {
         const a = appById(sheet.id); if (!a) return null;
@@ -514,13 +526,18 @@ export function MobileShell({ AC, user, data, apps, wallpaperId, customWp, setti
       })()}
 
       {/* floating drag clone (jiggle/edit mode) — moved via ref in onMove */}
-      {dragId && (() => { const a = appById(dragId); if (!a) return null; return (
-        <div ref={dragCloneRef} style={{ position: "fixed", left: 0, top: 0, width: 66, zIndex: 80, pointerEvents: "none", willChange: "transform", transform: "translate(" + (dragPt.current.x - 33) + "px," + (dragPt.current.y - 46) + "px)" }}>
-          <div style={{ transform: "scale(1.14)", opacity: 0.95, filter: "drop-shadow(0 12px 22px rgba(0,0,0,0.5))" }}>
-            <MobileIcon app={a} size={62} glass={glass} />
+      {dragId && (() => {
+        const fid = folderApp(dragId);
+        const inner = fid
+          ? (folders[fid] ? <div style={{ width: 62 }}><FolderTile folder={folders[fid]} appById={appById} glass={glass} /></div> : null)
+          : (() => { const a = appById(dragId); return a ? <MobileIcon app={a} size={62} glass={glass} /> : null; })();
+        if (!inner) return null;
+        return (
+          <div ref={dragCloneRef} style={{ position: "fixed", left: 0, top: 0, width: 66, zIndex: 80, pointerEvents: "none", willChange: "transform", transform: "translate(" + (dragPt.current.x - 33) + "px," + (dragPt.current.y - 46) + "px)" }}>
+            <div style={{ transform: "scale(1.14)", opacity: 0.95, filter: "drop-shadow(0 12px 22px rgba(0,0,0,0.5))" }}>{inner}</div>
           </div>
-        </div>
-      ); })()}
+        );
+      })()}
 
       {/* Add-to-Home picker (from edit mode) — only hidden apps */}
       {addPicker && (() => {
@@ -529,9 +546,9 @@ export function MobileShell({ AC, user, data, apps, wallpaperId, customWp, setti
           <div style={{ position: "absolute", inset: 0, zIndex: 78, background: "rgba(6,8,18,0.72)", backdropFilter: "blur(22px) saturate(140%)", WebkitBackdropFilter: "blur(22px) saturate(140%)", paddingTop: "calc(" + SAT + " + 40px)", display: "flex", flexDirection: "column", animation: "panel-up 0.34s cubic-bezier(0.22,1,0.36,1)" }}>
             <div style={{ textAlign: "center", color: "#fff", fontFamily: FFB, fontWeight: 700, fontSize: 14, paddingBottom: 12 }}>Add to Home</div>
             <div style={{ flex: 1, overflowY: "auto", padding: "4px 18px 24px" }}>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: "20px 8px", alignContent: "start" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(" + cols + ",1fr)", gap: "20px 8px", alignContent: "start", maxWidth: 760, margin: "0 auto" }}>
                 {hiddenApps.map(a => <IconTile key={a.id} app={a} glass={glass} onOpen={() => { addToHome(a.id); applyOrder([...editOrderRef.current, a.id]); }} />)}
-                {hiddenApps.length === 0 && <div style={{ gridColumn: "span 4", textAlign: "center", color: "rgba(255,255,255,0.5)", padding: "40px 0", fontStyle: "italic" }}>Every app is already on your Home Screen</div>}
+                {hiddenApps.length === 0 && <div style={{ gridColumn: "span " + cols, textAlign: "center", color: "rgba(255,255,255,0.5)", padding: "40px 0", fontStyle: "italic" }}>Every app is already on your Home Screen</div>}
               </div>
             </div>
             <button onClick={() => setAddPicker(false)} style={{ margin: "0 18px calc(" + SAB + " + 16px)", padding: "13px", borderRadius: 14, background: "rgba(255,255,255,0.12)", border: "1px solid rgba(255,255,255,0.18)", color: "#fff", fontFamily: FFB, fontWeight: 600, fontSize: 14, cursor: "pointer" }}>Done</button>
@@ -781,14 +798,14 @@ function NotificationCenter({ AC, notifications, appById, glass, onOpenApp, onDi
   };
   return (
     <div style={{ position: "absolute", inset: 0, zIndex: 60, paddingTop: "calc(" + SAT + " + 18px)", background: "rgba(6,8,18,0.62)", backdropFilter: "blur(22px) saturate(140%)", WebkitBackdropFilter: "blur(22px) saturate(140%)", animation: "panel-down 0.34s cubic-bezier(0.22,1,0.36,1)", display: "flex", flexDirection: "column" }}>
-      <div onTouchStart={hdrDown} onTouchEnd={hdrUp} onMouseDown={hdrDown} onMouseUp={hdrUp} style={{ padding: "0 18px 8px", touchAction: "none" }}>
+      <div onTouchStart={hdrDown} onTouchEnd={hdrUp} onMouseDown={hdrDown} onMouseUp={hdrUp} style={{ padding: "0 18px 8px", maxWidth: 560, width: "100%", margin: "0 auto", touchAction: "none" }}>
         <div style={{ display: "flex", justifyContent: "center", paddingBottom: 8 }}><div style={{ width: 40, height: 5, borderRadius: 3, background: "rgba(255,255,255,0.5)" }} /></div>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", color: "#fff", fontFamily: FFB, fontWeight: 700, fontSize: 15 }}>
           <span>Notifications</span>
           {notifications.length > 0 && <button onClick={onClear} style={{ background: "rgba(255,255,255,0.14)", border: "1px solid rgba(255,255,255,0.16)", color: "#fff", fontFamily: FFB, fontWeight: 600, fontSize: 12, padding: "6px 12px", borderRadius: 14, cursor: "pointer" }}>Clear</button>}
         </div>
       </div>
-      <div ref={listRef} onTouchStart={listDown} onTouchEnd={listUp} style={{ flex: 1, overflowY: "auto", padding: "6px 14px 16px", display: "flex", flexDirection: "column", gap: 10 }}>
+      <div ref={listRef} onTouchStart={listDown} onTouchEnd={listUp} style={{ flex: 1, overflowY: "auto", padding: "6px 14px 16px", display: "flex", flexDirection: "column", gap: 10, width: "100%", maxWidth: 560, margin: "0 auto" }}>
         {notifications.length === 0 ? (
           <div style={{ textAlign: "center", color: "rgba(255,255,255,0.55)", fontFamily: FFM, fontSize: 13, padding: "60px 0" }}>No notifications</div>
         ) : notifications.map(n => {
@@ -823,7 +840,7 @@ function NotificationCenter({ AC, notifications, appById, glass, onOpenApp, onDi
 }
 
 // ── App Library ───────────────────────────────────────────────────────────
-function AppLibrary({ AC, apps, glass, search, setSearch, onPick, onLong, onClose }) {
+function AppLibrary({ AC, apps, glass, cols = 4, search, setSearch, onPick, onLong, onClose }) {
   const q = search.trim().toLowerCase();
   const list = q ? apps.filter(a => a.label.toLowerCase().includes(q) || a.id.includes(q)) : apps;
   const sy = useRef(null);
@@ -844,9 +861,9 @@ function AppLibrary({ AC, apps, glass, search, setSearch, onPick, onLong, onClos
         </div>
       </div>
       <div onTouchStart={listDown} onTouchEnd={listUp} style={{ flex: 1, overflowY: "auto", padding: "4px 18px 28px" }}>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: "20px 8px", alignContent: "start" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(" + cols + ",1fr)", gap: "20px 8px", alignContent: "start", maxWidth: 760, margin: "0 auto" }}>
           {list.map(a => <IconTile key={a.id} app={a} glass={glass} onOpen={() => onPick(a.id)} onLong={() => onLong(a.id)} />)}
-          {list.length === 0 && <div style={{ gridColumn: "span 4", textAlign: "center", color: "rgba(255,255,255,0.5)", padding: "40px 0", fontStyle: "italic" }}>No apps found</div>}
+          {list.length === 0 && <div style={{ gridColumn: "span " + cols, textAlign: "center", color: "rgba(255,255,255,0.5)", padding: "40px 0", fontStyle: "italic" }}>No apps found</div>}
         </div>
       </div>
     </div>
