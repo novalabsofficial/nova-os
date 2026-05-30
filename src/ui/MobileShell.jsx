@@ -138,8 +138,8 @@ export function MobileShell({ AC, user, data, apps, wallpaperId, customWp, setti
 
   // ── bottom bar gestures ───────────────────────────────────────────────────
   const bar = useRef(null);
-  function barDown(e) { const y0 = pt(e).clientY; bar.current = { y0, moved: false, hold: setTimeout(() => { if (bar.current) { bar.current.hold = "fired"; setSwitcher(true); } }, 430) }; }
-  function barMove(e) { const b = bar.current; if (!b) return; if (Math.abs(pt(e).clientY - b.y0) > 8) { b.moved = true; if (b.hold && b.hold !== "fired") { clearTimeout(b.hold); b.hold = null; } } }
+  function barDown(e) { const y0 = pt(e).clientY; bar.current = { y0, moved: false, hold: setTimeout(() => { if (bar.current) { bar.current.hold = "fired"; setSwitcher(true); } }, 400) }; }
+  function barMove(e) { const b = bar.current; if (!b) return; if (Math.abs(pt(e).clientY - b.y0) > 14) { b.moved = true; if (b.hold && b.hold !== "fired") { clearTimeout(b.hold); b.hold = null; } } }
   function barUp(e) {
     const b = bar.current; bar.current = null; if (!b) return;
     if (b.hold === "fired") return;
@@ -162,7 +162,7 @@ export function MobileShell({ AC, user, data, apps, wallpaperId, customWp, setti
 
       {/* Springboard */}
       {!openId && (
-        <div {...padEvents} style={{ position: "absolute", inset: 0, paddingTop: 52, paddingBottom: 30, display: "flex", flexDirection: "column", zIndex: 10, touchAction: "none" }}>
+        <div {...padEvents} style={{ position: "absolute", inset: 0, paddingTop: 52, paddingBottom: 42, display: "flex", flexDirection: "column", zIndex: 10, touchAction: "none" }}>
           <div style={{ flex: 1, overflow: "hidden", minHeight: 0 }}>
             <div style={{ display: "flex", height: "100%", width: (pages.length * 100) + "%", transform: "translateX(calc(" + (-curPage * (100 / pages.length)) + "% + " + dragX + "px))", transition: dragX === 0 ? "transform 0.34s cubic-bezier(0.22,1,0.36,1)" : "none" }}>
               {pages.map((pg, pi) => (
@@ -198,19 +198,19 @@ export function MobileShell({ AC, user, data, apps, wallpaperId, customWp, setti
       {openId && (
         <div style={{ position: "absolute", inset: 0, zIndex: 20, display: "flex", flexDirection: "column", background: "var(--nv-surface-solid)", animation: "win-launch 0.26s cubic-bezier(0.16,1,0.3,1)" }}>
           <div style={{ height: 46, flexShrink: 0 }} />
-          <div style={{ flex: 1, minHeight: 0, overflowY: "auto", overflowX: "hidden", padding: "12px 14px 30px" }}>{renderApp(openId)}</div>
+          <div style={{ flex: 1, minHeight: 0, overflowY: "auto", overflowX: "hidden", padding: "12px 14px 40px" }}>{renderApp(openId)}</div>
         </div>
       )}
 
       {/* Persistent bottom bar */}
       <div {...barEvents} title="Swipe up: home · Hold: open apps"
-        style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: 28, zIndex: 35, display: "flex", alignItems: "center", justifyContent: "center", touchAction: "none", cursor: "pointer" }}>
+        style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: 40, zIndex: 35, display: "flex", alignItems: "center", justifyContent: "center", touchAction: "none", cursor: "pointer" }}>
         <div style={{ width: 138, height: 5, borderRadius: 3, background: openId ? "var(--nv-text-dim)" : "rgba(255,255,255,0.65)", boxShadow: openId ? "none" : "0 1px 3px rgba(0,0,0,0.4)" }} />
       </div>
 
       {control && <ControlCenter AC={AC} vol={vol} setVolume={setVolume} onClose={() => setControl(false)} />}
       {library && <AppLibrary AC={AC} apps={apps} glass={glass} search={search} setSearch={setSearch} pickMode={pickSlot !== null} onPick={openApp} onClose={() => { setLibrary(false); setSearch(""); setPickSlot(null); }} />}
-      {switcher && <AppSwitcher openApps={openApps} appById={appById} glass={glass} onPick={openApp} onCloseApp={closeApp} onDismiss={() => setSwitcher(false)} />}
+      {switcher && <AppSwitcher openApps={openApps} appById={appById} glass={glass} renderApp={renderApp} onPick={openApp} onCloseApp={closeApp} onDismiss={() => setSwitcher(false)} />}
     </div>
   );
 }
@@ -285,33 +285,49 @@ function AppLibrary({ AC, apps, glass, search, setSearch, pickMode, onPick, onCl
   );
 }
 
-// ── App Switcher ──────────────────────────────────────────────────────────
-function AppSwitcher({ openApps, appById, glass, onPick, onCloseApp, onDismiss }) {
+// ── App Switcher (Pixel-style recents with live shrunken app previews) ──────
+function AppSwitcher({ openApps, appById, glass, renderApp, onPick, onCloseApp, onDismiss }) {
   return (
-    <div onClick={e => { if (e.target === e.currentTarget) onDismiss(); }}
-      style={{ position: "absolute", inset: 0, zIndex: 70, background: "rgba(5,7,16,0.72)", backdropFilter: "blur(30px) saturate(140%)", WebkitBackdropFilter: "blur(30px) saturate(140%)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 18, animation: "ss-fade 0.16s" }}>
-      <div style={{ fontFamily: FFB, fontWeight: 700, fontSize: 14, color: "#fff", letterSpacing: 0.3 }}>Open apps</div>
+    <div onClick={e => { if (e.target === e.currentTarget) onDismiss(); }} onTouchEnd={e => { if (e.target === e.currentTarget) onDismiss(); }}
+      style={{ position: "absolute", inset: 0, zIndex: 70, background: "rgba(5,7,16,0.74)", backdropFilter: "blur(30px) saturate(140%)", WebkitBackdropFilter: "blur(30px) saturate(140%)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 16, animation: "ss-fade 0.16s" }}>
+      <div style={{ fontFamily: FFB, fontWeight: 700, fontSize: 14, color: "#fff", letterSpacing: 0.3 }}>Recent apps</div>
       {openApps.length === 0 ? (
         <div style={{ color: "rgba(255,255,255,0.55)", fontSize: 13, fontStyle: "italic" }}>No open apps</div>
       ) : (
-        <div style={{ display: "flex", gap: 16, overflowX: "auto", maxWidth: "100%", padding: "0 24px 6px" }}>
-          {openApps.map(id => { const a = appById(id); if (!a) return null; return <SwitcherCard key={id} app={a} glass={glass} onOpen={() => onPick(id)} onClose={() => onCloseApp(id)} />; })}
+        <div style={{ display: "flex", gap: 18, overflowX: "auto", maxWidth: "100%", padding: "4px 24px 8px", alignItems: "center" }}>
+          {openApps.map(id => { const a = appById(id); if (!a) return null; return <SwitcherCard key={id} app={a} glass={glass} renderApp={renderApp} onOpen={() => onPick(id)} onClose={() => onCloseApp(id)} />; })}
         </div>
       )}
-      <button onClick={onDismiss} style={{ background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.16)", borderRadius: 20, padding: "8px 20px", color: "#fff", fontFamily: FFB, fontWeight: 600, fontSize: 12, cursor: "pointer" }}>Close</button>
-      <div style={{ color: "rgba(255,255,255,0.5)", fontSize: 11.5, fontFamily: FFM }}>tap a card to open · swipe a card up to close</div>
+      <div style={{ color: "rgba(255,255,255,0.55)", fontSize: 11.5, fontFamily: FFM }}>tap to open · swipe a card up to clear</div>
     </div>
   );
 }
-function SwitcherCard({ app, glass, onOpen, onClose }) {
+function SwitcherCard({ app, glass, renderApp, onOpen, onClose }) {
   const sy = useRef(null);
+  const [gone, setGone] = useState(false);
+  const W = 172, H = 312;
+  const vw = typeof window !== "undefined" ? window.innerWidth : 390;
+  const scale = W / vw;
   const down = (e) => { sy.current = pt(e).clientY; };
-  const up = (e) => { if (sy.current != null && sy.current - pt(e).clientY > 40) onClose(); else onOpen(); sy.current = null; };
+  const up = (e) => {
+    const dy = sy.current != null ? pt(e).clientY - sy.current : 0; sy.current = null;
+    if (dy < -50) { setGone(true); setTimeout(onClose, 180); }   // swipe up → clear
+    else if (Math.abs(dy) < 12) onOpen();                         // tap → open
+  };
+  if (gone) return <div style={{ width: 0, transition: "width 0.18s" }} />;
   return (
     <div onTouchStart={down} onTouchEnd={up} onMouseDown={down} onMouseUp={up}
-      style={{ flexShrink: 0, width: 150, height: 200, borderRadius: 20, background: "var(--nv-surface-solid)", border: "1px solid rgba(255,255,255,0.12)", boxShadow: "0 16px 40px rgba(0,0,0,0.5)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 14, cursor: "pointer", touchAction: "none" }}>
-      <MobileIcon app={app} size={64} glass={glass} />
-      <span style={{ fontFamily: FFB, fontWeight: 600, fontSize: 13, color: "#fff" }}>{app.label}</span>
+      style={{ flexShrink: 0, width: W, display: "flex", flexDirection: "column", gap: 10, cursor: "pointer", touchAction: "none", animation: "win-launch 0.2s cubic-bezier(0.16,1,0.3,1)" }}>
+      {/* live, shrunken running app */}
+      <div style={{ width: W, height: H, borderRadius: 22, overflow: "hidden", position: "relative", background: "var(--nv-surface-solid)", border: "1px solid rgba(255,255,255,0.16)", boxShadow: "0 18px 46px rgba(0,0,0,0.55)" }}>
+        <div style={{ position: "absolute", top: 0, left: 0, width: vw, height: Math.round(H / scale), transform: "scale(" + scale + ")", transformOrigin: "top left", pointerEvents: "none", padding: "14px 16px", boxSizing: "border-box" }}>
+          {renderApp(app.id)}
+        </div>
+      </div>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, justifyContent: "center" }}>
+        <div style={{ lineHeight: 0 }}><MobileIcon app={app} size={22} glass={glass} /></div>
+        <span style={{ fontFamily: FFB, fontWeight: 600, fontSize: 13, color: "#fff" }}>{app.label}</span>
+      </div>
     </div>
   );
 }
