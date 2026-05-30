@@ -1777,6 +1777,12 @@ export default function NovaOS(){
   const hiddenFromDesktop=data?.hiddenFromDesktop||[];
   const hiddenSet=new Set(hiddenFromDesktop);
   const allDesktopIcons=allApps.filter(a=>!hiddenSet.has(a.id));
+  // v10.0 — for the native-webview browser: it's "active" (so its webview may
+  // show) only when it's the focused top window on the current desktop and no
+  // OS overlay is covering it. Any overlay forces the webview to hide so it
+  // can't paint over menus/Spotlight/Task View.
+  const overlayCoveringWin = menuOpen || spotlightOpen || commandOpen || taskViewOpen || notifsOpen || screensaver || !!severeAlert;
+  const focusedWinId = (()=>{ let id=null,z=-Infinity; for(const w of wins){ if((w.desk||0)!==curDesk||w.state==="minimized") continue; if((w.z||0)>=z){ z=w.z||0; id=w.id; } } return id; })();
 
   // v9.7 B1 — Windows-style drag-select marquee. Starts on a left-drag over
   // the empty-desktop surface; while dragging we intersect the box with each
@@ -2414,7 +2420,7 @@ export default function NovaOS(){
                 {win.app==="tasks"    &&<TasksApp    data={data} updateData={updateData} showToast={showToast} AC={AC} openNovaAi={()=>openApp("novaai")}/>}
                 {win.app==="files"    &&<FilesApp    data={data} updateData={updateData} showToast={showToast} AC={AC} commApps={commApps} openApp={openApp}/>}
                 {win.app==="paint"    &&<PaintApp    showToast={showToast} AC={AC} onSetWallpaper={handleCustomWallpaper}/>}
-                {win.app==="browser"  &&<BrowserApp  AC={AC}/>}
+                {win.app==="browser"  &&<BrowserApp  AC={AC} active={!overlayCoveringWin && win.id===focusedWinId && win.state!=="minimized" && (win.desk||0)===curDesk}/>}
                 {win.app==="snake"    &&<SnakeApp    AC={AC}/>}
                 {win.app==="2048"     &&<Game2048App AC={AC}/>}
                 {win.app==="store"    &&<StoreApp    user={user} data={data} updateData={updateData} showToast={showToast} AC={AC}/>}
