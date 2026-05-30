@@ -31,6 +31,10 @@ const hashColor = (id) => { let h = 0; for (let i = 0; i < id.length; i++) h = (
 const fmtTime = (d) => ((d.getHours() % 12) || 12) + ":" + String(d.getMinutes()).padStart(2, "0");
 // coords from a touch OR mouse event
 const pt = (e) => (e.touches && e.touches[0]) || (e.changedTouches && e.changedTouches[0]) || e;
+// timestamp of the last touch, so overlays can ignore the "ghost" click the
+// browser fires ~0-300ms after a touch release (which would otherwise dismiss
+// a menu the moment you lift the finger that opened it).
+let lastTouchAt = 0;
 
 function SignalGlyph() { return <svg width="17" height="11" viewBox="0 0 17 11" fill="#fff">{[0,1,2,3].map(i=><rect key={i} x={i*4.4} y={8-i*2.4} width="3" height={3+i*2.4} rx="0.7"/>)}</svg>; }
 function WifiGlyph() { return <svg width="16" height="12" viewBox="0 0 16 12" fill="none" stroke="#fff" strokeWidth="1.4" strokeLinecap="round"><path d="M1.6 3.8a10 10 0 0 1 12.8 0"/><path d="M4 6.5a6 6 0 0 1 8 0"/><path d="M6.4 9.1a2.4 2.4 0 0 1 3.2 0"/></svg>; }
@@ -142,9 +146,10 @@ export function MobileShell({ AC, user, data, apps, wallpaperId, customWp, setti
 
   // ── bottom bar gestures ───────────────────────────────────────────────────
   const bar = useRef(null);
-  function barDown(e) { const y0 = pt(e).clientY; bar.current = { y0, moved: false, hold: setTimeout(() => { if (bar.current) { bar.current.hold = "fired"; setSwitcher(true); } }, 130) }; }
+  function barDown(e) { lastTouchAt = Date.now(); const y0 = pt(e).clientY; bar.current = { y0, moved: false, hold: setTimeout(() => { if (bar.current) { bar.current.hold = "fired"; setSwitcher(true); } }, 130) }; }
   function barMove(e) { const b = bar.current; if (!b) return; if (Math.abs(pt(e).clientY - b.y0) > 14) { b.moved = true; if (b.hold && b.hold !== "fired") { clearTimeout(b.hold); b.hold = null; } } }
   function barUp(e) {
+    lastTouchAt = Date.now();
     const b = bar.current; bar.current = null; if (!b) return;
     if (b.hold === "fired") return;
     if (b.hold) clearTimeout(b.hold);
@@ -292,7 +297,7 @@ function AppLibrary({ AC, apps, glass, search, setSearch, pickMode, onPick, onCl
 // ── App Switcher (Pixel-style recents with live shrunken app previews) ──────
 function AppSwitcher({ openApps, appById, glass, renderApp, onPick, onCloseApp, onDismiss }) {
   return (
-    <div onClick={e => { if (e.target === e.currentTarget) onDismiss(); }} onTouchEnd={e => { if (e.target === e.currentTarget) onDismiss(); }}
+    <div onClick={e => { if (Date.now() - lastTouchAt < 700) return; if (e.target === e.currentTarget) onDismiss(); }} onTouchEnd={e => { lastTouchAt = Date.now(); if (e.target === e.currentTarget) onDismiss(); }}
       style={{ position: "absolute", inset: 0, zIndex: 70, background: "rgba(5,7,16,0.74)", backdropFilter: "blur(30px) saturate(140%)", WebkitBackdropFilter: "blur(30px) saturate(140%)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 16, animation: "ss-fade 0.16s" }}>
       <div style={{ fontFamily: FFB, fontWeight: 700, fontSize: 14, color: "#fff", letterSpacing: 0.3 }}>Recent apps</div>
       {openApps.length === 0 ? (
