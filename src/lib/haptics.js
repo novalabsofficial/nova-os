@@ -7,16 +7,18 @@
 const KEY = "nova:mobile:haptics";
 let enabled = (() => { try { return localStorage.getItem(KEY) !== "off"; } catch { return true; } })();
 
+// Durations in ms. Android's vibrator effectively ignores anything under
+// ~15ms, so everything here is >= 18ms; "feels like a tap" lives around 20-35ms.
 const PATTERNS = {
-  tap: 6,          // light UI tap
-  toggle: 10,      // switch flipped
-  open: 12,        // app launched
-  pick: 18,        // icon lifted into a drag
-  move: 4,         // crossed into a new reorder slot
-  drop: 12,        // dropped
-  remove: [0, 20], // removed from home
-  unlock: [0, 14, 30, 10], // lock screen released
-  error: [0, 30, 40, 30],
+  tap: 20,             // light UI tap
+  toggle: 28,          // switch flipped
+  open: 30,            // app launched
+  pick: 45,            // icon lifted into a drag (firm)
+  move: 16,            // crossed into a new reorder slot (light tick)
+  drop: 30,            // dropped
+  remove: [0, 35, 45, 35],   // removed from home (buzz)
+  unlock: [0, 25, 60, 35],   // lock screen released
+  error: [0, 45, 60, 45],
 };
 
 export function hapticsEnabled() { return enabled; }

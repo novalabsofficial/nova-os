@@ -2003,6 +2003,9 @@ export default function NovaOS(){
           settings={settings} updateSettings={updateSettings}
           renderApp={(id)=>renderAppContent(id, true)}
           widgets={renderMobileWidgets()}
+          notifications={notifications}
+          onDismissNotification={dismissNotification}
+          onClearNotifications={clearAllNotifications}
           onAppOpen={markAppNotificationsRead}
           onLogout={logout}
         />

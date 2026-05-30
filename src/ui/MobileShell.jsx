@@ -106,13 +106,14 @@ function IconTile({ app, glass, onOpen, onLong, size = 60 }) {
   );
 }
 
-export function MobileShell({ AC, user, data, apps, wallpaperId, customWp, settings, updateSettings, renderApp, onAppOpen, widgets }) {
+export function MobileShell({ AC, user, data, apps, wallpaperId, customWp, settings, updateSettings, renderApp, onAppOpen, widgets, notifications = [], onDismissNotification, onClearNotifications }) {
   const glass = !!settings?.glass;
   const [now, setNow] = useState(() => new Date());
   const [page, setPage] = useState(0);
   const [openId, setOpenId] = useState(null);
   const [openApps, setOpenApps] = useState([]);
   const [control, setControl] = useState(false);
+  const [notif, setNotif] = useState(false);
   const [library, setLibrary] = useState(false);
   const [switcher, setSwitcher] = useState(false);
   const [search, setSearch] = useState("");
@@ -176,7 +177,7 @@ export function MobileShell({ AC, user, data, apps, wallpaperId, customWp, setti
     haptic("open");
     onAppOpen?.(id);
     setOpenApps(s => [id, ...s.filter(x => x !== id)]);
-    setOpenId(id); setLibrary(false); setControl(false); setSwitcher(false); setSearch("");
+    setOpenId(id); setLibrary(false); setControl(false); setNotif(false); setSwitcher(false); setSearch("");
   }
   const goHome = () => setOpenId(null);
   const closeApp = (id) => { setOpenApps(s => s.filter(x => x !== id)); if (openId === id) setOpenId(null); };
@@ -296,12 +297,18 @@ export function MobileShell({ AC, user, data, apps, wallpaperId, customWp, setti
     if (g.hold === "fired") { setDragX(0); return; }
     const p = pt(e); const dx = p.clientX - g.x0, dy = p.clientY - g.y0;
     if (g.axis === "x") {
-      if (dx <= -40 && curPage < pages.length - 1) setPage(curPage + 1);
-      else if (dx >= 40 && curPage > 0) setPage(curPage - 1);
+      if (dx <= -40 && curPage < pages.length - 1) { setPage(curPage + 1); haptic("tap"); }
+      else if (dx >= 40 && curPage > 0) { setPage(curPage - 1); haptic("tap"); }
       setDragX(0);
     } else if (g.axis === "y") {
-      if (dy < -46) setLibrary(true);
-      else if (dy > 46) setControl(true);
+      if (dy < -46) { setLibrary(true); haptic("toggle"); }
+      else if (dy > 46) {
+        // iOS-style: swipe down from the right edge -> Control Center,
+        // from the rest of the top -> Notifications.
+        const w = typeof window !== "undefined" ? window.innerWidth : 400;
+        if (g.x0 > w * 0.6) setControl(true); else setNotif(true);
+        haptic("toggle");
+      }
       setDragX(0);
     } else if (g.app) { openApp(g.app); }
   }
@@ -395,6 +402,7 @@ export function MobileShell({ AC, user, data, apps, wallpaperId, customWp, setti
       </div>
 
       {control && <ControlCenter AC={AC} vol={vol} setVolume={setVolume} bright={bright} setBrightness={setBrightness} battery={battery} settings={settings} updateSettings={updateSettings} onLock={() => { setControl(false); setLocked(true); }} onClose={() => setControl(false)} />}
+      {notif && <NotificationCenter AC={AC} notifications={notifications} appById={appById} glass={glass} onOpenApp={openApp} onDismiss={onDismissNotification} onClear={onClearNotifications} onClose={() => setNotif(false)} />}
 
       {/* Lock screen — shows on launch / when locked; swipe up to enter */}
       {locked && <LockScreen now={now} battery={battery} onUnlock={() => { haptic("unlock"); setLocked(false); }} />}
@@ -607,6 +615,60 @@ function LockScreen({ now, onUnlock }) {
       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12 }}>
         <div style={{ width: 124, height: 5, borderRadius: 3, background: "rgba(255,255,255,0.7)", animation: "ls-hint 1.9s ease-in-out infinite" }} />
         <div style={{ fontSize: 12.5, fontFamily: FFM, color: "rgba(255,255,255,0.8)" }}>swipe up to unlock</div>
+      </div>
+    </div>
+  );
+}
+
+// ── Notification Center (swipe down from the top-left) ──────────────────────
+const NK_COLOR = { info: "#6366f1", success: "#10b981", warning: "#f59e0b", alert: "#ef4444" };
+function nkTimeAgo(ts) {
+  if (!ts) return "";
+  const s = Math.floor((Date.now() - ts) / 1000);
+  if (s < 60) return "now";
+  const m = Math.floor(s / 60); if (m < 60) return m + "m";
+  const h = Math.floor(m / 60); if (h < 24) return h + "h";
+  return Math.floor(h / 24) + "d";
+}
+function NotificationCenter({ AC, notifications, appById, glass, onOpenApp, onDismiss, onClear, onClose }) {
+  const sy = useRef(null);
+  const down = (e) => { sy.current = pt(e).clientY; };
+  const upClose = (e) => { if (sy.current != null && sy.current - pt(e).clientY > 40) onClose(); sy.current = null; };
+  const tapItem = (n) => { if (n.appId && appById(n.appId)) onOpenApp(n.appId); else onDismiss?.(n.id); };
+  return (
+    <div onClick={e => { if (Date.now() - lastTouchAt < 700) return; if (e.target === e.currentTarget) onClose(); }} onTouchEnd={e => { lastTouchAt = Date.now(); if (e.target === e.currentTarget) onClose(); }}
+      style={{ position: "absolute", inset: 0, zIndex: 60, paddingTop: "calc(" + SAT + " + 18px)", background: "rgba(6,8,18,0.62)", backdropFilter: "blur(22px) saturate(140%)", WebkitBackdropFilter: "blur(22px) saturate(140%)", animation: "panel-down 0.34s cubic-bezier(0.22,1,0.36,1)", display: "flex", flexDirection: "column" }}>
+      <div onTouchStart={down} onTouchEnd={upClose} onMouseDown={down} onMouseUp={upClose} style={{ padding: "0 18px 8px", touchAction: "none" }}>
+        <div style={{ display: "flex", justifyContent: "center", paddingBottom: 8 }}><div style={{ width: 40, height: 5, borderRadius: 3, background: "rgba(255,255,255,0.5)" }} /></div>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", color: "#fff", fontFamily: FFB, fontWeight: 700, fontSize: 15 }}>
+          <span>Notifications</span>
+          {notifications.length > 0 && <button onClick={onClear} style={{ background: "rgba(255,255,255,0.14)", border: "1px solid rgba(255,255,255,0.16)", color: "#fff", fontFamily: FFB, fontWeight: 600, fontSize: 12, padding: "6px 12px", borderRadius: 14, cursor: "pointer" }}>Clear</button>}
+        </div>
+      </div>
+      <div style={{ flex: 1, overflowY: "auto", padding: "6px 14px calc(" + SAB + " + 24px)", display: "flex", flexDirection: "column", gap: 10 }}>
+        {notifications.length === 0 ? (
+          <div style={{ textAlign: "center", color: "rgba(255,255,255,0.55)", fontFamily: FFM, fontSize: 13, padding: "60px 0" }}>No notifications</div>
+        ) : notifications.map(n => {
+          const a = n.appId ? appById(n.appId) : null;
+          return (
+            <div key={n.id} className="mb-cc-tile" onClick={() => tapItem(n)}
+              style={{ position: "relative", display: "flex", gap: 11, padding: "13px 14px", borderRadius: 18, cursor: "pointer", background: n.read ? "rgba(255,255,255,0.08)" : "rgba(255,255,255,0.14)", border: "1px solid rgba(255,255,255,0.12)" }}>
+              <div style={{ flexShrink: 0, marginTop: 1 }}>
+                {a ? <MobileIcon app={a} size={34} glass={glass} />
+                   : <div style={{ width: 34, height: 34, borderRadius: 9, background: NK_COLOR[n.kind] || NK_COLOR.info, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>🔔</div>}
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+                  <span style={{ flex: 1, minWidth: 0, fontFamily: FFB, fontWeight: 700, fontSize: 13.5, color: "#fff", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{n.title}</span>
+                  <span style={{ fontSize: 11, color: "rgba(255,255,255,0.5)", fontFamily: FFM, flexShrink: 0 }}>{nkTimeAgo(n.ts)}</span>
+                </div>
+                {n.body && <div style={{ fontSize: 12.5, color: "rgba(255,255,255,0.78)", marginTop: 3, lineHeight: 1.4, display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{n.body}</div>}
+              </div>
+              <button onClick={e => { e.stopPropagation(); onDismiss?.(n.id); }} style={{ flexShrink: 0, alignSelf: "flex-start", background: "none", border: "none", color: "rgba(255,255,255,0.5)", fontSize: 16, lineHeight: 1, cursor: "pointer", padding: 2 }}>✕</button>
+            </div>
+          );
+        })}
+        {notifications.length > 0 && <div style={{ textAlign: "center", color: "rgba(255,255,255,0.45)", fontSize: 11, fontFamily: FFM, paddingTop: 4 }}>swipe up or tap empty space to close</div>}
       </div>
     </div>
   );
