@@ -33,6 +33,13 @@ export function detectDevice(opts = {}) {
         ? window.innerWidth
         : 1280;
 
+  const height =
+    opts.height !== undefined
+      ? opts.height
+      : typeof window !== "undefined"
+        ? window.innerHeight
+        : 800;
+
   const hasTouch =
     opts.hasTouch !== undefined
       ? opts.hasTouch
@@ -48,7 +55,12 @@ export function detectDevice(opts = {}) {
         window.matchMedia("(pointer: coarse)").matches;
 
   const touchy = !!hasTouch || !!coarsePointer;
+  const shortSide = Math.min(width, height);
 
+  // A touch device whose *shorter* edge is phone-sized is a phone in ANY
+  // orientation — this keeps the iOS-style shell when the phone is rotated to
+  // landscape (where width alone would otherwise exceed the 600px threshold).
+  if (touchy && shortSide < 500) return "mobile";
   if (width < 600) return "mobile";
   // Tablet only if the input is touchy. A 1000px-wide laptop with no touch is desktop.
   if (width < 1200 && touchy) return "tablet";

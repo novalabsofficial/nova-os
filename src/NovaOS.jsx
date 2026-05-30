@@ -61,39 +61,60 @@ import {
 // notes-<hash>.js downloads; opening Tetris later pulls tetris-<hash>.js.
 // Suspense (wired around the window content below) shows the fallback while
 // each chunk is in flight.
-const NotesApp       = lazy(() => import("./apps/NotesApp.jsx").then(m       => ({default: m.NotesApp})));
-const TasksApp       = lazy(() => import("./apps/TasksApp.jsx").then(m       => ({default: m.TasksApp})));
-const FilesApp       = lazy(() => import("./apps/FilesApp.jsx").then(m       => ({default: m.FilesApp})));
-const PaintApp       = lazy(() => import("./apps/PaintApp.jsx").then(m       => ({default: m.PaintApp})));
-const BrowserApp     = lazy(() => import("./apps/BrowserApp.jsx").then(m     => ({default: m.BrowserApp})));
-const SnakeApp       = lazy(() => import("./apps/SnakeApp.jsx").then(m       => ({default: m.SnakeApp})));
-const Game2048App    = lazy(() => import("./apps/Game2048App.jsx").then(m    => ({default: m.Game2048App})));
-const StoreApp       = lazy(() => import("./apps/StoreApp.jsx").then(m       => ({default: m.StoreApp})));
-const TerminalApp    = lazy(() => import("./apps/TerminalApp.jsx").then(m    => ({default: m.TerminalApp})));
-const SettingsApp    = lazy(() => import("./apps/SettingsApp.jsx").then(m    => ({default: m.SettingsApp})));
-const ProfileApp     = lazy(() => import("./apps/ProfileApp.jsx").then(m     => ({default: m.ProfileApp})));
-const ChatApp        = lazy(() => import("./apps/ChatApp.jsx").then(m        => ({default: m.ChatApp})));
-const CalculatorApp  = lazy(() => import("./apps/CalculatorApp.jsx").then(m  => ({default: m.CalculatorApp})));
-const ClockApp       = lazy(() => import("./apps/ClockApp.jsx").then(m       => ({default: m.ClockApp})));
-const CalendarApp    = lazy(() => import("./apps/CalendarApp.jsx").then(m    => ({default: m.CalendarApp})));
-const MusicApp       = lazy(() => import("./apps/MusicApp.jsx").then(m       => ({default: m.MusicApp})));
-const PdfApp         = lazy(() => import("./apps/PdfApp.jsx").then(m         => ({default: m.PdfApp})));
-const AtmosApp       = lazy(() => import("./apps/AtmosApp.jsx").then(m       => ({default: m.AtmosApp})));
-const MinesweeperApp = lazy(() => import("./apps/MinesweeperApp.jsx").then(m => ({default: m.MinesweeperApp})));
-const WordleApp      = lazy(() => import("./apps/WordleApp.jsx").then(m      => ({default: m.WordleApp})));
-const TetrisApp      = lazy(() => import("./apps/TetrisApp.jsx").then(m      => ({default: m.TetrisApp})));
-const NovaAiApp      = lazy(() => import("./apps/NovaAiApp.jsx").then(m      => ({default: m.NovaAiApp})));
+//
+// lazyApp wraps the import so a failed chunk fetch recovers gracefully: it
+// retries once (transient network blips), and if it still fails — typically a
+// stale page after a new deploy whose old chunk filenames are gone — it reloads
+// the page ONCE (guarded against loops) to pull the fresh asset map. On a
+// genuinely unreachable origin (e.g. an auth-gated Vercel preview) it reloads
+// once, then surfaces the error instead of looping.
+const CHUNK_RELOAD_KEY = "nova:chunk-reloaded";
+function lazyApp(loader) {
+  return lazy(() =>
+    loader().catch(() => loader()).then(
+      (m) => { try { sessionStorage.removeItem(CHUNK_RELOAD_KEY); } catch {} return m; },
+      (err) => {
+        try {
+          if (!sessionStorage.getItem(CHUNK_RELOAD_KEY)) { sessionStorage.setItem(CHUNK_RELOAD_KEY, "1"); location.reload(); }
+        } catch {}
+        throw err;
+      }
+    )
+  );
+}
+const NotesApp       = lazyApp(() => import("./apps/NotesApp.jsx").then(m       => ({default: m.NotesApp})));
+const TasksApp       = lazyApp(() => import("./apps/TasksApp.jsx").then(m       => ({default: m.TasksApp})));
+const FilesApp       = lazyApp(() => import("./apps/FilesApp.jsx").then(m       => ({default: m.FilesApp})));
+const PaintApp       = lazyApp(() => import("./apps/PaintApp.jsx").then(m       => ({default: m.PaintApp})));
+const BrowserApp     = lazyApp(() => import("./apps/BrowserApp.jsx").then(m     => ({default: m.BrowserApp})));
+const SnakeApp       = lazyApp(() => import("./apps/SnakeApp.jsx").then(m       => ({default: m.SnakeApp})));
+const Game2048App    = lazyApp(() => import("./apps/Game2048App.jsx").then(m    => ({default: m.Game2048App})));
+const StoreApp       = lazyApp(() => import("./apps/StoreApp.jsx").then(m       => ({default: m.StoreApp})));
+const TerminalApp    = lazyApp(() => import("./apps/TerminalApp.jsx").then(m    => ({default: m.TerminalApp})));
+const SettingsApp    = lazyApp(() => import("./apps/SettingsApp.jsx").then(m    => ({default: m.SettingsApp})));
+const ProfileApp     = lazyApp(() => import("./apps/ProfileApp.jsx").then(m     => ({default: m.ProfileApp})));
+const ChatApp        = lazyApp(() => import("./apps/ChatApp.jsx").then(m        => ({default: m.ChatApp})));
+const CalculatorApp  = lazyApp(() => import("./apps/CalculatorApp.jsx").then(m  => ({default: m.CalculatorApp})));
+const ClockApp       = lazyApp(() => import("./apps/ClockApp.jsx").then(m       => ({default: m.ClockApp})));
+const CalendarApp    = lazyApp(() => import("./apps/CalendarApp.jsx").then(m    => ({default: m.CalendarApp})));
+const MusicApp       = lazyApp(() => import("./apps/MusicApp.jsx").then(m       => ({default: m.MusicApp})));
+const PdfApp         = lazyApp(() => import("./apps/PdfApp.jsx").then(m         => ({default: m.PdfApp})));
+const AtmosApp       = lazyApp(() => import("./apps/AtmosApp.jsx").then(m       => ({default: m.AtmosApp})));
+const MinesweeperApp = lazyApp(() => import("./apps/MinesweeperApp.jsx").then(m => ({default: m.MinesweeperApp})));
+const WordleApp      = lazyApp(() => import("./apps/WordleApp.jsx").then(m      => ({default: m.WordleApp})));
+const TetrisApp      = lazyApp(() => import("./apps/TetrisApp.jsx").then(m      => ({default: m.TetrisApp})));
+const NovaAiApp      = lazyApp(() => import("./apps/NovaAiApp.jsx").then(m      => ({default: m.NovaAiApp})));
 // v7.4 game additions
-const TicTacToeApp    = lazy(() => import("./apps/TicTacToeApp.jsx").then(m    => ({default: m.TicTacToeApp})));
-const PongApp         = lazy(() => import("./apps/PongApp.jsx").then(m         => ({default: m.PongApp})));
-const FlappyBirdApp   = lazy(() => import("./apps/FlappyBirdApp.jsx").then(m   => ({default: m.FlappyBirdApp})));
-const SpaceInvadersApp= lazy(() => import("./apps/SpaceInvadersApp.jsx").then(m=> ({default: m.SpaceInvadersApp})));
-const PacManApp       = lazy(() => import("./apps/PacManApp.jsx").then(m       => ({default: m.PacManApp})));
-const ChessApp        = lazy(() => import("./apps/ChessApp.jsx").then(m        => ({default: m.ChessApp})));
+const TicTacToeApp    = lazyApp(() => import("./apps/TicTacToeApp.jsx").then(m    => ({default: m.TicTacToeApp})));
+const PongApp         = lazyApp(() => import("./apps/PongApp.jsx").then(m         => ({default: m.PongApp})));
+const FlappyBirdApp   = lazyApp(() => import("./apps/FlappyBirdApp.jsx").then(m   => ({default: m.FlappyBirdApp})));
+const SpaceInvadersApp= lazyApp(() => import("./apps/SpaceInvadersApp.jsx").then(m=> ({default: m.SpaceInvadersApp})));
+const PacManApp       = lazyApp(() => import("./apps/PacManApp.jsx").then(m       => ({default: m.PacManApp})));
+const ChessApp        = lazyApp(() => import("./apps/ChessApp.jsx").then(m        => ({default: m.ChessApp})));
 // v8.0 round-3
-const PhotosApp       = lazy(() => import("./apps/PhotosApp.jsx").then(m       => ({default: m.PhotosApp})));
-const ScreenshotApp   = lazy(() => import("./apps/ScreenshotApp.jsx").then(m   => ({default: m.ScreenshotApp})));
-const SlidesApp       = lazy(() => import("./apps/SlidesApp.jsx").then(m       => ({default: m.SlidesApp})));
+const PhotosApp       = lazyApp(() => import("./apps/PhotosApp.jsx").then(m       => ({default: m.PhotosApp})));
+const ScreenshotApp   = lazyApp(() => import("./apps/ScreenshotApp.jsx").then(m   => ({default: m.ScreenshotApp})));
+const SlidesApp       = lazyApp(() => import("./apps/SlidesApp.jsx").then(m       => ({default: m.SlidesApp})));
 
 // ─── v9.0 taskbar glyphs ────────────────────────────────────────────────
 // Monochrome line-glyphs for the system tray, replacing the old emoji
@@ -2003,6 +2024,9 @@ export default function NovaOS(){
           settings={settings} updateSettings={updateSettings}
           renderApp={(id)=>renderAppContent(id, true)}
           widgets={renderMobileWidgets()}
+          notifications={notifications}
+          onDismissNotification={dismissNotification}
+          onClearNotifications={clearAllNotifications}
           onAppOpen={markAppNotificationsRead}
           onLogout={logout}
         />

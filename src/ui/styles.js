@@ -250,6 +250,8 @@ export const CSS = `
   .mb-ic:active{transform:scale(0.88);}
   .mb-cc-tile{transition:transform 0.12s var(--nv-ease),background 0.18s var(--nv-ease);}
   .mb-cc-tile:active{transform:scale(0.93);}
+  /* lock-screen "swipe up" handle hint */
+  @keyframes ls-hint{0%,100%{transform:translateY(0);opacity:0.55;}50%{transform:translateY(-5px);opacity:1;}}
   /* respect reduced-motion: drop all the extra movement */
   @media (prefers-reduced-motion: reduce){
     *{animation-duration:0.01ms!important;transition-duration:0.01ms!important;}

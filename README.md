@@ -1,15 +1,37 @@
-# Nova OS - Supernova Edition (v10.1)
+# Nova OS - Supernova Edition (v10.2)
 
 A browser-based operating system, built with React + Vite, backed by Firebase,
 and shippable three ways: boot it in a tab, **install it on your phone** as an
 app, or run it as a native desktop app with Tauri. Windows, a taskbar, a start
 menu, real multitasking, a shelf of built-in apps, cross-device accounts, an AI
-command bar, virtual desktops, a real tabbed browser, a sandboxed shell - and
-now a full iOS-style mobile edition.
+command bar, virtual desktops, a real tabbed browser, a sandboxed shell - and a
+full, polished iOS-style mobile edition.
 
-v10.0 "Supernova" was the foundation of the next era; **v10.1 delivers the
-Mobile edition** that builds on it. Still ahead: a future bootable Linux
-distribution.
+v10.1 delivered the Mobile edition; **v10.2 polishes it** into something that
+feels like a real phone OS. **Next up, v10.3 turns it into a working Google Play
+Store app** (a native shell via Capacitor, with real device haptics/hardware).
+Still on the long-term horizon: a bootable Linux distribution.
+
+---
+
+## What's new in 10.2 (mobile polish)
+
+- **App folders** - long-press to enter jiggle mode, tap "Folder" to make one,
+  then drag apps onto it. Open a folder to launch, rename, or remove apps; it
+  dissolves back to Home when emptied.
+- **Lock screen** - a clock/date wake screen on launch (swipe up to enter);
+  re-lockable from Control Center.
+- **Pull-down Notifications** - swipe down from the top-left for the Notification
+  Center (top-right still opens Control Center, iOS-style). Tap a notification to
+  jump to its app, swipe/clear to dismiss.
+- **Landscape + tablet layout** - the springboard now scales its columns and
+  rows to the screen, and a phone stays in the mobile UI when rotated to
+  landscape instead of flipping to the desktop layout.
+- **Haptics** - tactile feedback is wired throughout (taps, drags, toggles).
+  Web vibration is unreliable across devices, so haptics become fully reliable
+  in v10.3 via the native layer.
+- **Sturdier app loading** - a failed app-code chunk now retries and self-heals
+  after a deploy instead of dead-ending.
 
 ---
 
@@ -124,12 +146,13 @@ npm run test:run     # vitest (single run)
 
 ## Roadmap
 
-1. **Nova OS Mobile** - shipped in 10.1 (touch-first phone edition + installable
-   PWA).
-2. **Google Play Store** - publish the PWA as a TWA (MOBILE-APP.md).
-3. **Native capabilities** - wrap with Capacitor for real device hardware
-   (flashlight, brightness) and a true in-app browser.
-4. **Nova Linux** - a bootable Linux distribution for PC/laptop.
+1. **Nova OS Mobile** - shipped in 10.1, polished in 10.2 (touch-first phone
+   edition + installable PWA, app folders, lock screen, notifications, landscape).
+2. **v10.3 - Working Play Store app** - wrap the app in a native shell with
+   Capacitor and publish to the Google Play Store, unlocking reliable device
+   haptics, real hardware access, and a true in-app browser. This is the next
+   release. (See MOBILE-APP.md for the publishing path.)
+3. **Nova Linux** - a bootable Linux distribution for PC/laptop.
 
 ---
 
