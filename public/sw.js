@@ -49,32 +49,33 @@ self.addEventListener("fetch", (e) => {
   if (url.pathname === "/manifest.webmanifest") return;
 
   // App navigations: network-first (fresh deploys win), offline → cached shell.
+  // Always resolves to a real Response, even when the network/auth fails — a
+  // dangling undefined here is what threw "Failed to convert value to Response".
   if (req.mode === "navigate") {
-    e.respondWith(
-      fetch(req)
-        .then((res) => {
-          const copy = res.clone();
-          caches.open(CACHE).then((c) => c.put(SHELL, copy)).catch(() => {});
-          return res;
-        })
-        .catch(() => caches.match(SHELL).then((r) => r || caches.match(req)))
-    );
+    e.respondWith((async () => {
+      try {
+        const res = await fetch(req);
+        caches.open(CACHE).then((c) => c.put(SHELL, res.clone())).catch(() => {});
+        return res;
+      } catch {
+        const cached = await caches.match(SHELL);
+        return cached || new Response("Offline", { status: 503, headers: { "Content-Type": "text/plain" } });
+      }
+    })());
     return;
   }
 
-  // Static assets: stale-while-revalidate.
-  e.respondWith(
-    caches.match(req).then((cached) => {
-      const network = fetch(req)
-        .then((res) => {
-          if (res && res.status === 200 && res.type === "basic") {
-            const copy = res.clone();
-            caches.open(CACHE).then((c) => c.put(req, copy)).catch(() => {});
-          }
-          return res;
-        })
-        .catch(() => cached);
-      return cached || network;
-    })
-  );
+  // Static assets: stale-while-revalidate, guaranteed to yield a Response.
+  e.respondWith((async () => {
+    const cached = await caches.match(req);
+    const network = fetch(req)
+      .then((res) => {
+        if (res && res.status === 200 && res.type === "basic") {
+          caches.open(CACHE).then((c) => c.put(req, res.clone())).catch(() => {});
+        }
+        return res;
+      })
+      .catch(() => null);
+    return cached || (await network) || new Response("", { status: 504 });
+  })());
 });
