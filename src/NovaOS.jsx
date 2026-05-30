@@ -2424,7 +2424,7 @@ export default function NovaOS(){
                 {win.app==="snake"    &&<SnakeApp    AC={AC}/>}
                 {win.app==="2048"     &&<Game2048App AC={AC}/>}
                 {win.app==="store"    &&<StoreApp    user={user} data={data} updateData={updateData} showToast={showToast} AC={AC}/>}
-                {win.app==="terminal" &&<TerminalApp user={user} AC={AC}/>}
+                {win.app==="terminal" &&<TerminalApp user={user} AC={AC} openApp={openApp} showToast={showToast}/>}
                 {win.app==="chat"     &&<ChatApp     user={user} AC={AC} data={data} updateData={updateData}/>}
                 {win.app==="settings" &&<SettingsApp user={user} data={data} updateSettings={updateSettings} showToast={showToast} AC={AC} onCustomWallpaper={handleCustomWallpaper} onLogout={logout} initialSection={settingsSection}/>}
                 {win.app==="profile"  &&<ProfileApp  user={user} data={data} updateData={updateData} showToast={showToast} AC={AC}/>}
