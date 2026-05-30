@@ -17,6 +17,7 @@ import { AppIconDisplay } from "./icons.jsx";
 import { HAS_SVG_ICON } from "./constants.js";
 import { getSoundConfig, setSoundConfig } from "../lib/audio.js";
 import { canPromptInstall, promptInstall, onInstallChange, isStandalone, isIOS } from "../lib/pwa.js";
+import { haptic, hapticsEnabled, setHapticsEnabled } from "../lib/haptics.js";
 
 const COLS = 4;
 const PER_PAGE = 16;
@@ -120,6 +121,7 @@ export function MobileShell({ AC, user, data, apps, wallpaperId, customWp, setti
   const [vol, setVol] = useState(() => getSoundConfig().volume);
   const [bright, setBright] = useState(getBrightness);
   const setBrightness = (v) => { const c = Math.max(0.2, Math.min(1, v)); setBright(c); saveBrightness(c); };
+  const [locked, setLocked] = useState(true);   // lock screen shows on launch; swipe up to enter
   const [dragX, setDragX] = useState(0);
   // iOS-style jiggle/edit mode + drag-and-drop reorder
   const [editMode, setEditMode] = useState(false);
@@ -171,6 +173,7 @@ export function MobileShell({ AC, user, data, apps, wallpaperId, customWp, setti
   useEffect(() => { let dead = false; if (navigator.getBattery) navigator.getBattery().then(b => { if (dead) return; const upd = () => setBattery(b.level); upd(); b.addEventListener("levelchange", upd); }).catch(() => {}); return () => { dead = true; }; }, []);
 
   function openApp(id) {
+    haptic("open");
     onAppOpen?.(id);
     setOpenApps(s => [id, ...s.filter(x => x !== id)]);
     setOpenId(id); setLibrary(false); setControl(false); setSwitcher(false); setSearch("");
@@ -186,7 +189,7 @@ export function MobileShell({ AC, user, data, apps, wallpaperId, customWp, setti
   // them being flushed before drop/commit — that caused reorders to snap back).
   const applyOrder = (next) => { editOrderRef.current = next; setEditOrder(next); };
   const commitOrder = () => updateSettings?.({ mobileOrder: editOrderRef.current });
-  const enterEdit = () => { editOrderRef.current = homeIds; setEditOrder(homeIds); setEditMode(true); };
+  const enterEdit = () => { haptic("pick"); editOrderRef.current = homeIds; setEditOrder(homeIds); setEditMode(true); };
   // moves the floating drag clone via direct DOM write — no React re-render per
   // touchmove, which keeps the drag buttery instead of janky.
   const moveClone = () => { const n = dragCloneRef.current; if (n) n.style.transform = "translate(" + (dragPt.current.x - 33) + "px," + (dragPt.current.y - 46) + "px)"; };
@@ -250,6 +253,7 @@ export function MobileShell({ AC, user, data, apps, wallpaperId, customWp, setti
           let i = a.indexOf(tid); if (i < 0) i = a.length;
           a.splice(i, 0, dragRef.current);
           applyOrder(a);
+          haptic("move");
         }
       }
       return;
@@ -261,7 +265,7 @@ export function MobileShell({ AC, user, data, apps, wallpaperId, customWp, setti
   }
   function onUp(e) {
     const g = gest.current; gest.current = null; if (!g) return;
-    if (g.remove) { const id = g.remove; applyOrder(editOrderRef.current.filter(x => x !== id)); hideFromHome(id); return; }
+    if (g.remove) { const id = g.remove; haptic("remove"); applyOrder(editOrderRef.current.filter(x => x !== id)); hideFromHome(id); return; }
     if (g.drag) {
       const id = dragRef.current, from = dragFrom.current;
       dragRef.current = null; dragFrom.current = null; setDragId(null);
@@ -278,11 +282,13 @@ export function MobileShell({ AC, user, data, apps, wallpaperId, customWp, setti
         if (from == null && bumped && bumped !== id && !a.includes(bumped)) a.push(bumped); // bumped app returns to Home
         editOrderRef.current = a; setEditOrder(a);
         updateSettings?.({ mobileDock: nextDock, mobileOrder: a });
+        haptic("drop");
         return;
       }
       // dropped on the Home grid: a Home app was reordered live → commit;
       // a dock app dropped on Home just snaps back (dock stays full at 4).
       if (from == null) commitOrder();
+      haptic("drop");
       return;
     }
     if (g.exit) { commitOrder(); setEditMode(false); return; }
@@ -303,7 +309,7 @@ export function MobileShell({ AC, user, data, apps, wallpaperId, customWp, setti
 
   // ── bottom bar gestures ───────────────────────────────────────────────────
   const bar = useRef(null);
-  function barDown(e) { lastTouchAt = Date.now(); const y0 = pt(e).clientY; bar.current = { y0, moved: false, hold: setTimeout(() => { if (bar.current) { bar.current.hold = "fired"; setSwitcher(true); } }, 130) }; }
+  function barDown(e) { lastTouchAt = Date.now(); const y0 = pt(e).clientY; bar.current = { y0, moved: false, hold: setTimeout(() => { if (bar.current) { bar.current.hold = "fired"; haptic("pick"); setSwitcher(true); } }, 130) }; }
   function barMove(e) { const b = bar.current; if (!b) return; if (Math.abs(pt(e).clientY - b.y0) > 14) { b.moved = true; if (b.hold && b.hold !== "fired") { clearTimeout(b.hold); b.hold = null; } } }
   function barUp(e) {
     lastTouchAt = Date.now();
@@ -388,7 +394,10 @@ export function MobileShell({ AC, user, data, apps, wallpaperId, customWp, setti
         <div style={{ width: 138, height: 5, borderRadius: 3, background: openId ? "var(--nv-text-dim)" : "rgba(255,255,255,0.65)", boxShadow: openId ? "none" : "0 1px 3px rgba(0,0,0,0.4)" }} />
       </div>
 
-      {control && <ControlCenter AC={AC} vol={vol} setVolume={setVolume} bright={bright} setBrightness={setBrightness} battery={battery} settings={settings} updateSettings={updateSettings} onClose={() => setControl(false)} />}
+      {control && <ControlCenter AC={AC} vol={vol} setVolume={setVolume} bright={bright} setBrightness={setBrightness} battery={battery} settings={settings} updateSettings={updateSettings} onLock={() => { setControl(false); setLocked(true); }} onClose={() => setControl(false)} />}
+
+      {/* Lock screen — shows on launch / when locked; swipe up to enter */}
+      {locked && <LockScreen now={now} battery={battery} onUnlock={() => { haptic("unlock"); setLocked(false); }} />}
 
       {/* software brightness dimmer — sits above everything, never blocks touch */}
       {bright < 0.999 && <div style={{ position: "fixed", inset: 0, background: "#000", opacity: (1 - bright) * 0.82, pointerEvents: "none", zIndex: 95, transition: "opacity 0.12s linear" }} />}
@@ -435,7 +444,7 @@ export function MobileShell({ AC, user, data, apps, wallpaperId, customWp, setti
 }
 
 // ── Control Center ──────────────────────────────────────────────────────────
-function ControlCenter({ AC, vol, setVolume, bright, setBrightness, battery, settings, updateSettings, onClose }) {
+function ControlCenter({ AC, vol, setVolume, bright, setBrightness, battery, settings, updateSettings, onLock, onClose }) {
   const sy = useRef(null);
   const torchTrack = useRef(null);
   const [soundOn, setSoundOn] = useState(() => getSoundConfig().enabled);
@@ -443,6 +452,7 @@ function ControlCenter({ AC, vol, setVolume, bright, setBrightness, battery, set
   const [online, setOnline] = useState(() => typeof navigator === "undefined" ? true : navigator.onLine);
   const [torchOn, setTorchOn] = useState(false);
   const [rotLock, setRotLock] = useState(false);
+  const [hapt, setHapt] = useState(() => hapticsEnabled());
   const [installable, setInstallable] = useState(() => canPromptInstall());
   const glass = !!settings?.glass, animated = !!settings?.wallpaperAnimated;
   // Always offer install guidance on mobile web (hidden only once installed).
@@ -461,10 +471,11 @@ function ControlCenter({ AC, vol, setVolume, bright, setBrightness, battery, set
   }, []);
   useEffect(() => () => { try { torchTrack.current?.stop(); } catch {} }, []);  // kill the camera if we unmount
 
-  const toggleSound = () => { const v = !soundOn; setSoundOn(v); setSoundConfig({ ...getSoundConfig(), enabled: v }); };
-  const toggleGlass = () => updateSettings?.({ glass: !glass });
-  const toggleAnimate = () => updateSettings?.({ wallpaperAnimated: !animated });
-  const toggleFs = () => { try { if (document.fullscreenElement) document.exitFullscreen(); else document.documentElement.requestFullscreen?.(); } catch {} };
+  const toggleSound = () => { haptic("toggle"); const v = !soundOn; setSoundOn(v); setSoundConfig({ ...getSoundConfig(), enabled: v }); };
+  const toggleGlass = () => { haptic("toggle"); updateSettings?.({ glass: !glass }); };
+  const toggleAnimate = () => { haptic("toggle"); updateSettings?.({ wallpaperAnimated: !animated }); };
+  const toggleFs = () => { haptic("toggle"); try { if (document.fullscreenElement) document.exitFullscreen(); else document.documentElement.requestFullscreen?.(); } catch {} };
+  const toggleHaptics = () => { const v = !hapt; setHapt(v); setHapticsEnabled(v); };
   const toggleTorch = async () => {
     try {
       if (torchTrack.current) { torchTrack.current.stop(); torchTrack.current = null; setTorchOn(false); return; }
@@ -539,9 +550,11 @@ function ControlCenter({ AC, vol, setVolume, bright, setBrightness, battery, set
         <CCSlider icon="🔊" label="Volume" value={vol} onChange={setVolume} />
 
         {/* utility round buttons */}
-        <div style={{ display: "flex", gap: 8, padding: "2px 10px" }}>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, padding: "2px 4px", justifyContent: "center" }}>
           {roundBtn("🔦", "Flashlight", torchOn, toggleTorch)}
-          {roundBtn("🔒", "Rotate Lock", rotLock, toggleRotate)}
+          {roundBtn("🔄", "Rotate Lock", rotLock, toggleRotate)}
+          {roundBtn("📳", "Haptics", hapt, toggleHaptics)}
+          {roundBtn("🔒", "Lock", false, () => onLock?.())}
           {roundBtn("🔃", "Reload", false, () => { try { window.location.reload(); } catch {} })}
         </div>
 
@@ -562,6 +575,38 @@ function CCSlider({ icon, label, value, onChange }) {
         onMouseDown={e => { e.stopPropagation(); dragging.current = true; set(e.clientX); }} onMouseMove={e => { if (dragging.current) set(e.clientX); }} onMouseUp={() => { dragging.current = false; }}
         style={{ height: 32, borderRadius: 16, background: "rgba(255,255,255,0.18)", position: "relative", cursor: "pointer", overflow: "hidden", touchAction: "none" }}>
         <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: Math.round(value * 100) + "%", background: "#fff", borderRadius: 16 }} />
+      </div>
+    </div>
+  );
+}
+
+// ── Lock screen ─────────────────────────────────────────────────────────────
+// Shows on launch (and when re-locked from Control Center). Big clock over the
+// wallpaper; swipe up to enter. No PIN — it's an emulator, this is the "wake"
+// experience, not real security.
+function LockScreen({ now, onUnlock }) {
+  const sy = useRef(null);
+  const [out, setOut] = useState(false);
+  const time = ((now.getHours() % 12) || 12) + ":" + String(now.getMinutes()).padStart(2, "0");
+  const ampm = now.getHours() >= 12 ? "PM" : "AM";
+  const date = now.toLocaleDateString([], { weekday: "long", month: "long", day: "numeric" });
+  const unlock = () => { if (out) return; setOut(true); setTimeout(onUnlock, 340); };
+  const down = (e) => { sy.current = pt(e).clientY; };
+  const up = (e) => { if (sy.current != null && sy.current - pt(e).clientY > 60) unlock(); sy.current = null; };
+  return (
+    <div onTouchStart={down} onTouchEnd={up} onMouseDown={down} onMouseUp={up}
+      style={{ position: "fixed", inset: 0, zIndex: 88, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "space-between",
+        paddingTop: "calc(" + SAT + " + 64px)", paddingBottom: "calc(" + SAB + " + 38px)",
+        background: "linear-gradient(180deg, rgba(4,6,16,0.32), rgba(4,6,16,0.72))", backdropFilter: "blur(2px)", WebkitBackdropFilter: "blur(2px)",
+        touchAction: "none", transform: out ? "translateY(-100%)" : "none", opacity: out ? 0 : 1,
+        transition: "transform 0.36s cubic-bezier(0.22,1,0.36,1), opacity 0.36s" }}>
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", color: "#fff", textShadow: "0 2px 14px rgba(0,0,0,0.5)" }}>
+        <div style={{ fontSize: 15, fontFamily: FFB, fontWeight: 600, opacity: 0.85, marginBottom: 4, display: "flex", alignItems: "center", gap: 7 }}><span style={{ fontSize: 12 }}>🔒</span>{date}</div>
+        <div style={{ fontFamily: FFB, fontWeight: 300, fontSize: 82, lineHeight: 1.05, letterSpacing: -2 }}>{time}<span style={{ fontSize: 26, fontWeight: 600, marginLeft: 8 }}>{ampm}</span></div>
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12 }}>
+        <div style={{ width: 124, height: 5, borderRadius: 3, background: "rgba(255,255,255,0.7)", animation: "ls-hint 1.9s ease-in-out infinite" }} />
+        <div style={{ fontSize: 12.5, fontFamily: FFM, color: "rgba(255,255,255,0.8)" }}>swipe up to unlock</div>
       </div>
     </div>
   );
