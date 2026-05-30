@@ -16,6 +16,7 @@ import { Wallpaper } from "./wallpapers.jsx";
 import { AppIconDisplay } from "./icons.jsx";
 import { HAS_SVG_ICON } from "./constants.js";
 import { getSoundConfig, setSoundConfig } from "../lib/audio.js";
+import { canPromptInstall, promptInstall, onInstallChange, isStandalone, isIOS } from "../lib/pwa.js";
 
 const COLS = 4;
 const PER_PAGE = 16;
@@ -442,8 +443,11 @@ function ControlCenter({ AC, vol, setVolume, bright, setBrightness, battery, set
   const [online, setOnline] = useState(() => typeof navigator === "undefined" ? true : navigator.onLine);
   const [torchOn, setTorchOn] = useState(false);
   const [rotLock, setRotLock] = useState(false);
+  const [installable, setInstallable] = useState(() => canPromptInstall());
   const glass = !!settings?.glass, animated = !!settings?.wallpaperAnimated;
+  const showInstall = !isStandalone() && (installable || isIOS());
 
+  useEffect(() => onInstallChange(() => setInstallable(canPromptInstall())), []);
   useEffect(() => {
     const onFs = () => setFs(!!document.fullscreenElement);
     const up = () => setOnline(true), dn = () => setOnline(false);
@@ -503,6 +507,17 @@ function ControlCenter({ AC, vol, setVolume, bright, setBrightness, battery, set
             <span>🔋 {Math.round(battery * 100)}%</span>
           </span>
         </div>
+
+        {/* Install Nova OS — Android: one-tap; iOS: how-to hint */}
+        {showInstall && (installable ? (
+          <button onClick={() => promptInstall()} className="mb-cc-tile" style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 9, padding: "14px", borderRadius: 18, border: "1px solid " + bdr(AC), background: fill(AC), color: AC, fontFamily: FFB, fontWeight: 700, fontSize: 14, cursor: "pointer" }}>
+            <span style={{ fontSize: 18 }}>⬇️</span> Install Nova OS
+          </button>
+        ) : (
+          <div style={{ display: "flex", alignItems: "center", gap: 9, padding: "12px 14px", borderRadius: 16, background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.14)", color: "rgba(255,255,255,0.92)", fontFamily: FFB, fontWeight: 600, fontSize: 12 }}>
+            <span style={{ fontSize: 18 }}>📲</span><span>Install: tap <b>Share</b> → <b>Add to Home Screen</b></span>
+          </div>
+        ))}
 
         {/* working toggle tiles */}
         <div style={{ display: "flex", gap: 10 }}>

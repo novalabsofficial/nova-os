@@ -1,6 +1,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import NovaOS from './NovaOS.jsx';
+import './lib/pwa.js';   // capture the install prompt as early as possible
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
