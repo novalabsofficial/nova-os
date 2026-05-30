@@ -1,19 +1,13 @@
 // Mobile edition — an iOS-style shell rendered instead of the desktop
 // windowing UI whenever Nova OS is on a phone (deviceMode === "mobile").
 //
-// Layout:
-//   • Status bar (top): time + signal / wifi / battery.
-//   • Springboard: paginated home grid (4 cols), live horizontal swipe + dots,
-//     a widget row on the first page, and a customizable 4-app dock.
-//   • Persistent bottom bar (home indicator): swipe up to go home / open the
-//     app drawer; LONG-PRESS to open the app switcher (all open apps).
-//   • App view: tap an app to open it fullscreen.
-//   • Control Center: swipe DOWN from the top — toggles + sliders; swipe UP to
-//     close.
-//   • App Library (drawer): swipe UP on the home — every app + search; swipe
-//     down (or Done) to close.
+// Gestures use native TOUCH events (with a mouse fallback for desktop testing)
+// rather than Pointer Events, which proved unreliable on real phones here.
 //
-// Apps render through the shared renderApp callback (same as desktop windows).
+// Layout: status bar · paginated springboard (4 cols) + widget row + dock ·
+// persistent bottom bar (swipe up = home/drawer, long-press = app switcher) ·
+// Control Center (swipe down from top, swipe up to close) · App Library
+// (swipe up / down from the middle, search).
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { FF, FFB, FFM } from "./styles.js";
@@ -24,15 +18,16 @@ import { HAS_SVG_ICON } from "./constants.js";
 import { getSoundConfig, setSoundConfig } from "../lib/audio.js";
 
 const COLS = 4;
-const PER_PAGE = 16;            // 4 × 4 fits comfortably on a phone without scroll
+const PER_PAGE = 16;
 const DEFAULT_DOCK = ["files", "browser", "chat", "settings"];
 const TILE_PALETTE = ["#6366f1", "#ec4899", "#06b6d4", "#f59e0b", "#10b981", "#a855f7", "#ef4444", "#3b82f6", "#14b8a6", "#f43f5e"];
 
 const chunk = (arr, n) => { const out = []; for (let i = 0; i < arr.length; i += n) out.push(arr.slice(i, i + n)); return out; };
-function hashColor(id) { let h = 0; for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0; return TILE_PALETTE[h % TILE_PALETTE.length]; }
-function fmtTime(d) { const h = d.getHours(); return ((h % 12) || 12) + ":" + String(d.getMinutes()).padStart(2, "0"); }
+const hashColor = (id) => { let h = 0; for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0; return TILE_PALETTE[h % TILE_PALETTE.length]; };
+const fmtTime = (d) => ((d.getHours() % 12) || 12) + ":" + String(d.getMinutes()).padStart(2, "0");
+// coords from a touch OR mouse event
+const pt = (e) => (e.touches && e.touches[0]) || (e.changedTouches && e.changedTouches[0]) || e;
 
-// ── status-bar glyphs ──────────────────────────────────────────────────────
 function SignalGlyph() { return <svg width="17" height="11" viewBox="0 0 17 11" fill="#fff">{[0,1,2,3].map(i=><rect key={i} x={i*4.4} y={8-i*2.4} width="3" height={3+i*2.4} rx="0.7"/>)}</svg>; }
 function WifiGlyph() { return <svg width="16" height="12" viewBox="0 0 16 12" fill="none" stroke="#fff" strokeWidth="1.4" strokeLinecap="round"><path d="M1.6 3.8a10 10 0 0 1 12.8 0"/><path d="M4 6.5a6 6 0 0 1 8 0"/><path d="M6.4 9.1a2.4 2.4 0 0 1 3.2 0"/></svg>; }
 function BatteryGlyph({ level = 1 }) {
@@ -40,37 +35,14 @@ function BatteryGlyph({ level = 1 }) {
   return (<svg width="26" height="13" viewBox="0 0 26 13" fill="none"><rect x="0.6" y="1.2" width="22" height="10.6" rx="3" stroke="#fff" strokeOpacity="0.5" strokeWidth="1"/><rect x="2" y="2.6" width={w} height="7.8" rx="1.6" fill="#fff"/><rect x="23.4" y="4.4" width="1.8" height="4.4" rx="0.9" fill="#fff" fillOpacity="0.6"/></svg>);
 }
 
-// ── a full-bleed iOS app icon ───────────────────────────────────────────────
-// SVG-icon apps + glass mode already render as full rounded tiles via
-// AppIconDisplay; emoji-only apps get a solid colored tile so they match
-// (instead of the faint translucent box).
+// full-bleed iOS app icon
 function MobileIcon({ app, size, glass }) {
   if (glass || app.storeApp || HAS_SVG_ICON.has(app.id)) return <AppIconDisplay app={app} size={size} glass={glass} />;
   const c = hashColor(app.id);
-  return (
-    <div style={{ width: size, height: size, borderRadius: Math.round(size * 0.225), background: "linear-gradient(150deg," + c + ", rgba(0,0,0,0.25))", boxShadow: "inset 0 1px 0 rgba(255,255,255,0.25)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: Math.round(size * 0.5), lineHeight: 1 }}>{app.icon || "📦"}</div>
-  );
+  return <div style={{ width: size, height: size, borderRadius: Math.round(size * 0.225), background: "linear-gradient(150deg," + c + ", rgba(0,0,0,0.25))", boxShadow: "inset 0 1px 0 rgba(255,255,255,0.25)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: Math.round(size * 0.5), lineHeight: 1 }}>{app.icon || "📦"}</div>;
 }
 
-function IconTile({ app, glass, onOpen, onHold, hideLabel, size = 60 }) {
-  const hold = useRef(null);
-  const start = () => { if (onHold) hold.current = setTimeout(() => { hold.current = "fired"; onHold(); }, 480); };
-  const clear = () => { if (hold.current && hold.current !== "fired") { clearTimeout(hold.current); hold.current = null; } };
-  const up = () => { const h = hold.current; hold.current = null; if (h === "fired") return; if (h) clearTimeout(h); onOpen(); };
-  return (
-    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6, width: "100%" }}>
-      <div className="ps" onPointerDown={start} onPointerUp={up} onPointerLeave={clear} onPointerCancel={clear}
-        style={{ cursor: "pointer", lineHeight: 0, filter: "drop-shadow(0 4px 10px rgba(0,0,0,0.34))" }}>
-        <MobileIcon app={app} size={size} glass={glass} />
-      </div>
-      {!hideLabel && <span style={{ fontSize: 11, color: "#fff", textShadow: "0 1px 3px rgba(0,0,0,0.55)", maxWidth: 74, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontWeight: 500 }}>{app.label}</span>}
-    </div>
-  );
-}
-
-// Visual-only icon for the springboard (the parent owns all gestures). The
-// data-app / data-dock attributes let the springboard's pointer handler know
-// which app was tapped / long-pressed.
+// visual-only icon for the springboard (parent owns gestures via data-app)
 function IconVisual({ app, glass, hideLabel, size = 60, ...rest }) {
   return (
     <div {...rest} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6, width: "100%" }}>
@@ -80,12 +52,24 @@ function IconVisual({ app, glass, hideLabel, size = 60, ...rest }) {
   );
 }
 
+// tappable icon (used inside the App Library, which scrolls natively)
+function IconTile({ app, glass, onOpen, size = 60 }) {
+  const moved = useRef(false);
+  return (
+    <div className="ps" onTouchStart={() => { moved.current = false; }} onTouchMove={() => { moved.current = true; }} onTouchEnd={() => { if (!moved.current) onOpen(); }} onClick={() => onOpen()}
+      style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6, width: "100%", cursor: "pointer" }}>
+      <div style={{ lineHeight: 0, filter: "drop-shadow(0 4px 10px rgba(0,0,0,0.34))" }}><MobileIcon app={app} size={size} glass={glass} /></div>
+      <span style={{ fontSize: 11, color: "#fff", textShadow: "0 1px 3px rgba(0,0,0,0.55)", maxWidth: 74, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontWeight: 500 }}>{app.label}</span>
+    </div>
+  );
+}
+
 export function MobileShell({ AC, user, data, apps, wallpaperId, customWp, settings, updateSettings, renderApp, onAppOpen, widgets }) {
   const glass = !!settings?.glass;
   const [now, setNow] = useState(() => new Date());
   const [page, setPage] = useState(0);
   const [openId, setOpenId] = useState(null);
-  const [openApps, setOpenApps] = useState([]);       // recent/open stack
+  const [openApps, setOpenApps] = useState([]);
   const [control, setControl] = useState(false);
   const [library, setLibrary] = useState(false);
   const [switcher, setSwitcher] = useState(false);
@@ -98,8 +82,6 @@ export function MobileShell({ AC, user, data, apps, wallpaperId, customWp, setti
   const dock = (settings?.mobileDock && settings.mobileDock.length === 4) ? settings.mobileDock : DEFAULT_DOCK;
   const dockSet = new Set(dock);
   const homeApps = apps.filter(a => !dockSet.has(a.id));
-  // page 0 holds fewer icons when a widget row is present (so nothing clips on
-  // short phones, where the home grid can't scroll). Other pages hold PER_PAGE.
   const hasWidgets = widgets && widgets.length > 0;
   const cap0 = hasWidgets ? 8 : PER_PAGE;
   const pages = [homeApps.slice(0, cap0), ...chunk(homeApps.slice(cap0), PER_PAGE)].filter((p, i) => i === 0 || p.length);
@@ -108,11 +90,7 @@ export function MobileShell({ AC, user, data, apps, wallpaperId, customWp, setti
   const appById = useCallback((id) => apps.find(a => a.id === id), [apps]);
 
   useEffect(() => { const t = setInterval(() => setNow(new Date()), 15000); return () => clearInterval(t); }, []);
-  useEffect(() => {
-    let dead = false;
-    if (navigator.getBattery) navigator.getBattery().then(b => { if (dead) return; const upd = () => setBattery(b.level); upd(); b.addEventListener("levelchange", upd); }).catch(() => {});
-    return () => { dead = true; };
-  }, []);
+  useEffect(() => { let dead = false; if (navigator.getBattery) navigator.getBattery().then(b => { if (dead) return; const upd = () => setBattery(b.level); upd(); b.addEventListener("levelchange", upd); }).catch(() => {}); return () => { dead = true; }; }, []);
 
   function openApp(id) {
     if (pickSlot !== null) { const next = [...dock]; next[pickSlot] = id; updateSettings?.({ mobileDock: next }); setPickSlot(null); setLibrary(false); setSearch(""); return; }
@@ -120,59 +98,55 @@ export function MobileShell({ AC, user, data, apps, wallpaperId, customWp, setti
     setOpenApps(s => [id, ...s.filter(x => x !== id)]);
     setOpenId(id); setLibrary(false); setControl(false); setSwitcher(false); setSearch("");
   }
-  function goHome() { setOpenId(null); }
-  function closeApp(id) { setOpenApps(s => s.filter(x => x !== id)); if (openId === id) setOpenId(null); }
-  function setVolume(v) { setVol(v); setSoundConfig({ ...getSoundConfig(), volume: v }); }
+  const goHome = () => setOpenId(null);
+  const closeApp = (id) => { setOpenApps(s => s.filter(x => x !== id)); if (openId === id) setOpenId(null); };
+  const setVolume = (v) => { setVol(v); setSoundConfig({ ...getSoundConfig(), volume: v }); };
 
-  // ── springboard gestures ──────────────────────────────────────────────────
-  // The springboard CAPTURES the pointer and owns every gesture (tap to open,
-  // long-press a dock slot to edit, horizontal swipe = page, vertical swipe =
-  // Control Center / App Library). Icons are visual-only (data-app / data-dock)
-  // so they can't intercept the swipe.
+  // ── springboard gestures (touch + mouse) ──────────────────────────────────
   const gest = useRef(null);
   function onDown(e) {
-    try { e.currentTarget.setPointerCapture?.(e.pointerId); } catch {}
+    const p = pt(e);
     const el = e.target.closest ? e.target.closest("[data-app]") : null;
-    const g = { x0: e.clientX, y0: e.clientY, axis: null, app: el?.getAttribute("data-app") || null, dock: el?.getAttribute("data-dock"), hold: null };
+    const g = { x0: p.clientX, y0: p.clientY, axis: null, app: el?.getAttribute("data-app") || null, dock: el?.getAttribute("data-dock"), hold: null };
     if (g.dock != null) g.hold = setTimeout(() => { if (gest.current === g) { g.hold = "fired"; setPickSlot(+g.dock); setLibrary(true); } }, 470);
     gest.current = g;
   }
   function onMove(e) {
     const g = gest.current; if (!g) return;
-    const dx = e.clientX - g.x0, dy = e.clientY - g.y0;
-    if (!g.axis && (Math.abs(dx) > 10 || Math.abs(dy) > 10)) { g.axis = Math.abs(dx) > Math.abs(dy) ? "x" : "y"; if (g.hold && g.hold !== "fired") { clearTimeout(g.hold); g.hold = null; } }
+    const p = pt(e); const dx = p.clientX - g.x0, dy = p.clientY - g.y0;
+    if (!g.axis && (Math.abs(dx) > 8 || Math.abs(dy) > 8)) { g.axis = Math.abs(dx) > Math.abs(dy) ? "x" : "y"; if (g.hold && g.hold !== "fired") { clearTimeout(g.hold); g.hold = null; } }
     if (g.axis === "x") { let nx = dx; if ((curPage === 0 && dx > 0) || (curPage === pages.length - 1 && dx < 0)) nx = dx * 0.35; setDragX(nx); }
   }
   function onUp(e) {
     const g = gest.current; gest.current = null; if (!g) return;
     if (g.hold && g.hold !== "fired") clearTimeout(g.hold);
-    if (g.hold === "fired") { setDragX(0); return; }       // dock-edit already triggered
-    const dx = e.clientX - g.x0, dy = e.clientY - g.y0;
+    if (g.hold === "fired") { setDragX(0); return; }
+    const p = pt(e); const dx = p.clientX - g.x0, dy = p.clientY - g.y0;
     if (g.axis === "x") {
-      if (dx <= -45 && curPage < pages.length - 1) setPage(curPage + 1);
-      else if (dx >= 45 && curPage > 0) setPage(curPage - 1);
+      if (dx <= -40 && curPage < pages.length - 1) setPage(curPage + 1);
+      else if (dx >= 40 && curPage > 0) setPage(curPage - 1);
       setDragX(0);
     } else if (g.axis === "y") {
-      if (dy > 50 && g.y0 < 80) setControl(true);          // down from the top edge → Control Center
-      else if (Math.abs(dy) > 50) setLibrary(true);        // up OR down from the body → App Library
+      if (dy > 48 && g.y0 < 90) setControl(true);
+      else if (Math.abs(dy) > 48) setLibrary(true);
       setDragX(0);
-    } else if (g.app) {
-      openApp(g.app);                                      // tap → open
-    }
+    } else if (g.app) { openApp(g.app); }
   }
+  const padEvents = { onTouchStart: onDown, onTouchMove: onMove, onTouchEnd: onUp, onTouchCancel: () => { gest.current = null; setDragX(0); }, onMouseDown: onDown, onMouseMove: onMove, onMouseUp: onUp };
 
-  // ── persistent bottom bar (home indicator) gestures ──────────────────────
+  // ── bottom bar gestures ───────────────────────────────────────────────────
   const bar = useRef(null);
-  function barDown(e) { bar.current = { y0: e.clientY, moved: false, hold: setTimeout(() => { if (bar.current) { bar.current.hold = "fired"; setSwitcher(true); } }, 450) }; }
-  function barMove(e) { const b = bar.current; if (!b) return; if (Math.abs(e.clientY - b.y0) > 8) { b.moved = true; if (b.hold && b.hold !== "fired") { clearTimeout(b.hold); b.hold = null; } } }
+  function barDown(e) { const y0 = pt(e).clientY; bar.current = { y0, moved: false, hold: setTimeout(() => { if (bar.current) { bar.current.hold = "fired"; setSwitcher(true); } }, 430) }; }
+  function barMove(e) { const b = bar.current; if (!b) return; if (Math.abs(pt(e).clientY - b.y0) > 8) { b.moved = true; if (b.hold && b.hold !== "fired") { clearTimeout(b.hold); b.hold = null; } } }
   function barUp(e) {
     const b = bar.current; bar.current = null; if (!b) return;
-    if (b.hold === "fired") return;            // long-press already opened switcher
+    if (b.hold === "fired") return;
     if (b.hold) clearTimeout(b.hold);
-    const dy = e.clientY - b.y0;
-    if (dy < -22) { openId ? goHome() : setLibrary(true); }
-    else if (!b.moved) { if (openId) goHome(); }
+    const dy = pt(e).clientY - b.y0;
+    if (dy < -20) { openId ? goHome() : setLibrary(true); }
+    else if (!b.moved && openId) goHome();
   }
+  const barEvents = { onTouchStart: barDown, onTouchMove: barMove, onTouchEnd: barUp, onTouchCancel: () => { bar.current = null; }, onMouseDown: barDown, onMouseMove: barMove, onMouseUp: barUp };
 
   return (
     <div style={{ position: "fixed", inset: 0, overflow: "hidden", fontFamily: FF, background: "#05060f", userSelect: "none", WebkitUserSelect: "none" }}>
@@ -186,17 +160,15 @@ export function MobileShell({ AC, user, data, apps, wallpaperId, customWp, setti
 
       {/* Springboard */}
       {!openId && (
-        <div onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={() => { gest.current = null; setDragX(0); }}
-          style={{ position: "absolute", inset: 0, paddingTop: 52, paddingBottom: 30, display: "flex", flexDirection: "column", zIndex: 10, touchAction: "none" }}>
+        <div {...padEvents} style={{ position: "absolute", inset: 0, paddingTop: 52, paddingBottom: 30, display: "flex", flexDirection: "column", zIndex: 10, touchAction: "none" }}>
           <div style={{ flex: 1, overflow: "hidden", minHeight: 0 }}>
             <div style={{ display: "flex", height: "100%", width: (pages.length * 100) + "%", transform: "translateX(calc(" + (-curPage * (100 / pages.length)) + "% + " + dragX + "px))", transition: dragX === 0 ? "transform 0.34s cubic-bezier(0.22,1,0.36,1)" : "none" }}>
               {pages.map((pg, pi) => (
-                <div key={pi} style={{ width: (100 / pages.length) + "%", flexShrink: 0, display: "flex", flexDirection: "column", minHeight: 0, overflowY: "auto" }}>
-                  {/* widget row on the first page */}
-                  {pi === 0 && widgets && widgets.length > 0 && (
-                    <div style={{ display: "flex", gap: 12, overflowX: "auto", padding: "4px 18px 14px", scrollbarWidth: "none" }}>
-                      {widgets.map(w => (
-                        <div key={w.id} style={{ flexShrink: 0, width: 168, height: 150, borderRadius: 20, overflow: "hidden", padding: 12, background: "rgba(255,255,255,0.1)", backdropFilter: "blur(24px) saturate(150%)", WebkitBackdropFilter: "blur(24px) saturate(150%)", border: "1px solid rgba(255,255,255,0.14)", boxShadow: "0 8px 22px rgba(0,0,0,0.3)" }}>{w.content}</div>
+                <div key={pi} style={{ width: (100 / pages.length) + "%", flexShrink: 0, display: "flex", flexDirection: "column", minHeight: 0 }}>
+                  {pi === 0 && hasWidgets && (
+                    <div style={{ display: "flex", gap: 12, overflowX: "hidden", padding: "4px 18px 14px" }}>
+                      {widgets.slice(0, 2).map(w => (
+                        <div key={w.id} style={{ flex: 1, minWidth: 0, height: 150, borderRadius: 20, overflow: "hidden", padding: 12, background: "rgba(255,255,255,0.1)", backdropFilter: "blur(24px) saturate(150%)", WebkitBackdropFilter: "blur(24px) saturate(150%)", border: "1px solid rgba(255,255,255,0.14)", boxShadow: "0 8px 22px rgba(0,0,0,0.3)" }}>{w.content}</div>
                       ))}
                     </div>
                   )}
@@ -214,14 +186,13 @@ export function MobileShell({ AC, user, data, apps, wallpaperId, customWp, setti
             </div>
           )}
 
-          {/* dock */}
           <div style={{ margin: "4px 12px 6px", padding: "12px 14px", borderRadius: 30, background: "rgba(255,255,255,0.13)", backdropFilter: "blur(28px) saturate(160%)", WebkitBackdropFilter: "blur(28px) saturate(160%)", border: "1px solid rgba(255,255,255,0.14)", display: "flex", justifyContent: "space-around" }}>
             {dock.map((id, i) => { const a = appById(id); if (!a) return <div key={i} style={{ width: 60 }} />; return <IconVisual key={id} app={a} glass={glass} hideLabel data-app={id} data-dock={i} />; })}
           </div>
         </div>
       )}
 
-      {/* Open app (fullscreen) */}
+      {/* Open app */}
       {openId && (
         <div style={{ position: "absolute", inset: 0, zIndex: 20, display: "flex", flexDirection: "column", background: "var(--nv-surface-solid)", animation: "win-launch 0.26s cubic-bezier(0.16,1,0.3,1)" }}>
           <div style={{ height: 46, flexShrink: 0 }} />
@@ -229,71 +200,68 @@ export function MobileShell({ AC, user, data, apps, wallpaperId, customWp, setti
         </div>
       )}
 
-      {/* Persistent bottom bar (home indicator) — always visible, big hit area */}
-      <div onPointerDown={barDown} onPointerMove={barMove} onPointerUp={barUp} onPointerCancel={() => { if (bar.current?.hold && bar.current.hold !== "fired") clearTimeout(bar.current.hold); bar.current = null; }}
-        title="Swipe up: home · Hold: open apps"
-        style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: 26, zIndex: 35, display: "flex", alignItems: "center", justifyContent: "center", touchAction: "none", cursor: "pointer" }}>
+      {/* Persistent bottom bar */}
+      <div {...barEvents} title="Swipe up: home · Hold: open apps"
+        style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: 28, zIndex: 35, display: "flex", alignItems: "center", justifyContent: "center", touchAction: "none", cursor: "pointer" }}>
         <div style={{ width: 138, height: 5, borderRadius: 3, background: openId ? "var(--nv-text-dim)" : "rgba(255,255,255,0.65)", boxShadow: openId ? "none" : "0 1px 3px rgba(0,0,0,0.4)" }} />
       </div>
 
-      {/* Control Center */}
       {control && <ControlCenter AC={AC} vol={vol} setVolume={setVolume} onClose={() => setControl(false)} />}
-
-      {/* App Library + search */}
       {library && <AppLibrary AC={AC} apps={apps} glass={glass} search={search} setSearch={setSearch} pickMode={pickSlot !== null} onPick={openApp} onClose={() => { setLibrary(false); setSearch(""); setPickSlot(null); }} />}
-
-      {/* App switcher */}
-      {switcher && <AppSwitcher AC={AC} openApps={openApps} appById={appById} glass={glass} onPick={openApp} onClose={(id) => closeApp(id)} onDismiss={() => setSwitcher(false)} />}
+      {switcher && <AppSwitcher openApps={openApps} appById={appById} glass={glass} onPick={openApp} onCloseApp={closeApp} onDismiss={() => setSwitcher(false)} />}
     </div>
   );
 }
 
-// ── Control Center (swipe down from top; swipe up to close) ─────────────────
+// ── Control Center ──────────────────────────────────────────────────────────
 function ControlCenter({ AC, vol, setVolume, onClose }) {
-  const toggles = [
-    { id: "airplane", icon: "✈️", label: "Airplane" }, { id: "wifi", icon: "📶", label: "Wi-Fi" },
-    { id: "cell", icon: "📡", label: "Cellular" }, { id: "bt", icon: "🔵", label: "Bluetooth" },
-  ];
+  const toggles = [{ id: "airplane", icon: "✈️", label: "Airplane" }, { id: "wifi", icon: "📶", label: "Wi-Fi" }, { id: "cell", icon: "📡", label: "Cellular" }, { id: "bt", icon: "🔵", label: "Bluetooth" }];
   const [tg, setTg] = useState({ wifi: true, cell: true, bt: true });
-  const sy = useRef(0);
+  const sy = useRef(null);
   const tile = (on) => ({ flex: 1, aspectRatio: "1", borderRadius: 18, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 6, cursor: "pointer", border: "1px solid rgba(255,255,255,0.12)", background: on ? fill(AC) : "rgba(255,255,255,0.1)", color: on ? AC : "rgba(255,255,255,0.85)", fontFamily: FFB, fontWeight: 600, fontSize: 11 });
+  const down = (e) => { sy.current = pt(e).clientY; };
+  const upClose = (e) => { if (sy.current != null && sy.current - pt(e).clientY > 34) onClose(); sy.current = null; };
   return (
-    <div onPointerDownCapture={e => { sy.current = e.clientY; }} onPointerUpCapture={e => { if (sy.current - e.clientY > 36) onClose(); }} onClick={e => { if (e.target === e.currentTarget) onClose(); }}
-      style={{ position: "absolute", inset: 0, zIndex: 60, padding: "30px 16px 0", background: "rgba(6,8,18,0.5)", backdropFilter: "blur(34px) saturate(150%)", WebkitBackdropFilter: "blur(34px) saturate(150%)", animation: "panel-down 0.3s cubic-bezier(0.22,1,0.36,1)" }}>
+    <div onTouchStart={down} onTouchEnd={upClose} onMouseDown={down} onMouseUp={upClose} onClick={e => { if (e.target === e.currentTarget) onClose(); }}
+      style={{ position: "absolute", inset: 0, zIndex: 60, padding: "28px 16px 0", background: "rgba(6,8,18,0.5)", backdropFilter: "blur(34px) saturate(150%)", WebkitBackdropFilter: "blur(34px) saturate(150%)", animation: "panel-down 0.3s cubic-bezier(0.22,1,0.36,1)", touchAction: "none" }}>
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-        <div style={{ display: "flex", justifyContent: "center", paddingBottom: 4 }}><div style={{ width: 38, height: 5, borderRadius: 3, background: "rgba(255,255,255,0.5)" }} /></div>
+        <div style={{ display: "flex", justifyContent: "center", paddingBottom: 4 }}><div style={{ width: 40, height: 5, borderRadius: 3, background: "rgba(255,255,255,0.55)" }} /></div>
         <div style={{ display: "flex", gap: 12 }}>{toggles.map(t => (<div key={t.id} onClick={() => setTg(s => ({ ...s, [t.id]: !s[t.id] }))} style={tile(!!tg[t.id])}><span style={{ fontSize: 20 }}>{t.icon}</span>{t.label}</div>))}</div>
         <CCSlider icon="🔆" label="Brightness" value={0.85} onChange={() => {}} />
         <CCSlider icon="🔊" label="Volume" value={vol} onChange={setVolume} />
-        <div style={{ textAlign: "center", color: "rgba(255,255,255,0.55)", fontSize: 11.5, fontFamily: FFM, marginTop: 2 }}>swipe up or tap to close</div>
+        <div style={{ textAlign: "center", color: "rgba(255,255,255,0.6)", fontSize: 11.5, fontFamily: FFM, marginTop: 2 }}>swipe up or tap to close</div>
       </div>
     </div>
   );
 }
 function CCSlider({ icon, label, value, onChange }) {
   const ref = useRef(null);
+  const dragging = useRef(false);
   const set = (x) => { const r = ref.current.getBoundingClientRect(); onChange(Math.max(0, Math.min(1, (x - r.left) / r.width))); };
   return (
     <div style={{ padding: "16px", borderRadius: 20, background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.12)" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10, color: "#fff", fontFamily: FFB, fontWeight: 600, fontSize: 12 }}><span>{icon}</span>{label}</div>
-      <div ref={ref} onPointerDown={e => { e.stopPropagation(); e.currentTarget.setPointerCapture?.(e.pointerId); set(e.clientX); }} onPointerMove={e => { e.stopPropagation(); if (e.buttons) set(e.clientX); }} onPointerUp={e => e.stopPropagation()}
-        style={{ height: 30, borderRadius: 15, background: "rgba(255,255,255,0.18)", position: "relative", cursor: "pointer", overflow: "hidden", touchAction: "none" }}>
-        <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: Math.round(value * 100) + "%", background: "#fff", borderRadius: 15 }} />
+      <div ref={ref}
+        onTouchStart={e => { e.stopPropagation(); set(pt(e).clientX); }} onTouchMove={e => { e.stopPropagation(); set(pt(e).clientX); }}
+        onMouseDown={e => { e.stopPropagation(); dragging.current = true; set(e.clientX); }} onMouseMove={e => { if (dragging.current) set(e.clientX); }} onMouseUp={() => { dragging.current = false; }}
+        style={{ height: 32, borderRadius: 16, background: "rgba(255,255,255,0.18)", position: "relative", cursor: "pointer", overflow: "hidden", touchAction: "none" }}>
+        <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: Math.round(value * 100) + "%", background: "#fff", borderRadius: 16 }} />
       </div>
     </div>
   );
 }
 
-// ── App Library (swipe up on home; swipe down on header / Done to close) ────
+// ── App Library ───────────────────────────────────────────────────────────
 function AppLibrary({ AC, apps, glass, search, setSearch, pickMode, onPick, onClose }) {
   const q = search.trim().toLowerCase();
   const list = q ? apps.filter(a => a.label.toLowerCase().includes(q) || a.id.includes(q)) : apps;
-  const sy = useRef(0);
+  const sy = useRef(null);
+  const down = (e) => { sy.current = pt(e).clientY; };
+  const upClose = (e) => { if (sy.current != null && pt(e).clientY - sy.current > 34) onClose(); sy.current = null; };
   return (
     <div style={{ position: "absolute", inset: 0, zIndex: 60, paddingTop: 48, background: "rgba(6,8,18,0.66)", backdropFilter: "blur(36px) saturate(150%)", WebkitBackdropFilter: "blur(36px) saturate(150%)", display: "flex", flexDirection: "column", animation: "panel-up 0.3s cubic-bezier(0.22,1,0.36,1)" }}>
-      {/* header (swipe DOWN here to close) */}
-      <div onPointerDown={e => { sy.current = e.clientY; }} onPointerUp={e => { if (e.clientY - sy.current > 38) onClose(); }} style={{ padding: "6px 18px 12px", touchAction: "none" }}>
-        <div style={{ display: "flex", justifyContent: "center", paddingBottom: 8 }}><div style={{ width: 38, height: 5, borderRadius: 3, background: "rgba(255,255,255,0.5)" }} /></div>
+      <div onTouchStart={down} onTouchEnd={upClose} onMouseDown={down} onMouseUp={upClose} style={{ padding: "6px 18px 12px", touchAction: "none" }}>
+        <div style={{ display: "flex", justifyContent: "center", paddingBottom: 8 }}><div style={{ width: 40, height: 5, borderRadius: 3, background: "rgba(255,255,255,0.5)" }} /></div>
         {pickMode && <div style={{ textAlign: "center", color: AC, fontFamily: FFB, fontWeight: 700, fontSize: 12, marginBottom: 8 }}>Choose an app for the dock</div>}
         <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "0 14px", height: 42, background: "rgba(255,255,255,0.14)", borderRadius: 12 }}>
           <span style={{ fontSize: 14, opacity: 0.7 }}>🔍</span>
@@ -311,29 +279,31 @@ function AppLibrary({ AC, apps, glass, search, setSearch, pickMode, onPick, onCl
   );
 }
 
-// ── App switcher (long-press the bottom bar) ────────────────────────────────
-function AppSwitcher({ AC, openApps, appById, glass, onPick, onClose, onDismiss }) {
-  const sy = useRef(0);
+// ── App Switcher ──────────────────────────────────────────────────────────
+function AppSwitcher({ openApps, appById, glass, onPick, onCloseApp, onDismiss }) {
   return (
-    <div onPointerDown={e => { if (e.target === e.currentTarget) sy.current = e.clientY; }} onPointerUp={e => { if (e.target === e.currentTarget) onDismiss(); }}
+    <div onClick={e => { if (e.target === e.currentTarget) onDismiss(); }}
       style={{ position: "absolute", inset: 0, zIndex: 70, background: "rgba(5,7,16,0.72)", backdropFilter: "blur(30px) saturate(140%)", WebkitBackdropFilter: "blur(30px) saturate(140%)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 18, animation: "ss-fade 0.16s" }}>
       <div style={{ fontFamily: FFB, fontWeight: 700, fontSize: 14, color: "#fff", letterSpacing: 0.3 }}>Open apps</div>
       {openApps.length === 0 ? (
         <div style={{ color: "rgba(255,255,255,0.55)", fontSize: 13, fontStyle: "italic" }}>No open apps</div>
       ) : (
         <div style={{ display: "flex", gap: 16, overflowX: "auto", maxWidth: "100%", padding: "0 24px 6px" }}>
-          {openApps.map(id => { const a = appById(id); if (!a) return null; return <SwitcherCard key={id} app={a} glass={glass} onOpen={() => onPick(id)} onClose={() => onClose(id)} />; })}
+          {openApps.map(id => { const a = appById(id); if (!a) return null; return <SwitcherCard key={id} app={a} glass={glass} onOpen={() => onPick(id)} onClose={() => onCloseApp(id)} />; })}
         </div>
       )}
+      <button onClick={onDismiss} style={{ background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.16)", borderRadius: 20, padding: "8px 20px", color: "#fff", fontFamily: FFB, fontWeight: 600, fontSize: 12, cursor: "pointer" }}>Close</button>
       <div style={{ color: "rgba(255,255,255,0.5)", fontSize: 11.5, fontFamily: FFM }}>tap a card to open · swipe a card up to close</div>
     </div>
   );
 }
 function SwitcherCard({ app, glass, onOpen, onClose }) {
   const sy = useRef(null);
+  const down = (e) => { sy.current = pt(e).clientY; };
+  const up = (e) => { if (sy.current != null && sy.current - pt(e).clientY > 40) onClose(); else onOpen(); sy.current = null; };
   return (
-    <div onPointerDown={e => { sy.current = e.clientY; }} onPointerUp={e => { if (sy.current != null && sy.current - e.clientY > 40) { onClose(); } else { onOpen(); } sy.current = null; }}
-      style={{ flexShrink: 0, width: 150, height: 200, borderRadius: 20, background: "var(--nv-surface-solid)", border: "1px solid rgba(255,255,255,0.12)", boxShadow: "0 16px 40px rgba(0,0,0,0.5)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 14, cursor: "pointer" }}>
+    <div onTouchStart={down} onTouchEnd={up} onMouseDown={down} onMouseUp={up}
+      style={{ flexShrink: 0, width: 150, height: 200, borderRadius: 20, background: "var(--nv-surface-solid)", border: "1px solid rgba(255,255,255,0.12)", boxShadow: "0 16px 40px rgba(0,0,0,0.5)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 14, cursor: "pointer", touchAction: "none" }}>
       <MobileIcon app={app} size={64} glass={glass} />
       <span style={{ fontFamily: FFB, fontWeight: 600, fontSize: 13, color: "#fff" }}>{app.label}</span>
     </div>
