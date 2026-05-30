@@ -18,7 +18,10 @@ sudo rm -f /etc/systemd/system/nova-kiosk.service
 sudo systemctl daemon-reload
 
 echo ">> Re-enabling the desktop session + autologin for $ME ..."
-sudo systemctl enable gdm3 2>/dev/null || true
+# GDM is a display manager: it's selected via the display-manager.service
+# symlink, not `systemctl enable`. Recreate that symlink so it starts at boot.
+GDM_UNIT="$(systemctl show -p FragmentPath gdm3.service 2>/dev/null | cut -d= -f2)"
+[ -n "$GDM_UNIT" ] && sudo ln -sf "$GDM_UNIT" /etc/systemd/system/display-manager.service
 sudo systemctl set-default graphical.target
 sudo mkdir -p /etc/gdm3
 sudo tee /etc/gdm3/custom.conf >/dev/null <<CONF
