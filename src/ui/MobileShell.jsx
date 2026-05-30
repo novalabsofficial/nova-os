@@ -445,7 +445,11 @@ function ControlCenter({ AC, vol, setVolume, bright, setBrightness, battery, set
   const [rotLock, setRotLock] = useState(false);
   const [installable, setInstallable] = useState(() => canPromptInstall());
   const glass = !!settings?.glass, animated = !!settings?.wallpaperAnimated;
-  const showInstall = !isStandalone() && (installable || isIOS());
+  // Always offer install guidance on mobile web (hidden only once installed).
+  // Android one-tap appears when Chrome fires beforeinstallprompt; otherwise we
+  // fall back to a menu hint so the option is never invisible.
+  const showInstall = !isStandalone();
+  const ios = isIOS();
 
   useEffect(() => onInstallChange(() => setInstallable(canPromptInstall())), []);
   useEffect(() => {
@@ -508,14 +512,17 @@ function ControlCenter({ AC, vol, setVolume, bright, setBrightness, battery, set
           </span>
         </div>
 
-        {/* Install Nova OS — Android: one-tap; iOS: how-to hint */}
+        {/* Install Nova OS — one-tap when Chrome offers it, else a how-to hint */}
         {showInstall && (installable ? (
           <button onClick={() => promptInstall()} className="mb-cc-tile" style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 9, padding: "14px", borderRadius: 18, border: "1px solid " + bdr(AC), background: fill(AC), color: AC, fontFamily: FFB, fontWeight: 700, fontSize: 14, cursor: "pointer" }}>
             <span style={{ fontSize: 18 }}>⬇️</span> Install Nova OS
           </button>
         ) : (
-          <div style={{ display: "flex", alignItems: "center", gap: 9, padding: "12px 14px", borderRadius: 16, background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.14)", color: "rgba(255,255,255,0.92)", fontFamily: FFB, fontWeight: 600, fontSize: 12 }}>
-            <span style={{ fontSize: 18 }}>📲</span><span>Install: tap <b>Share</b> → <b>Add to Home Screen</b></span>
+          <div style={{ display: "flex", alignItems: "center", gap: 9, padding: "12px 14px", borderRadius: 16, background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.14)", color: "rgba(255,255,255,0.92)", fontFamily: FFB, fontWeight: 600, fontSize: 12, lineHeight: 1.45 }}>
+            <span style={{ fontSize: 18 }}>📲</span>
+            {ios
+              ? <span>To install: tap <b>Share</b> → <b>Add to Home Screen</b></span>
+              : <span>To install: open the browser menu <b>(⋮)</b> → <b>Install app</b> / <b>Add to Home screen</b></span>}
           </div>
         ))}
 
