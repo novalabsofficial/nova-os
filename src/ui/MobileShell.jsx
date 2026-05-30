@@ -18,6 +18,7 @@ import { HAS_SVG_ICON } from "./constants.js";
 import { getSoundConfig, setSoundConfig } from "../lib/audio.js";
 import { canPromptInstall, promptInstall, onInstallChange, isStandalone, isIOS, isAndroid, isNativeApp, ANDROID_APK_URL } from "../lib/pwa.js";
 import { haptic, hapticsEnabled, setHapticsEnabled } from "../lib/haptics.js";
+import { isNative, toggleImmersive, isImmersive } from "../lib/native.js";
 
 // columns + page size are now computed responsively from the viewport (see MobileShell)
 const PER_PAGE = 16;   // fallback page size
@@ -238,7 +239,7 @@ export function MobileShell({ AC, user, data, apps, wallpaperId, customWp, setti
   // Wallpaper is expensive (animated canvas/SVG) — memoize so it doesn't
   // re-render on every clock tick, page-drag or reorder.
   const wallpaperEl = useMemo(
-    () => <Wallpaper id={wallpaperId} customUrl={customWp} animate={!!settings?.wallpaperAnimated} />,
+    () => <Wallpaper id={wallpaperId} customUrl={customWp} animate={!!settings?.wallpaperAnimated && !isNative()} />,
     [wallpaperId, customWp, settings?.wallpaperAnimated]
   );
 
@@ -250,6 +251,26 @@ export function MobileShell({ AC, user, data, apps, wallpaperId, customWp, setti
   }, []);
   useEffect(() => { const t = setInterval(() => setNow(new Date()), 15000); return () => clearInterval(t); }, []);
   useEffect(() => { let dead = false; if (navigator.getBattery) navigator.getBattery().then(b => { if (dead) return; const upd = () => setBattery(b.level); upd(); b.addEventListener("levelchange", upd); }).catch(() => {}); return () => { dead = true; }; }, []);
+
+  // Android hardware back button (dispatched by lib/native.js): consume it to
+  // close whatever is on top / go Home; if there's nothing to close, let it fall
+  // through (native backgrounds the app instead of hard-quitting).
+  useEffect(() => {
+    const onBack = (e) => {
+      if (addPicker) { e.preventDefault(); setAddPicker(false); return; }
+      if (openFolder) { e.preventDefault(); setOpenFolder(null); return; }
+      if (sheet) { e.preventDefault(); setSheet(null); return; }
+      if (switcher) { e.preventDefault(); setSwitcher(false); return; }
+      if (control) { e.preventDefault(); setControl(false); return; }
+      if (notif) { e.preventDefault(); setNotif(false); return; }
+      if (library) { e.preventDefault(); setLibrary(false); setSearch(""); return; }
+      if (editMode) { e.preventDefault(); pruneEmptyFolders(); commitOrder(); setEditMode(false); return; }
+      if (openId) { e.preventDefault(); setOpenId(null); return; }
+      if (locked) { e.preventDefault(); return; }
+    };
+    window.addEventListener("nova-back", onBack);
+    return () => window.removeEventListener("nova-back", onBack);
+  });
 
   function openApp(id) {
     haptic("open");
@@ -572,7 +593,7 @@ function ControlCenter({ AC, vol, setVolume, bright, setBrightness, battery, set
   const sy = useRef(null);
   const torchTrack = useRef(null);
   const [soundOn, setSoundOn] = useState(() => getSoundConfig().enabled);
-  const [fs, setFs] = useState(() => typeof document !== "undefined" && !!document.fullscreenElement);
+  const [fs, setFs] = useState(() => isNative() ? isImmersive() : (typeof document !== "undefined" && !!document.fullscreenElement));
   const [online, setOnline] = useState(() => typeof navigator === "undefined" ? true : navigator.onLine);
   const [torchOn, setTorchOn] = useState(false);
   const [rotLock, setRotLock] = useState(false);
@@ -598,7 +619,11 @@ function ControlCenter({ AC, vol, setVolume, bright, setBrightness, battery, set
   const toggleSound = () => { haptic("toggle"); const v = !soundOn; setSoundOn(v); setSoundConfig({ ...getSoundConfig(), enabled: v }); };
   const toggleGlass = () => { haptic("toggle"); updateSettings?.({ glass: !glass }); };
   const toggleAnimate = () => { haptic("toggle"); updateSettings?.({ wallpaperAnimated: !animated }); };
-  const toggleFs = () => { haptic("toggle"); try { if (document.fullscreenElement) document.exitFullscreen(); else document.documentElement.requestFullscreen?.(); } catch {} };
+  const toggleFs = () => {
+    haptic("toggle");
+    if (isNative()) { setFs(toggleImmersive()); return; }   // hide/show the phone's system UI
+    try { if (document.fullscreenElement) document.exitFullscreen(); else document.documentElement.requestFullscreen?.(); } catch {}
+  };
   const toggleHaptics = () => { const v = !hapt; setHapt(v); setHapticsEnabled(v); };
   const toggleTorch = async () => {
     try {

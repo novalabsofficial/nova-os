@@ -252,6 +252,13 @@ export const CSS = `
   .mb-cc-tile:active{transform:scale(0.93);}
   /* lock-screen "swipe up" handle hint */
   @keyframes ls-hint{0%,100%{transform:translateY(0);opacity:0.55;}50%{transform:translateY(-5px);opacity:1;}}
+  /* Native Android app (Capacitor): backdrop-filter blur is extremely janky in
+     the WebView and is the main cause of stuttery panel/drawer animations. Drop
+     it everywhere (overriding inline styles via !important) and add GPU
+     compositing hints — overlays keep their translucent background, just
+     unblurred, and motion gets noticeably smoother. */
+  html.nova-native *{backdrop-filter:none!important;-webkit-backdrop-filter:none!important;}
+  html.nova-native{-webkit-tap-highlight-color:transparent;}
   /* respect reduced-motion: drop all the extra movement */
   @media (prefers-reduced-motion: reduce){
     *{animation-duration:0.01ms!important;transition-duration:0.01ms!important;}

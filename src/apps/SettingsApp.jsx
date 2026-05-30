@@ -6,6 +6,7 @@ import { Toggle } from "../ui/Toggle.jsx";
 import { getSoundConfig, setSoundConfig, playSound, setSoundWallpaper } from "../lib/audio.js";
 import { db } from "../lib/db.js";
 import { isFullscreen, toggleFullscreen, onFullscreenChange } from "../lib/fullscreen.js";
+import { isNative, exitApp } from "../lib/native.js";
 
 // ── v9.0 sidebar glyphs ──────────────────────────────────────────────────
 // Small monochrome line-icons for the left rail. Stroke uses currentColor so
@@ -353,6 +354,9 @@ export function SettingsApp({ user, data, updateSettings, showToast, AC, onCusto
           <div style={{ padding: "11px 14px", background: "rgba(255,255,255,0.04)", border: "1px solid var(--nv-border)", borderRadius: 8, marginBottom: 8 }}><div style={{ fontSize: 11, color: "var(--nv-text-dim)", marginBottom: 2 }}>Signed in as</div><div style={{ fontFamily: FFB, fontWeight: 600, fontSize: 16, color: "var(--nv-text-strong)" }}>@{user}</div></div>
           {onLogout && (
             <button onClick={onLogout} style={{ width: "100%", padding: "10px", background: "rgba(255,80,80,0.08)", border: "1px solid rgba(255,80,80,0.3)", borderRadius: 8, cursor: "pointer", fontFamily: FFB, fontWeight: 600, fontSize: 12, color: "#ff8b8b" }}>Sign Out</button>
+          )}
+          {isNative() && (
+            <button onClick={() => exitApp()} style={{ width: "100%", marginTop: 8, padding: "10px", background: "rgba(255,255,255,0.05)", border: "1px solid var(--nv-border)", borderRadius: 8, cursor: "pointer", fontFamily: FFB, fontWeight: 600, fontSize: 12, color: "var(--nv-text)" }}>Close Nova OS</button>
           )}
         </>)}
 
