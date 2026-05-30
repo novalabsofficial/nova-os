@@ -155,14 +155,14 @@ export function MobileShell({ AC, user, data, apps, wallpaperId, customWp, setti
       <Wallpaper id={wallpaperId} customUrl={customWp} animate={!!settings?.wallpaperAnimated} />
 
       {/* Status bar */}
-      <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 46, display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 22px", zIndex: 40, color: "#fff", pointerEvents: "none" }}>
+      <div style={{ position: "absolute", top: "env(safe-area-inset-top, 0px)", left: 0, right: 0, height: 46, display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 22px", zIndex: 40, color: "#fff", pointerEvents: "none" }}>
         <span style={{ fontFamily: FFB, fontWeight: 700, fontSize: 15, letterSpacing: 0.3, textShadow: openId ? "none" : "0 1px 3px rgba(0,0,0,0.4)" }}>{fmtTime(now)}</span>
         <span style={{ display: "flex", alignItems: "center", gap: 6, filter: openId ? "none" : "drop-shadow(0 1px 2px rgba(0,0,0,0.4))" }}><SignalGlyph /><WifiGlyph /><BatteryGlyph level={battery} /></span>
       </div>
 
       {/* Springboard */}
       {!openId && (
-        <div {...padEvents} style={{ position: "absolute", inset: 0, paddingTop: 52, paddingBottom: 42, display: "flex", flexDirection: "column", zIndex: 10, touchAction: "none" }}>
+        <div {...padEvents} style={{ position: "absolute", inset: 0, paddingTop: "calc(env(safe-area-inset-top, 0px) + 52px)", paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 46px)", display: "flex", flexDirection: "column", zIndex: 10, touchAction: "none" }}>
           <div style={{ flex: 1, overflow: "hidden", minHeight: 0 }}>
             <div style={{ display: "flex", height: "100%", width: (pages.length * 100) + "%", transform: "translateX(calc(" + (-curPage * (100 / pages.length)) + "% + " + dragX + "px))", transition: dragX === 0 ? "transform 0.34s cubic-bezier(0.22,1,0.36,1)" : "none" }}>
               {pages.map((pg, pi) => (
@@ -197,14 +197,14 @@ export function MobileShell({ AC, user, data, apps, wallpaperId, customWp, setti
       {/* Open app */}
       {openId && (
         <div style={{ position: "absolute", inset: 0, zIndex: 20, display: "flex", flexDirection: "column", background: "var(--nv-surface-solid)", animation: "win-launch 0.26s cubic-bezier(0.16,1,0.3,1)" }}>
-          <div style={{ height: 46, flexShrink: 0 }} />
-          <div style={{ flex: 1, minHeight: 0, overflowY: "auto", overflowX: "hidden", padding: "12px 14px 40px" }}>{renderApp(openId)}</div>
+          <div style={{ height: "calc(env(safe-area-inset-top, 0px) + 46px)", flexShrink: 0 }} />
+          <div style={{ flex: 1, minHeight: 0, overflowY: "auto", overflowX: "hidden", padding: "12px 14px calc(env(safe-area-inset-bottom, 0px) + 44px)" }}>{renderApp(openId)}</div>
         </div>
       )}
 
       {/* Persistent bottom bar */}
       <div {...barEvents} title="Swipe up: home · Hold: open apps"
-        style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: 40, zIndex: 35, display: "flex", alignItems: "center", justifyContent: "center", touchAction: "none", cursor: "pointer" }}>
+        style={{ position: "absolute", left: 0, right: 0, bottom: "env(safe-area-inset-bottom, 0px)", height: 40, zIndex: 35, display: "flex", alignItems: "center", justifyContent: "center", touchAction: "none", cursor: "pointer" }}>
         <div style={{ width: 138, height: 5, borderRadius: 3, background: openId ? "var(--nv-text-dim)" : "rgba(255,255,255,0.65)", boxShadow: openId ? "none" : "0 1px 3px rgba(0,0,0,0.4)" }} />
       </div>
 
@@ -225,7 +225,7 @@ function ControlCenter({ AC, vol, setVolume, onClose }) {
   const upClose = (e) => { if (sy.current != null && sy.current - pt(e).clientY > 34) onClose(); sy.current = null; };
   return (
     <div onTouchStart={down} onTouchEnd={upClose} onMouseDown={down} onMouseUp={upClose} onClick={e => { if (e.target === e.currentTarget) onClose(); }}
-      style={{ position: "absolute", inset: 0, zIndex: 60, padding: "28px 16px 0", background: "rgba(6,8,18,0.5)", backdropFilter: "blur(34px) saturate(150%)", WebkitBackdropFilter: "blur(34px) saturate(150%)", animation: "panel-down 0.3s cubic-bezier(0.22,1,0.36,1)", touchAction: "none" }}>
+      style={{ position: "absolute", inset: 0, zIndex: 60, padding: "calc(env(safe-area-inset-top, 0px) + 28px) 16px 0", background: "rgba(6,8,18,0.5)", backdropFilter: "blur(34px) saturate(150%)", WebkitBackdropFilter: "blur(34px) saturate(150%)", animation: "panel-down 0.3s cubic-bezier(0.22,1,0.36,1)", touchAction: "none" }}>
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         <div style={{ display: "flex", justifyContent: "center", paddingBottom: 4 }}><div style={{ width: 40, height: 5, borderRadius: 3, background: "rgba(255,255,255,0.55)" }} /></div>
         <div style={{ display: "flex", gap: 12 }}>{toggles.map(t => (<div key={t.id} onClick={() => setTg(s => ({ ...s, [t.id]: !s[t.id] }))} style={tile(!!tg[t.id])}><span style={{ fontSize: 20 }}>{t.icon}</span>{t.label}</div>))}</div>
@@ -265,7 +265,7 @@ function AppLibrary({ AC, apps, glass, search, setSearch, pickMode, onPick, onCl
   const listDown = (e) => { listSt.current = { y: pt(e).clientY, top: e.currentTarget.scrollTop }; };
   const listUp = (e) => { const s = listSt.current; listSt.current = null; if (s && s.top <= 2 && pt(e).clientY - s.y > 48) onClose(); };
   return (
-    <div style={{ position: "absolute", inset: 0, zIndex: 60, paddingTop: 48, background: "rgba(6,8,18,0.66)", backdropFilter: "blur(36px) saturate(150%)", WebkitBackdropFilter: "blur(36px) saturate(150%)", display: "flex", flexDirection: "column", animation: "panel-up 0.3s cubic-bezier(0.22,1,0.36,1)" }}>
+    <div style={{ position: "absolute", inset: 0, zIndex: 60, paddingTop: "calc(env(safe-area-inset-top, 0px) + 44px)", background: "rgba(6,8,18,0.66)", backdropFilter: "blur(36px) saturate(150%)", WebkitBackdropFilter: "blur(36px) saturate(150%)", display: "flex", flexDirection: "column", animation: "panel-up 0.3s cubic-bezier(0.22,1,0.36,1)" }}>
       <div onTouchStart={down} onTouchEnd={upClose} onMouseDown={down} onMouseUp={upClose} style={{ padding: "6px 18px 12px", touchAction: "none" }}>
         <div style={{ display: "flex", justifyContent: "center", paddingBottom: 8 }}><div style={{ width: 40, height: 5, borderRadius: 3, background: "rgba(255,255,255,0.5)" }} /></div>
         {pickMode && <div style={{ textAlign: "center", color: AC, fontFamily: FFB, fontWeight: 700, fontSize: 12, marginBottom: 8 }}>Choose an app for the dock</div>}
