@@ -36,6 +36,14 @@ const pt = (e) => (e.touches && e.touches[0]) || (e.changedTouches && e.changedT
 // a menu the moment you lift the finger that opened it).
 let lastTouchAt = 0;
 
+// Screen brightness is a software dimmer (the web can't touch hardware
+// backlight) — persisted in localStorage so it survives reloads without
+// spamming Firestore on every slider move. Floor at 0.2 so you can always
+// still see the slider to turn it back up.
+const BRIGHT_KEY = "nova:mobile:brightness";
+const getBrightness = () => { try { const v = parseFloat(localStorage.getItem(BRIGHT_KEY)); return isNaN(v) ? 1 : Math.max(0.2, Math.min(1, v)); } catch { return 1; } };
+const saveBrightness = (v) => { try { localStorage.setItem(BRIGHT_KEY, String(v)); } catch {} };
+
 // Stops a single crashing app from black-screening the whole mobile shell.
 // Resets when the shown app changes (appKey).
 class AppErrorBoundary extends Component {
@@ -109,6 +117,8 @@ export function MobileShell({ AC, user, data, apps, wallpaperId, customWp, setti
   const [sheet, setSheet] = useState(null);   // { id } — long-press customization sheet
   const [battery, setBattery] = useState(1);
   const [vol, setVol] = useState(() => getSoundConfig().volume);
+  const [bright, setBright] = useState(getBrightness);
+  const setBrightness = (v) => { const c = Math.max(0.2, Math.min(1, v)); setBright(c); saveBrightness(c); };
   const [dragX, setDragX] = useState(0);
   // iOS-style jiggle/edit mode + drag-and-drop reorder
   const [editMode, setEditMode] = useState(false);
@@ -377,7 +387,10 @@ export function MobileShell({ AC, user, data, apps, wallpaperId, customWp, setti
         <div style={{ width: 138, height: 5, borderRadius: 3, background: openId ? "var(--nv-text-dim)" : "rgba(255,255,255,0.65)", boxShadow: openId ? "none" : "0 1px 3px rgba(0,0,0,0.4)" }} />
       </div>
 
-      {control && <ControlCenter AC={AC} vol={vol} setVolume={setVolume} onClose={() => setControl(false)} />}
+      {control && <ControlCenter AC={AC} vol={vol} setVolume={setVolume} bright={bright} setBrightness={setBrightness} battery={battery} settings={settings} updateSettings={updateSettings} onClose={() => setControl(false)} />}
+
+      {/* software brightness dimmer — sits above everything, never blocks touch */}
+      {bright < 0.999 && <div style={{ position: "fixed", inset: 0, background: "#000", opacity: (1 - bright) * 0.82, pointerEvents: "none", zIndex: 95, transition: "opacity 0.12s linear" }} />}
       {library && <AppLibrary AC={AC} apps={apps} glass={glass} search={search} setSearch={setSearch} onPick={openApp} onLong={(id) => setSheet({ id })} onClose={() => { setLibrary(false); setSearch(""); }} />}
       {switcher && <AppSwitcher openApps={openApps} appById={appById} glass={glass} renderApp={renderApp} onPick={openApp} onCloseApp={closeApp} onDismiss={() => { setSwitcher(false); goHome(); }} />}
       {sheet && (() => {
@@ -421,22 +434,96 @@ export function MobileShell({ AC, user, data, apps, wallpaperId, customWp, setti
 }
 
 // ── Control Center ──────────────────────────────────────────────────────────
-function ControlCenter({ AC, vol, setVolume, onClose }) {
-  const toggles = [{ id: "airplane", icon: "✈️", label: "Airplane" }, { id: "wifi", icon: "📶", label: "Wi-Fi" }, { id: "cell", icon: "📡", label: "Cellular" }, { id: "bt", icon: "🔵", label: "Bluetooth" }];
-  const [tg, setTg] = useState({ wifi: true, cell: true, bt: true });
+function ControlCenter({ AC, vol, setVolume, bright, setBrightness, battery, settings, updateSettings, onClose }) {
   const sy = useRef(null);
-  const tile = (on) => ({ flex: 1, aspectRatio: "1", borderRadius: 18, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 6, cursor: "pointer", border: "1px solid rgba(255,255,255,0.12)", background: on ? fill(AC) : "rgba(255,255,255,0.1)", color: on ? AC : "rgba(255,255,255,0.85)", fontFamily: FFB, fontWeight: 600, fontSize: 11 });
+  const torchTrack = useRef(null);
+  const [soundOn, setSoundOn] = useState(() => getSoundConfig().enabled);
+  const [fs, setFs] = useState(() => typeof document !== "undefined" && !!document.fullscreenElement);
+  const [online, setOnline] = useState(() => typeof navigator === "undefined" ? true : navigator.onLine);
+  const [torchOn, setTorchOn] = useState(false);
+  const [rotLock, setRotLock] = useState(false);
+  const glass = !!settings?.glass, animated = !!settings?.wallpaperAnimated;
+
+  useEffect(() => {
+    const onFs = () => setFs(!!document.fullscreenElement);
+    const up = () => setOnline(true), dn = () => setOnline(false);
+    document.addEventListener("fullscreenchange", onFs);
+    window.addEventListener("online", up); window.addEventListener("offline", dn);
+    return () => { document.removeEventListener("fullscreenchange", onFs); window.removeEventListener("online", up); window.removeEventListener("offline", dn); };
+  }, []);
+  useEffect(() => () => { try { torchTrack.current?.stop(); } catch {} }, []);  // kill the camera if we unmount
+
+  const toggleSound = () => { const v = !soundOn; setSoundOn(v); setSoundConfig({ ...getSoundConfig(), enabled: v }); };
+  const toggleGlass = () => updateSettings?.({ glass: !glass });
+  const toggleAnimate = () => updateSettings?.({ wallpaperAnimated: !animated });
+  const toggleFs = () => { try { if (document.fullscreenElement) document.exitFullscreen(); else document.documentElement.requestFullscreen?.(); } catch {} };
+  const toggleTorch = async () => {
+    try {
+      if (torchTrack.current) { torchTrack.current.stop(); torchTrack.current = null; setTorchOn(false); return; }
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+      const track = stream.getVideoTracks()[0];
+      const caps = track.getCapabilities ? track.getCapabilities() : {};
+      if (caps.torch) { await track.applyConstraints({ advanced: [{ torch: true }] }); torchTrack.current = track; setTorchOn(true); }
+      else { track.stop(); }   // device/browser has no torch capability
+    } catch {}
+  };
+  const toggleRotate = async () => {
+    try {
+      if (rotLock) { window.screen?.orientation?.unlock?.(); setRotLock(false); }
+      else { await window.screen?.orientation?.lock?.("portrait"); setRotLock(true); }
+    } catch {}
+  };
+
   const down = (e) => { sy.current = pt(e).clientY; };
   const upClose = (e) => { if (sy.current != null && sy.current - pt(e).clientY > 34) onClose(); sy.current = null; };
+
+  const tileBtn = (icon, label, on, onClick) => (
+    <button onClick={onClick} className="mb-cc-tile" style={{ flex: 1, minWidth: 0, height: 70, borderRadius: 20, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 6, cursor: "pointer", border: "1px solid " + (on ? bdr(AC) : "rgba(255,255,255,0.12)"), background: on ? fill(AC) : "rgba(255,255,255,0.1)", color: on ? AC : "rgba(255,255,255,0.9)", fontFamily: FFB, fontWeight: 600, fontSize: 10.5, letterSpacing: 0.2 }}>
+      <span style={{ fontSize: 21, lineHeight: 1 }}>{icon}</span>{label}
+    </button>
+  );
+  const roundBtn = (icon, label, on, onClick) => (
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6, flex: 1 }}>
+      <button onClick={onClick} className="mb-cc-tile" style={{ width: 56, height: 56, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", border: "1px solid " + (on ? bdr(AC) : "rgba(255,255,255,0.14)"), background: on ? fill(AC) : "rgba(255,255,255,0.1)", color: on ? AC : "#fff", fontSize: 22 }}>{icon}</button>
+      <span style={{ fontSize: 10, color: "rgba(255,255,255,0.7)", fontFamily: FFB, fontWeight: 600 }}>{label}</span>
+    </div>
+  );
+
   return (
     <div onTouchStart={down} onTouchEnd={upClose} onMouseDown={down} onMouseUp={upClose} onClick={e => { if (e.target === e.currentTarget) onClose(); }}
-      style={{ position: "absolute", inset: 0, zIndex: 60, padding: "calc(" + SAT + " + 24px) 16px 0", background: "rgba(6,8,18,0.62)", backdropFilter: "blur(22px) saturate(140%)", WebkitBackdropFilter: "blur(22px) saturate(140%)", animation: "panel-down 0.34s cubic-bezier(0.22,1,0.36,1)", touchAction: "none" }}>
-      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-        <div style={{ display: "flex", justifyContent: "center", paddingBottom: 4 }}><div style={{ width: 40, height: 5, borderRadius: 3, background: "rgba(255,255,255,0.55)" }} /></div>
-        <div style={{ display: "flex", gap: 12 }}>{toggles.map(t => (<div key={t.id} className="mb-cc-tile" onClick={() => setTg(s => ({ ...s, [t.id]: !s[t.id] }))} style={tile(!!tg[t.id])}><span style={{ fontSize: 20 }}>{t.icon}</span>{t.label}</div>))}</div>
-        <CCSlider icon="🔆" label="Brightness" value={0.85} onChange={() => {}} />
+      style={{ position: "absolute", inset: 0, zIndex: 60, padding: "calc(" + SAT + " + 18px) 14px 0", background: "rgba(6,8,18,0.62)", backdropFilter: "blur(22px) saturate(140%)", WebkitBackdropFilter: "blur(22px) saturate(140%)", animation: "panel-down 0.34s cubic-bezier(0.22,1,0.36,1)", touchAction: "none" }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 12, maxWidth: 460, margin: "0 auto" }}>
+        <div style={{ display: "flex", justifyContent: "center", paddingBottom: 2 }}><div style={{ width: 40, height: 5, borderRadius: 3, background: "rgba(255,255,255,0.5)" }} /></div>
+
+        {/* header + live status */}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 6px", color: "rgba(255,255,255,0.92)", fontFamily: FFB, fontWeight: 700, fontSize: 13 }}>
+          <span>Control Center</span>
+          <span style={{ display: "flex", alignItems: "center", gap: 12, fontWeight: 600, fontSize: 12 }}>
+            <span style={{ display: "flex", alignItems: "center", gap: 5 }}><span style={{ width: 8, height: 8, borderRadius: "50%", background: online ? "#34d399" : "#f87171", boxShadow: online ? "0 0 8px #34d399" : "none" }} />{online ? "Online" : "Offline"}</span>
+            <span>🔋 {Math.round(battery * 100)}%</span>
+          </span>
+        </div>
+
+        {/* working toggle tiles */}
+        <div style={{ display: "flex", gap: 10 }}>
+          {tileBtn(soundOn ? "🔔" : "🔕", soundOn ? "Sound" : "Silent", soundOn, toggleSound)}
+          {tileBtn("✨", "Glass", glass, toggleGlass)}
+          {tileBtn("🌀", "Live BG", animated, toggleAnimate)}
+          {tileBtn("⛶", "Full", fs, toggleFs)}
+        </div>
+
+        {/* sliders */}
+        <CCSlider icon="🔆" label="Brightness" value={bright} onChange={setBrightness} />
         <CCSlider icon="🔊" label="Volume" value={vol} onChange={setVolume} />
-        <div style={{ textAlign: "center", color: "rgba(255,255,255,0.6)", fontSize: 11.5, fontFamily: FFM, marginTop: 2 }}>swipe up or tap to close</div>
+
+        {/* utility round buttons */}
+        <div style={{ display: "flex", gap: 8, padding: "2px 10px" }}>
+          {roundBtn("🔦", "Flashlight", torchOn, toggleTorch)}
+          {roundBtn("🔒", "Rotate Lock", rotLock, toggleRotate)}
+          {roundBtn("🔃", "Reload", false, () => { try { window.location.reload(); } catch {} })}
+        </div>
+
+        <div style={{ textAlign: "center", color: "rgba(255,255,255,0.5)", fontSize: 11.5, fontFamily: FFM, marginTop: 2, paddingBottom: 16 }}>swipe up or tap to close</div>
       </div>
     </div>
   );
