@@ -202,66 +202,79 @@ export function MobileShell({ AC, user, data, apps, wallpaperId, customWp, setti
       return;
     }
     const el = e.target.closest ? e.target.closest("[data-app]") : null;
-    const g = { x0: p.clientX, y0: p.clientY, axis: null, app: el?.getAttribute("data-app") || null, hold: null };
-    if (g.app) g.hold = setTimeout(() => { if (gest.current === g) { g.hold = "fired"; enterEdit(); } }, 400);
+    const g = { x0: p.clientX, y0: p.clientY, axis: null, app: el?.getAttribute("data-app") || null, dock: el?.getAttribute("data-dock"), hold: null };
+    if (g.app) g.hold = setTimeout(() => {
+      if (gest.current !== g) return;
+      g.hold = "fired";
+      enterEdit();
+      // iOS-style: the held icon "lifts" and immediately becomes the dragged
+      // item, so you can keep dragging the SAME finger without lifting to
+      // re-grab. (This was the snap-back bug — the in-progress press wasn't a
+      // drag gesture, so motion after the long-press did nothing.)
+      dragRef.current = g.app;
+      dragFrom.current = g.dock != null ? +g.dock : null;
+      dragPt.current = { x: g.x0, y: g.y0 };
+      setDragId(g.app);
+      gest.current = { drag: true };
+    }, 400);
     gest.current = g;
   }
+  // Handlers branch on the gesture SHAPE (g.drag / g.exit / g.remove vs a normal
+  // swipe), not on the editMode flag — the flag is a stale closure for the frame
+  // right after a long-press promotes the press into a drag.
   function onMove(e) {
     const g = gest.current; if (!g) return;
     const p = pt(e);
-    if (editMode) {
-      if (g.drag && dragRef.current) {
-        dragPt.current = { x: p.clientX, y: p.clientY };
-        moveClone();
-        // Live reorder only while dragging a Home-grid app (dock apps just swap on drop).
-        if (dragFrom.current == null) {
-          const t = document.elementFromPoint(p.clientX, p.clientY);
-          const tEl = t && t.closest ? t.closest("[data-app]") : null;
-          const tid = tEl && tEl.getAttribute("data-dock") == null ? tEl.getAttribute("data-app") : null;
-          if (tid && tid !== dragRef.current) {
-            const a = editOrderRef.current.filter(x => x !== dragRef.current);
-            let i = a.indexOf(tid); if (i < 0) i = a.length;
-            a.splice(i, 0, dragRef.current);
-            applyOrder(a);
-          }
+    if (g.drag) {
+      if (!dragRef.current) return;
+      dragPt.current = { x: p.clientX, y: p.clientY };
+      moveClone();
+      // Live reorder only while dragging a Home-grid app (dock apps swap on drop).
+      if (dragFrom.current == null) {
+        const t = document.elementFromPoint(p.clientX, p.clientY);
+        const tEl = t && t.closest ? t.closest("[data-app]") : null;
+        const tid = tEl && tEl.getAttribute("data-dock") == null ? tEl.getAttribute("data-app") : null;
+        if (tid && tid !== dragRef.current) {
+          const a = editOrderRef.current.filter(x => x !== dragRef.current);
+          let i = a.indexOf(tid); if (i < 0) i = a.length;
+          a.splice(i, 0, dragRef.current);
+          applyOrder(a);
         }
-      } else if (g.exit && (Math.abs(p.clientX - g.x0) > 8 || Math.abs(p.clientY - g.y0) > 8)) g.exit = false;
+      }
       return;
     }
+    if (g.exit) { if (Math.abs(p.clientX - g.x0) > 8 || Math.abs(p.clientY - g.y0) > 8) g.exit = false; return; }
     const dx = p.clientX - g.x0, dy = p.clientY - g.y0;
     if (!g.axis && (Math.abs(dx) > 8 || Math.abs(dy) > 8)) { g.axis = Math.abs(dx) > Math.abs(dy) ? "x" : "y"; if (g.hold && g.hold !== "fired") { clearTimeout(g.hold); g.hold = null; } }
     if (g.axis === "x") { let nx = dx; if ((curPage === 0 && dx > 0) || (curPage === pages.length - 1 && dx < 0)) nx = dx * 0.35; setDragX(nx); }
   }
   function onUp(e) {
     const g = gest.current; gest.current = null; if (!g) return;
-    if (editMode) {
-      if (g.remove) { const id = g.remove; applyOrder(editOrderRef.current.filter(x => x !== id)); hideFromHome(id); return; }
-      if (g.drag) {
-        const id = dragRef.current, from = dragFrom.current;
-        dragRef.current = null; dragFrom.current = null; setDragId(null);
-        const p = pt(e);
-        const t = document.elementFromPoint(p.clientX, p.clientY);
-        const zone = t && t.closest ? t.closest("[data-dockzone]") : null;
-        if (zone && id) {
-          // dropped on the dock → which of the 4 slots (by x position)
-          const r = zone.getBoundingClientRect();
-          const slot = Math.max(0, Math.min(3, Math.floor(((p.clientX - r.left) / r.width) * 4)));
-          const nextDock = [...dock]; const bumped = nextDock[slot]; const at = nextDock.indexOf(id);
-          nextDock[slot] = id; if (at >= 0 && at !== slot) nextDock[at] = bumped;   // swap within dock
-          let a = editOrderRef.current.filter(x => x !== id);                         // dragged app leaves Home
-          if (from == null && bumped && bumped !== id && !a.includes(bumped)) a.push(bumped); // bumped app returns to Home
-          editOrderRef.current = a; setEditOrder(a);
-          updateSettings?.({ mobileDock: nextDock, mobileOrder: a });
-          return;
-        }
-        // dropped on the Home grid: a Home app was already reordered live → commit;
-        // a dock app dropped on Home just snaps back (dock stays full at 4).
-        if (from == null) commitOrder();
+    if (g.remove) { const id = g.remove; applyOrder(editOrderRef.current.filter(x => x !== id)); hideFromHome(id); return; }
+    if (g.drag) {
+      const id = dragRef.current, from = dragFrom.current;
+      dragRef.current = null; dragFrom.current = null; setDragId(null);
+      const p = pt(e);
+      const t = document.elementFromPoint(p.clientX, p.clientY);
+      const zone = t && t.closest ? t.closest("[data-dockzone]") : null;
+      if (zone && id) {
+        // dropped on the dock → which of the 4 slots (by x position)
+        const r = zone.getBoundingClientRect();
+        const slot = Math.max(0, Math.min(3, Math.floor(((p.clientX - r.left) / r.width) * 4)));
+        const nextDock = [...dock]; const bumped = nextDock[slot]; const at = nextDock.indexOf(id);
+        nextDock[slot] = id; if (at >= 0 && at !== slot) nextDock[at] = bumped;   // swap within dock
+        let a = editOrderRef.current.filter(x => x !== id);                         // dragged app leaves Home
+        if (from == null && bumped && bumped !== id && !a.includes(bumped)) a.push(bumped); // bumped app returns to Home
+        editOrderRef.current = a; setEditOrder(a);
+        updateSettings?.({ mobileDock: nextDock, mobileOrder: a });
         return;
       }
-      if (g.exit) { commitOrder(); setEditMode(false); }
+      // dropped on the Home grid: a Home app was reordered live → commit;
+      // a dock app dropped on Home just snaps back (dock stays full at 4).
+      if (from == null) commitOrder();
       return;
     }
+    if (g.exit) { commitOrder(); setEditMode(false); return; }
     if (g.hold && g.hold !== "fired") clearTimeout(g.hold);
     if (g.hold === "fired") { setDragX(0); return; }
     const p = pt(e); const dx = p.clientX - g.x0, dy = p.clientY - g.y0;

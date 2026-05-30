@@ -1998,7 +1998,7 @@ export default function NovaOS(){
       <>
         <style>{CSS}</style>
         <MobileShell
-          AC={AC} user={user} data={data} apps={APPS}
+          AC={AC} user={user} data={data} apps={allApps}
           wallpaperId={wpId} customWp={customWp}
           settings={settings} updateSettings={updateSettings}
           renderApp={(id)=>renderAppContent(id, true)}
