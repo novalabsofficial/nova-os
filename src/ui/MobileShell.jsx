@@ -631,21 +631,32 @@ function nkTimeAgo(ts) {
   return Math.floor(h / 24) + "d";
 }
 function NotificationCenter({ AC, notifications, appById, glass, onOpenApp, onDismiss, onClear, onClose }) {
-  const sy = useRef(null);
-  const down = (e) => { sy.current = pt(e).clientY; };
-  const upClose = (e) => { if (sy.current != null && sy.current - pt(e).clientY > 40) onClose(); sy.current = null; };
+  const hdr = useRef(null);
+  const lst = useRef(null);
+  const listRef = useRef(null);
   const tapItem = (n) => { if (n.appId && appById(n.appId)) onOpenApp(n.appId); else onDismiss?.(n.id); };
+  // swipe up on the header → close
+  const hdrDown = (e) => { hdr.current = pt(e).clientY; };
+  const hdrUp = (e) => { if (hdr.current != null && hdr.current - pt(e).clientY > 36) onClose(); hdr.current = null; };
+  // in the list: swipe up while scrolled to the top → close; tap empty area → close
+  const listDown = (e) => { lst.current = { y: pt(e).clientY, top: e.currentTarget.scrollTop, target: e.target }; };
+  const listUp = (e) => {
+    lastTouchAt = Date.now();
+    const s = lst.current; lst.current = null; if (!s) return;
+    const dy = s.y - pt(e).clientY;
+    if (s.top <= 2 && dy > 50) { onClose(); return; }                       // swipe up at top
+    if (Math.abs(dy) < 10 && e.target === e.currentTarget) onClose();       // tap empty area
+  };
   return (
-    <div onClick={e => { if (Date.now() - lastTouchAt < 700) return; if (e.target === e.currentTarget) onClose(); }} onTouchEnd={e => { lastTouchAt = Date.now(); if (e.target === e.currentTarget) onClose(); }}
-      style={{ position: "absolute", inset: 0, zIndex: 60, paddingTop: "calc(" + SAT + " + 18px)", background: "rgba(6,8,18,0.62)", backdropFilter: "blur(22px) saturate(140%)", WebkitBackdropFilter: "blur(22px) saturate(140%)", animation: "panel-down 0.34s cubic-bezier(0.22,1,0.36,1)", display: "flex", flexDirection: "column" }}>
-      <div onTouchStart={down} onTouchEnd={upClose} onMouseDown={down} onMouseUp={upClose} style={{ padding: "0 18px 8px", touchAction: "none" }}>
+    <div style={{ position: "absolute", inset: 0, zIndex: 60, paddingTop: "calc(" + SAT + " + 18px)", background: "rgba(6,8,18,0.62)", backdropFilter: "blur(22px) saturate(140%)", WebkitBackdropFilter: "blur(22px) saturate(140%)", animation: "panel-down 0.34s cubic-bezier(0.22,1,0.36,1)", display: "flex", flexDirection: "column" }}>
+      <div onTouchStart={hdrDown} onTouchEnd={hdrUp} onMouseDown={hdrDown} onMouseUp={hdrUp} style={{ padding: "0 18px 8px", touchAction: "none" }}>
         <div style={{ display: "flex", justifyContent: "center", paddingBottom: 8 }}><div style={{ width: 40, height: 5, borderRadius: 3, background: "rgba(255,255,255,0.5)" }} /></div>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", color: "#fff", fontFamily: FFB, fontWeight: 700, fontSize: 15 }}>
           <span>Notifications</span>
           {notifications.length > 0 && <button onClick={onClear} style={{ background: "rgba(255,255,255,0.14)", border: "1px solid rgba(255,255,255,0.16)", color: "#fff", fontFamily: FFB, fontWeight: 600, fontSize: 12, padding: "6px 12px", borderRadius: 14, cursor: "pointer" }}>Clear</button>}
         </div>
       </div>
-      <div style={{ flex: 1, overflowY: "auto", padding: "6px 14px calc(" + SAB + " + 24px)", display: "flex", flexDirection: "column", gap: 10 }}>
+      <div ref={listRef} onTouchStart={listDown} onTouchEnd={listUp} style={{ flex: 1, overflowY: "auto", padding: "6px 14px 16px", display: "flex", flexDirection: "column", gap: 10 }}>
         {notifications.length === 0 ? (
           <div style={{ textAlign: "center", color: "rgba(255,255,255,0.55)", fontFamily: FFM, fontSize: 13, padding: "60px 0" }}>No notifications</div>
         ) : notifications.map(n => {
@@ -668,7 +679,12 @@ function NotificationCenter({ AC, notifications, appById, glass, onOpenApp, onDi
             </div>
           );
         })}
-        {notifications.length > 0 && <div style={{ textAlign: "center", color: "rgba(255,255,255,0.45)", fontSize: 11, fontFamily: FFM, paddingTop: 4 }}>swipe up or tap empty space to close</div>}
+      </div>
+      {/* always-present close bar — tap or swipe up; guarantees an exit */}
+      <div onClick={onClose} onTouchStart={hdrDown} onTouchEnd={(e) => { lastTouchAt = Date.now(); hdrUp(e); }}
+        style={{ flexShrink: 0, paddingBottom: "calc(" + SAB + " + 8px)", paddingTop: 8, display: "flex", flexDirection: "column", alignItems: "center", gap: 6, cursor: "pointer", touchAction: "none" }}>
+        <div style={{ width: 124, height: 5, borderRadius: 3, background: "rgba(255,255,255,0.6)" }} />
+        <span style={{ fontSize: 11.5, fontFamily: FFM, color: "rgba(255,255,255,0.6)" }}>tap or swipe up to close</span>
       </div>
     </div>
   );

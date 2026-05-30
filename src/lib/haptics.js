@@ -7,25 +7,26 @@
 const KEY = "nova:mobile:haptics";
 let enabled = (() => { try { return localStorage.getItem(KEY) !== "off"; } catch { return true; } })();
 
-// Durations in ms. Android's vibrator effectively ignores anything under
-// ~15ms, so everything here is >= 18ms; "feels like a tap" lives around 20-35ms.
+// Durations in ms. Many Android motors barely register anything under ~25ms,
+// so these are deliberately punchy; "feels like a tap" sits around 30-45ms.
 const PATTERNS = {
-  tap: 20,             // light UI tap
-  toggle: 28,          // switch flipped
-  open: 30,            // app launched
-  pick: 45,            // icon lifted into a drag (firm)
-  move: 16,            // crossed into a new reorder slot (light tick)
-  drop: 30,            // dropped
-  remove: [0, 35, 45, 35],   // removed from home (buzz)
-  unlock: [0, 25, 60, 35],   // lock screen released
-  error: [0, 45, 60, 45],
+  tap: 35,             // light UI tap
+  toggle: 45,          // switch flipped
+  open: 45,            // app launched
+  pick: [0, 60],       // icon lifted into a drag (firm)
+  move: 25,            // crossed into a new reorder slot (light tick)
+  drop: 45,            // dropped
+  remove: [0, 45, 50, 45],   // removed from home (buzz)
+  unlock: [0, 40, 70, 50],   // lock screen released
+  confirm: [0, 50, 70, 50],  // strong, unmistakable test buzz
+  error: [0, 50, 60, 50],
 };
 
 export function hapticsEnabled() { return enabled; }
 export function setHapticsEnabled(v) {
   enabled = !!v;
   try { localStorage.setItem(KEY, enabled ? "on" : "off"); } catch {}
-  if (enabled) haptic("tap");
+  if (enabled) haptic("confirm");   // distinct double-buzz so you can verify it works
 }
 
 export function haptic(kind = "tap") {
