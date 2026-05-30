@@ -51,15 +51,23 @@ const saveBrightness = (v) => { try { localStorage.setItem(BRIGHT_KEY, String(v)
 class AppErrorBoundary extends Component {
   constructor(p) { super(p); this.state = { err: null }; }
   static getDerivedStateFromError(err) { return { err }; }
+  componentDidCatch(err) { try { console.error("[nova-app-error]", err); } catch {} }
   componentDidUpdate(prev) { if (prev.appKey !== this.props.appKey && this.state.err) this.setState({ err: null }); }
   render() {
-    if (this.state.err) return (
-      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100%", gap: 10, padding: 24, textAlign: "center", color: "var(--nv-text)", fontFamily: FF }}>
-        <div style={{ fontSize: 34 }}>😵</div>
-        <div style={{ fontFamily: FFB, fontWeight: 700, fontSize: 15, color: "var(--nv-text-strong)" }}>This app hit an error</div>
-        <div style={{ fontSize: 12, color: "var(--nv-text-dim)", fontFamily: FFM, wordBreak: "break-word", maxWidth: 320 }}>{String(this.state.err?.message || this.state.err)}</div>
-      </div>
-    );
+    if (this.state.err) {
+      const msg = String(this.state.err?.message || this.state.err);
+      // A failed dynamic import means the app's code chunk couldn't be fetched
+      // (offline, a stale deploy, or an auth-gated host) — not an app crash.
+      const chunk = /dynamically imported module|importing a module script failed|Loading chunk|Failed to fetch|error loading dynamically/i.test(msg);
+      return (
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100%", gap: 10, padding: 24, textAlign: "center", color: "var(--nv-text)", fontFamily: FF }}>
+          <div style={{ fontSize: 34 }}>{chunk ? "📡" : "😵"}</div>
+          <div style={{ fontFamily: FFB, fontWeight: 700, fontSize: 15, color: "var(--nv-text-strong)" }}>{chunk ? "Couldn't load this app" : "This app hit an error"}</div>
+          <div style={{ fontSize: 12, color: "var(--nv-text-dim)", fontFamily: FFM, wordBreak: "break-word", maxWidth: 320 }}>{chunk ? "Its code couldn't be downloaded — check your connection, then reload." : msg}</div>
+          <button onClick={() => { try { location.reload(); } catch {} }} style={{ marginTop: 6, padding: "9px 20px", borderRadius: 12, background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.2)", color: "var(--nv-text)", fontFamily: FFB, fontWeight: 600, fontSize: 13, cursor: "pointer" }}>Reload</button>
+        </div>
+      );
+    }
     return this.props.children;
   }
 }
