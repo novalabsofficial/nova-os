@@ -110,6 +110,13 @@ export function MobileShell({ AC, user, data, apps, wallpaperId, customWp, setti
   const [battery, setBattery] = useState(1);
   const [vol, setVol] = useState(() => getSoundConfig().volume);
   const [dragX, setDragX] = useState(0);
+  // iOS-style jiggle/edit mode + drag-and-drop reorder
+  const [editMode, setEditMode] = useState(false);
+  const [editOrder, setEditOrder] = useState([]);
+  const [dragVis, setDragVis] = useState(null);   // { id, x, y } floating drag clone
+  const [addPicker, setAddPicker] = useState(false);
+  const editOrderRef = useRef([]);
+  const dragRef = useRef(null);
 
   const dock = (settings?.mobileDock && settings.mobileDock.length === 4) ? settings.mobileDock : DEFAULT_DOCK;
   const dockSet = new Set(dock);
@@ -124,8 +131,11 @@ export function MobileShell({ AC, user, data, apps, wallpaperId, customWp, setti
     ...order.filter(id => apps.some(a => a.id === id) && !hidden.has(id) && !dockSet.has(id)),
     ...apps.filter(a => !hidden.has(a.id) && !dockSet.has(a.id) && !order.includes(a.id)).map(a => a.id),
   ];
-  const homeApps = homeIds.map(id => appById(id)).filter(Boolean);
-  const hasWidgets = widgets && widgets.length > 0;
+  // In edit mode the grid renders from the live working order (editOrder).
+  const baseIds = editMode ? editOrder : homeIds;
+  const homeApps = baseIds.map(id => appById(id)).filter(Boolean);
+  editOrderRef.current = editOrder;
+  const hasWidgets = widgets && widgets.length > 0 && !editMode;
   const cap0 = hasWidgets ? 8 : PER_PAGE;
   const pages = [homeApps.slice(0, cap0), ...chunk(homeApps.slice(cap0), PER_PAGE)].filter((p, i) => i === 0 || p.length);
   if (pages.length === 0) pages.push([]);
@@ -151,21 +161,54 @@ export function MobileShell({ AC, user, data, apps, wallpaperId, customWp, setti
 
   // ── springboard gestures (touch + mouse) ──────────────────────────────────
   const gest = useRef(null);
+  const commitOrder = () => updateSettings?.({ mobileOrder: editOrderRef.current });
   function onDown(e) {
     const p = pt(e);
+    if (editMode) {
+      const rem = e.target.closest ? e.target.closest("[data-remove]") : null;
+      if (rem) { gest.current = { remove: rem.getAttribute("data-remove") }; return; }
+      const el = e.target.closest ? e.target.closest("[data-app]") : null;
+      if (el && el.getAttribute("data-dock") == null) { dragRef.current = el.getAttribute("data-app"); setDragVis({ id: dragRef.current, x: p.clientX, y: p.clientY }); gest.current = { drag: true }; }
+      else gest.current = { exit: true, x0: p.clientX, y0: p.clientY };
+      return;
+    }
     const el = e.target.closest ? e.target.closest("[data-app]") : null;
     const g = { x0: p.clientX, y0: p.clientY, axis: null, app: el?.getAttribute("data-app") || null, dock: el?.getAttribute("data-dock"), hold: null };
-    if (g.app) g.hold = setTimeout(() => { if (gest.current === g) { g.hold = "fired"; setSheet({ id: g.app }); } }, 420);
+    if (g.app) g.hold = setTimeout(() => { if (gest.current === g) { g.hold = "fired"; setEditOrder(homeIds); setEditMode(true); } }, 400);
     gest.current = g;
   }
   function onMove(e) {
     const g = gest.current; if (!g) return;
-    const p = pt(e); const dx = p.clientX - g.x0, dy = p.clientY - g.y0;
+    const p = pt(e);
+    if (editMode) {
+      if (g.drag && dragRef.current) {
+        setDragVis({ id: dragRef.current, x: p.clientX, y: p.clientY });
+        const t = document.elementFromPoint(p.clientX, p.clientY);
+        const tEl = t && t.closest ? t.closest("[data-app]") : null;
+        const tid = tEl && tEl.getAttribute("data-dock") == null ? tEl.getAttribute("data-app") : null;
+        if (tid && tid !== dragRef.current) setEditOrder(prev => { const a = prev.filter(x => x !== dragRef.current); let i = a.indexOf(tid); if (i < 0) i = a.length; a.splice(i, 0, dragRef.current); return a; });
+      } else if (g.exit && (Math.abs(p.clientX - g.x0) > 8 || Math.abs(p.clientY - g.y0) > 8)) g.exit = false;
+      return;
+    }
+    const dx = p.clientX - g.x0, dy = p.clientY - g.y0;
     if (!g.axis && (Math.abs(dx) > 8 || Math.abs(dy) > 8)) { g.axis = Math.abs(dx) > Math.abs(dy) ? "x" : "y"; if (g.hold && g.hold !== "fired") { clearTimeout(g.hold); g.hold = null; } }
     if (g.axis === "x") { let nx = dx; if ((curPage === 0 && dx > 0) || (curPage === pages.length - 1 && dx < 0)) nx = dx * 0.35; setDragX(nx); }
   }
   function onUp(e) {
     const g = gest.current; gest.current = null; if (!g) return;
+    if (editMode) {
+      if (g.remove) { const id = g.remove; setEditOrder(prev => prev.filter(x => x !== id)); hideFromHome(id); return; }
+      if (g.drag) {
+        const id = dragRef.current; dragRef.current = null; setDragVis(null);
+        const p = pt(e); const t = document.elementFromPoint(p.clientX, p.clientY);
+        const dk = t && t.closest ? t.closest("[data-dock]") : null;
+        if (dk && id) { pinToDock(id, +dk.getAttribute("data-dock")); setEditOrder(prev => prev.filter(x => x !== id)); }
+        else commitOrder();
+        return;
+      }
+      if (g.exit) { commitOrder(); setEditMode(false); }
+      return;
+    }
     if (g.hold && g.hold !== "fired") clearTimeout(g.hold);
     if (g.hold === "fired") { setDragX(0); return; }
     const p = pt(e); const dx = p.clientX - g.x0, dy = p.clientY - g.y0;
@@ -174,8 +217,6 @@ export function MobileShell({ AC, user, data, apps, wallpaperId, customWp, setti
       else if (dx >= 40 && curPage > 0) setPage(curPage - 1);
       setDragX(0);
     } else if (g.axis === "y") {
-      // direction-pure so up/down never get confused: UP → App Drawer,
-      // DOWN → Control Center (from anywhere on the home screen).
       if (dy < -46) setLibrary(true);
       else if (dy > 46) setControl(true);
       setDragX(0);
@@ -223,18 +264,28 @@ export function MobileShell({ AC, user, data, apps, wallpaperId, customWp, setti
                     </div>
                   )}
                   <div style={{ padding: "4px 18px 0", display: "grid", gridTemplateColumns: "repeat(" + COLS + ",1fr)", gridAutoRows: "min-content", gap: "20px 8px", alignContent: "start" }}>
-                    {pg.map(a => <IconVisual key={a.id} app={a} glass={glass} data-app={a.id} />)}
+                    {pg.map(a => (
+                      <div key={a.id} data-app={a.id} style={{ position: "relative", opacity: dragVis?.id === a.id ? 0 : 1, animation: editMode ? "icon-jiggle 0.34s ease-in-out infinite" : undefined, animationDelay: editMode ? "-" + ((a.id.length % 5) * 0.05) + "s" : undefined }}>
+                        <IconVisual app={a} glass={glass} />
+                        {editMode && <div data-remove={a.id} style={{ position: "absolute", top: -3, left: "calc(50% - 30px)", width: 22, height: 22, borderRadius: "50%", background: "#3a3a3c", border: "1.5px solid rgba(255,255,255,0.55)", color: "#fff", fontSize: 19, lineHeight: "17px", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 1px 4px rgba(0,0,0,0.45)" }}>−</div>}
+                      </div>
+                    ))}
                   </div>
                 </div>
               ))}
             </div>
           </div>
 
-          {pages.length > 1 && (
+          {editMode ? (
+            <div style={{ display: "flex", justifyContent: "center", gap: 10, padding: "6px 16px 8px" }}>
+              <button onClick={() => setAddPicker(true)} style={{ padding: "8px 16px", borderRadius: 20, background: "rgba(255,255,255,0.14)", border: "1px solid rgba(255,255,255,0.18)", color: "#fff", fontFamily: FFB, fontWeight: 600, fontSize: 13, cursor: "pointer" }}>＋ Add apps</button>
+              <button onClick={() => { commitOrder(); setEditMode(false); }} style={{ padding: "8px 22px", borderRadius: 20, background: fill(AC), border: "1px solid " + bdr(AC), color: AC, fontFamily: FFB, fontWeight: 700, fontSize: 13, cursor: "pointer" }}>Done</button>
+            </div>
+          ) : pages.length > 1 ? (
             <div style={{ display: "flex", justifyContent: "center", gap: 7, padding: "8px 0 6px" }}>
               {pages.map((_, i) => <span key={i} style={{ width: i === curPage ? 7 : 6, height: i === curPage ? 7 : 6, borderRadius: "50%", background: i === curPage ? "#fff" : "rgba(255,255,255,0.4)", transition: "all 0.2s" }} />)}
             </div>
-          )}
+          ) : null}
 
           <div style={{ margin: "4px 12px 6px", padding: "12px 14px", borderRadius: 30, background: "rgba(255,255,255,0.13)", backdropFilter: "blur(28px) saturate(160%)", WebkitBackdropFilter: "blur(28px) saturate(160%)", border: "1px solid rgba(255,255,255,0.14)", display: "flex", justifyContent: "space-around" }}>
             {dock.map((id, i) => { const a = appById(id); if (!a) return <div key={i} style={{ width: 60 }} />; return <IconVisual key={id} app={a} glass={glass} hideLabel data-app={id} data-dock={i} />; })}
@@ -268,6 +319,30 @@ export function MobileShell({ AC, user, data, apps, wallpaperId, customWp, setti
           onAdd={() => { addToHome(sheet.id); setSheet(null); }}
           onPinDock={(slot) => { pinToDock(sheet.id, slot); setSheet(null); }}
           onClose={() => setSheet(null)} />;
+      })()}
+
+      {/* floating drag clone (jiggle/edit mode) */}
+      {dragVis && (() => { const a = appById(dragVis.id); if (!a) return null; return (
+        <div style={{ position: "fixed", left: dragVis.x - 34, top: dragVis.y - 46, width: 68, zIndex: 80, pointerEvents: "none", opacity: 0.96, transform: "scale(1.12)", filter: "drop-shadow(0 10px 20px rgba(0,0,0,0.5))" }}>
+          <MobileIcon app={a} size={62} glass={glass} />
+        </div>
+      ); })()}
+
+      {/* Add-to-Home picker (from edit mode) — only hidden apps */}
+      {addPicker && (() => {
+        const hiddenApps = apps.filter(a => hidden.has(a.id));
+        return (
+          <div style={{ position: "absolute", inset: 0, zIndex: 78, background: "rgba(6,8,18,0.66)", backdropFilter: "blur(34px) saturate(150%)", WebkitBackdropFilter: "blur(34px) saturate(150%)", paddingTop: "calc(" + SAT + " + 40px)", display: "flex", flexDirection: "column", animation: "panel-up 0.3s cubic-bezier(0.22,1,0.36,1)" }}>
+            <div style={{ textAlign: "center", color: "#fff", fontFamily: FFB, fontWeight: 700, fontSize: 14, paddingBottom: 12 }}>Add to Home</div>
+            <div style={{ flex: 1, overflowY: "auto", padding: "4px 18px 24px" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: "20px 8px", alignContent: "start" }}>
+                {hiddenApps.map(a => <IconTile key={a.id} app={a} glass={glass} onOpen={() => { addToHome(a.id); setEditOrder(prev => [...prev, a.id]); }} />)}
+                {hiddenApps.length === 0 && <div style={{ gridColumn: "span 4", textAlign: "center", color: "rgba(255,255,255,0.5)", padding: "40px 0", fontStyle: "italic" }}>Every app is already on your Home Screen</div>}
+              </div>
+            </div>
+            <button onClick={() => setAddPicker(false)} style={{ margin: "0 18px calc(" + SAB + " + 16px)", padding: "13px", borderRadius: 14, background: "rgba(255,255,255,0.12)", border: "1px solid rgba(255,255,255,0.18)", color: "#fff", fontFamily: FFB, fontWeight: 600, fontSize: 14, cursor: "pointer" }}>Done</button>
+          </div>
+        );
       })()}
     </div>
   );

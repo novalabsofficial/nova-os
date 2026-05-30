@@ -241,6 +241,8 @@ export const CSS = `
   /* mobile Control Center drops from the top; App Library rises from the bottom */
   @keyframes panel-down{from{opacity:0;transform:translateY(-22px);}to{opacity:1;transform:none;}}
   @keyframes panel-up{from{opacity:0;transform:translateY(26px);}to{opacity:1;transform:none;}}
+  /* iOS-style icon wobble while the mobile home screen is in edit mode */
+  @keyframes icon-jiggle{0%{transform:rotate(-1.6deg);}50%{transform:rotate(1.6deg);}100%{transform:rotate(-1.6deg);}}
   /* respect reduced-motion: drop all the extra movement */
   @media (prefers-reduced-motion: reduce){
     *{animation-duration:0.01ms!important;transition-duration:0.01ms!important;}
