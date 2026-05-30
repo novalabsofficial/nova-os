@@ -8,7 +8,7 @@ export const COLL = "nova_storage";
 // header. Update this when you do a version sweep — package.json /
 // tauri.conf.json still need their own bumps but at least *display* text
 // won't drift again. Format: "<major>.<minor>".
-export const NOVA_VERSION = "9.8";
+export const NOVA_VERSION = "10.0";
 
 // Widget metadata: label/emoji + minimum size constraints used by WidgetShell.
 export const WIDGET_CONFIGS = {
@@ -45,9 +45,9 @@ export const DEFAULT_SIZES = {
   // v9.5: tasks bumped to 660×560 for the new two-pane (rail + main) layout.
   // Calendar bumped to 760×620 to fit the new mini-month + agenda sidebar.
   notes:{w:500,h:520},tasks:{w:660,h:560},files:{w:540,h:520},
-  paint:{w:700,h:560},browser:{w:760,h:620},screenshot:{w:740,h:600},
+  paint:{w:940,h:660},browser:{w:760,h:620},screenshot:{w:740,h:600},
   snake:{w:460,h:560},"2048":{w:480,h:580},
-  store:{w:680,h:600},terminal:{w:580,h:460},
+  store:{w:680,h:600},terminal:{w:720,h:500},
   settings:{w:480,h:640},profile:{w:440,h:540},chat:{w:480,h:580},
   // 5.1 additions
   // v9.5: calculator bumped to 640×620 for the new multi-mode layout with
@@ -275,6 +275,11 @@ export const WALLPAPERS = {
   // shows as a pickable swatch; it has no `grad`, only a preview gradient.
   auto:     {name:"Auto",      semitones: 0,  preview:"linear-gradient(90deg,#0b1026 0%,#1d4ed8 26%,#f59e0b 52%,#7c3aed 76%,#0b1026 100%)"},
   mesh:     {name:"Mesh",      semitones: 0,  preview:"radial-gradient(ellipse at 18% 22%,#6366f1 0%,transparent 45%),radial-gradient(ellipse at 82% 18%,#ec4899 0%,transparent 40%),radial-gradient(ellipse at 60% 85%,#06b6d4 0%,transparent 45%),linear-gradient(135deg,#0a0a14,#050510)"},
+  // v10.0 — Supernova Edition signature wallpapers (SVG-backed; see
+  // wallpapers.jsx). Supernova: a radiant exploding-star burst. Nebula: a
+  // calm, spacious deep-space cloud companion. Both clean + professional.
+  supernova:{name:"Supernova", semitones: 7,  preview:"radial-gradient(circle at 50% 44%,#eaf6ff 0%,#a5e8ff 12%,#22d3ee 26%,#38bdf8 42%,#2563eb 60%,#1e3a8a 78%,#03070f 100%)"},
+  nebula:   {name:"Nebula",    semitones:-3,  preview:"radial-gradient(ellipse at 28% 30%,#2dd4bf 0%,transparent 46%),radial-gradient(ellipse at 76% 34%,#6366f1 0%,transparent 46%),radial-gradient(ellipse at 54% 82%,#c026d3 0%,transparent 48%),radial-gradient(ellipse at 86% 78%,#fb7185 0%,transparent 40%),linear-gradient(135deg,#07071a,#050510)"},
   // v8.0 additions — five new wallpapers designed for the refreshed UI.
   // Prism is SVG-backed (renders the holographic shimmer cleanly at any size);
   // the others are pure CSS gradients so they're zero-cost to render. Each
