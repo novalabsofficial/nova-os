@@ -1472,6 +1472,23 @@ export default function NovaOS(){
       </Suspense>
     );
   }
+  // v10.x — enabled widgets rendered for the mobile home screen (a horizontal
+  // card row). Reuses the same *WidgetContent components as the desktop.
+  function renderMobileWidgets(){
+    const s={x:0,y:0,w:168,h:150};
+    return Object.keys(WIDGET_CONFIGS).filter(id=>widgets[id]).map(id=>{
+      let content=null;
+      if(id==="clock")        content=<ClockWidgetContent   state={s} tick={tick} use24h={use24h} AC={AC}/>;
+      else if(id==="weather") content=<WeatherWidgetContent  state={s} data={data} updateSettings={updateSettings}/>;
+      else if(id==="notesw")  content=<NotesWidgetContent    state={s} data={data}/>;
+      else if(id==="tasksw")  content=<TasksWidgetContent    state={s} data={data} updateData={updateData}/>;
+      else if(id==="calendar")content=<CalendarWidgetContent state={s} tick={tick} AC={AC}/>;
+      else if(id==="sysinfo") content=<SysInfoWidgetContent  state={s}/>;
+      else if(id==="battery") content=<BatteryWidgetContent  state={s} AC={AC}/>;
+      else if(id==="pomodoro")content=<PomodoroWidgetContent state={s} AC={AC}/>;
+      return {id, content};
+    });
+  }
   // v10.0 — close plays a shrink-fade, THEN removes the window from state.
   function closeWin(id){
     playSound("windowClose");
@@ -1985,6 +2002,7 @@ export default function NovaOS(){
           wallpaperId={wpId} customWp={customWp}
           settings={settings} updateSettings={updateSettings}
           renderApp={(id)=>renderAppContent(id, true)}
+          widgets={renderMobileWidgets()}
           onAppOpen={markAppNotificationsRead}
           onLogout={logout}
         />

@@ -238,8 +238,9 @@ export const CSS = `
   /* generic pop-in for popovers/dialogs that want it inline */
   @keyframes pop-in{from{opacity:0;transform:scale(0.94) translateY(8px);}to{opacity:1;transform:none;}}
   @keyframes panel-in-right{from{opacity:0;transform:translateX(26px);}to{opacity:1;transform:none;}}
-  /* mobile Control Center / App Library drop in from the top */
+  /* mobile Control Center drops from the top; App Library rises from the bottom */
   @keyframes panel-down{from{opacity:0;transform:translateY(-22px);}to{opacity:1;transform:none;}}
+  @keyframes panel-up{from{opacity:0;transform:translateY(26px);}to{opacity:1;transform:none;}}
   /* respect reduced-motion: drop all the extra movement */
   @media (prefers-reduced-motion: reduce){
     *{animation-duration:0.01ms!important;transition-duration:0.01ms!important;}
