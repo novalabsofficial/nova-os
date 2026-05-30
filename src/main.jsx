@@ -2,6 +2,11 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import NovaOS from './NovaOS.jsx';
 import './lib/pwa.js';   // capture the install prompt as early as possible
+import { initNative } from './lib/native.js';
+
+// Native (Capacitor) one-time setup: immersive mode, back-button routing,
+// nova-native document class. No-ops on the web.
+initNative();
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>

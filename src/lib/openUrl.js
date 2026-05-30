@@ -21,6 +21,17 @@ function isTauri() {
   );
 }
 
+// Capacitor Browser plugin (Chrome Custom Tab) — a real in-app browser on the
+// native Android build. Reached via the injected global so nothing is bundled
+// on the web.
+function capacitorBrowser() {
+  try {
+    const c = typeof window !== "undefined" ? window.Capacitor : null;
+    if (c && c.isNativePlatform && c.isNativePlatform() && c.Plugins && c.Plugins.Browser) return c.Plugins.Browser;
+  } catch {}
+  return null;
+}
+
 /**
  * Open a URL the user can actually see. Picks browser tab on web, system
  * browser on Tauri desktop.
@@ -46,6 +57,12 @@ export async function openExternalUrl(url) {
       console.warn("[openExternalUrl] shell.open failed, falling back:", e);
     }
     return;
+  }
+
+  // Native Android: open in the in-app browser (Chrome Custom Tab).
+  const B = capacitorBrowser();
+  if (B && B.open) {
+    try { await B.open({ url }); return; } catch {}
   }
 
   // Web: standard new-tab open.

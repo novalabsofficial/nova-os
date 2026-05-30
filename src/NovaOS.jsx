@@ -28,6 +28,7 @@ import { db, setDbUid, getDbUid } from "./lib/db.js";
 import { watchMyThreads } from "./lib/dms.js";
 import { watchMyServers } from "./lib/servers.js";
 import { openExternalUrl } from "./lib/openUrl.js";
+import { isNative as nativeIsNative, notify as nativeNotify } from "./lib/native.js";
 import { login as authLogin, register as authRegister, logoutUser as authLogout, normalizeUsername } from "./lib/auth.js";
 import { aiLoad, aiSave, AI_LS_KEYS, AI_LS_CONFIG, AI_LS_CHATS } from "./lib/ai-storage.js";
 // UI (shared components + visual constants)
@@ -1103,6 +1104,8 @@ export default function NovaOS(){
       return next;
     });
     playSound("notification");
+    // In the native Android app, also raise a real system notification.
+    if(nativeIsNative()) nativeNotify({ title: notif.title, body: notif.body });
   },[saveData]);
   const dismissNotification = useCallback((id)=>{
     setData(prev=>{
