@@ -240,7 +240,7 @@ export function SettingsApp({ user, data, updateSettings, showToast, AC, onCusto
               { id: "auto", label: "⚙ Auto", desc: "Detect from device" },
               { id: "desktop", label: "🖥 Desktop", desc: "Mouse-precision UI" },
               { id: "tablet", label: "📱 Tablet", desc: "Larger touch targets" },
-              { id: "mobile", label: "📲 Mobile", desc: "Phone-size notice" },
+              { id: "mobile", label: "📲 Mobile", desc: "iOS-style phone UI" },
             ].map(m => {
               const active = (settings.displayMode || "auto") === m.id;
               return (<button key={m.id} onClick={() => { updateSettings({ displayMode: m.id }); showToast("Display: " + m.label + " ✓"); }} style={{ textAlign: "left", padding: "10px 12px", background: active ? fill(AC) : "rgba(255,255,255,0.04)", border: "1px solid " + (active ? bdr(AC) : "rgba(255,255,255,0.08)"), borderRadius: 8, cursor: "pointer", fontFamily: FF, color: active ? AC : "var(--nv-text)" }}>
