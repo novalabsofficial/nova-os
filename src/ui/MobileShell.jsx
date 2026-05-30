@@ -9,7 +9,7 @@
 // Control Center (swipe down from top, swipe up to close) · App Library
 // (swipe up / down from the middle, search).
 
-import { useState, useEffect, useRef, useCallback, Component } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo, Component } from "react";
 import { FF, FFB, FFM } from "./styles.js";
 import { fill, bdr } from "../lib/format.js";
 import { Wallpaper } from "./wallpapers.jsx";
@@ -113,10 +113,13 @@ export function MobileShell({ AC, user, data, apps, wallpaperId, customWp, setti
   // iOS-style jiggle/edit mode + drag-and-drop reorder
   const [editMode, setEditMode] = useState(false);
   const [editOrder, setEditOrder] = useState([]);
-  const [dragVis, setDragVis] = useState(null);   // { id, x, y } floating drag clone
+  const [dragId, setDragId] = useState(null);      // which app is being dragged (renders the floating clone)
   const [addPicker, setAddPicker] = useState(false);
   const editOrderRef = useRef([]);
-  const dragRef = useRef(null);
+  const dragRef = useRef(null);       // id currently dragged
+  const dragFrom = useRef(null);      // dock slot the drag started from (null = from Home grid)
+  const dragPt = useRef({ x: 0, y: 0 });  // last finger point (drives the clone via ref, no re-render)
+  const dragCloneRef = useRef(null);  // the floating clone DOM node
 
   const dock = (settings?.mobileDock && settings.mobileDock.length === 4) ? settings.mobileDock : DEFAULT_DOCK;
   const dockSet = new Set(dock);
@@ -134,7 +137,6 @@ export function MobileShell({ AC, user, data, apps, wallpaperId, customWp, setti
   // In edit mode the grid renders from the live working order (editOrder).
   const baseIds = editMode ? editOrder : homeIds;
   const homeApps = baseIds.map(id => appById(id)).filter(Boolean);
-  editOrderRef.current = editOrder;
   const hasWidgets = widgets && widgets.length > 0 && !editMode;
   const cap0 = hasWidgets ? 8 : PER_PAGE;
   const pages = [homeApps.slice(0, cap0), ...chunk(homeApps.slice(cap0), PER_PAGE)].filter((p, i) => i === 0 || p.length);
@@ -146,6 +148,13 @@ export function MobileShell({ AC, user, data, apps, wallpaperId, customWp, setti
   const addToHome = (id) => updateSettings?.({ mobileHidden: (settings?.mobileHidden || []).filter(x => x !== id) });
   const moveHome = (id, dir) => { const ids = [...homeIds]; const i = ids.indexOf(id), j = i + dir; if (i < 0 || j < 0 || j >= ids.length) return; [ids[i], ids[j]] = [ids[j], ids[i]]; updateSettings?.({ mobileOrder: ids }); };
   const pinToDock = (id, slot) => { const next = [...dock]; const prev = next[slot], at = next.indexOf(id); next[slot] = id; if (at >= 0 && at !== slot) next[at] = prev; updateSettings?.({ mobileDock: next }); };
+
+  // Wallpaper is expensive (animated canvas/SVG) — memoize so it doesn't
+  // re-render on every clock tick, page-drag or reorder.
+  const wallpaperEl = useMemo(
+    () => <Wallpaper id={wallpaperId} customUrl={customWp} animate={!!settings?.wallpaperAnimated} />,
+    [wallpaperId, customWp, settings?.wallpaperAnimated]
+  );
 
   useEffect(() => { const t = setInterval(() => setNow(new Date()), 15000); return () => clearInterval(t); }, []);
   useEffect(() => { let dead = false; if (navigator.getBattery) navigator.getBattery().then(b => { if (dead) return; const upd = () => setBattery(b.level); upd(); b.addEventListener("levelchange", upd); }).catch(() => {}); return () => { dead = true; }; }, []);
@@ -161,20 +170,40 @@ export function MobileShell({ AC, user, data, apps, wallpaperId, customWp, setti
 
   // ── springboard gestures (touch + mouse) ──────────────────────────────────
   const gest = useRef(null);
+  // editOrderRef is the *authoritative* working order, updated synchronously
+  // inside event handlers (React state updaters run later, so we can't rely on
+  // them being flushed before drop/commit — that caused reorders to snap back).
+  const applyOrder = (next) => { editOrderRef.current = next; setEditOrder(next); };
   const commitOrder = () => updateSettings?.({ mobileOrder: editOrderRef.current });
+  const enterEdit = () => { editOrderRef.current = homeIds; setEditOrder(homeIds); setEditMode(true); };
+  // moves the floating drag clone via direct DOM write — no React re-render per
+  // touchmove, which keeps the drag buttery instead of janky.
+  const moveClone = () => { const n = dragCloneRef.current; if (n) n.style.transform = "translate(" + (dragPt.current.x - 33) + "px," + (dragPt.current.y - 46) + "px)"; };
   function onDown(e) {
     const p = pt(e);
     if (editMode) {
-      const rem = e.target.closest ? e.target.closest("[data-remove]") : null;
+      const tgt = e.target;
+      // taps on the edit toolbar buttons (Add apps / Done) handle themselves —
+      // don't let the pad treat them as "tap empty → exit".
+      if (tgt && tgt.closest && tgt.closest("button")) { gest.current = null; return; }
+      const rem = tgt && tgt.closest ? tgt.closest("[data-remove]") : null;
       if (rem) { gest.current = { remove: rem.getAttribute("data-remove") }; return; }
-      const el = e.target.closest ? e.target.closest("[data-app]") : null;
-      if (el && el.getAttribute("data-dock") == null) { dragRef.current = el.getAttribute("data-app"); setDragVis({ id: dragRef.current, x: p.clientX, y: p.clientY }); gest.current = { drag: true }; }
-      else gest.current = { exit: true, x0: p.clientX, y0: p.clientY };
+      const el = tgt && tgt.closest ? tgt.closest("[data-app]") : null;
+      if (el) {
+        const dk = el.getAttribute("data-dock");
+        dragRef.current = el.getAttribute("data-app");
+        dragFrom.current = dk != null ? +dk : null;
+        dragPt.current = { x: p.clientX, y: p.clientY };
+        setDragId(dragRef.current);
+        gest.current = { drag: true };
+        return;
+      }
+      gest.current = { exit: true, x0: p.clientX, y0: p.clientY };
       return;
     }
     const el = e.target.closest ? e.target.closest("[data-app]") : null;
-    const g = { x0: p.clientX, y0: p.clientY, axis: null, app: el?.getAttribute("data-app") || null, dock: el?.getAttribute("data-dock"), hold: null };
-    if (g.app) g.hold = setTimeout(() => { if (gest.current === g) { g.hold = "fired"; setEditOrder(homeIds); setEditMode(true); } }, 400);
+    const g = { x0: p.clientX, y0: p.clientY, axis: null, app: el?.getAttribute("data-app") || null, hold: null };
+    if (g.app) g.hold = setTimeout(() => { if (gest.current === g) { g.hold = "fired"; enterEdit(); } }, 400);
     gest.current = g;
   }
   function onMove(e) {
@@ -182,11 +211,20 @@ export function MobileShell({ AC, user, data, apps, wallpaperId, customWp, setti
     const p = pt(e);
     if (editMode) {
       if (g.drag && dragRef.current) {
-        setDragVis({ id: dragRef.current, x: p.clientX, y: p.clientY });
-        const t = document.elementFromPoint(p.clientX, p.clientY);
-        const tEl = t && t.closest ? t.closest("[data-app]") : null;
-        const tid = tEl && tEl.getAttribute("data-dock") == null ? tEl.getAttribute("data-app") : null;
-        if (tid && tid !== dragRef.current) setEditOrder(prev => { const a = prev.filter(x => x !== dragRef.current); let i = a.indexOf(tid); if (i < 0) i = a.length; a.splice(i, 0, dragRef.current); return a; });
+        dragPt.current = { x: p.clientX, y: p.clientY };
+        moveClone();
+        // Live reorder only while dragging a Home-grid app (dock apps just swap on drop).
+        if (dragFrom.current == null) {
+          const t = document.elementFromPoint(p.clientX, p.clientY);
+          const tEl = t && t.closest ? t.closest("[data-app]") : null;
+          const tid = tEl && tEl.getAttribute("data-dock") == null ? tEl.getAttribute("data-app") : null;
+          if (tid && tid !== dragRef.current) {
+            const a = editOrderRef.current.filter(x => x !== dragRef.current);
+            let i = a.indexOf(tid); if (i < 0) i = a.length;
+            a.splice(i, 0, dragRef.current);
+            applyOrder(a);
+          }
+        }
       } else if (g.exit && (Math.abs(p.clientX - g.x0) > 8 || Math.abs(p.clientY - g.y0) > 8)) g.exit = false;
       return;
     }
@@ -197,13 +235,28 @@ export function MobileShell({ AC, user, data, apps, wallpaperId, customWp, setti
   function onUp(e) {
     const g = gest.current; gest.current = null; if (!g) return;
     if (editMode) {
-      if (g.remove) { const id = g.remove; setEditOrder(prev => prev.filter(x => x !== id)); hideFromHome(id); return; }
+      if (g.remove) { const id = g.remove; applyOrder(editOrderRef.current.filter(x => x !== id)); hideFromHome(id); return; }
       if (g.drag) {
-        const id = dragRef.current; dragRef.current = null; setDragVis(null);
-        const p = pt(e); const t = document.elementFromPoint(p.clientX, p.clientY);
-        const dk = t && t.closest ? t.closest("[data-dock]") : null;
-        if (dk && id) { pinToDock(id, +dk.getAttribute("data-dock")); setEditOrder(prev => prev.filter(x => x !== id)); }
-        else commitOrder();
+        const id = dragRef.current, from = dragFrom.current;
+        dragRef.current = null; dragFrom.current = null; setDragId(null);
+        const p = pt(e);
+        const t = document.elementFromPoint(p.clientX, p.clientY);
+        const zone = t && t.closest ? t.closest("[data-dockzone]") : null;
+        if (zone && id) {
+          // dropped on the dock → which of the 4 slots (by x position)
+          const r = zone.getBoundingClientRect();
+          const slot = Math.max(0, Math.min(3, Math.floor(((p.clientX - r.left) / r.width) * 4)));
+          const nextDock = [...dock]; const bumped = nextDock[slot]; const at = nextDock.indexOf(id);
+          nextDock[slot] = id; if (at >= 0 && at !== slot) nextDock[at] = bumped;   // swap within dock
+          let a = editOrderRef.current.filter(x => x !== id);                         // dragged app leaves Home
+          if (from == null && bumped && bumped !== id && !a.includes(bumped)) a.push(bumped); // bumped app returns to Home
+          editOrderRef.current = a; setEditOrder(a);
+          updateSettings?.({ mobileDock: nextDock, mobileOrder: a });
+          return;
+        }
+        // dropped on the Home grid: a Home app was already reordered live → commit;
+        // a dock app dropped on Home just snaps back (dock stays full at 4).
+        if (from == null) commitOrder();
         return;
       }
       if (g.exit) { commitOrder(); setEditMode(false); }
@@ -241,7 +294,7 @@ export function MobileShell({ AC, user, data, apps, wallpaperId, customWp, setti
 
   return (
     <div style={{ position: "fixed", inset: 0, overflow: "hidden", fontFamily: FF, background: "#05060f", userSelect: "none", WebkitUserSelect: "none" }}>
-      <Wallpaper id={wallpaperId} customUrl={customWp} animate={!!settings?.wallpaperAnimated} />
+      {wallpaperEl}
 
       {/* Status bar */}
       <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "calc(" + SAT + " + 30px)", display: "flex", alignItems: "center", justifyContent: "space-between", padding: SAT + " 22px 0", zIndex: 40, color: "#fff", pointerEvents: "none" }}>
@@ -251,21 +304,21 @@ export function MobileShell({ AC, user, data, apps, wallpaperId, customWp, setti
 
       {/* Springboard */}
       {!openId && (
-        <div {...padEvents} style={{ position: "absolute", inset: 0, paddingTop: "calc(" + SAT + " + 40px)", paddingBottom: "calc(" + SAB + " + 56px)", display: "flex", flexDirection: "column", zIndex: 10, touchAction: "none" }}>
+        <div {...padEvents} style={{ position: "absolute", inset: 0, paddingTop: "calc(" + SAT + " + 40px)", paddingBottom: "calc(" + SAB + " + 56px)", display: "flex", flexDirection: "column", zIndex: 10, touchAction: "none", animation: "home-in 0.32s cubic-bezier(0.22,1,0.36,1)" }}>
           <div style={{ flex: 1, overflow: "hidden", minHeight: 0 }}>
-            <div style={{ display: "flex", height: "100%", width: (pages.length * 100) + "%", transform: "translateX(calc(" + (-curPage * (100 / pages.length)) + "% + " + dragX + "px))", transition: dragX === 0 ? "transform 0.34s cubic-bezier(0.22,1,0.36,1)" : "none" }}>
+            <div style={{ display: "flex", height: "100%", width: (pages.length * 100) + "%", willChange: "transform", transform: "translateX(calc(" + (-curPage * (100 / pages.length)) + "% + " + dragX + "px))", transition: dragX === 0 ? "transform 0.42s cubic-bezier(0.22,1,0.36,1)" : "none" }}>
               {pages.map((pg, pi) => (
                 <div key={pi} style={{ width: (100 / pages.length) + "%", flexShrink: 0, display: "flex", flexDirection: "column", minHeight: 0 }}>
                   {pi === 0 && hasWidgets && (
                     <div style={{ display: "flex", gap: 12, overflowX: "hidden", padding: "4px 18px 14px" }}>
                       {widgets.slice(0, 2).map(w => (
-                        <div key={w.id} style={{ flex: 1, minWidth: 0, height: 150, borderRadius: 20, overflow: "hidden", padding: 12, background: "rgba(255,255,255,0.1)", backdropFilter: "blur(24px) saturate(150%)", WebkitBackdropFilter: "blur(24px) saturate(150%)", border: "1px solid rgba(255,255,255,0.14)", boxShadow: "0 8px 22px rgba(0,0,0,0.3)" }}>{w.content}</div>
+                        <div key={w.id} style={{ flex: 1, minWidth: 0, height: 150, borderRadius: 20, overflow: "hidden", padding: 12, background: "rgba(255,255,255,0.12)", backdropFilter: "blur(16px) saturate(140%)", WebkitBackdropFilter: "blur(16px) saturate(140%)", border: "1px solid rgba(255,255,255,0.14)", boxShadow: "0 8px 22px rgba(0,0,0,0.3)" }}>{w.content}</div>
                       ))}
                     </div>
                   )}
                   <div style={{ padding: "4px 18px 0", display: "grid", gridTemplateColumns: "repeat(" + COLS + ",1fr)", gridAutoRows: "min-content", gap: "20px 8px", alignContent: "start" }}>
                     {pg.map(a => (
-                      <div key={a.id} data-app={a.id} style={{ position: "relative", opacity: dragVis?.id === a.id ? 0 : 1, animation: editMode ? "icon-jiggle 0.34s ease-in-out infinite" : undefined, animationDelay: editMode ? "-" + ((a.id.length % 5) * 0.05) + "s" : undefined }}>
+                      <div key={a.id} data-app={a.id} className={editMode ? undefined : "mb-ic"} style={{ position: "relative", opacity: dragId === a.id ? 0 : 1, animation: editMode ? "icon-jiggle 0.34s ease-in-out infinite" : undefined, animationDelay: editMode ? "-" + ((a.id.length % 5) * 0.05) + "s" : undefined }}>
                         <IconVisual app={a} glass={glass} />
                         {editMode && <div data-remove={a.id} style={{ position: "absolute", top: -3, left: "calc(50% - 30px)", width: 22, height: 22, borderRadius: "50%", background: "#3a3a3c", border: "1.5px solid rgba(255,255,255,0.55)", color: "#fff", fontSize: 19, lineHeight: "17px", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 1px 4px rgba(0,0,0,0.45)" }}>−</div>}
                       </div>
@@ -287,15 +340,19 @@ export function MobileShell({ AC, user, data, apps, wallpaperId, customWp, setti
             </div>
           ) : null}
 
-          <div style={{ margin: "4px 12px 6px", padding: "12px 14px", borderRadius: 30, background: "rgba(255,255,255,0.13)", backdropFilter: "blur(28px) saturate(160%)", WebkitBackdropFilter: "blur(28px) saturate(160%)", border: "1px solid rgba(255,255,255,0.14)", display: "flex", justifyContent: "space-around" }}>
-            {dock.map((id, i) => { const a = appById(id); if (!a) return <div key={i} style={{ width: 60 }} />; return <IconVisual key={id} app={a} glass={glass} hideLabel data-app={id} data-dock={i} />; })}
+          <div data-dockzone style={{ margin: "4px 12px 6px", padding: "12px 14px", borderRadius: 30, background: editMode ? "rgba(255,255,255,0.18)" : "rgba(255,255,255,0.13)", backdropFilter: "blur(20px) saturate(150%)", WebkitBackdropFilter: "blur(20px) saturate(150%)", border: "1px solid " + (editMode ? "rgba(255,255,255,0.32)" : "rgba(255,255,255,0.14)"), display: "flex", justifyContent: "space-around", transition: "background 0.2s, border-color 0.2s" }}>
+            {dock.map((id, i) => { const a = appById(id); if (!a) return <div key={i} style={{ width: 60 }} />; return (
+              <div key={id} data-app={id} data-dock={i} className={editMode ? undefined : "mb-ic"} style={{ opacity: dragId === id ? 0 : 1, animation: editMode ? "icon-jiggle 0.34s ease-in-out infinite" : undefined, animationDelay: editMode ? "-" + ((id.length % 5) * 0.05) + "s" : undefined }}>
+                <IconVisual app={a} glass={glass} hideLabel />
+              </div>
+            ); })}
           </div>
         </div>
       )}
 
       {/* Open app */}
       {openId && (
-        <div style={{ position: "absolute", inset: 0, zIndex: 20, display: "flex", flexDirection: "column", background: "var(--nv-surface-solid)", animation: "win-launch 0.26s cubic-bezier(0.16,1,0.3,1)" }}>
+        <div style={{ position: "absolute", inset: 0, zIndex: 20, display: "flex", flexDirection: "column", background: "var(--nv-surface-solid)", willChange: "transform, opacity", animation: "app-in 0.3s cubic-bezier(0.22,1,0.36,1)" }}>
           <div style={{ height: "calc(" + SAT + " + 40px)", flexShrink: 0 }} />
           <div style={{ flex: 1, minHeight: 0, overflowY: "auto", overflowX: "hidden", padding: "12px 14px calc(" + SAB + " + 54px)" }}><AppErrorBoundary appKey={openId}>{renderApp(openId)}</AppErrorBoundary></div>
         </div>
@@ -321,10 +378,12 @@ export function MobileShell({ AC, user, data, apps, wallpaperId, customWp, setti
           onClose={() => setSheet(null)} />;
       })()}
 
-      {/* floating drag clone (jiggle/edit mode) */}
-      {dragVis && (() => { const a = appById(dragVis.id); if (!a) return null; return (
-        <div style={{ position: "fixed", left: dragVis.x - 34, top: dragVis.y - 46, width: 68, zIndex: 80, pointerEvents: "none", opacity: 0.96, transform: "scale(1.12)", filter: "drop-shadow(0 10px 20px rgba(0,0,0,0.5))" }}>
-          <MobileIcon app={a} size={62} glass={glass} />
+      {/* floating drag clone (jiggle/edit mode) — moved via ref in onMove */}
+      {dragId && (() => { const a = appById(dragId); if (!a) return null; return (
+        <div ref={dragCloneRef} style={{ position: "fixed", left: 0, top: 0, width: 66, zIndex: 80, pointerEvents: "none", willChange: "transform", transform: "translate(" + (dragPt.current.x - 33) + "px," + (dragPt.current.y - 46) + "px)" }}>
+          <div style={{ transform: "scale(1.14)", opacity: 0.95, filter: "drop-shadow(0 12px 22px rgba(0,0,0,0.5))" }}>
+            <MobileIcon app={a} size={62} glass={glass} />
+          </div>
         </div>
       ); })()}
 
@@ -332,7 +391,7 @@ export function MobileShell({ AC, user, data, apps, wallpaperId, customWp, setti
       {addPicker && (() => {
         const hiddenApps = apps.filter(a => hidden.has(a.id));
         return (
-          <div style={{ position: "absolute", inset: 0, zIndex: 78, background: "rgba(6,8,18,0.66)", backdropFilter: "blur(34px) saturate(150%)", WebkitBackdropFilter: "blur(34px) saturate(150%)", paddingTop: "calc(" + SAT + " + 40px)", display: "flex", flexDirection: "column", animation: "panel-up 0.3s cubic-bezier(0.22,1,0.36,1)" }}>
+          <div style={{ position: "absolute", inset: 0, zIndex: 78, background: "rgba(6,8,18,0.72)", backdropFilter: "blur(22px) saturate(140%)", WebkitBackdropFilter: "blur(22px) saturate(140%)", paddingTop: "calc(" + SAT + " + 40px)", display: "flex", flexDirection: "column", animation: "panel-up 0.34s cubic-bezier(0.22,1,0.36,1)" }}>
             <div style={{ textAlign: "center", color: "#fff", fontFamily: FFB, fontWeight: 700, fontSize: 14, paddingBottom: 12 }}>Add to Home</div>
             <div style={{ flex: 1, overflowY: "auto", padding: "4px 18px 24px" }}>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: "20px 8px", alignContent: "start" }}>
@@ -358,10 +417,10 @@ function ControlCenter({ AC, vol, setVolume, onClose }) {
   const upClose = (e) => { if (sy.current != null && sy.current - pt(e).clientY > 34) onClose(); sy.current = null; };
   return (
     <div onTouchStart={down} onTouchEnd={upClose} onMouseDown={down} onMouseUp={upClose} onClick={e => { if (e.target === e.currentTarget) onClose(); }}
-      style={{ position: "absolute", inset: 0, zIndex: 60, padding: "calc(" + SAT + " + 24px) 16px 0", background: "rgba(6,8,18,0.5)", backdropFilter: "blur(34px) saturate(150%)", WebkitBackdropFilter: "blur(34px) saturate(150%)", animation: "panel-down 0.3s cubic-bezier(0.22,1,0.36,1)", touchAction: "none" }}>
+      style={{ position: "absolute", inset: 0, zIndex: 60, padding: "calc(" + SAT + " + 24px) 16px 0", background: "rgba(6,8,18,0.62)", backdropFilter: "blur(22px) saturate(140%)", WebkitBackdropFilter: "blur(22px) saturate(140%)", animation: "panel-down 0.34s cubic-bezier(0.22,1,0.36,1)", touchAction: "none" }}>
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         <div style={{ display: "flex", justifyContent: "center", paddingBottom: 4 }}><div style={{ width: 40, height: 5, borderRadius: 3, background: "rgba(255,255,255,0.55)" }} /></div>
-        <div style={{ display: "flex", gap: 12 }}>{toggles.map(t => (<div key={t.id} onClick={() => setTg(s => ({ ...s, [t.id]: !s[t.id] }))} style={tile(!!tg[t.id])}><span style={{ fontSize: 20 }}>{t.icon}</span>{t.label}</div>))}</div>
+        <div style={{ display: "flex", gap: 12 }}>{toggles.map(t => (<div key={t.id} className="mb-cc-tile" onClick={() => setTg(s => ({ ...s, [t.id]: !s[t.id] }))} style={tile(!!tg[t.id])}><span style={{ fontSize: 20 }}>{t.icon}</span>{t.label}</div>))}</div>
         <CCSlider icon="🔆" label="Brightness" value={0.85} onChange={() => {}} />
         <CCSlider icon="🔊" label="Volume" value={vol} onChange={setVolume} />
         <div style={{ textAlign: "center", color: "rgba(255,255,255,0.6)", fontSize: 11.5, fontFamily: FFM, marginTop: 2 }}>swipe up or tap to close</div>
@@ -398,7 +457,7 @@ function AppLibrary({ AC, apps, glass, search, setSearch, onPick, onLong, onClos
   const listDown = (e) => { listSt.current = { y: pt(e).clientY, top: e.currentTarget.scrollTop }; };
   const listUp = (e) => { const s = listSt.current; listSt.current = null; if (s && s.top <= 2 && pt(e).clientY - s.y > 48) onClose(); };
   return (
-    <div style={{ position: "absolute", inset: 0, zIndex: 60, paddingTop: "calc(" + SAT + " + 40px)", background: "rgba(6,8,18,0.66)", backdropFilter: "blur(36px) saturate(150%)", WebkitBackdropFilter: "blur(36px) saturate(150%)", display: "flex", flexDirection: "column", animation: "panel-up 0.3s cubic-bezier(0.22,1,0.36,1)" }}>
+    <div style={{ position: "absolute", inset: 0, zIndex: 60, paddingTop: "calc(" + SAT + " + 40px)", background: "rgba(6,8,18,0.72)", backdropFilter: "blur(22px) saturate(140%)", WebkitBackdropFilter: "blur(22px) saturate(140%)", display: "flex", flexDirection: "column", animation: "panel-up 0.34s cubic-bezier(0.22,1,0.36,1)" }}>
       <div onTouchStart={down} onTouchEnd={upClose} onMouseDown={down} onMouseUp={upClose} style={{ padding: "6px 18px 12px", touchAction: "none" }}>
         <div style={{ display: "flex", justifyContent: "center", paddingBottom: 8 }}><div style={{ width: 40, height: 5, borderRadius: 3, background: "rgba(255,255,255,0.5)" }} /></div>
         <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "0 14px", height: 42, background: "rgba(255,255,255,0.14)", borderRadius: 12 }}>
@@ -421,7 +480,7 @@ function AppLibrary({ AC, apps, glass, search, setSearch, onPick, onLong, onClos
 function AppSwitcher({ openApps, appById, glass, renderApp, onPick, onCloseApp, onDismiss }) {
   return (
     <div onClick={e => { if (Date.now() - lastTouchAt < 700) return; if (e.target === e.currentTarget) onDismiss(); }} onTouchEnd={e => { lastTouchAt = Date.now(); if (e.target === e.currentTarget) onDismiss(); }}
-      style={{ position: "absolute", inset: 0, zIndex: 70, background: "rgba(5,7,16,0.74)", backdropFilter: "blur(30px) saturate(140%)", WebkitBackdropFilter: "blur(30px) saturate(140%)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 16, animation: "ss-fade 0.16s" }}>
+      style={{ position: "absolute", inset: 0, zIndex: 70, background: "rgba(5,7,16,0.82)", backdropFilter: "blur(18px) saturate(135%)", WebkitBackdropFilter: "blur(18px) saturate(135%)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 16, animation: "ss-fade 0.2s" }}>
       <div style={{ fontFamily: FFB, fontWeight: 700, fontSize: 14, color: "#fff", letterSpacing: 0.3 }}>Recent apps</div>
       {openApps.length === 0 ? (
         <div style={{ color: "rgba(255,255,255,0.55)", fontSize: 13, fontStyle: "italic" }}>No open apps</div>
