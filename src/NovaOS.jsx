@@ -39,6 +39,8 @@ import {
   WALLPAPERS, WMO, HAS_SVG_ICON, NOVA_VERSION,
 } from "./ui/constants.js";
 import { Wallpaper, NovaBg, BlissBg, AuroraBg, MeshBg, SupernovaBg } from "./ui/wallpapers.jsx";
+import { isDesktop, powerOff } from "./lib/system.js";
+import { isLiteMode } from "./lib/lite.js";
 import { CommandBar } from "./ui/CommandBar.jsx";
 import { TaskView } from "./ui/TaskView.jsx";
 import { MobileShell } from "./ui/MobileShell.jsx";
@@ -2421,6 +2423,13 @@ export default function NovaOS(){
               exit point. */}
           <button onClick={()=>{setMenuOpen(false);toggleFullscreen();}} title={isFs?"Exit fullscreen (F11)":"Enter fullscreen (F11)"} style={{width:34,height:34,borderRadius:8,background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.1)",cursor:"pointer",fontSize:13,color:"rgba(255,255,255,0.7)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,transition:"all 0.15s"}}>{isFs?"🗗":"⛶"}</button>
           <button onClick={logout} title="Sign out" style={{padding:"7px 13px",background:"rgba(255,80,80,0.1)",border:"1px solid rgba(255,80,80,0.28)",borderRadius:8,cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:11,color:"rgba(255,140,140,0.95)",transition:"all 0.18s cubic-bezier(0.4,0,0.2,1)"}}>Logout</button>
+          {/* v10.5 — Shut Down (powers off the host). Only the Nova Linux Tauri
+              kiosk can actually do this, so it's shown only there
+              (Tauri + lite/kiosk mode); hidden on web, PWA, Android, and the
+              normal windowed desktop build. */}
+          {isDesktop()&&isLiteMode()&&(
+            <button onClick={()=>{playSound("logout");powerOff();}} title="Shut down this machine" style={{padding:"7px 11px",background:"rgba(255,170,60,0.1)",border:"1px solid rgba(255,170,60,0.3)",borderRadius:8,cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:11,color:"rgba(255,196,120,0.96)",transition:"all 0.18s cubic-bezier(0.4,0,0.2,1)",display:"flex",alignItems:"center",gap:5}}>⏻ Shut Down</button>
+          )}
         </div>
       </div>)}
  
