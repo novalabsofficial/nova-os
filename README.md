@@ -1,4 +1,4 @@
-# Nova OS - Supernova Edition (v10.3)
+# Nova OS - Supernova Edition (v10.4)
 
 A browser-based operating system, built with React + Vite, backed by Firebase,
 and shippable four ways: boot it in a tab, **install it on your phone** (PWA),
@@ -8,10 +8,28 @@ built-in apps, cross-device accounts, an AI command bar, virtual desktops, a
 real tabbed browser, a sandboxed shell - and a full, polished iOS-style mobile
 edition.
 
-v10.1 delivered the Mobile edition, v10.2 polished it, and **v10.3 ships a real
-native Android app** (via Capacitor) distributed as a free APK on GitHub
-Releases - no app-store fee - with reliable on-device haptics. Still on the
-long-term horizon: a bootable Linux distribution.
+v10.1 delivered the Mobile edition, v10.2 polished it, v10.3 shipped a real
+native Android app (free APK on GitHub Releases, reliable haptics), and **v10.4
+deepens the native app** with immersive fullscreen, a true in-app browser, real
+notifications, and smoother on-device motion. Still on the long-term horizon: a
+bootable Linux distribution.
+
+---
+
+## What's new in 10.4 (native app polish)
+
+- **Working fullscreen / immersive** - the Control Center fullscreen button now
+  hides the phone's system UI (Android immersive mode); Nova OS also goes
+  immersive on launch so it owns the whole screen.
+- **True in-app browser** - external links and the Browser app's "Open
+  externally" open a real Chrome Custom Tab (Capacitor Browser) in the app.
+- **Real notifications** - Nova OS notifications also raise actual Android system
+  notifications.
+- **Hardware back button** - routes into the OS (close the open overlay/app, then
+  Home); at the Home screen it backgrounds the app instead of quitting.
+- **Close Nova OS** - a quit button in Settings (native app only).
+- **Smoother animations on device** - dropped the WebView-janky backdrop blur and
+  the animated wallpaper inside the native app.
 
 ---
 
