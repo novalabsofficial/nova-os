@@ -138,6 +138,9 @@ const SOUND_WALLPAPER_LS_KEY = "nova-sound-wallpaper";
 // this module stays a pure leaf with no circular import risk.
 const WALLPAPER_SEMITONES = {
   mesh:   0,
+  // v10.0 Supernova edition wallpapers
+  supernova: 7,   // bright, energetic (perfect fifth up)
+  nebula:   -3,   // calm, spacious
   // v8.0 additions
   halcyon: 2,
   cascade: 4,
@@ -249,14 +252,17 @@ function _voice(ctx, dest, freq, t, durMs, gain, type = "sine", attackMs = 8) {
   osc.stop(t + dur);
 }
 
-// A clean "chime": a sine fundamental, a quiet octave for clarity, and a
-// faint slightly-inharmonic 12th (×3.01) for a touch of sparkle. Far lighter
-// than the old 4-oscillator detuned bell — the reverb bus supplies the body
-// and tail, so the note itself stays uncluttered.
-function _chime(ctx, dest, t, freq, durMs, gain, attackMs = 6) {
-  _voice(ctx, dest, freq,        t, durMs,        gain,        "sine", attackMs);
-  _voice(ctx, dest, freq * 2.0,  t, durMs * 0.55, gain * 0.26, "sine", attackMs);
-  _voice(ctx, dest, freq * 3.01, t, durMs * 0.32, gain * 0.09, "sine", attackMs);
+// v10.0 — a warmer, cleaner "tine" chime. A sine fundamental for the body,
+// a faint triangle at the fundamental for gentle warmth (soft odd harmonics),
+// a quiet octave for clarity, and a faint *consonant* twelfth (×3.0, a pure
+// octave-plus-fifth) for sparkle. Dropping the old ×3.01 inharmonic removes
+// the slight metallic "beating" that made the previous chimes read a touch
+// digital — the partials now all sit in tune, so the note rings clean.
+function _chime(ctx, dest, t, freq, durMs, gain, attackMs = 7) {
+  _voice(ctx, dest, freq,       t, durMs,         gain,        "sine",     attackMs); // fundamental
+  _voice(ctx, dest, freq,       t, durMs * 0.85,  gain * 0.14, "triangle", attackMs); // warmth
+  _voice(ctx, dest, freq * 2.0, t, durMs * 0.50,  gain * 0.20, "sine",     attackMs); // octave (clarity)
+  _voice(ctx, dest, freq * 3.0, t, durMs * 0.26,  gain * 0.06, "sine",     attackMs); // twelfth (sparkle)
 }
 
 // A slow swelling pad: fundamental + perfect fifth + sub-octave, all with a
@@ -287,10 +293,11 @@ const SOUND_RECIPES = {
   // supplying the tail, the three notes ring *together* into one resonant
   // moment. This is the sound the whole v9.0 pass was built to fix.
   login: (ctx, t, v, r, d) => {
-    _voice(ctx, d, 130.81 * r, t + 0.00, 1400, 0.06 * v, "sine", 120);   // C3 body
+    _voice(ctx, d, 130.81 * r, t + 0.00, 1500, 0.06 * v, "sine", 140);   // C3 body
     _chime(ctx, d, t + 0.00, 523.25 * r, 900,  0.15 * v);                // C5
     _chime(ctx, d, t + 0.10, 659.25 * r, 950,  0.15 * v);                // E5
     _chime(ctx, d, t + 0.20, 783.99 * r, 1300, 0.16 * v);                // G5 — rings out
+    _voice(ctx, d, 1046.50 * r, t + 0.34, 760, 0.05 * v, "sine", 9);     // C6 — premium shimmer
   },
 
   // Logout — a calm two-step descent (G5 → C5) settling onto a low C body.
@@ -551,26 +558,46 @@ function _buildBus(ctx, withReverb) {
       limiter.release.value = 0.2;
       limiter.connect(ctx.destination);
 
-      // Gentle lowpass — shaves the brittle digital top off pure oscillators.
-      const tone = ctx.createBiquadFilter();
-      tone.type = "lowpass";
-      tone.frequency.value = 8800;
-      tone.Q.value = 0.4;
-      tone.connect(limiter);
+      // v10.0 tone shaping. A gentle lowpass shaves the brittle digital top
+      // off pure oscillators; a highpass clears sub-rumble so the sounds read
+      // clean and "present" rather than boomy. Together they give the tight,
+      // expensive midband modern OS sounds sit in.
+      const lowpass = ctx.createBiquadFilter();
+      lowpass.type = "lowpass";
+      lowpass.frequency.value = 9400;
+      lowpass.Q.value = 0.5;
+      lowpass.connect(limiter);
 
-      input = tone;
+      const highpass = ctx.createBiquadFilter();
+      highpass.type = "highpass";
+      highpass.frequency.value = 72;
+      highpass.connect(lowpass);
 
-      // Reverb send — only for musical sounds, and only if convolution is
-      // available. Generating the impulse is cheap and these sounds are rare.
+      input = highpass;
+
+      // Reverb send — musical sounds only. v10.0: a shorter, smoother tail
+      // with a small pre-delay (separates the dry hit from the wash for
+      // clarity) and a highpass on the wet so the tail stays airy, never
+      // muddy. Fed post-EQ so the reverb inherits the clean band.
       if (withReverb &&
           typeof ctx.createConvolver === "function" &&
           typeof ctx.createBuffer === "function") {
         const conv = ctx.createConvolver();
-        conv.buffer = _impulse(ctx, 1.6, 2.6);
+        conv.buffer = _impulse(ctx, 1.3, 3.0);
+        let head = conv;
+        if (typeof ctx.createDelay === "function") {
+          const pre = ctx.createDelay(0.2);
+          pre.delayTime.value = 0.022;
+          pre.connect(conv);
+          head = pre;
+        }
+        const wetHp = ctx.createBiquadFilter();
+        wetHp.type = "highpass";
+        wetHp.frequency.value = 320;
         const wet = ctx.createGain();
         wet.gain.value = 0.2;
-        tone.connect(conv);
-        conv.connect(wet).connect(limiter);
+        conv.connect(wetHp).connect(wet).connect(limiter);
+        lowpass.connect(head);
         reverb = true;
       }
     }

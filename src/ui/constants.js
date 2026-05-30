@@ -275,6 +275,11 @@ export const WALLPAPERS = {
   // shows as a pickable swatch; it has no `grad`, only a preview gradient.
   auto:     {name:"Auto",      semitones: 0,  preview:"linear-gradient(90deg,#0b1026 0%,#1d4ed8 26%,#f59e0b 52%,#7c3aed 76%,#0b1026 100%)"},
   mesh:     {name:"Mesh",      semitones: 0,  preview:"radial-gradient(ellipse at 18% 22%,#6366f1 0%,transparent 45%),radial-gradient(ellipse at 82% 18%,#ec4899 0%,transparent 40%),radial-gradient(ellipse at 60% 85%,#06b6d4 0%,transparent 45%),linear-gradient(135deg,#0a0a14,#050510)"},
+  // v10.0 — Supernova Edition signature wallpapers (SVG-backed; see
+  // wallpapers.jsx). Supernova: a radiant exploding-star burst. Nebula: a
+  // calm, spacious deep-space cloud companion. Both clean + professional.
+  supernova:{name:"Supernova", semitones: 7,  preview:"radial-gradient(circle at 50% 44%,#ffffff 0%,#fde68a 7%,#f59e0b 15%,#ec4899 33%,#a855f7 54%,#3b1d6e 76%,#060414 100%)"},
+  nebula:   {name:"Nebula",    semitones:-3,  preview:"radial-gradient(ellipse at 28% 30%,#2dd4bf 0%,transparent 46%),radial-gradient(ellipse at 76% 34%,#6366f1 0%,transparent 46%),radial-gradient(ellipse at 54% 82%,#c026d3 0%,transparent 48%),radial-gradient(ellipse at 86% 78%,#fb7185 0%,transparent 40%),linear-gradient(135deg,#07071a,#050510)"},
   // v8.0 additions — five new wallpapers designed for the refreshed UI.
   // Prism is SVG-backed (renders the holographic shimmer cleanly at any size);
   // the others are pure CSS gradients so they're zero-cost to render. Each

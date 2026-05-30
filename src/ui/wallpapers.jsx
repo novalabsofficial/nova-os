@@ -547,6 +547,149 @@ function MeshBg() {
   );
 }
 
+// v10.0 — Supernova: the edition's signature wallpaper. A brilliant exploding
+// star: a white-hot core blooming through gold → magenta → violet → deep blue
+// against near-black space, with a faint expanding shockwave shell and a
+// scattered star field. Built the Mesh/Ember way — large heavily-blurred
+// radial glows for the energy field, a small crisp core on top — so it stays
+// smooth and premium rather than busy. Off-centre core (upper third) leaves
+// the lower desktop calm for icons.
+function SupernovaBg() {
+  const cx = 720, cy = 360;
+  return (
+    <svg style={{position:"absolute",inset:0,width:"100%",height:"100%"}} viewBox="0 0 1440 900" preserveAspectRatio="xMidYMid slice">
+      <defs>
+        {/* Deep-space backdrop: faint blue-violet bloom around the burst,
+            falling to near-black at the edges */}
+        <radialGradient id="sn-bg" cx="50%" cy="40%" r="80%">
+          <stop offset="0%"   stopColor="#161438"/>
+          <stop offset="45%"  stopColor="#0a0820"/>
+          <stop offset="100%" stopColor="#040311"/>
+        </radialGradient>
+        {/* Energy field — concentric color zones, hottest in the middle */}
+        <radialGradient id="sn-core" cx="50%" cy="50%" r="50%">
+          <stop offset="0%"   stopColor="#ffffff" stopOpacity="0.95"/>
+          <stop offset="30%"  stopColor="#fff3c4" stopOpacity="0.85"/>
+          <stop offset="62%"  stopColor="#f59e0b" stopOpacity="0.45"/>
+          <stop offset="100%" stopColor="#f59e0b" stopOpacity="0"/>
+        </radialGradient>
+        <radialGradient id="sn-mid" cx="50%" cy="50%" r="50%">
+          <stop offset="0%"   stopColor="#ec4899" stopOpacity="0.7"/>
+          <stop offset="55%"  stopColor="#db2777" stopOpacity="0.28"/>
+          <stop offset="100%" stopColor="#db2777" stopOpacity="0"/>
+        </radialGradient>
+        <radialGradient id="sn-out" cx="50%" cy="50%" r="50%">
+          <stop offset="0%"   stopColor="#a855f7" stopOpacity="0.55"/>
+          <stop offset="60%"  stopColor="#6d28d9" stopOpacity="0.22"/>
+          <stop offset="100%" stopColor="#6d28d9" stopOpacity="0"/>
+        </radialGradient>
+        <radialGradient id="sn-far" cx="50%" cy="50%" r="50%">
+          <stop offset="0%"   stopColor="#3b82f6" stopOpacity="0.4"/>
+          <stop offset="100%" stopColor="#3b82f6" stopOpacity="0"/>
+        </radialGradient>
+        <filter id="sn-blur"><feGaussianBlur stdDeviation="80"/></filter>
+        <filter id="sn-coreblur"><feGaussianBlur stdDeviation="9"/></filter>
+        <radialGradient id="sn-dot" cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stopColor="#ffffff" stopOpacity="1"/>
+          <stop offset="60%" stopColor="#fff7e0" stopOpacity="0.9"/>
+          <stop offset="100%" stopColor="#ffd27a" stopOpacity="0"/>
+        </radialGradient>
+        <radialGradient id="sn-vign" cx="50%" cy="42%" r="80%">
+          <stop offset="55%" stopColor="#000" stopOpacity="0"/>
+          <stop offset="100%" stopColor="#000" stopOpacity="0.5"/>
+        </radialGradient>
+      </defs>
+
+      <rect width="1440" height="900" fill="url(#sn-bg)"/>
+
+      {/* Star field (behind the glow so the burst washes over nearby stars) */}
+      {[...Array(90)].map((_, i) => {
+        const x = (i*167.3+41)%1440, y = (i*101.7+23)%900, r = i%7===0 ? 1.7 : i%3===0 ? 1.1 : 0.6;
+        const op = 0.28 + (i%5)*0.12;
+        return <circle key={i} cx={x} cy={y} r={r} fill={"rgba(255,255,255,"+op+")"}/>;
+      })}
+
+      {/* Energy field — blurred concentric glows */}
+      <g filter="url(#sn-blur)">
+        <circle cx={cx} cy={cy} r="640" fill="url(#sn-far)"/>
+        <circle cx={cx} cy={cy} r="470" fill="url(#sn-out)"/>
+        <circle cx={cx} cy={cy} r="320" fill="url(#sn-mid)"/>
+        <circle cx={cx} cy={cy} r="230" fill="url(#sn-core)"/>
+      </g>
+
+      {/* Expanding shockwave shell — a thin faint ring */}
+      <circle cx={cx} cy={cy} r="300" fill="none" stroke="rgba(255,225,180,0.18)" strokeWidth="2"/>
+      <circle cx={cx} cy={cy} r="404" fill="none" stroke="rgba(190,160,255,0.10)" strokeWidth="1.5"/>
+
+      {/* Crisp white-hot core on top */}
+      <g filter="url(#sn-coreblur)"><circle cx={cx} cy={cy} r="58" fill="url(#sn-dot)"/></g>
+      <circle cx={cx} cy={cy} r="14" fill="#ffffff"/>
+
+      <rect width="1440" height="900" fill="url(#sn-vign)"/>
+    </svg>
+  );
+}
+
+// v10.0 — Nebula: a calm, spacious deep-space companion to Supernova. Soft
+// teal / indigo / violet / rose clouds drift over near-black, heavily blurred
+// (Mesh-grade) so they melt into one smooth field, with a dense star field
+// and a gentle vignette. Lots of usable dark space; reads premium + serene.
+function NebulaBg() {
+  return (
+    <svg style={{position:"absolute",inset:0,width:"100%",height:"100%"}} viewBox="0 0 1440 900" preserveAspectRatio="xMidYMid slice">
+      <defs>
+        <radialGradient id="neb1" cx="26%" cy="30%" r="52%">
+          <stop offset="0%"   stopColor="#2dd4bf" stopOpacity="0.62"/>
+          <stop offset="55%"  stopColor="#0f766e" stopOpacity="0.18"/>
+          <stop offset="100%" stopColor="#05051a" stopOpacity="0"/>
+        </radialGradient>
+        <radialGradient id="neb2" cx="74%" cy="32%" r="54%">
+          <stop offset="0%"   stopColor="#6366f1" stopOpacity="0.66"/>
+          <stop offset="55%"  stopColor="#3730a3" stopOpacity="0.2"/>
+          <stop offset="100%" stopColor="#05051a" stopOpacity="0"/>
+        </radialGradient>
+        <radialGradient id="neb3" cx="52%" cy="80%" r="56%">
+          <stop offset="0%"   stopColor="#c026d3" stopOpacity="0.6"/>
+          <stop offset="55%"  stopColor="#86198f" stopOpacity="0.18"/>
+          <stop offset="100%" stopColor="#05051a" stopOpacity="0"/>
+        </radialGradient>
+        <radialGradient id="neb4" cx="86%" cy="76%" r="40%">
+          <stop offset="0%"   stopColor="#fb7185" stopOpacity="0.42"/>
+          <stop offset="100%" stopColor="#05051a" stopOpacity="0"/>
+        </radialGradient>
+        <radialGradient id="neb5" cx="12%" cy="82%" r="38%">
+          <stop offset="0%"   stopColor="#38bdf8" stopOpacity="0.38"/>
+          <stop offset="100%" stopColor="#05051a" stopOpacity="0"/>
+        </radialGradient>
+        <filter id="neb-blur"><feGaussianBlur stdDeviation="92"/></filter>
+        <radialGradient id="neb-vign" cx="50%" cy="50%" r="78%">
+          <stop offset="58%" stopColor="#000" stopOpacity="0"/>
+          <stop offset="100%" stopColor="#000" stopOpacity="0.42"/>
+        </radialGradient>
+      </defs>
+
+      <rect width="1440" height="900" fill="#05051a"/>
+
+      <g filter="url(#neb-blur)">
+        <rect width="1440" height="900" fill="url(#neb1)"/>
+        <rect width="1440" height="900" fill="url(#neb2)"/>
+        <rect width="1440" height="900" fill="url(#neb3)"/>
+        <rect width="1440" height="900" fill="url(#neb4)"/>
+        <rect width="1440" height="900" fill="url(#neb5)"/>
+      </g>
+
+      {/* Star field */}
+      {[...Array(120)].map((_, i) => {
+        const x = (i*151.7+19)%1440, y = (i*89.3+13)%900, r = i%8===0 ? 1.6 : i%3===0 ? 1 : 0.55;
+        const op = 0.3 + (i%5)*0.12;
+        return <circle key={i} cx={x} cy={y} r={r} fill={"rgba(255,255,255,"+op+")"}/>;
+      })}
+
+      <rect width="1440" height="900" fill="url(#neb-vign)"/>
+    </svg>
+  );
+}
+
 /**
  * Resolve the concrete background element for a wallpaper id.
  * "custom" requires a customUrl (the user-uploaded base64 image).
@@ -557,6 +700,8 @@ function renderBg(id, customUrl) {
     return <div style={{position:"absolute",inset:0,background:'url("'+customUrl+'") center/cover no-repeat'}}/>;
   }
   if (!id || id === "mesh")  return <MeshBg/>;
+  if (id === "supernova")    return <SupernovaBg/>;
+  if (id === "nebula")       return <NebulaBg/>;
   if (id === "aurora")       return <AuroraBg/>;
   if (id === "nova")         return <NovaBg/>;
   if (id === "bliss")        return <BlissBg/>;
