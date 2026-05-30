@@ -278,7 +278,7 @@ export const WALLPAPERS = {
   // v10.0 — Supernova Edition signature wallpapers (SVG-backed; see
   // wallpapers.jsx). Supernova: a radiant exploding-star burst. Nebula: a
   // calm, spacious deep-space cloud companion. Both clean + professional.
-  supernova:{name:"Supernova", semitones: 7,  preview:"radial-gradient(circle at 50% 44%,#ffffff 0%,#fde68a 7%,#f59e0b 15%,#ec4899 33%,#a855f7 54%,#3b1d6e 76%,#060414 100%)"},
+  supernova:{name:"Supernova", semitones: 7,  preview:"radial-gradient(circle at 50% 44%,#eaf6ff 0%,#a5e8ff 12%,#22d3ee 26%,#38bdf8 42%,#2563eb 60%,#1e3a8a 78%,#03070f 100%)"},
   nebula:   {name:"Nebula",    semitones:-3,  preview:"radial-gradient(ellipse at 28% 30%,#2dd4bf 0%,transparent 46%),radial-gradient(ellipse at 76% 34%,#6366f1 0%,transparent 46%),radial-gradient(ellipse at 54% 82%,#c026d3 0%,transparent 48%),radial-gradient(ellipse at 86% 78%,#fb7185 0%,transparent 40%),linear-gradient(135deg,#07071a,#050510)"},
   // v8.0 additions — five new wallpapers designed for the refreshed UI.
   // Prism is SVG-backed (renders the holographic shimmer cleanly at any size);

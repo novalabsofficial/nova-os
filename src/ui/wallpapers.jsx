@@ -547,54 +547,54 @@ function MeshBg() {
   );
 }
 
-// v10.0 — Supernova: the edition's signature wallpaper. A brilliant exploding
-// star: a white-hot core blooming through gold → magenta → violet → deep blue
-// against near-black space, with a faint expanding shockwave shell and a
-// scattered star field. Built the Mesh/Ember way — large heavily-blurred
-// radial glows for the energy field, a small crisp core on top — so it stays
-// smooth and premium rather than busy. Off-centre core (upper third) leaves
-// the lower desktop calm for icons.
+// v10.0 — Supernova: the edition's signature wallpaper. A cool, crisp stellar
+// glow — a luminous blue-white core melting out through cyan and electric blue
+// into deep navy and black space, over a fine star field. No rings, no hard
+// edges: built the Mesh/Ember way from large heavily-blurred radial glows so
+// it stays smooth and premium. The core sits in the upper third so the lower
+// desktop stays calm for icons.
 function SupernovaBg() {
-  const cx = 720, cy = 360;
+  const cx = 720, cy = 372;
   return (
     <svg style={{position:"absolute",inset:0,width:"100%",height:"100%"}} viewBox="0 0 1440 900" preserveAspectRatio="xMidYMid slice">
       <defs>
-        {/* Deep-space backdrop: faint blue-violet bloom around the burst,
-            falling to near-black at the edges */}
-        <radialGradient id="sn-bg" cx="50%" cy="40%" r="80%">
-          <stop offset="0%"   stopColor="#161438"/>
-          <stop offset="45%"  stopColor="#0a0820"/>
-          <stop offset="100%" stopColor="#040311"/>
+        {/* Deep-space backdrop: a faint blue bloom around the star, falling to
+            near-black navy at the edges */}
+        <radialGradient id="sn-bg" cx="50%" cy="41%" r="82%">
+          <stop offset="0%"   stopColor="#0d2350"/>
+          <stop offset="45%"  stopColor="#071632"/>
+          <stop offset="100%" stopColor="#03070f"/>
         </radialGradient>
-        {/* Energy field — concentric color zones, hottest in the middle */}
+        {/* Energy field — concentric cool zones, brightest in the middle */}
         <radialGradient id="sn-core" cx="50%" cy="50%" r="50%">
-          <stop offset="0%"   stopColor="#ffffff" stopOpacity="0.95"/>
-          <stop offset="30%"  stopColor="#fff3c4" stopOpacity="0.85"/>
-          <stop offset="62%"  stopColor="#f59e0b" stopOpacity="0.45"/>
-          <stop offset="100%" stopColor="#f59e0b" stopOpacity="0"/>
+          <stop offset="0%"   stopColor="#eaf6ff" stopOpacity="0.95"/>
+          <stop offset="34%"  stopColor="#a5e8ff" stopOpacity="0.8"/>
+          <stop offset="66%"  stopColor="#22d3ee" stopOpacity="0.4"/>
+          <stop offset="100%" stopColor="#22d3ee" stopOpacity="0"/>
         </radialGradient>
         <radialGradient id="sn-mid" cx="50%" cy="50%" r="50%">
-          <stop offset="0%"   stopColor="#ec4899" stopOpacity="0.7"/>
-          <stop offset="55%"  stopColor="#db2777" stopOpacity="0.28"/>
-          <stop offset="100%" stopColor="#db2777" stopOpacity="0"/>
+          <stop offset="0%"   stopColor="#38bdf8" stopOpacity="0.6"/>
+          <stop offset="55%"  stopColor="#0ea5e9" stopOpacity="0.26"/>
+          <stop offset="100%" stopColor="#0ea5e9" stopOpacity="0"/>
         </radialGradient>
         <radialGradient id="sn-out" cx="50%" cy="50%" r="50%">
-          <stop offset="0%"   stopColor="#a855f7" stopOpacity="0.55"/>
-          <stop offset="60%"  stopColor="#6d28d9" stopOpacity="0.22"/>
-          <stop offset="100%" stopColor="#6d28d9" stopOpacity="0"/>
+          <stop offset="0%"   stopColor="#3b82f6" stopOpacity="0.5"/>
+          <stop offset="60%"  stopColor="#2563eb" stopOpacity="0.2"/>
+          <stop offset="100%" stopColor="#2563eb" stopOpacity="0"/>
         </radialGradient>
         <radialGradient id="sn-far" cx="50%" cy="50%" r="50%">
-          <stop offset="0%"   stopColor="#3b82f6" stopOpacity="0.4"/>
-          <stop offset="100%" stopColor="#3b82f6" stopOpacity="0"/>
+          <stop offset="0%"   stopColor="#1e3a8a" stopOpacity="0.45"/>
+          <stop offset="100%" stopColor="#1e3a8a" stopOpacity="0"/>
         </radialGradient>
-        <filter id="sn-blur"><feGaussianBlur stdDeviation="80"/></filter>
-        <filter id="sn-coreblur"><feGaussianBlur stdDeviation="9"/></filter>
-        <radialGradient id="sn-dot" cx="50%" cy="50%" r="50%">
-          <stop offset="0%" stopColor="#ffffff" stopOpacity="1"/>
-          <stop offset="60%" stopColor="#fff7e0" stopOpacity="0.9"/>
-          <stop offset="100%" stopColor="#ffd27a" stopOpacity="0"/>
+        {/* soft halo bloom for the core (no hard dot) */}
+        <radialGradient id="sn-glow" cx="50%" cy="50%" r="50%">
+          <stop offset="0%"   stopColor="#f2fbff" stopOpacity="0.9"/>
+          <stop offset="45%"  stopColor="#bdecff" stopOpacity="0.5"/>
+          <stop offset="100%" stopColor="#7dd3fc" stopOpacity="0"/>
         </radialGradient>
-        <radialGradient id="sn-vign" cx="50%" cy="42%" r="80%">
+        <filter id="sn-blur"><feGaussianBlur stdDeviation="82"/></filter>
+        <filter id="sn-coreblur"><feGaussianBlur stdDeviation="26"/></filter>
+        <radialGradient id="sn-vign" cx="50%" cy="42%" r="82%">
           <stop offset="55%" stopColor="#000" stopOpacity="0"/>
           <stop offset="100%" stopColor="#000" stopOpacity="0.5"/>
         </radialGradient>
@@ -602,28 +602,23 @@ function SupernovaBg() {
 
       <rect width="1440" height="900" fill="url(#sn-bg)"/>
 
-      {/* Star field (behind the glow so the burst washes over nearby stars) */}
-      {[...Array(90)].map((_, i) => {
+      {/* Star field (behind the glow so the star washes over nearby ones) */}
+      {[...Array(95)].map((_, i) => {
         const x = (i*167.3+41)%1440, y = (i*101.7+23)%900, r = i%7===0 ? 1.7 : i%3===0 ? 1.1 : 0.6;
-        const op = 0.28 + (i%5)*0.12;
-        return <circle key={i} cx={x} cy={y} r={r} fill={"rgba(255,255,255,"+op+")"}/>;
+        const op = 0.26 + (i%5)*0.12;
+        return <circle key={i} cx={x} cy={y} r={r} fill={"rgba(214,236,255,"+op+")"}/>;
       })}
 
-      {/* Energy field — blurred concentric glows */}
+      {/* Energy field — blurred concentric cool glows */}
       <g filter="url(#sn-blur)">
-        <circle cx={cx} cy={cy} r="640" fill="url(#sn-far)"/>
-        <circle cx={cx} cy={cy} r="470" fill="url(#sn-out)"/>
-        <circle cx={cx} cy={cy} r="320" fill="url(#sn-mid)"/>
-        <circle cx={cx} cy={cy} r="230" fill="url(#sn-core)"/>
+        <circle cx={cx} cy={cy} r="660" fill="url(#sn-far)"/>
+        <circle cx={cx} cy={cy} r="480" fill="url(#sn-out)"/>
+        <circle cx={cx} cy={cy} r="330" fill="url(#sn-mid)"/>
+        <circle cx={cx} cy={cy} r="240" fill="url(#sn-core)"/>
       </g>
 
-      {/* Expanding shockwave shell — a thin faint ring */}
-      <circle cx={cx} cy={cy} r="300" fill="none" stroke="rgba(255,225,180,0.18)" strokeWidth="2"/>
-      <circle cx={cx} cy={cy} r="404" fill="none" stroke="rgba(190,160,255,0.10)" strokeWidth="1.5"/>
-
-      {/* Crisp white-hot core on top */}
-      <g filter="url(#sn-coreblur)"><circle cx={cx} cy={cy} r="58" fill="url(#sn-dot)"/></g>
-      <circle cx={cx} cy={cy} r="14" fill="#ffffff"/>
+      {/* Soft luminous core bloom — blurred, no hard white edge */}
+      <g filter="url(#sn-coreblur)"><circle cx={cx} cy={cy} r="86" fill="url(#sn-glow)"/></g>
 
       <rect width="1440" height="900" fill="url(#sn-vign)"/>
     </svg>
