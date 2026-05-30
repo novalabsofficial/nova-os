@@ -11,14 +11,17 @@
 NOVA_URL="https://nova-os-official.vercel.app"
 ME="$(id -un)"
 
-echo ">> Installing cage + a kiosk browser ..."
+echo ">> Installing cage + seatd + a kiosk browser ..."
 sudo add-apt-repository -y universe
 sudo apt update
-sudo apt install -y cage
+# seatd = seat manager so a service-launched cage can grab the display (DRM
+# master) without an "active" logind session.
+sudo apt install -y cage seatd
+sudo systemctl enable --now seatd
 # Prefer surf (clean, no browser chrome); fall back to GNOME Web (epiphany)
 # which is always packaged. (cog isn't in Ubuntu's repos.)
 if sudo apt install -y surf; then BROWSER="surf"; else sudo apt install -y epiphany-browser; BROWSER="epiphany-browser"; fi
-sudo usermod -aG video,input,tty "$ME"
+sudo usermod -aG video,input,tty,seat,render "$ME"
 
 echo ">> Writing the kiosk service ..."
 sudo tee /etc/systemd/system/nova-kiosk.service >/dev/null <<UNIT
@@ -39,6 +42,7 @@ TTYReset=yes
 TTYVHangup=yes
 Environment=WLR_RENDERER=pixman
 Environment=WLR_NO_HARDWARE_CURSORS=1
+Environment=LIBSEAT_BACKEND=seatd
 ExecStart=/usr/bin/cage -- $BROWSER $NOVA_URL
 Restart=always
 
