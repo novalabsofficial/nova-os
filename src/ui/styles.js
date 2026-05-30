@@ -238,6 +238,18 @@ export const CSS = `
   /* generic pop-in for popovers/dialogs that want it inline */
   @keyframes pop-in{from{opacity:0;transform:scale(0.94) translateY(8px);}to{opacity:1;transform:none;}}
   @keyframes panel-in-right{from{opacity:0;transform:translateX(26px);}to{opacity:1;transform:none;}}
+  /* mobile Control Center drops from the top; App Library rises from the bottom */
+  @keyframes panel-down{from{opacity:0;transform:translateY(-22px);}to{opacity:1;transform:none;}}
+  @keyframes panel-up{from{opacity:0;transform:translateY(26px);}to{opacity:1;transform:none;}}
+  /* iOS-style icon wobble while the mobile home screen is in edit mode */
+  @keyframes icon-jiggle{0%{transform:rotate(-1.6deg);}50%{transform:rotate(1.6deg);}100%{transform:rotate(-1.6deg);}}
+  /* mobile springboard: spring home-return + tactile icon press */
+  @keyframes home-in{from{opacity:0;transform:scale(1.08);}to{opacity:1;transform:none;}}
+  @keyframes app-in{from{opacity:0;transform:scale(0.92) translateY(2%);}to{opacity:1;transform:none;}}
+  .mb-ic{transition:transform 0.13s var(--nv-ease);-webkit-touch-callout:none;}
+  .mb-ic:active{transform:scale(0.88);}
+  .mb-cc-tile{transition:transform 0.12s var(--nv-ease),background 0.18s var(--nv-ease);}
+  .mb-cc-tile:active{transform:scale(0.93);}
   /* respect reduced-motion: drop all the extra movement */
   @media (prefers-reduced-motion: reduce){
     *{animation-duration:0.01ms!important;transition-duration:0.01ms!important;}

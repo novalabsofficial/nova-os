@@ -40,6 +40,7 @@ import {
 import { Wallpaper, NovaBg, BlissBg, AuroraBg, MeshBg, SupernovaBg } from "./ui/wallpapers.jsx";
 import { CommandBar } from "./ui/CommandBar.jsx";
 import { TaskView } from "./ui/TaskView.jsx";
+import { MobileShell } from "./ui/MobileShell.jsx";
 import { NovaSvgIcon, AppIconDisplay, NovaLogo, WindowControlIcon, UserAvatar } from "./ui/icons.jsx";
 import { subscribeDrag, moveDrag, endDrag, getDrag } from "./lib/dragStore.js";
 import { Toggle } from "./ui/Toggle.jsx";
@@ -1425,6 +1426,69 @@ export default function NovaOS(){
     focusWin(winId);
   }
   function startResize(e,winId,edge){if(e.button!==0)return;e.preventDefault();const w=winsRef.current.find(w=>w.id===winId);if(w){setDrag({type:"resize",winId,edge,sx:e.clientX,sy:e.clientY,wx:w.x,wy:w.y,ww:w.width,wh:w.height});focusWin(winId);}}
+  // v10.x — the app-content switch, extracted so BOTH desktop windows and the
+  // mobile shell render apps the same way. `browserActive` controls the native
+  // browser webview's visibility (always true on mobile = one fullscreen app).
+  function renderAppContent(appId, browserActive=true){
+    const app=APPS.find(a=>a.id===appId);
+    return (
+      <Suspense fallback={
+        <div style={{display:"flex",alignItems:"center",justifyContent:"center",height:"100%",gap:10,color:"rgba(255,255,255,0.4)",padding:24}}>
+          <div style={{width:18,height:18,border:"2px solid rgba(255,255,255,0.15)",borderTopColor:AC,borderRadius:"50%",animation:"spin 0.8s linear infinite"}}/>
+          <span style={{fontFamily:FF,fontSize:12}}>Loading {app?.label||"app"}…</span>
+        </div>
+      }>
+        {appId==="notes"    &&<NotesApp    data={data} updateData={updateData} showToast={showToast} AC={AC} openNovaAi={()=>openApp("novaai")}/>}
+        {appId==="tasks"    &&<TasksApp    data={data} updateData={updateData} showToast={showToast} AC={AC} openNovaAi={()=>openApp("novaai")}/>}
+        {appId==="files"    &&<FilesApp    data={data} updateData={updateData} showToast={showToast} AC={AC} commApps={commApps} openApp={openApp}/>}
+        {appId==="paint"    &&<PaintApp    showToast={showToast} AC={AC} onSetWallpaper={handleCustomWallpaper}/>}
+        {appId==="browser"  &&<BrowserApp  AC={AC} active={browserActive}/>}
+        {appId==="snake"    &&<SnakeApp    AC={AC}/>}
+        {appId==="2048"     &&<Game2048App AC={AC}/>}
+        {appId==="store"    &&<StoreApp    user={user} data={data} updateData={updateData} showToast={showToast} AC={AC}/>}
+        {appId==="terminal" &&<TerminalApp user={user} AC={AC} openApp={openApp} showToast={showToast}/>}
+        {appId==="chat"     &&<ChatApp     user={user} AC={AC} data={data} updateData={updateData}/>}
+        {appId==="settings" &&<SettingsApp user={user} data={data} updateSettings={updateSettings} showToast={showToast} AC={AC} onCustomWallpaper={handleCustomWallpaper} onLogout={logout} initialSection={settingsSection}/>}
+        {appId==="profile"  &&<ProfileApp  user={user} data={data} updateData={updateData} showToast={showToast} AC={AC}/>}
+        {appId==="calculator" &&<CalculatorApp AC={AC}/>}
+        {appId==="clock"      &&<ClockApp AC={AC} data={data} updateSettings={updateSettings}/>}
+        {appId==="calendar"   &&<CalendarApp data={data} updateData={updateData} showToast={showToast} AC={AC}/>}
+        {appId==="music"      &&<MusicApp AC={AC} showToast={showToast}/>}
+        {appId==="pdf"        &&<PdfApp AC={AC} showToast={showToast}/>}
+        {appId==="atmos"      &&<AtmosApp AC={AC} showToast={showToast} pushNotification={pushNotification} openNovaAi={()=>openApp("novaai")} data={data} updateSettings={updateSettings} onSevereAlert={alert=>setSevereAlert(alert)}/>}
+        {appId==="minesweeper"&&<MinesweeperApp AC={AC} user={user}/>}
+        {appId==="wordle"     &&<WordleApp AC={AC} showToast={showToast}/>}
+        {appId==="tetris"     &&<TetrisApp AC={AC}/>}
+        {appId==="novaai"     &&<NovaAiApp AC={AC} showToast={showToast}/>}
+        {appId==="tictactoe"  &&<TicTacToeApp AC={AC}/>}
+        {appId==="pong"       &&<PongApp AC={AC}/>}
+        {appId==="flappy"     &&<FlappyBirdApp AC={AC} data={data} updateSettings={updateSettings} user={user}/>}
+        {appId==="invaders"   &&<SpaceInvadersApp AC={AC} data={data} updateSettings={updateSettings}/>}
+        {appId==="pacman"     &&<PacManApp AC={AC} data={data} updateSettings={updateSettings}/>}
+        {appId==="chess"      &&<ChessApp user={user} AC={AC}/>}
+        {appId==="photos"     &&<PhotosApp AC={AC} showToast={showToast} onSetWallpaper={handleCustomWallpaper}/>}
+        {appId==="screenshot" &&<ScreenshotApp AC={AC} showToast={showToast} onSetWallpaper={handleCustomWallpaper}/>}
+        {appId==="slides"     &&<SlidesApp AC={AC} data={data} updateData={updateData} showToast={showToast}/>}
+      </Suspense>
+    );
+  }
+  // v10.x — enabled widgets rendered for the mobile home screen (a horizontal
+  // card row). Reuses the same *WidgetContent components as the desktop.
+  function renderMobileWidgets(){
+    const s={x:0,y:0,w:168,h:150};
+    return Object.keys(WIDGET_CONFIGS).filter(id=>widgets[id]).map(id=>{
+      let content=null;
+      if(id==="clock")        content=<ClockWidgetContent   state={s} tick={tick} use24h={use24h} AC={AC}/>;
+      else if(id==="weather") content=<WeatherWidgetContent  state={s} data={data} updateSettings={updateSettings}/>;
+      else if(id==="notesw")  content=<NotesWidgetContent    state={s} data={data}/>;
+      else if(id==="tasksw")  content=<TasksWidgetContent    state={s} data={data} updateData={updateData}/>;
+      else if(id==="calendar")content=<CalendarWidgetContent state={s} tick={tick} AC={AC}/>;
+      else if(id==="sysinfo") content=<SysInfoWidgetContent  state={s}/>;
+      else if(id==="battery") content=<BatteryWidgetContent  state={s} AC={AC}/>;
+      else if(id==="pomodoro")content=<PomodoroWidgetContent state={s} AC={AC}/>;
+      return {id, content};
+    });
+  }
   // v10.0 — close plays a shrink-fade, THEN removes the window from state.
   function closeWin(id){
     playSound("windowClose");
@@ -1927,6 +1991,25 @@ export default function NovaOS(){
   );
  
   // ── DESKTOP ──────────────────────────────────────────────────────────────
+  // Mobile edition — phones get a wholly separate iOS-style shell instead of
+  // the desktop windowing UI (springboard, dock, Control Center, App Library).
+  if(deviceMode==="mobile"){
+    return (
+      <>
+        <style>{CSS}</style>
+        <MobileShell
+          AC={AC} user={user} data={data} apps={allApps}
+          wallpaperId={wpId} customWp={customWp}
+          settings={settings} updateSettings={updateSettings}
+          renderApp={(id)=>renderAppContent(id, true)}
+          widgets={renderMobileWidgets()}
+          onAppOpen={markAppNotificationsRead}
+          onLogout={logout}
+        />
+      </>
+    );
+  }
+
   return(
     <div data-drop="wallpaper" style={{width:"100%",height:"100vh",position:"relative",overflow:"hidden",cursor:dragCursor,fontSize:largeFnt?15:13}}
       onContextMenu={e=>{
@@ -2407,50 +2490,10 @@ export default function NovaOS(){
                 which would overflow. Applied to the content area (not the
                 window frame) so the title bar / controls stay a fixed size. */}
             <div style={{flex:1,overflowY:"auto",overflowX:"hidden",padding:20,minWidth:0,zoom:largeFnt?1.18:1}}>
-              {/* Each app is lazy-loaded — Suspense shows the spinner while the
-                  chunk is downloading. Once cached, reopens are instant.
-                  Per-window Suspense means opening Tetris doesn't blank out
-                  an already-loaded Notes window in another tab. */}
-              <Suspense fallback={
-                <div style={{display:"flex",alignItems:"center",justifyContent:"center",height:"100%",gap:10,color:"rgba(255,255,255,0.4)",padding:24}}>
-                  <div style={{width:18,height:18,border:"2px solid rgba(255,255,255,0.15)",borderTopColor:AC,borderRadius:"50%",animation:"spin 0.8s linear infinite"}}/>
-                  <span style={{fontFamily:FF,fontSize:12}}>Loading {app?.label||"app"}…</span>
-                </div>
-              }>
-                {win.app==="notes"    &&<NotesApp    data={data} updateData={updateData} showToast={showToast} AC={AC} openNovaAi={()=>openApp("novaai")}/>}
-                {win.app==="tasks"    &&<TasksApp    data={data} updateData={updateData} showToast={showToast} AC={AC} openNovaAi={()=>openApp("novaai")}/>}
-                {win.app==="files"    &&<FilesApp    data={data} updateData={updateData} showToast={showToast} AC={AC} commApps={commApps} openApp={openApp}/>}
-                {win.app==="paint"    &&<PaintApp    showToast={showToast} AC={AC} onSetWallpaper={handleCustomWallpaper}/>}
-                {win.app==="browser"  &&<BrowserApp  AC={AC} active={!overlayCoveringWin && win.id===focusedWinId && win.state!=="minimized" && (win.desk||0)===curDesk}/>}
-                {win.app==="snake"    &&<SnakeApp    AC={AC}/>}
-                {win.app==="2048"     &&<Game2048App AC={AC}/>}
-                {win.app==="store"    &&<StoreApp    user={user} data={data} updateData={updateData} showToast={showToast} AC={AC}/>}
-                {win.app==="terminal" &&<TerminalApp user={user} AC={AC} openApp={openApp} showToast={showToast}/>}
-                {win.app==="chat"     &&<ChatApp     user={user} AC={AC} data={data} updateData={updateData}/>}
-                {win.app==="settings" &&<SettingsApp user={user} data={data} updateSettings={updateSettings} showToast={showToast} AC={AC} onCustomWallpaper={handleCustomWallpaper} onLogout={logout} initialSection={settingsSection}/>}
-                {win.app==="profile"  &&<ProfileApp  user={user} data={data} updateData={updateData} showToast={showToast} AC={AC}/>}
-                {win.app==="calculator" &&<CalculatorApp AC={AC}/>}
-                {win.app==="clock"      &&<ClockApp AC={AC} data={data} updateSettings={updateSettings}/>}
-                {win.app==="calendar"   &&<CalendarApp data={data} updateData={updateData} showToast={showToast} AC={AC}/>}
-                {win.app==="music"      &&<MusicApp AC={AC} showToast={showToast}/>}
-                {win.app==="pdf"        &&<PdfApp AC={AC} showToast={showToast}/>}
-                {win.app==="atmos"      &&<AtmosApp AC={AC} showToast={showToast} pushNotification={pushNotification} openNovaAi={()=>openApp("novaai")} data={data} updateSettings={updateSettings} onSevereAlert={alert=>setSevereAlert(alert)}/>}
-                {win.app==="minesweeper"&&<MinesweeperApp AC={AC} user={user}/>}
-                {win.app==="wordle"     &&<WordleApp AC={AC} showToast={showToast}/>}
-                {win.app==="tetris"     &&<TetrisApp AC={AC}/>}
-                {win.app==="novaai"     &&<NovaAiApp AC={AC} showToast={showToast}/>}
-                {/* v7.4 games */}
-                {win.app==="tictactoe"  &&<TicTacToeApp AC={AC}/>}
-                {win.app==="pong"       &&<PongApp AC={AC}/>}
-                {win.app==="flappy"     &&<FlappyBirdApp AC={AC} data={data} updateSettings={updateSettings} user={user}/>}
-                {win.app==="invaders"   &&<SpaceInvadersApp AC={AC} data={data} updateSettings={updateSettings}/>}
-                {win.app==="pacman"     &&<PacManApp AC={AC} data={data} updateSettings={updateSettings}/>}
-                {win.app==="chess"      &&<ChessApp user={user} AC={AC}/>}
-                {/* v8.0 round-3 */}
-                {win.app==="photos"     &&<PhotosApp AC={AC} showToast={showToast} onSetWallpaper={handleCustomWallpaper}/>}
-                {win.app==="screenshot" &&<ScreenshotApp AC={AC} showToast={showToast} onSetWallpaper={handleCustomWallpaper}/>}
-                {win.app==="slides"     &&<SlidesApp AC={AC} data={data} updateData={updateData} showToast={showToast}/>}
-              </Suspense>
+              {/* App content — see renderAppContent (shared with the mobile
+                  shell). Per-window Suspense means opening one app doesn't
+                  blank out an already-loaded window. */}
+              {renderAppContent(win.app, !overlayCoveringWin && win.id===focusedWinId && win.state!=="minimized" && (win.desk||0)===curDesk)}
             </div>
           </div>
         );
