@@ -142,7 +142,7 @@ export function MobileShell({ AC, user, data, apps, wallpaperId, customWp, setti
 
   // ── bottom bar gestures ───────────────────────────────────────────────────
   const bar = useRef(null);
-  function barDown(e) { const y0 = pt(e).clientY; bar.current = { y0, moved: false, hold: setTimeout(() => { if (bar.current) { bar.current.hold = "fired"; setSwitcher(true); } }, 400) }; }
+  function barDown(e) { const y0 = pt(e).clientY; bar.current = { y0, moved: false, hold: setTimeout(() => { if (bar.current) { bar.current.hold = "fired"; setSwitcher(true); } }, 130) }; }
   function barMove(e) { const b = bar.current; if (!b) return; if (Math.abs(pt(e).clientY - b.y0) > 14) { b.moved = true; if (b.hold && b.hold !== "fired") { clearTimeout(b.hold); b.hold = null; } } }
   function barUp(e) {
     const b = bar.current; bar.current = null; if (!b) return;
@@ -166,7 +166,7 @@ export function MobileShell({ AC, user, data, apps, wallpaperId, customWp, setti
 
       {/* Springboard */}
       {!openId && (
-        <div {...padEvents} style={{ position: "absolute", inset: 0, paddingTop: "calc(" + SAT + " + 40px)", paddingBottom: "calc(" + SAB + " + 46px)", display: "flex", flexDirection: "column", zIndex: 10, touchAction: "none" }}>
+        <div {...padEvents} style={{ position: "absolute", inset: 0, paddingTop: "calc(" + SAT + " + 40px)", paddingBottom: "calc(" + SAB + " + 56px)", display: "flex", flexDirection: "column", zIndex: 10, touchAction: "none" }}>
           <div style={{ flex: 1, overflow: "hidden", minHeight: 0 }}>
             <div style={{ display: "flex", height: "100%", width: (pages.length * 100) + "%", transform: "translateX(calc(" + (-curPage * (100 / pages.length)) + "% + " + dragX + "px))", transition: dragX === 0 ? "transform 0.34s cubic-bezier(0.22,1,0.36,1)" : "none" }}>
               {pages.map((pg, pi) => (
@@ -202,13 +202,13 @@ export function MobileShell({ AC, user, data, apps, wallpaperId, customWp, setti
       {openId && (
         <div style={{ position: "absolute", inset: 0, zIndex: 20, display: "flex", flexDirection: "column", background: "var(--nv-surface-solid)", animation: "win-launch 0.26s cubic-bezier(0.16,1,0.3,1)" }}>
           <div style={{ height: "calc(" + SAT + " + 40px)", flexShrink: 0 }} />
-          <div style={{ flex: 1, minHeight: 0, overflowY: "auto", overflowX: "hidden", padding: "12px 14px calc(" + SAB + " + 44px)" }}>{renderApp(openId)}</div>
+          <div style={{ flex: 1, minHeight: 0, overflowY: "auto", overflowX: "hidden", padding: "12px 14px calc(" + SAB + " + 54px)" }}>{renderApp(openId)}</div>
         </div>
       )}
 
       {/* Persistent bottom bar */}
       <div {...barEvents} title="Swipe up: home · Hold: open apps"
-        style={{ position: "absolute", left: 0, right: 0, bottom: "env(safe-area-inset-bottom, 0px)", height: 40, zIndex: 35, display: "flex", alignItems: "center", justifyContent: "center", touchAction: "none", cursor: "pointer" }}>
+        style={{ position: "absolute", left: 0, right: 0, bottom: "env(safe-area-inset-bottom, 0px)", height: 50, zIndex: 35, display: "flex", alignItems: "center", justifyContent: "center", touchAction: "none", cursor: "pointer" }}>
         <div style={{ width: 138, height: 5, borderRadius: 3, background: openId ? "var(--nv-text-dim)" : "rgba(255,255,255,0.65)", boxShadow: openId ? "none" : "0 1px 3px rgba(0,0,0,0.4)" }} />
       </div>
 
