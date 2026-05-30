@@ -33,6 +33,20 @@ export function isIOS() {
     || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);  // iPadOS poses as Mac
 }
 
+export function isAndroid() {
+  return typeof navigator !== "undefined" && /android/i.test(navigator.userAgent);
+}
+
+// Are we running inside the Capacitor native Android app?
+export function isNativeApp() {
+  try { return !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()); }
+  catch { return false; }
+}
+
+// The signed APK published by the android-release GitHub Action. "latest"
+// always resolves to the newest release's asset, so this link never goes stale.
+export const ANDROID_APK_URL = "https://github.com/novalabsofficial/nova-os/releases/latest/download/nova-os.apk";
+
 // Is a one-tap install prompt available right now? (Android/Chromium only)
 export function canPromptInstall() { return !!deferredPrompt; }
 

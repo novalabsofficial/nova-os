@@ -16,7 +16,7 @@ import { Wallpaper } from "./wallpapers.jsx";
 import { AppIconDisplay } from "./icons.jsx";
 import { HAS_SVG_ICON } from "./constants.js";
 import { getSoundConfig, setSoundConfig } from "../lib/audio.js";
-import { canPromptInstall, promptInstall, onInstallChange, isStandalone, isIOS } from "../lib/pwa.js";
+import { canPromptInstall, promptInstall, onInstallChange, isStandalone, isIOS, isAndroid, isNativeApp, ANDROID_APK_URL } from "../lib/pwa.js";
 import { haptic, hapticsEnabled, setHapticsEnabled } from "../lib/haptics.js";
 
 // columns + page size are now computed responsively from the viewport (see MobileShell)
@@ -660,6 +660,14 @@ function ControlCenter({ AC, vol, setVolume, bright, setBrightness, battery, set
               : <span>To install: open the browser menu <b>(⋮)</b> → <b>Install app</b> / <b>Add to Home screen</b></span>}
           </div>
         ))}
+
+        {/* Native Android app (Capacitor APK on GitHub Releases) — shown on
+            Android web only, hidden once running inside the native app. */}
+        {isAndroid() && !isNativeApp() && (
+          <a href={ANDROID_APK_URL} target="_blank" rel="noopener noreferrer" className="mb-cc-tile" style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 9, padding: "13px", borderRadius: 16, background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.16)", color: "#fff", fontFamily: FFB, fontWeight: 700, fontSize: 13, cursor: "pointer", textDecoration: "none" }}>
+            <span style={{ fontSize: 18 }}>🤖</span> Download Android app
+          </a>
+        )}
 
         {/* working toggle tiles */}
         <div style={{ display: "flex", gap: 10 }}>
