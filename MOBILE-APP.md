@@ -49,74 +49,70 @@ install) or the **Tauri** desktop build (the SW is explicitly skipped there).
 
 ---
 
-## 2. Publish to the Google Play Store (TWA via Bubblewrap)
+## 2. Native Android app (Capacitor) — free APK via GitHub Releases
 
-A TWA wraps the PWA in a thin Android app that's just a fullscreen Chrome window
-pointed at your URL. **Because it loads from Vercel, web updates appear instantly
-in the installed app with no new store submission.**
+This is the **v10.3** distribution path: a real native Android app (via
+[Capacitor](https://capacitorjs.com/)) that unlocks reliable device haptics and
+hardware — **no Google Play fee.** The APK is built automatically by CI and
+attached to the GitHub Release; users download it from the release page or the
+in-app "Download Android app" button (shown in Control Center on Android).
 
-### Prerequisites
-- Node.js (already installed)
-- A Google Play Console account (one-time $25 USD)
-- Java JDK 17+ (Bubblewrap will prompt / can install it)
+### How it builds (automatic)
+`.github/workflows/android-release.yml` runs on every `v*` tag (same trigger as
+the desktop build). On GitHub's runners it:
+1. `npm ci` + `npm run build`
+2. `npx cap add android` (generates the native project fresh — not committed)
+3. brands the launcher icon from `public/nova-icon.png`
+4. `./gradlew assembleDebug`
+5. attaches the result as **`nova-os.apk`** to the release.
 
-### Steps
-
+So you don't need Android Studio / the SDK locally — just push a tag:
 ```bash
-# 1. Install Google's TWA generator
-npm install -g @bubblewrap/cli
+git tag v10.3.0 && git push origin v10.3.0
+```
+The APK appears on the release within a few minutes.
 
-# 2. Initialize from the live manifest (use your real deployed URL)
-bubblewrap init --manifest https://YOUR-NOVA-OS-URL/manifest.webmanifest
-#    - Bubblewrap reads the manifest and generates all Android icon sizes
-#      from /nova-icon.png automatically.
-#    - Pick an application id like: app.novaos.twa  (this is permanent)
-#    - It creates/uses a signing keystore — BACK THIS UP, you need it for
-#      every future store update.
+### How users install it
+- In Nova OS on Android: swipe down → Control Center → **Download Android app**
+  (links to `releases/latest/download/nova-os.apk`).
+- Or directly from the GitHub Releases page.
+- Android asks them to allow installs from that source once, then it installs
+  like any app — its own icon, fullscreen, native haptics.
 
-# 3. Build the Android App Bundle
-bubblewrap build
-#    → produces app-release-bundle.aab  (this is what you upload)
+### Build it locally instead (optional)
+```bash
+npm run build
+npx cap add android        # first time only
+npx cap sync android
+cd android && ./gradlew assembleDebug
+# → android/app/build/outputs/apk/debug/app-debug.apk
 ```
 
-### Digital Asset Links (removes the browser address bar)
-After `bubblewrap init`, it prints a **SHA-256 fingerprint** of your signing key.
-Create this file and deploy it to the web root so Android trusts the link:
-
-`public/.well-known/assetlinks.json`
-```json
-[{
-  "relation": ["delegate_permission/common.handle_all_urls"],
-  "target": {
-    "namespace": "android_app",
-    "package_name": "app.novaos.twa",
-    "sha256_cert_fingerprints": ["PASTE_FINGERPRINT_FROM_BUBBLEWRAP_HERE"]
-  }
-}]
-```
-Vercel serves `public/` at the root, so it becomes
-`https://YOUR-URL/.well-known/assetlinks.json` after a normal `git push`.
-(`bubblewrap fingerprint` re-prints the value if you need it again.)
-
-### Upload
-Play Console → Create app → upload `app-release-bundle.aab` → fill the listing
-(screenshots, description) → submit. First review takes a few hours to ~2 days;
-later updates are usually reviewed within hours.
+### Notes
+- The current workflow ships a **debug-signed** APK — fine for direct download.
+  For a polished release, generate a keystore once and switch the Gradle step to
+  `assembleRelease` with the signing secrets stored in GitHub Actions secrets.
+- By default the APK **bundles** the web build (`webDir: dist`), so it's
+  offline-capable and updates when you publish a new APK. To make it load the
+  live site instead (instant web updates, like the PWA), add
+  `"server": { "url": "https://YOUR-NOVA-OS-URL" }` to `capacitor.config.json` —
+  native haptics still work because the Capacitor bridge is injected.
 
 ---
 
-## 3. Later: native hardware + a real browser (Capacitor)
+## 3. Optional later: Google Play Store
 
-When you want genuine native capabilities — real flashlight, screen brightness,
-true in-app browser tabs (native WebView), push notifications — wrap the same
-build with [Capacitor](https://capacitorjs.com/) instead of a TWA. It reuses all
-the existing code and adds native plugins. This is a separate, additive phase;
-the PWA/TWA above keeps working in the meantime.
+If you ever want store discoverability/trust, the same Capacitor project can be
+published to Google Play (one-time $25 USD): switch CI to `bundleRelease` (an
+`.aab`), sign it, and upload via the Play Console. Nothing here needs to change
+to do that later — it's purely additive.
 
 ---
 
 ## Updating, in one line
 
-- **App content (99% of changes):** `git push` → Vercel. Done. No store action.
-- **App icon / name / permissions:** rebuild the `.aab` with Bubblewrap, bump the
-  version, re-upload to Play Console.
+- **App content (99% of changes):** `git push origin main` → Vercel. The PWA and
+  (if you set `server.url`) the Android app pick it up immediately.
+- **Bundled APK / icon / native plugins:** push a new `vX.Y.Z` tag → CI rebuilds
+  `nova-os.apk` and attaches it to the new release. The in-app download button
+  always points at the latest.
