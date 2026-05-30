@@ -30,6 +30,33 @@
 </head>
 <body>
   <div id="root"></div>
+  <!-- Boot-error reporter: if the app fails to start (e.g. inside a native
+       WebView with no devtools), paint the actual error onto the screen instead
+       of a silent black screen. Harmless on a normal boot. -->
+  <script>
+    (function () {
+      function show(msg) {
+        var el = document.getElementById('nova-boot-err');
+        if (!el) {
+          el = document.createElement('pre');
+          el.id = 'nova-boot-err';
+          el.style.cssText = 'position:fixed;inset:0;z-index:2147483647;margin:0;padding:16px;background:#0a0c16;color:#ff8a8a;font:12px/1.5 ui-monospace,Menlo,Consolas,monospace;white-space:pre-wrap;word-break:break-word;overflow:auto;';
+          (document.body || document.documentElement).appendChild(el);
+        }
+        el.textContent += msg + '\n\n';
+      }
+      window.addEventListener('error', function (e) {
+        show('JS error: ' + (e.message || (e.error && e.error.message) || e.error) + (e.filename ? ('\n@ ' + e.filename + ':' + e.lineno + ':' + e.colno) : '') + (e.error && e.error.stack ? ('\n' + e.error.stack) : ''));
+      });
+      window.addEventListener('unhandledrejection', function (e) {
+        var r = e.reason; show('Promise rejection: ' + ((r && (r.stack || r.message)) || r));
+      });
+      setTimeout(function () {
+        var root = document.getElementById('root');
+        if (root && root.childElementCount === 0) show('Nova OS did not start: #root is still empty after 6s. If no error is shown above, the app bundle failed to load.');
+      }, 6000);
+    })();
+  </script>
   <script type="module" src="/src/main.jsx"></script>
 </body>
 </html>
