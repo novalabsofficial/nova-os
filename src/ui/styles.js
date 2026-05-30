@@ -259,6 +259,11 @@ export const CSS = `
      unblurred, and motion gets noticeably smoother. */
   html.nova-native *{backdrop-filter:none!important;-webkit-backdrop-filter:none!important;}
   html.nova-native{-webkit-tap-highlight-color:transparent;}
+  /* Lite mode (?kiosk=1) — software-rendered / low-power hosts (e.g. Nova OS as
+     the Linux desktop in a VM). Kill backdrop blur everywhere; the heavy
+     animated-wallpaper drift is disabled in JS (see wallpapers.jsx). This is
+     what unsticks the glassy taskbar/panels on a GPU-less host. */
+  html.nova-lite *{backdrop-filter:none!important;-webkit-backdrop-filter:none!important;}
   /* respect reduced-motion: drop all the extra movement */
   @media (prefers-reduced-motion: reduce){
     *{animation-duration:0.01ms!important;transition-duration:0.01ms!important;}

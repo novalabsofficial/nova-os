@@ -6,6 +6,7 @@
 
 import { useState, useEffect } from "react";
 import { WALLPAPERS } from "./constants.js";
+import { isLiteMode } from "../lib/lite.js";
 
 function NovaBg() {
   return (
@@ -743,7 +744,9 @@ export function Wallpaper({ id, customUrl, animate }) {
   }, [id]);
   const realId = id === "auto" ? autoId : id;
   const bg = renderBg(realId, customUrl);
-  if (!animate) return bg;
+  // Lite mode (?kiosk=1): never run the drift — re-compositing a huge
+  // gaussian-blurred SVG every frame is the worst offender on a GPU-less host.
+  if (!animate || isLiteMode()) return bg;
   return (
     <div style={{position:"absolute",inset:0,overflow:"hidden"}}>
       <div style={{position:"absolute",inset:0,transformOrigin:"center",animation:"wp-drift 26s ease-in-out infinite",willChange:"transform"}}>{bg}</div>

@@ -3,6 +3,12 @@ import ReactDOM from 'react-dom/client';
 import NovaOS from './NovaOS.jsx';
 import './lib/pwa.js';   // capture the install prompt as early as possible
 import { initNative } from './lib/native.js';
+import { initLite } from './lib/lite.js';
+
+// Lite mode (?kiosk=1): tag the document before first paint so the GPU-heavy
+// blur/drift overrides apply immediately. For low-power hosts (e.g. Nova OS as
+// the Linux desktop in a VM). No-op on a normal load.
+initLite();
 
 // Native (Capacitor) one-time setup: immersive mode, back-button routing,
 // nova-native document class. No-ops on the web.
