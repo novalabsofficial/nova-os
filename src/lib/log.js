@@ -5,16 +5,18 @@
 //     writes it to stdout + a file
 //     (~/.local/share/com.novalabsofficial.novaos/logs/*.log)
 //   • mirrors every line to an ON-SCREEN overlay (desktop only) so a screenshot
-//     of the boot IS the diagnostic — no terminal / journalctl / VT switching
-//     needed. The overlay auto-hides ~6 s after a healthy boot (it STAYS if
-//     anything errored or the app never mounted, so a failed boot is still
-//     screenshot-able).
+//     of the boot IS the diagnostic — no terminal / journalctl / VT switching.
+//   • the overlay's lines are ALSO persisted to sessionStorage and restored on
+//     load, so if the page RELOADS (chunk retry, web-process crash, etc.) the
+//     overlay keeps the full multi-load history instead of flashing + vanishing.
+//   • auto-hides ~6 s after a healthy boot; STAYS if anything errored.
 //   • on web / PWA / Android: just the browser console (no overlay, no bridge).
 //
 // initLogging() also captures uncaught errors + unhandled promise rejections.
 
 const isTauri = typeof window !== "undefined" &&
   ("__TAURI_INTERNALS__" in window || "__TAURI__" in window);
+const SS_KEY = "nova:bootlog";
 
 let _invokeReady = null;
 function invoker() {
@@ -35,40 +37,60 @@ let _overlay = null;
 let _hidden = false;
 let _hadError = false;
 
+function paintLine(el, level, msg, dim) {
+  const line = document.createElement("div");
+  line.textContent = "[" + level + "] " + msg;
+  if (level === "error") line.style.color = "#ff8a8a";
+  else if (level === "warn") line.style.color = "#ffd479";
+  if (dim) line.style.opacity = "0.55";
+  el.appendChild(line);
+}
+
 function overlayEl() {
   if (!isTauri || _hidden || typeof document === "undefined") return null;
   if (_overlay) return _overlay;
   const el = document.createElement("div");
   el.id = "nova-boot-log";
   el.style.cssText = [
-    "position:fixed", "left:0", "top:0", "right:0", "max-height:60vh",
+    "position:fixed", "left:0", "top:0", "right:0", "max-height:70vh",
     "overflow:auto", "z-index:2147483647", "pointer-events:none",
     "margin:0", "padding:8px 10px",
-    "font-family:monospace", "font-size:12px", "line-height:1.45",
+    "font-family:monospace", "font-size:12px", "line-height:1.4",
     "white-space:pre-wrap", "word-break:break-word",
-    "background:rgba(0,0,0,0.82)", "color:#cfe",
+    "background:rgba(0,0,0,0.85)", "color:#cfe",
   ].join(";");
-  // documentElement is always present, even before <body> exists.
   (document.body || document.documentElement).appendChild(el);
   _overlay = el;
+  // Restore lines saved before a reload (sessionStorage survives reloads), so a
+  // reload/crash that wipes the page keeps the trace instead of flashing away.
+  try {
+    const arr = JSON.parse(sessionStorage.getItem(SS_KEY) || "[]");
+    if (arr.length) {
+      paintLine(el, "info", "— " + arr.length + " line(s) from before a reload —", true);
+      for (const l of arr) paintLine(el, l.level, l.msg, true);
+      paintLine(el, "info", "— current load —", true);
+    }
+  } catch {}
   return el;
 }
 
-function paint(level, msg) {
-  const el = overlayEl();
-  if (!el) return;
-  const line = document.createElement("div");
-  line.textContent = "[" + level + "] " + msg;
-  if (level === "error") line.style.color = "#ff8a8a";
-  else if (level === "warn") line.style.color = "#ffd479";
-  el.appendChild(line);
+function persist(level, msg) {
+  if (!isTauri) return;
+  try {
+    const arr = JSON.parse(sessionStorage.getItem(SS_KEY) || "[]");
+    arr.push({ level, msg });
+    if (arr.length > 150) arr.splice(0, arr.length - 150);
+    sessionStorage.setItem(SS_KEY, JSON.stringify(arr));
+  } catch {}
 }
 
 function emit(level, args) {
   const msg = args.map(str).join(" ");
   if (level === "error") _hadError = true;
   try { (console[level] || console.log).call(console, "[nova]", msg); } catch {}
-  paint(level, msg);
+  persist(level, msg);
+  const el = overlayEl();
+  if (el) paintLine(el, level, msg, false);
   if (isTauri) invoker().then((inv) => { try { if (inv) inv("js_log", { level, msg }); } catch {} });
 }
 
@@ -82,9 +104,11 @@ export const log = {
 /** True if any error has been logged this session. */
 export function bootLogHadError() { return _hadError; }
 
-/** Remove the on-screen boot-log overlay (call once the app is confirmed healthy). */
+/** Remove the on-screen boot-log overlay + clear its saved history (call once
+ *  the app is confirmed healthy). */
 export function hideBootLog() {
   _hidden = true;
+  try { sessionStorage.removeItem(SS_KEY); } catch {}
   if (_overlay && _overlay.parentNode) _overlay.parentNode.removeChild(_overlay);
   _overlay = null;
 }

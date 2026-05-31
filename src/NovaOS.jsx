@@ -72,13 +72,23 @@ import {
 // genuinely unreachable origin (e.g. an auth-gated Vercel preview) it reloads
 // once, then surfaces the error instead of looping.
 const CHUNK_RELOAD_KEY = "nova:chunk-reloaded";
+// Web/PWA only: a failed chunk is usually a stale page after a new deploy whose
+// old chunk filenames are gone — reload ONCE (guarded) to pull the fresh asset
+// map. NEVER reload on the Tauri build: assets are bundled (a reload can't fix a
+// load failure), and reloading the `tauri://` page DROPS the IPC bridge + wipes
+// the boot log — so on desktop we just surface the error instead.
+const IN_TAURI = typeof window !== "undefined" &&
+  ("__TAURI_INTERNALS__" in window || "__TAURI__" in window);
 function lazyApp(loader) {
   return lazy(() =>
     loader().catch(() => loader()).then(
       (m) => { try { sessionStorage.removeItem(CHUNK_RELOAD_KEY); } catch {} return m; },
       (err) => {
         try {
-          if (!sessionStorage.getItem(CHUNK_RELOAD_KEY)) { sessionStorage.setItem(CHUNK_RELOAD_KEY, "1"); location.reload(); }
+          if (!IN_TAURI && !sessionStorage.getItem(CHUNK_RELOAD_KEY)) {
+            sessionStorage.setItem(CHUNK_RELOAD_KEY, "1");
+            location.reload();
+          }
         } catch {}
         throw err;
       }
