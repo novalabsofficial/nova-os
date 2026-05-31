@@ -180,6 +180,36 @@ npm run test:run     # vitest (single run)
 
 ---
 
+## Logging & troubleshooting
+
+The desktop (Tauri) build — including **Nova Linux** — logs everything (Rust +
+frontend) to one place, so debugging a bad boot is "pull the log, send it over"
+instead of guessing at a black screen. **This is the primary troubleshooting
+channel for the native/Linux builds.**
+
+- **Log file:** `~/.local/share/com.novalabsofficial.novaos/logs/*.log`
+- **Also on stdout** — when the kiosk runs as a systemd service that means
+  `journalctl -u nova-kiosk -f`; run by hand, it prints to the terminal.
+- The frontend forwards its logs to the same sink via the Rust `js_log` command,
+  and **all uncaught JS errors + promise rejections are captured with full
+  stacks** (no more masked "Script error.").
+- Boot emits breadcrumbs — `tauri bridge = …`, `kiosk session = …`, `lite mode
+  …`, `mounting React` — so the log narrates exactly how far startup got.
+
+**Pull the log:**
+```bash
+cat ~/.local/share/com.novalabsofficial.novaos/logs/*.log
+# watch live:  tail -f ~/.local/share/com.novalabsofficial.novaos/logs/*.log
+# OOM / kernel kills:  journalctl -k -b | grep -iE "out of memory|killed process"
+```
+
+Where it lives in code: `src-tauri/src/lib.rs` (log plugin + `js_log` + Rust
+breadcrumbs), `src/lib/log.js` (frontend logger + global error capture),
+`src/main.jsx` (boot breadcrumbs). Web / PWA / Android have no Tauri bridge, so
+their logs go to the browser console only.
+
+---
+
 ## Roadmap
 
 1. **Nova OS Mobile** - shipped in 10.1, polished in 10.2 (touch-first phone

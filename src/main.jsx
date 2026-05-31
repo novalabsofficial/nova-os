@@ -4,6 +4,15 @@ import NovaOS from './NovaOS.jsx';
 import './lib/pwa.js';   // capture the install prompt as early as possible
 import { initNative } from './lib/native.js';
 import { initLite, isLiteMode, forceLite } from './lib/lite.js';
+import { log, initLogging } from './lib/log.js';
+
+// Unified logging FIRST — capture every boot breadcrumb + uncaught error. On
+// desktop these flow to the Rust log file + stdout (via the js_log bridge); on
+// web they go to the console. See README "Logging & troubleshooting".
+initLogging();
+const hasTauri = typeof window !== 'undefined' &&
+  ('__TAURI_INTERNALS__' in window || '__TAURI__' in window);
+log.info('boot: main.jsx start — tauri bridge =', hasTauri, '| lite(url) =', isLiteMode());
 
 // Lite mode (?kiosk=1): tag the document before first paint so the GPU-heavy
 // blur/drift overrides apply immediately. For low-power hosts (e.g. Nova OS as
@@ -15,11 +24,13 @@ initLite();
 initNative();
 
 function mount() {
+  log.info('boot: mounting React (lite =', isLiteMode(), ')');
   ReactDOM.createRoot(document.getElementById('root')).render(
     <React.StrictMode>
       <NovaOS />
     </React.StrictMode>
   );
+  log.info('boot: React render dispatched');
 }
 
 // Nova Linux kiosk (the Tauri shell launched with NOVA_KIOSK): activate lite
@@ -30,16 +41,18 @@ function mount() {
 // Instead, await the kiosk_mode invoke once (the bridge is alive on first load)
 // and flip lite on before first paint, without reloading, so the bridge stays
 // intact. Gated to Tauri; web/PWA/Android render immediately via the else branch.
-if (!isLiteMode() && typeof window !== 'undefined' &&
-    ('__TAURI_INTERNALS__' in window || '__TAURI__' in window)) {
+if (!isLiteMode() && hasTauri) {
   let mounted = false;
   const go = () => { if (!mounted) { mounted = true; mount(); } };
   import('./lib/system.js')
     .then(({ isKioskSession }) => isKioskSession())
-    .then((kiosk) => { if (kiosk) forceLite(); })
-    .catch(() => {})
+    .then((kiosk) => {
+      log.info('boot: kiosk session =', kiosk);
+      if (kiosk) { forceLite(); log.info('boot: lite mode forced on (no reload)'); }
+    })
+    .catch((e) => { log.warn('boot: kiosk check failed —', e); })
     .finally(go);
-  setTimeout(go, 1200);   // safety: render even if the bridge never answers
+  setTimeout(() => { if (!mounted) log.warn('boot: kiosk check slow (>1.2s) — mounting anyway'); go(); }, 1200);
 } else {
   mount();
 }

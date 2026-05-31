@@ -82,6 +82,45 @@ error you get the on-screen boot-error reporter or drop to the desktop (run
 
 ---
 
+## 🔎 Logging — the primary troubleshooting loop (added 2026-05-31)
+
+The desktop build now has **real logging, enabled in release** (it was debug-only
+before — which is why we'd been guessing at black screens). This is now **the main
+way we debug Nova Linux**: pull the log → send it over → diagnose.
+
+**Where logs go (Tauri build):** `tauri-plugin-log` writes to —
+- **a file:** `~/.local/share/com.novalabsofficial.novaos/logs/*.log`
+- **stdout** → captured by journald when the kiosk runs as a systemd service
+  (`journalctl -u nova-kiosk -f`), or the terminal when run by hand.
+- the webview console (dev).
+
+**What's captured:**
+- **Rust** breadcrumbs — startup, kiosk detection, fullscreen, power_off/restart.
+- **Frontend** breadcrumbs (forwarded via the `js_log` command) — `tauri bridge
+  =`, `kiosk session =`, `lite mode forced on`, `mounting React`, `React render
+  dispatched`.
+- **Every uncaught JS error + promise rejection, with full stack** — permanently
+  kills the masked "Script error." problem.
+
+**Commands to run when asked for logs:**
+```
+cat ~/.local/share/com.novalabsofficial.novaos/logs/*.log     # the app log
+tail -f ~/.local/share/com.novalabsofficial.novaos/logs/*.log # live
+journalctl -k -b | grep -iE "out of memory|killed process"    # OOM / kernel kills
+journalctl -u nova-kiosk -b --no-pager                        # once it's a service
+```
+
+**Code:** `src-tauri/src/lib.rs` (log plugin + `js_log` + Rust breadcrumbs),
+`src/lib/log.js` (frontend logger + global error capture), `src/main.jsx` (boot
+breadcrumbs). **Keep release logging ON** — it's the debugging backbone for the
+cage migration and every future iteration.
+
+> Known so far from logs: the VMware black screen was an **OOM kill** (GNOME +
+> software-rendered WebKit + the heavy app exhausted RAM) — which is what's
+> driving the planned move to a minimal **cage** session (no GNOME). See §7.
+
+---
+
 ## 1. Key decisions
 
 1. **Tauri is the real Nova Linux shell, not Firefox.** The Firefox-kiosk ISO
