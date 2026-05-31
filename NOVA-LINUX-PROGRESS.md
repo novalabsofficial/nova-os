@@ -56,20 +56,29 @@ laptop if needed** (§3).
   Dev mode (`tauri dev`) confirmed all native features work. **Not yet tested on
   the production ISO** — that's the next step.
 
-### ▶ RESUME HERE (paused mid-rebuild, 2026-05-31)
-Workshop VM already has the **rebuilt `.deb`** at
-`~/nova-os/src-tauri/target/release/bundle/deb/Nova OS_10.4.0_amd64.deb` (note the
-space + caps in the name). Pick up at:
-1. **Copy it out (quote the space):**
-   `cp "src-tauri/target/release/bundle/deb/Nova OS_10.4.0_amd64.deb" ~/nova-os.deb`
-2. **Cubic:** open `~/nova-iso` project → chroot terminal → get `nova-os.deb` into
-   the chroot → `dpkg -i nova-os.deb` → **Generate**.
-3. **Transfer:** `cd ~/nova-iso && python3 -m http.server 8000` → download the ISO
-   on Windows.
-4. **Boot the new ISO in VMware** (3D accel on).
+### ▶ RESUME HERE (paused in Cubic, 2026-05-31)
+Done so far: fix pushed (`1d32972`); workshop VM pulled it; rebuilt `.deb` copied
+to `~/nova-os.deb`; Cubic `~/nova-iso` project open, **new `.deb` `dpkg -i`'d into
+the chroot**, and the kiosk **autostart rewritten to Tauri-only** (Firefox
+autostart removed — `/etc/xdg/autostart/nova-kiosk.desktop` →
+`Exec=env NOVA_KIOSK=1 /usr/bin/app`). Pick up at:
+1. **Cubic chroot — confirm the autostart** is still Tauri:
+   `cat /etc/xdg/autostart/nova-kiosk.desktop` (should show `…/usr/bin/app`) and
+   `ls -la /usr/bin/app`. (Re-run the heredoc from the chat if it's missing — the
+   `grep … rm` line deletes any firefox `.desktop`, so the write must come first.)
+2. **Generate** the ISO in Cubic.
+3. **Transfer:** `cd ~/nova-iso && python3 -m http.server 8000` → on Windows
+   download from **`http://localhost:8888/`** (VirtualBox NAT forwards host 8888 →
+   guest 8000). Cubic reuses the `…2026.05.30…` name but the file's *mtime* is the
+   real build time — grab the newest.
+4. **VMware → CD/DVD → point at the new ISO → power on** (3D accel on).
 5. **✅ Verify:** Start menu → is the **Shut Down button** there? If yes, the
    bridge fix worked. (Browser may show a blank stage — separate Linux
    multi-webview issue, expected.)
+
+Note: the kiosk now launches **only** the Tauri app (no Firefox fallback). On
+error you get the on-screen boot-error reporter or drop to the desktop (run
+`env NOVA_KIOSK=1 /usr/bin/app` to read the error) — never a Firefox bounce.
 
 ---
 
