@@ -4,7 +4,7 @@ import NovaOS from './NovaOS.jsx';
 import './lib/pwa.js';   // capture the install prompt as early as possible
 import { initNative } from './lib/native.js';
 import { initLite, isLiteMode, forceLite } from './lib/lite.js';
-import { log, initLogging } from './lib/log.js';
+import { log, initLogging, hideBootLog, bootLogHadError } from './lib/log.js';
 
 // Unified logging FIRST — capture every boot breadcrumb + uncaught error. On
 // desktop these flow to the Rust log file + stdout (via the js_log bridge); on
@@ -31,6 +31,13 @@ function mount() {
     </React.StrictMode>
   );
   log.info('boot: React render dispatched');
+  // Healthy boot? Clear the on-screen boot-log overlay after a few seconds. It
+  // stays if anything errored or #root never filled, so a failed boot remains
+  // screenshot-able.
+  setTimeout(() => {
+    const root = document.getElementById('root');
+    if (root && root.childElementCount > 0 && !bootLogHadError()) hideBootLog();
+  }, 6000);
 }
 
 // Nova Linux kiosk (the Tauri shell launched with NOVA_KIOSK): activate lite

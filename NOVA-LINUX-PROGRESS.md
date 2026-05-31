@@ -93,6 +93,11 @@ way we debug Nova Linux**: pull the log → send it over → diagnose.
 - **stdout** → captured by journald when the kiosk runs as a systemd service
   (`journalctl -u nova-kiosk -f`), or the terminal when run by hand.
 - the webview console (dev).
+- **an on-screen overlay (desktop only)** — every boot line is mirrored to a
+  visible overlay, so on a kiosk a **screenshot of the boot screen IS the
+  diagnostic** (no terminal / VT switching needed — which the VMware+casper
+  fight proved we badly need). Auto-hides ~6 s after a healthy boot; **stays** if
+  anything errors or `#root` never fills, so a failed boot is screenshot-able.
 
 **What's captured:**
 - **Rust** breadcrumbs — startup, kiosk detection, fullscreen, power_off/restart.
