@@ -1,5 +1,9 @@
 # Nova Linux - Architecture Plan (draft)
 
+> 📍 **Where we actually got to / how to resume:** see **`NOVA-LINUX-PROGRESS.md`**
+> (decisions, the VirtualBox blocker, VMware → real-laptop plan, build playbook).
+> This file is the long-term vision; that one is the live working log.
+
 A bootable Linux distribution where **Nova OS is the desktop shell on top of a
 full Linux system** - so you can install real software, manage hardware (WiFi,
 audio, displays), and run games, while keeping Nova OS's look and feel.
