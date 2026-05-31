@@ -38,3 +38,16 @@ export function initLite() {
     if (isLiteMode()) document.documentElement.classList.add("nova-lite");
   } catch {}
 }
+
+/**
+ * Force lite mode on without a URL param or a page reload. Used by the Nova
+ * Linux kiosk (Tauri): we can't reload to add `?kiosk=1` because that reload
+ * drops the Tauri IPC bridge on the production custom protocol (tauri://) — it
+ * survives over http in dev but breaks on tauri://, killing the power controls
+ * + native detection. So once the kiosk session is confirmed we just flip lite
+ * mode on in place, before first paint.
+ */
+export function forceLite() {
+  _lite = true;
+  try { document.documentElement.classList.add("nova-lite"); } catch {}
+}

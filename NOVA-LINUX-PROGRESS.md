@@ -26,6 +26,31 @@ canonical Nova Linux build.** We are **not** settling for the Firefox version.
 The plan is to run the Tauri ISO where it actually works → **VMware first, real
 laptop if needed** (§3).
 
+### Update — 2026-05-31: VMware renders it, but the native bridge is down
+- ✅ **VMware Workstation Pro (3D acceleration ON) renders Nova OS reliably.** The
+  rendering problem is solved — VMware is now the dev/test environment, not
+  VirtualBox. (Setup: WHP checkbox during install since the host has Hyper-V/VBS;
+  VM = 8 GB RAM / 4 CPU / 3D accel on / boot the Tauri ISO live.)
+- ⚠️ **But the Tauri JS↔Rust bridge isn't connecting in the booted build.**
+  Three symptoms, all gated on `isDesktop()`/`isTauri()` (the
+  `__TAURI_INTERNALS__` global): **no Shut Down button**, **Browser falls back to
+  the iframe** ("can't be embedded"), and lite mode is URL-driven only.
+- **Prime suspect — the `?kiosk=1` reload in `src/main.jsx`.** Its own guard
+  requires `__TAURI_INTERNALS__` to be present *to fire the reload* — so the
+  bridge IS there on first load, then the client-side `location.replace` reload
+  **drops it** (WebKitGTK on Linux doesn't re-inject the IPC after that
+  navigation). That reload, added only for lite mode, is sabotaging every native
+  feature.
+- **Fix plan:** remove the reload; activate lite mode synchronously *without
+  navigating* — inject a `window.__NOVA_KIOSK__` flag from Rust (`lib.rs` init
+  script) or have Rust load the webview URL with `?kiosk=1` already appended, and
+  have `lite.js` read it. Verify in the workshop VM with `tauri dev` + devtools
+  (confirm `window.__TAURI_INTERNALS__` survives).
+- **Caveat still stands:** even with the bridge fixed, native *browser embeds*
+  use Tauri multi-webview (weak on Linux) — Shut Down + lite should fully work;
+  the in-app browser may need a different Linux approach (separate WebviewWindow
+  or system-browser hand-off).
+
 ---
 
 ## 1. Key decisions
