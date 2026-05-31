@@ -50,6 +50,26 @@ laptop if needed** (§3).
   use Tauri multi-webview (weak on Linux) — Shut Down + lite should fully work;
   the in-app browser may need a different Linux approach (separate WebviewWindow
   or system-browser hand-off).
+- **Fix status — DONE + pushed (commit `1d32972`).** The `?kiosk=1` reload is
+  gone: `src/main.jsx` now awaits `kiosk_mode` once and calls `forceLite()` (new
+  export in `src/lib/lite.js`) in place, no navigation. Web build verified clean.
+  Dev mode (`tauri dev`) confirmed all native features work. **Not yet tested on
+  the production ISO** — that's the next step.
+
+### ▶ RESUME HERE (paused mid-rebuild, 2026-05-31)
+Workshop VM already has the **rebuilt `.deb`** at
+`~/nova-os/src-tauri/target/release/bundle/deb/Nova OS_10.4.0_amd64.deb` (note the
+space + caps in the name). Pick up at:
+1. **Copy it out (quote the space):**
+   `cp "src-tauri/target/release/bundle/deb/Nova OS_10.4.0_amd64.deb" ~/nova-os.deb`
+2. **Cubic:** open `~/nova-iso` project → chroot terminal → get `nova-os.deb` into
+   the chroot → `dpkg -i nova-os.deb` → **Generate**.
+3. **Transfer:** `cd ~/nova-iso && python3 -m http.server 8000` → download the ISO
+   on Windows.
+4. **Boot the new ISO in VMware** (3D accel on).
+5. **✅ Verify:** Start menu → is the **Shut Down button** there? If yes, the
+   bridge fix worked. (Browser may show a blank stage — separate Linux
+   multi-webview issue, expected.)
 
 ---
 
