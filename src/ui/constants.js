@@ -71,6 +71,8 @@ export const DEFAULT_SIZES = {
   photos:{w:760,h:600},
   // v9.7
   slides:{w:880,h:620},
+  // v10.x — Asset Studio (decal/asset editor)
+  assetstudio:{w:980,h:700},
 };
 
 // The master app list — drives the desktop, start menu, and store icons.
@@ -112,6 +114,7 @@ export const APPS = [
   {id:"screenshot", icon:"📸",label:"Screenshot",  desc:"Capture & annotate your screen"},
   // v9.7
   {id:"slides",     icon:"📊",label:"Slides",      desc:"Build & present slide decks"},
+  {id:"assetstudio",icon:"🪄",label:"Asset Studio", desc:"Decals, shapes & transparent PNGs"},
 ];
 
 // Curated catalog of external apps shown in the Store's "Official" tab.
