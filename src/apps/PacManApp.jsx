@@ -409,6 +409,18 @@ export function PacManApp({ AC, data, updateSettings }) {
     setPhase("playing");
   }
 
+  // Mobile: swipe the maze to change direction (was keyboard-only before).
+  function onSwipeDown(e) {
+    const sx = e.clientX, sy = e.clientY;
+    const up = (ev) => {
+      window.removeEventListener("pointerup", up);
+      const dx = ev.clientX - sx, dy = ev.clientY - sy, ax = Math.abs(dx), ay = Math.abs(dy);
+      if (Math.max(ax, ay) < 18) return;
+      queuedDirRef.current = ax > ay ? (dx > 0 ? "right" : "left") : (dy > 0 ? "down" : "up");
+    };
+    window.addEventListener("pointerup", up);
+  }
+
   return (
     <div style={{ width:"100%", display:"flex", flexDirection:"column", alignItems:"center", gap:10, fontFamily:FF }}>
       <div style={SEC}>Pac-Man</div>
@@ -421,8 +433,8 @@ export function PacManApp({ AC, data, updateSettings }) {
       </div>
 
       <div style={{ position:"relative" }}>
-        <canvas ref={canvasRef} width={CW} height={CH}
-          style={{ width:"100%", maxWidth: 460, aspectRatio: CW + "/" + CH, background:"#000", border:"1px solid rgba(255,255,255,0.1)", borderRadius:6, display:"block", imageRendering:"pixelated" }}
+        <canvas ref={canvasRef} width={CW} height={CH} onPointerDown={onSwipeDown}
+          style={{ width:"100%", maxWidth: 460, aspectRatio: CW + "/" + CH, background:"#000", border:"1px solid rgba(255,255,255,0.1)", borderRadius:6, display:"block", imageRendering:"pixelated", touchAction:"none" }}
         />
         {phase !== "playing" && (
           <div style={{ position:"absolute", inset:0, display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:12, background:"rgba(0,0,0,0.88)", borderRadius:6 }}>
@@ -440,7 +452,7 @@ export function PacManApp({ AC, data, updateSettings }) {
       </div>
 
       <div style={{ fontFamily:FF, fontStyle:"italic", fontSize:10, color:"rgba(255,255,255,0.3)", textAlign:"center", maxWidth:340, lineHeight:1.5, marginTop:4 }}>
-        Arrow keys or <strong style={{color:"rgba(255,255,255,0.55)"}}>WASD</strong> to move. Eat all pellets to win. Power pellets make ghosts vulnerable for ~6 seconds.
+        Swipe, arrow keys or <strong style={{color:"rgba(255,255,255,0.55)"}}>WASD</strong> to move. Eat all pellets to win. Power pellets make ghosts vulnerable for ~6 seconds.
       </div>
     </div>
   );
