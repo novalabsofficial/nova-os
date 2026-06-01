@@ -16,6 +16,7 @@ import { playSound } from "../lib/audio.js";
 
 const SIZES = { Small: 13, Medium: 17, Large: 21 };
 const APPLE_OPTS = [1, 3, 5];
+const SPEEDS = { Slow: 130, Normal: 85, Fast: 55 };  // ms per step — lower is faster
 const BOARD_PX = 400;        // target board size; cell size derives from this
 const STEP_MS = 85;          // constant tempo (Google Snake doesn't speed up)
 
@@ -27,6 +28,7 @@ const APPLE   = "#e7471d";
 export function SnakeApp({ AC }) {
   const [grid, setGrid] = useState(17);        // current map size
   const [apples, setApples] = useState(1);     // apples on the board at once
+  const [speedMs, setSpeedMs] = useState(STEP_MS); // ms per step (default Normal); see SPEEDS
   const [phase, setPhase] = useState("idle");  // idle | playing | over
   const [score, setScore] = useState(0);
   const [best, setBest] = useState(0);
@@ -144,7 +146,7 @@ export function SnakeApp({ AC }) {
     setScore(0);
     setPhase("playing");
     clearInterval(intv.current);
-    intv.current = setInterval(tick, STEP_MS);
+    intv.current = setInterval(tick, speedMs);
     draw();
   }
 
@@ -202,6 +204,7 @@ export function SnakeApp({ AC }) {
       <div style={{ display: "flex", gap: 14, flexWrap: "wrap", justifyContent: "center", opacity: phase === "playing" ? 0.4 : 1, pointerEvents: phase === "playing" ? "none" : "auto" }}>
         <Segment label="Board" options={Object.keys(SIZES)} value={Object.keys(SIZES).find(k => SIZES[k] === grid)} onPick={k => setGrid(SIZES[k])} AC={AC} />
         <Segment label="Apples" options={APPLE_OPTS} value={apples} onPick={n => setApples(n)} AC={AC} />
+        <Segment label="Speed" options={Object.keys(SPEEDS)} value={Object.keys(SPEEDS).find(k => SPEEDS[k] === speedMs)} onPick={k => setSpeedMs(SPEEDS[k])} AC={AC} />
       </div>
 
       {/* Board */}
