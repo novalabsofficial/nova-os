@@ -146,5 +146,41 @@ export function initLogging() {
     };
   };
   ["setTimeout", "setInterval", "requestAnimationFrame", "requestIdleCallback", "queueMicrotask"].forEach(wrap);
+  // Wrap addEventListener so a throw in ANY event handler (resize, load,
+  // visibilitychange, media-query, etc.) logs the real error. A WeakMap keeps
+  // removeEventListener working by mapping original -> wrapped.
+  try {
+    const ep = EventTarget.prototype, add = ep.addEventListener, rem = ep.removeEventListener, seen = new WeakMap();
+    ep.addEventListener = function (type, fn, opts) {
+      if (typeof fn !== "function") return add.call(this, type, fn, opts);
+      let w = seen.get(fn);
+      if (!w) {
+        w = function (...a) {
+          try { return fn.apply(this, a); }
+          catch (e) { emit("error", ["listener(" + type + ") threw: " + ((e && e.message) || e) + ((e && e.stack) ? "\n" + e.stack : "")]); throw e; }
+        };
+        seen.set(fn, w);
+      }
+      return add.call(this, type, w, opts);
+    };
+    ep.removeEventListener = function (type, fn, opts) {
+      return rem.call(this, type, (typeof fn === "function" && seen.get(fn)) || fn, opts);
+    };
+  } catch {}
+  // Wrap observer callbacks (ResizeObserver / IntersectionObserver / MutationObserver).
+  ["ResizeObserver", "IntersectionObserver", "MutationObserver"].forEach((n) => {
+    const O = window[n];
+    if (typeof O !== "function") return;
+    try {
+      const Wrapped = function (cb, ...rest) {
+        const w = (typeof cb === "function")
+          ? function (...a) { try { return cb.apply(this, a); } catch (e) { emit("error", ["observer(" + n + ") threw: " + ((e && e.message) || e) + ((e && e.stack) ? "\n" + e.stack : "")]); throw e; } }
+          : cb;
+        return new O(w, ...rest);
+      };
+      Wrapped.prototype = O.prototype;
+      window[n] = Wrapped;
+    } catch {}
+  });
   log.info("logging ready (tauri=" + isTauri + ")");
 }
