@@ -1,6 +1,6 @@
 {
   "name": "nova-os",
-  "version": "10.5.1",
+  "version": "10.5.2",
   "private": true,
   "scripts": {
     "dev": "vite",
