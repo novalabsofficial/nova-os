@@ -129,6 +129,7 @@ const PhotosApp       = lazyApp(() => import("./apps/PhotosApp.jsx").then(m     
 const ScreenshotApp   = lazyApp(() => import("./apps/ScreenshotApp.jsx").then(m   => ({default: m.ScreenshotApp})));
 const SlidesApp       = lazyApp(() => import("./apps/SlidesApp.jsx").then(m       => ({default: m.SlidesApp})));
 const AssetStudioApp  = lazyApp(() => import("./apps/AssetStudioApp.jsx").then(m  => ({default: m.AssetStudioApp})));
+const AtlasApp        = lazyApp(() => import("./apps/AtlasApp.jsx").then(m        => ({default: m.AtlasApp})));
 
 // ─── v9.0 taskbar glyphs ────────────────────────────────────────────────
 // Monochrome line-glyphs for the system tray, replacing the old emoji
@@ -1507,6 +1508,7 @@ export default function NovaOS(){
         {appId==="screenshot" &&<ScreenshotApp AC={AC} showToast={showToast} onSetWallpaper={handleCustomWallpaper}/>}
         {appId==="slides"     &&<SlidesApp AC={AC} data={data} updateData={updateData} showToast={showToast}/>}
         {appId==="assetstudio"&&<AssetStudioApp AC={AC} showToast={showToast}/>}
+        {appId==="atlas"      &&<AtlasApp AC={AC} showToast={showToast}/>}
       </Suspense>
     );
   }
