@@ -3,7 +3,7 @@
 > Companion to **`NOVA-LINUX.md`** (the long-term architecture vision).
 > This file is the *working log*: where we actually got to, every decision we
 > made, the hard-won gotchas, and an exact checklist to pick the work back up.
-> Last updated: **2026-05-30**.
+> Last updated: **2026-06-01**.
 
 ---
 
@@ -56,29 +56,55 @@ laptop if needed** (§3).
   Dev mode (`tauri dev`) confirmed all native features work. **Not yet tested on
   the production ISO** — that's the next step.
 
-### ▶ RESUME HERE (paused in Cubic, 2026-05-31)
-Done so far: fix pushed (`1d32972`); workshop VM pulled it; rebuilt `.deb` copied
-to `~/nova-os.deb`; Cubic `~/nova-iso` project open, **new `.deb` `dpkg -i`'d into
-the chroot**, and the kiosk **autostart rewritten to Tauri-only** (Firefox
-autostart removed — `/etc/xdg/autostart/nova-kiosk.desktop` →
-`Exec=env NOVA_KIOSK=1 /usr/bin/app`). Pick up at:
-1. **Cubic chroot — confirm the autostart** is still Tauri:
-   `cat /etc/xdg/autostart/nova-kiosk.desktop` (should show `…/usr/bin/app`) and
-   `ls -la /usr/bin/app`. (Re-run the heredoc from the chat if it's missing — the
-   `grep … rm` line deletes any firefox `.desktop`, so the write must come first.)
-2. **Generate** the ISO in Cubic.
-3. **Transfer:** `cd ~/nova-iso && python3 -m http.server 8000` → on Windows
-   download from **`http://localhost:8888/`** (VirtualBox NAT forwards host 8888 →
-   guest 8000). Cubic reuses the `…2026.05.30…` name but the file's *mtime* is the
-   real build time — grab the newest.
-4. **VMware → CD/DVD → point at the new ISO → power on** (3D accel on).
-5. **✅ Verify:** Start menu → is the **Shut Down button** there? If yes, the
-   bridge fix worked. (Browser may show a blank stage — separate Linux
-   multi-webview issue, expected.)
+### Update — 2026-06-01: bridge FIXED ✅, but the VM is a hard dead end for rendering
+- ✅ **The bridge fix worked.** The cage build's log shows `tauri bridge = true`,
+  `kiosk session = true`, `lite mode forced on`, `mounting React`, `React render
+  dispatched`. Native detection is alive; the `?kiosk=1`-reload bug is dead.
+- ✅ **cage (Wayland kiosk) renders the page** — the black screen is solved by
+  dropping GNOME for cage + software rendering.
+- ❌ **But a masked `Script error. (?:0:0)` fires right after render**, and we could
+  NOT unmask it despite heavy instrumentation (stripped `crossorigin`, top-level
+  error boundary, wrapped timers + promises + addEventListener + observers, enabled
+  the WebKit inspector). None of the callback wraps caught it and the boundary
+  didn't fire → it's a **script/module-level error**, cross-origin-masked by the
+  `tauri://` protocol.
+- 🔑 **Root correlation: SOFTWARE WebKit rendering.** The error appears under
+  **both** cage/Wayland **and** X11 whenever `WEBKIT_DISABLE_COMPOSITING_MODE=1`
+  (software) is set. The only run that was ever *clean* used GPU compositing — and
+  that rendered **black** (no real GPU in the VM). So in this GPU-less VM:
+  **GPU mode → black; software mode → the masked error. It cannot render the Tauri
+  app either way.** No-GPU limitation, not a code bug (it ran perfectly in `tauri dev`).
+- **Conclusion: the VM is exhausted. WebKit needs a real GPU → real hardware.**
 
-Note: the kiosk now launches **only** the Tauri app (no Firefox fallback). On
-error you get the on-screen boot-error reporter or drop to the desktop (run
-`env NOVA_KIOSK=1 /usr/bin/app` to read the error) — never a Firefox bounce.
+### ▶ RESUME HERE (next session — needs a USB stick)
+The Tauri **cage ISO is built** (logging build baked in; in `~/nova-iso/`, name
+`ubuntu-24.04.4-2026.05.30-…iso`, *mtime* is the real build time). To see it on a
+real GPU:
+1. **Get a USB stick (8 GB+)** — the single blocker.
+2. On Windows, flash the cage ISO with **Rufus** or **balenaEtcher**.
+3. **Boot the spare laptop from USB → "Try Ubuntu" (NOT Install).** Non-destructive —
+   runs in RAM, never touches the laptop's drive or Windows files.
+4. `NOVA_KIOSK=1` autostart launches the Tauri app fullscreen via cage. With a
+   **real GPU**, WebKit uses hardware compositing — **no software flags, so the
+   masked Script error should not occur** — and it should render cleanly.
+5. **Verify:** renders + Start-menu **Shut Down** works + check the **Browser**
+   (native embeds may still need the separate Linux multi-webview work). If clean,
+   start **Phase 1 — system agent** (§7).
+   - **If the Script error STILL appears on real hardware** → it's not
+     rendering-mode after all → debug with real devtools (right-click → Inspect
+     works on a normal desktop, no kiosk constraints) to finally read the message.
+
+**No-USB alternative:** **WSL2 + WSLg** on the Windows PC gives a GPU-accelerated
+Linux GUI in a sandbox (doesn't touch your files). `sudo dpkg -i` the `.deb`, run
+`/usr/bin/app` — its GPU passthrough may render WebKit cleanly. Worth a try if a
+USB stick is the dealbreaker.
+
+**Built + version-controlled:** cage session setup (`nova-linux/cage-setup.sh`),
+windowed debug launcher (`nova-linux/debug-run.sh`), full logging (Rust + frontend
++ on-screen overlay — `lib.rs` / `src/lib/log.js`), the bridge fix + crossorigin
+strip + error boundary + devtools feature. The masked error's real message is
+still **unknown** — reading it needs an environment where WebKit renders with a
+GPU (real hardware / WSLg) + devtools.
 
 ---
 
