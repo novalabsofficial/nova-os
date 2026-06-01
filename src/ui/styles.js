@@ -130,6 +130,11 @@ export const CSS = `
   ::-webkit-scrollbar-thumb:hover{background:var(--nv-scroll-hover);}
   ::-webkit-scrollbar-corner{background:transparent;}
 
+  /* Hidden-scrollbar utility — for horizontal strips (e.g. the taskbar app
+     cluster) that should scroll when crowded without showing a scrollbar. */
+  .no-sb{scrollbar-width:none;-ms-overflow-style:none;}
+  .no-sb::-webkit-scrollbar{width:0;height:0;display:none;}
+
   input,textarea,button{font-family:inherit;}
   input::placeholder,textarea::placeholder{color:var(--nv-text-dim);}
   textarea{resize:vertical;}

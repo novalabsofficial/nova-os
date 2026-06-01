@@ -2659,10 +2659,13 @@ export default function NovaOS(){
         {/* v9.0 — Windows 11-style weather pill in the bottom-left corner. */}
         {deviceMode!=="mobile" && <TaskbarWeather data={data} onClick={()=>openApp("atmos")} />}
         </div>
-        {/* CENTER cluster — pinned + running apps, absolutely centered
-            (Windows 11 style). Capped width so a long row of apps never runs
-            under the left/right clusters. */}
-        <div style={{position:"absolute",left:"50%",top:"50%",transform:"translate(-50%,-50%)",display:"flex",alignItems:"center",gap:7,maxWidth:deviceMode==="mobile"?"calc(100% - 220px)":"calc(100% - 400px)",zIndex:1}}>
+        {/* CENTER cluster — pinned + running apps. In-flow flex:1 between the
+            left/right clusters with `safe center` + horizontal scroll, so a long
+            row of apps can never overlap the other taskbar items on small
+            screens — it scrolls within the available space instead. (Was
+            position:absolute with a fixed width cap, which spilled over the
+            clusters once they were wider than that budget.) */}
+        <div className="no-sb" style={{flex:1,minWidth:0,display:"flex",alignItems:"center",justifyContent:"safe center",gap:7,overflowX:"auto",overflowY:"hidden",padding:"5px 0",zIndex:1}}>
         {/* v8.0 — Taskbar: pinned apps + running windows.
             Pinned apps with NO running windows render as compact icon-only
             "launcher" chips (40x40, no label). Pinned apps WITH running
