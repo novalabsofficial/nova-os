@@ -23,11 +23,27 @@ initLite();
 // nova-native document class. No-ops on the web.
 initNative();
 
+// Top-level error boundary — React hands componentDidCatch the REAL error
+// object (unmasked: message + stack + component stack), so a render/effect crash
+// is logged in full instead of only surfacing as a masked "Script error.".
+class BootBoundary extends React.Component {
+  constructor(props) { super(props); this.state = { crashed: false }; }
+  static getDerivedStateFromError() { return { crashed: true }; }
+  componentDidCatch(err, info) {
+    log.error('React crash:', (err && err.message) || String(err),
+      (err && err.stack) ? '\n' + err.stack : '',
+      (info && info.componentStack) ? '\ncomponentStack:' + info.componentStack : '');
+  }
+  render() { return this.state.crashed ? null : this.props.children; }
+}
+
 function mount() {
   log.info('boot: mounting React (lite =', isLiteMode(), ')');
   ReactDOM.createRoot(document.getElementById('root')).render(
     <React.StrictMode>
-      <NovaOS />
+      <BootBoundary>
+        <NovaOS />
+      </BootBoundary>
     </React.StrictMode>
   );
   log.info('boot: React render dispatched');
