@@ -128,5 +128,23 @@ export function initLogging() {
   window.addEventListener("unhandledrejection", (e) => {
     emit("error", ["unhandledrejection: " + str(e && e.reason)]);
   });
+  // Wrap async callback schedulers: a synchronous throw inside one is logged
+  // with the REAL error (our own try/catch isn't subject to the cross-origin
+  // window.onerror masking — "Script error. (?:0:0)" — that tauri:// triggers).
+  const wrap = (name) => {
+    const orig = window[name];
+    if (typeof orig !== "function") return;
+    window[name] = function (cb, ...rest) {
+      if (typeof cb !== "function") return orig.call(this, cb, ...rest);
+      return orig.call(this, function (...a) {
+        try { return cb.apply(this, a); }
+        catch (e) {
+          emit("error", ["callback(" + name + ") threw: " + ((e && e.message) || e) + ((e && e.stack) ? "\n" + e.stack : "")]);
+          throw e;
+        }
+      }, ...rest);
+    };
+  };
+  ["setTimeout", "setInterval", "requestAnimationFrame", "requestIdleCallback", "queueMicrotask"].forEach(wrap);
   log.info("logging ready (tauri=" + isTauri + ")");
 }
