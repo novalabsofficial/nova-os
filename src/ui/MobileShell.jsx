@@ -914,7 +914,7 @@ function AppLibrary({ AC, apps, glass, cols = 4, search, setSearch, onPick, onLo
 // ── App Switcher (Pixel-style recents with live shrunken app previews) ──────
 function AppSwitcher({ openApps, appById, glass, renderApp, onPick, onCloseApp, onDismiss }) {
   return (
-    <div onClick={e => { if (Date.now() - lastTouchAt < 700) return; if (e.target === e.currentTarget) onDismiss(); }} onTouchEnd={e => { lastTouchAt = Date.now(); if (e.target === e.currentTarget) onDismiss(); }}
+    <div onClick={e => { if (Date.now() - lastTouchAt < 700) return; if (e.target === e.currentTarget) onDismiss(); }} onTouchEnd={e => { lastTouchAt = Date.now(); if (e.target === e.currentTarget) { e.preventDefault(); onDismiss(); } }}
       style={{ position: "absolute", inset: 0, zIndex: 70, background: "rgba(5,7,16,0.82)", backdropFilter: "blur(18px) saturate(135%)", WebkitBackdropFilter: "blur(18px) saturate(135%)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 16, animation: "ss-fade 0.2s" }}>
       <div style={{ fontFamily: FFB, fontWeight: 700, fontSize: 14, color: "#fff", letterSpacing: 0.3 }}>Recent apps</div>
       {openApps.length === 0 ? (

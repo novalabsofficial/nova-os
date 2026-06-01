@@ -218,7 +218,7 @@ export function ChessApp({ user, AC }) {
         // v9.3 board-sizing fix).
         gridTemplateColumns: "repeat(8, minmax(0, 1fr))",
         gridTemplateRows: "repeat(8, minmax(0, 1fr))",
-        width: "min(440px, 80vmin)",
+        width: isMobile ? "min(94vw, 62vh)" : "min(440px, 80vmin)",
         aspectRatio: "1/1",
         borderRadius: 6,
         overflow: "hidden",
@@ -289,10 +289,13 @@ export function ChessApp({ user, AC }) {
   }
 
   // ── Render ────────────────────────────────────────────────────────────
+  // Mobile: stack the games list above the board so the board can use the full
+  // width (the desktop side-by-side layout cut the board in half on a phone).
+  const isMobile = typeof window !== "undefined" && window.innerWidth < 600;
   return (
-    <div style={{ width:"100%", height:"100%", display:"flex", fontFamily:FF, minHeight:0 }}>
+    <div style={{ width:"100%", height:"100%", display:"flex", flexDirection: isMobile ? "column" : "row", fontFamily:FF, minHeight:0 }}>
       {/* Sidebar */}
-      <div style={{ width:180, flexShrink:0, borderRight:"1px solid rgba(255,255,255,0.07)", display:"flex", flexDirection:"column", background:"rgba(255,255,255,0.015)" }}>
+      <div style={{ width: isMobile ? "100%" : 180, flexShrink:0, maxHeight: isMobile ? 150 : "none", borderRight: isMobile ? "none" : "1px solid rgba(255,255,255,0.07)", borderBottom: isMobile ? "1px solid rgba(255,255,255,0.07)" : "none", display:"flex", flexDirection:"column", background:"rgba(255,255,255,0.015)" }}>
         <div style={{ padding:"12px 12px 4px", display:"flex", alignItems:"center", gap:6 }}>
           <span style={{ ...SEC, marginBottom:0, fontSize:10 }}>Games</span>
           <button onClick={() => { setView("challenge"); setChallengeErr(""); setActiveGameId(null); }}

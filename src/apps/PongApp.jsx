@@ -33,6 +33,8 @@ export function PongApp({ AC }) {
   const stateRef = useRef(initGame());
   // Track each physical key independently so we can route them per-mode.
   const keysRef  = useRef({ w: false, s: false, up: false, down: false });
+  // Mobile: drag-to-move paddle targets (internal canvas Y, or null when no touch).
+  const touchRef = useRef({ L: null, R: null });
   const aiSpeedRef = useRef(AI_SPEEDS.normal);
   const modeRef = useRef(mode);
   useEffect(() => { modeRef.current = mode; }, [mode]);
@@ -77,6 +79,23 @@ export function PongApp({ AC }) {
     const ctx = canvas.getContext("2d");
     let raf;
 
+    // Mobile touch controls: drag on the board to move a paddle. 1-player drags
+    // the left paddle anywhere; 2-player splits left/right halves of the board.
+    canvas.style.touchAction = "none";
+    const ptrs = new Map();
+    const setTarget = (side, clientY) => {
+      const r = canvas.getBoundingClientRect();
+      const y = (clientY - r.top) * (CH / r.height);
+      touchRef.current[side] = Math.max(0, Math.min(CH - PADDLE_H, y - PADDLE_H / 2));
+    };
+    const pDown = (e) => { const r = canvas.getBoundingClientRect(); const side = (modeRef.current !== "2p" || (e.clientX - r.left) < r.width / 2) ? "L" : "R"; ptrs.set(e.pointerId, side); setTarget(side, e.clientY); e.preventDefault(); };
+    const pMove = (e) => { const side = ptrs.get(e.pointerId); if (side) { setTarget(side, e.clientY); e.preventDefault(); } };
+    const pUp = (e) => { const side = ptrs.get(e.pointerId); if (side) { touchRef.current[side] = null; ptrs.delete(e.pointerId); } };
+    canvas.addEventListener("pointerdown", pDown);
+    canvas.addEventListener("pointermove", pMove);
+    canvas.addEventListener("pointerup", pUp);
+    canvas.addEventListener("pointercancel", pUp);
+
     function serve() {
       const s = stateRef.current;
       s.ball.x = CW / 2;
@@ -113,6 +132,10 @@ export function PongApp({ AC }) {
         if (Math.abs(dy) > AI_DEADZONE) s.rightY += Math.sign(dy) * Math.min(Math.abs(dy), reactSpeed);
       }
       s.rightY = Math.max(0, Math.min(CH - PADDLE_H, s.rightY));
+
+      // Touch drag (mobile) snaps a paddle straight to the finger.
+      if (touchRef.current.L != null) s.leftY = touchRef.current.L;
+      if (twoP && touchRef.current.R != null) s.rightY = touchRef.current.R;
 
       // Ball physics.
       s.ball.x += s.ball.vx;
@@ -156,7 +179,13 @@ export function PongApp({ AC }) {
       raf = requestAnimationFrame(frame);
     }
     raf = requestAnimationFrame(frame);
-    return () => cancelAnimationFrame(raf);
+    return () => {
+      cancelAnimationFrame(raf);
+      canvas.removeEventListener("pointerdown", pDown);
+      canvas.removeEventListener("pointermove", pMove);
+      canvas.removeEventListener("pointerup", pUp);
+      canvas.removeEventListener("pointercancel", pUp);
+    };
   }, [running, winner]);
 
   useEffect(() => {

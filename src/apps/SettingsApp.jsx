@@ -58,6 +58,9 @@ export function SettingsApp({ user, data, updateSettings, showToast, AC, onCusto
   // categories + a scrolling content pane. `section` tracks the active pane;
   // `initialSection` lets the taskbar quick-settings deep-link straight to
   // e.g. Network or Sound.
+  // Mobile master-detail: "list" shows the section list, "detail" shows one
+  // section with a Back button (the desktop two-pane has no back on a phone).
+  const [mobilePane, setMobilePane] = useState("list");
   const [section, setSection] = useState(initialSection || "appearance");
   useEffect(() => { if (initialSection) setSection(initialSection); }, [initialSection]);
 
@@ -135,12 +138,17 @@ export function SettingsApp({ user, data, updateSettings, showToast, AC, onCusto
   const PANE_TITLE = { fontFamily: FFB, fontWeight: 700, fontSize: 19, color: "var(--nv-text-strong)", marginBottom: 3, letterSpacing: 0.2 };
   const PANE_SUB = { fontSize: 11.5, color: "var(--nv-text-dim)", marginBottom: 20, lineHeight: 1.5 };
 
+  const isMobile = typeof window !== "undefined" && window.innerWidth < 600;
+
   return (
-    <div style={{ display: "flex", height: "100%", minHeight: 0, fontFamily: FF }}>
-      {/* ── Left rail ──────────────────────────────────────────────── */}
+    <div style={{ display: "flex", flexDirection: isMobile ? "column" : "row", height: "100%", minHeight: 0, fontFamily: FF }}>
+      {/* ── Left rail (mobile: the master list; hidden once a section opens) ── */}
       <div style={{
-        width: 184, flexShrink: 0, borderRight: "1px solid var(--nv-border)",
-        padding: "16px 10px", overflowY: "auto", display: "flex", flexDirection: "column", gap: 2,
+        width: isMobile ? "100%" : 184, flexShrink: 0,
+        borderRight: isMobile ? "none" : "1px solid var(--nv-border)",
+        padding: "16px 10px", overflowY: "auto",
+        display: (isMobile && mobilePane !== "list") ? "none" : "flex",
+        flexDirection: "column", gap: 2,
         background: "rgba(255,255,255,0.02)",
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: 9, padding: "4px 8px 14px" }}>
@@ -153,7 +161,7 @@ export function SettingsApp({ user, data, updateSettings, showToast, AC, onCusto
         {SECTIONS.map(s => {
           const active = section === s.id;
           return (
-            <button key={s.id} onClick={() => setSection(s.id)} style={{
+            <button key={s.id} onClick={() => { setSection(s.id); if (isMobile) setMobilePane("detail"); }} style={{
               display: "flex", alignItems: "center", gap: 11, padding: "9px 11px", borderRadius: 9,
               background: active ? fill(AC) : "transparent",
               border: "1px solid " + (active ? bdr(AC) : "transparent"),
@@ -169,8 +177,15 @@ export function SettingsApp({ user, data, updateSettings, showToast, AC, onCusto
         })}
       </div>
 
-      {/* ── Content pane ──────────────────────────────────────────── */}
-      <div style={{ flex: 1, minWidth: 0, overflowY: "auto", padding: "20px 24px" }}>
+      {/* ── Content pane (mobile: shown once a section is picked, with Back) ── */}
+      <div style={{ flex: 1, minWidth: 0, overflowY: "auto", padding: isMobile ? "0 16px 24px" : "20px 24px", display: (isMobile && mobilePane === "list") ? "none" : "block" }}>
+
+        {isMobile && (
+          <div style={{ position: "sticky", top: 0, zIndex: 2, display: "flex", alignItems: "center", gap: 10, padding: "12px 0", marginBottom: 6, background: "var(--nv-surface-solid)", borderBottom: "1px solid var(--nv-border)" }}>
+            <button onClick={() => setMobilePane("list")} style={{ background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.14)", borderRadius: 8, padding: "7px 12px", color: "var(--nv-text-strong)", cursor: "pointer", fontFamily: FFB, fontWeight: 700, fontSize: 13 }}>← Settings</button>
+            <span style={{ fontFamily: FFB, fontWeight: 700, fontSize: 14, color: "var(--nv-text-strong)" }}>{(SECTIONS.find(s => s.id === section) || {}).label}</span>
+          </div>
+        )}
 
         {section === "appearance" && (<>
           <div style={PANE_TITLE}>Appearance</div>
