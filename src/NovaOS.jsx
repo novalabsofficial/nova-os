@@ -25,7 +25,7 @@ import { wmoIcon, wmoLabel, geocodeUrl, parseGeocode, forecastUrl, parseForecast
 import { PROVIDERS as AI_PROVIDERS, streamResponse as aiStream, deriveTitle as aiDeriveTitle } from "./lib/ai.js";
 import { playTone, speak, cancelSpeech, playSound, getSoundConfig, setSoundConfig, setSoundWallpaper, subscribeSoundConfig } from "./lib/audio.js";
 import { db, setDbUid, getDbUid } from "./lib/db.js";
-import { watchMyThreads } from "./lib/dms.js";
+import { watchMyThreads, otherParticipantName } from "./lib/dms.js";
 import { watchMyServers } from "./lib/servers.js";
 import { openExternalUrl } from "./lib/openUrl.js";
 import { isNative as nativeIsNative, notify as nativeNotify } from "./lib/native.js";
@@ -1281,6 +1281,30 @@ export default function NovaOS(){
         pushNotifRef.current({ appId: "chess", kind: "info", title: "♟ Chess challenge", body: "@" + (g.participantUsernames?.[0] || "Someone") + " challenged you to a game of chess." });
       });
       const newest = games.reduce((mx, g) => Math.max(mx, g.createdAt || 0), lastTs);
+      if (newest > lastTs) { lastTs = newest; try { localStorage.setItem(key, String(lastTs)); } catch {} }
+    });
+    return () => unsub && unsub();
+  }, [user]);
+
+  // v10.8 — notify on incoming DMs. Watch my threads; a thread whose last
+  // message is newer than the watermark and was sent by the OTHER person is a
+  // new DM. Same offline-safe watermark as mentions/chess.
+  useEffect(() => {
+    const uid = getDbUid();
+    if (!uid || !user) return;
+    const key = "nova-dm-ts-" + user;
+    let lastTs = Number(localStorage.getItem(key)) || Date.now();
+    const notified = new Set();
+    const unsub = watchMyThreads(uid, threads => {
+      threads.forEach(th => {
+        const ts = th.lastTs || 0;
+        if (!th.lastMessage || th.lastSenderUid === uid) return;   // no msg, or my own
+        const k = th.id + ":" + ts;
+        if (ts <= lastTs || notified.has(k)) return;
+        notified.add(k);
+        pushNotifRef.current({ appId: "chat", kind: "info", title: "@" + (otherParticipantName(th, uid) || "Someone") + " messaged you", body: (th.lastMessage || "").slice(0, 140) });
+      });
+      const newest = threads.reduce((mx, th) => Math.max(mx, th.lastTs || 0), lastTs);
       if (newest > lastTs) { lastTs = newest; try { localStorage.setItem(key, String(lastTs)); } catch {} }
     });
     return () => unsub && unsub();
@@ -2975,15 +2999,22 @@ export default function NovaOS(){
         <div style={{position:"fixed",right:14,bottom:TASKBAR_H+16,zIndex:9990,display:"flex",flexDirection:"column",gap:10,alignItems:"flex-end",pointerEvents:"none"}}>
           {notifToasts.map(t=>{
             const kc = t.kind==="alert"?"#ff8b8b":t.kind==="warning"?"#ffcc66":t.kind==="success"?"#4cef90":AC;
+            const appObj = t.appId ? APPS.find(a=>a.id===t.appId) : null;
             return(
               <div key={t.id} onClick={()=>{dismissNotifToast(t.id); if(t.appId) openApp(t.appId);}}
-                style={{pointerEvents:"auto",cursor:"pointer",width:"min(330px, calc(100vw - 28px))",background:"var(--nv-surface-solid)",backdropFilter:"blur(30px) saturate(170%)",WebkitBackdropFilter:"blur(30px) saturate(170%)",border:"1px solid rgba(255,255,255,0.12)",borderLeft:"3px solid "+kc,borderRadius:12,boxShadow:"0 10px 30px rgba(0,0,0,0.5)",padding:"11px 13px",animation:"panel-in-right 0.3s cubic-bezier(0.22,1,0.36,1)"}}>
-                <div style={{display:"flex",alignItems:"center",gap:8}}>
-                  <span style={{fontSize:14,filter:"drop-shadow(0 0 6px "+kc+"66)"}}>🔔</span>
-                  <div style={{flex:1,minWidth:0,fontFamily:FFB,fontWeight:700,fontSize:13,color:"#fff",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t.title}</div>
-                  <button onClick={e=>{e.stopPropagation();dismissNotifToast(t.id);}} title="Dismiss" style={{background:"none",border:"none",color:"rgba(255,255,255,0.4)",cursor:"pointer",fontSize:14,lineHeight:1,padding:2,flexShrink:0}}>✕</button>
+                style={{position:"relative",pointerEvents:"auto",cursor:"pointer",width:"min(360px, calc(100vw - 28px))",display:"flex",gap:12,alignItems:"flex-start",padding:"13px 30px 13px 15px",background:"var(--nv-surface-solid)",backdropFilter:"blur(44px) saturate(180%)",WebkitBackdropFilter:"blur(44px) saturate(180%)",border:"1px solid rgba(255,255,255,0.12)",borderRadius:16,boxShadow:"0 8px 18px rgba(0,0,0,0.32), 0 26px 64px rgba(0,0,0,0.5), 0 1px 0 rgba(255,255,255,0.09) inset",animation:"panel-in-right 0.34s cubic-bezier(0.22,1,0.36,1)",overflow:"hidden"}}>
+                <div style={{position:"absolute",left:0,top:0,bottom:0,width:3,background:kc,boxShadow:"0 0 12px "+kc+"99"}}/>
+                <div style={{flexShrink:0,width:38,height:38,borderRadius:11,display:"flex",alignItems:"center",justifyContent:"center",background:fill(kc),border:"1px solid "+bdr(kc)}}>
+                  {appObj ? <AppIconDisplay app={{id:appObj.id,icon:appObj.icon}} size={24} glass={glass}/> : <span style={{fontSize:18}}>🔔</span>}
                 </div>
-                {t.body && <div style={{fontSize:12,color:"rgba(255,255,255,0.7)",marginTop:4,lineHeight:1.4,display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical",overflow:"hidden"}}>{t.body}</div>}
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{display:"flex",alignItems:"baseline",gap:8}}>
+                    <div style={{flex:1,minWidth:0,fontFamily:FFB,fontWeight:700,fontSize:13,color:"var(--nv-text-strong)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t.title}</div>
+                    <span style={{fontFamily:FFM,fontSize:9.5,color:"var(--nv-text-dim)",flexShrink:0}}>now</span>
+                  </div>
+                  {t.body && <div style={{fontSize:12,color:"var(--nv-text)",opacity:0.82,marginTop:3,lineHeight:1.42,display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical",overflow:"hidden"}}>{t.body}</div>}
+                </div>
+                <button onClick={e=>{e.stopPropagation();dismissNotifToast(t.id);}} title="Dismiss" style={{position:"absolute",top:8,right:8,width:19,height:19,borderRadius:6,background:"rgba(255,255,255,0.07)",border:"none",color:"rgba(255,255,255,0.55)",cursor:"pointer",fontSize:10,lineHeight:1,display:"flex",alignItems:"center",justifyContent:"center",padding:0}}>✕</button>
               </div>
             );
           })}
