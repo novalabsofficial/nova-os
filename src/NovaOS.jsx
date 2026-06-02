@@ -2643,7 +2643,6 @@ export default function NovaOS(){
           }}>
             <span style={{fontSize:14,lineHeight:1}}>🔍</span>
             <span>Search</span>
-            <span style={{fontFamily:FFM,fontSize:10,padding:"1px 6px",background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.09)",borderRadius:4,marginLeft:4,letterSpacing:0.3}}>Ctrl+K</span>
           </button>
         )}
         {/* v10.0 Supernova — Nova AI command bar launcher. Accent-tinted so it
@@ -2657,7 +2656,6 @@ export default function NovaOS(){
         }}>
           <span style={{fontSize:14,lineHeight:1,filter:commandOpen?"drop-shadow(0 0 8px rgba("+hexRgb(AC)+",0.5))":"none"}}>✨</span>
           {deviceMode!=="mobile" && <span>Ask Nova</span>}
-          {deviceMode!=="mobile" && <span style={{fontFamily:FFM,fontSize:10,padding:"1px 6px",background:commandOpen?"rgba("+hexRgb(AC)+",0.18)":"rgba(255,255,255,0.06)",border:"1px solid "+(commandOpen?bdr(AC):"rgba(255,255,255,0.09)"),borderRadius:4,marginLeft:2,letterSpacing:0.3}}>Ctrl+J</span>}
         </button>
         {/* v10.0 Supernova — Task View launcher (virtual desktops). Shows the
             current/total desktop count; opens the Task View overview. */}
@@ -2860,22 +2858,32 @@ export default function NovaOS(){
               away without opening Settings. Same flyout as the network
               button; both are at-a-glance indicators that share quick
               settings. The icon reflects the current mute state. */}
-          {/* v10.7 — merged the network + volume buttons into ONE quick-settings
-              button (both opened the same flyout). Shows both glyphs; the volume
-              one reflects mute state. */}
+          {/* v9.3 (#22) — Dedicated volume button so the slider is one click
+              away without opening Settings. Same flyout as the network
+              button; both are at-a-glance indicators that share quick
+              settings. The icon reflects the current mute state. */}
           {(() => {
             const muted = !soundCfg.enabled || soundCfg.volume <= 0;
             return (
-              <button className="sb" onClick={()=>setQsOpen(o=>!o)} title={muted ? "Quick settings — muted" : "Quick settings — network & volume"} style={{
-                height:36,display:"flex",alignItems:"center",gap:5,padding:"0 9px",borderRadius:9,
+              <button className="sb" onClick={()=>setQsOpen(o=>!o)} title={muted ? "Muted — click to adjust" : "Volume " + Math.round(soundCfg.volume*100) + "%"} style={{
+                width:36,height:36,borderRadius:9,
                 background:qsOpen?fill(AC):"transparent",
                 border:qsOpen?"1px solid "+bdr(AC):"1px solid transparent",
-                cursor:"pointer",
-                color:qsOpen?AC:"rgba(255,255,255,0.62)",
+                cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",
+                color:qsOpen?AC:(muted?"rgba(255,255,255,0.42)":"rgba(255,255,255,0.62)"),
                 transition:"all 0.18s cubic-bezier(0.4,0,0.2,1)",
-              }}><WifiGlyph size={16}/><VolumeGlyph size={16} muted={muted}/></button>
+              }}><VolumeGlyph size={17} muted={muted}/></button>
             );
           })()}
+          {/* v9.0 — Network/quick-settings button. Opens the same flyout. */}
+          <button className="sb" onClick={()=>setQsOpen(o=>!o)} title="Quick settings" style={{
+            width:36,height:36,borderRadius:9,
+            background:qsOpen?fill(AC):"transparent",
+            border:qsOpen?"1px solid "+bdr(AC):"1px solid transparent",
+            cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",
+            color:qsOpen?AC:"rgba(255,255,255,0.62)",
+            transition:"all 0.18s cubic-bezier(0.4,0,0.2,1)",
+          }}><WifiGlyph size={17}/></button>
           {/* Notification bell — badge shows unread count, click toggles the panel.
               v9.0: monochrome glass glyph (inherits color via currentColor). */}
           <button className="sb" onClick={()=>setNotifsOpen(o=>!o)} title={unreadCount>0?unreadCount+" unread":"Notifications"} style={{
