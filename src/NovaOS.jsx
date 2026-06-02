@@ -1243,7 +1243,10 @@ export default function NovaOS(){
     // the whole backlog was ignored on connect, so offline pings were silent.
     let lastTs = Number(localStorage.getItem(key)) || Date.now();
     const notified = new Set();
-    const q = query(collection(firestoreDb, "nova_chat"), orderBy("ts", "asc"), limit(40));
+    // orderBy DESC: watch the NEWEST 40 messages. (The old "asc" window watched
+    // the 40 oldest, which never change once the chat grows past 40 — so new
+    // pings were never seen and mention notifications never fired.)
+    const q = query(collection(firestoreDb, "nova_chat"), orderBy("ts", "desc"), limit(40));
     const unsub = onSnapshot(q, snap => {
       snap.docs.forEach(d => {
         const m = d.data();
