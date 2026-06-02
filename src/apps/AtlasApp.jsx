@@ -54,6 +54,27 @@ async function fetchWiki(wp) {
   } catch { return null; }
 }
 
+// Photon (Komoot) — an OSM-based geocoder designed for autocomplete, which the
+// public Nominatim explicitly does NOT permit. Keyless + CORS-enabled. Returns
+// our own {lat, lon, label} shape so a picked suggestion routes to the exact spot.
+async function photon(q, limit = 6) {
+  const r = await fetch("https://photon.komoot.io/api/?limit=" + limit + "&q=" + encodeURIComponent(q));
+  const d = await r.json();
+  return (d.features || [])
+    .filter(f => f.geometry && f.geometry.coordinates)
+    .map(f => ({ lon: f.geometry.coordinates[0], lat: f.geometry.coordinates[1], label: photonLabel(f.properties || {}) }));
+}
+function photonLabel(p) {
+  const seg = [];
+  if (p.name) seg.push(p.name);
+  if (p.street) seg.push(p.housenumber ? p.street + " " + p.housenumber : p.street);
+  const place = p.city || p.town || p.village || p.county;
+  if (place) seg.push(place);
+  if (p.state) seg.push(p.state);
+  if (p.country) seg.push(p.country);
+  return seg.filter((v, i) => v && v !== seg[i - 1]).join(", ") || (p.country || "Unknown place");
+}
+
 export function AtlasApp({ AC, showToast }) {
   const mapEl = useRef(null);
   const mapRef = useRef(null);
@@ -71,6 +92,10 @@ export function AtlasApp({ AC, showToast }) {
   const [startQ, setStartQ] = useState("");
   const [endQ, setEndQ] = useState("");
   const [route, setRoute] = useState(null);
+  const [sug, setSug] = useState({ field: null, items: [] });   // directions autocomplete
+  const startSel = useRef(null);   // chosen start {lat,lon,label} — skips re-geocode
+  const endSel = useRef(null);
+  const sugTimer = useRef(null);
   const isMobile = typeof window !== "undefined" && window.innerWidth < 600;
 
   useEffect(() => { modeRef.current = mode; }, [mode]);
@@ -141,14 +166,36 @@ export function AtlasApp({ AC, showToast }) {
     [routeLine, startMk, endMk].forEach(r => { if (r.current) { r.current.remove(); r.current = null; } });
     setRoute(null);
   }
+  // ── Directions autocomplete (Photon) ──
+  async function resolveEndpoint(text, sel) {
+    if (sel) return sel;                       // user picked a suggestion → exact coords
+    const list = await photon(text, 1);
+    return list && list[0];
+  }
+  function queueSuggest(field, value) {
+    if (field === "start") { setStartQ(value); startSel.current = null; }
+    else { setEndQ(value); endSel.current = null; }
+    clearTimeout(sugTimer.current);
+    const v = value.trim();
+    if (v.length < 3) { setSug({ field: null, items: [] }); return; }
+    sugTimer.current = setTimeout(async () => {
+      try { const items = await photon(v, 6); setSug({ field, items }); }
+      catch { setSug({ field: null, items: [] }); }
+    }, 380);   // debounce — respectful of the geocoder + avoids per-keystroke calls
+  }
+  function pickSuggest(field, it) {
+    if (field === "start") { setStartQ(it.label); startSel.current = it; }
+    else { setEndQ(it.label); endSel.current = it; }
+    setSug({ field: null, items: [] });
+  }
+
   async function doRoute(e) {
     if (e) e.preventDefault();
     const a = startQ.trim(), b = endQ.trim();
     if (!a || !b) { showToast?.("Enter both a start and a destination"); return; }
-    setBusy(true);
+    setBusy(true); setSug({ field: null, items: [] });
     try {
-      const [sa, sb] = await Promise.all([geocode(a, 1), geocode(b, 1)]);
-      const s = sa && sa[0], en = sb && sb[0];
+      const [s, en] = await Promise.all([resolveEndpoint(a, startSel.current), resolveEndpoint(b, endSel.current)]);
       if (!s) { showToast?.("Couldn't find the start"); setBusy(false); return; }
       if (!en) { showToast?.("Couldn't find the destination"); setBusy(false); return; }
       const url = OSRM + `/route/v1/driving/${s.lon},${s.lat};${en.lon},${en.lat}?overview=full&geometries=geojson`;
@@ -160,23 +207,27 @@ export function AtlasApp({ AC, showToast }) {
       setPlace(null);
       const m = mapRef.current;
       routeLine.current = L.polyline(rt.geometry.coordinates.map(([lon, lat]) => [lat, lon]), { color: AC, weight: 6, opacity: 0.85, lineJoin: "round" }).addTo(m);
-      startMk.current = L.marker([s.lat, s.lon], { icon: dotIcon("#2ecc71", "A") }).addTo(m).bindPopup((s.display_name || "").split(",")[0]);
-      endMk.current = L.marker([en.lat, en.lon], { icon: dotIcon("#e74c3c", "B") }).addTo(m).bindPopup((en.display_name || "").split(",")[0]);
+      startMk.current = L.marker([s.lat, s.lon], { icon: dotIcon("#2ecc71", "A") }).addTo(m).bindPopup((s.label || a).split(",")[0]);
+      endMk.current = L.marker([en.lat, en.lon], { icon: dotIcon("#e74c3c", "B") }).addTo(m).bindPopup((en.label || b).split(",")[0]);
       m.fitBounds(routeLine.current.getBounds(), { padding: [50, 50] });
-      setRoute({ distanceM: rt.distance, durationS: rt.duration, from: (s.display_name || "").split(",")[0], to: (en.display_name || "").split(",")[0] });
+      setRoute({ distanceM: rt.distance, durationS: rt.duration, from: (s.label || a).split(",")[0], to: (en.label || b).split(",")[0] });
     } catch { showToast?.("Routing failed — check your connection"); }
     setBusy(false);
   }
 
   function switchMode(m) {
     setMode(m);
+    setSug({ field: null, items: [] });
     if (m === "directions") { setResults([]); setPlace(null); }
     else { clearRoute(); }
   }
   function directionsToPlace() {
     setMode("directions");
+    setStartQ(""); startSel.current = null;
     setEndQ(place.name);
-    setStartQ("");
+    // Reuse the place's exact coords so routing doesn't have to re-resolve the name.
+    endSel.current = (place.lat != null && place.lon != null) ? { lat: place.lat, lon: place.lon, label: place.name } : null;
+    setSug({ field: null, items: [] });
     showToast?.("Destination set — enter a starting point");
   }
 
@@ -214,8 +265,29 @@ export function AtlasApp({ AC, showToast }) {
           </form>
         ) : (
           <form onSubmit={doRoute} style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-            <input value={startQ} onChange={e => setStartQ(e.target.value)} placeholder="🟢 Start (place or address)" style={{ ...input, flexBasis: 160 }} />
-            <input value={endQ} onChange={e => setEndQ(e.target.value)} placeholder="🔴 Destination" style={{ ...input, flexBasis: 160 }} />
+            {["start", "end"].map(field => (
+              <div key={field} style={{ position: "relative", flex: "1 1 150px", minWidth: 130 }}>
+                <input
+                  value={field === "start" ? startQ : endQ}
+                  onChange={e => queueSuggest(field, e.target.value)}
+                  onBlur={() => setTimeout(() => setSug(s => (s.field === field ? { field: null, items: [] } : s)), 160)}
+                  placeholder={field === "start" ? "🟢 Start — type to search" : "🔴 Destination — type to search"}
+                  autoComplete="off"
+                  style={{ ...input, width: "100%" }} />
+                {sug.field === field && sug.items.length > 0 && (
+                  <div style={{ position: "absolute", top: "100%", left: 0, right: 0, marginTop: 4, maxHeight: 240, overflowY: "auto", background: "var(--nv-surface-solid)", border: "1px solid var(--nv-border-strong)", borderRadius: 10, boxShadow: "0 14px 40px rgba(0,0,0,0.5)", zIndex: 1200 }}>
+                    {sug.items.map((it, i) => (
+                      <button key={i} type="button" onMouseDown={e => e.preventDefault()} onClick={() => pickSuggest(field, it)}
+                        style={{ display: "block", width: "100%", textAlign: "left", padding: "8px 11px", background: "transparent", border: "none", borderBottom: i < sug.items.length - 1 ? "1px solid var(--nv-border)" : "none", color: "var(--nv-text)", cursor: "pointer", fontFamily: FF, fontSize: 12, lineHeight: 1.35 }}
+                        onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,0.05)"}
+                        onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+                        {it.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
             <button type="submit" disabled={busy} style={goBtn}>{busy ? "…" : "Route"}</button>
             {route && <button type="button" onClick={clearRoute} style={ghost}>Clear</button>}
           </form>
@@ -290,7 +362,7 @@ export function AtlasApp({ AC, showToast }) {
       </div>
 
       <div style={{ padding: "5px 12px", fontSize: 10, color: "var(--nv-text-dim)", fontStyle: "italic", borderTop: "1px solid var(--nv-border)", textAlign: "center" }}>
-        Map © OpenStreetMap · Search by Nominatim · Routing by OSRM · Info from Wikipedia
+        Map © OpenStreetMap · Search by Nominatim · Autocomplete by Photon · Routing by OSRM · Info from Wikipedia
       </div>
     </div>
   );
