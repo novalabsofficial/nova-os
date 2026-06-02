@@ -79,7 +79,7 @@ export function AtlasApp({ AC, showToast }) {
   const mapEl = useRef(null);
   const mapRef = useRef(null);
   const searchMk = useRef(null);
-  const routeLine = useRef(null);
+  const routeLayers = useRef([]);   // one L.polyline per alternative route
   const startMk = useRef(null);
   const endMk = useRef(null);
   const modeRef = useRef("search");
@@ -91,7 +91,9 @@ export function AtlasApp({ AC, showToast }) {
   const [place, setPlace] = useState(null);
   const [startQ, setStartQ] = useState("");
   const [endQ, setEndQ] = useState("");
-  const [route, setRoute] = useState(null);
+  const [routes, setRoutes] = useState([]);   // [{distanceM, durationS}], sorted fastest-first
+  const [routeIdx, setRouteIdx] = useState(0);
+  const [ends, setEnds] = useState(null);     // {from, to}
   const [sug, setSug] = useState({ field: null, items: [] });   // directions autocomplete
   const startSel = useRef(null);   // chosen start {lat,lon,label} — skips re-geocode
   const endSel = useRef(null);
@@ -162,9 +164,17 @@ export function AtlasApp({ AC, showToast }) {
     );
   }
 
+  function styleRoutes(sel) {
+    routeLayers.current.forEach((pl, i) => {
+      if (i === sel) { pl.setStyle({ color: AC, weight: 7, opacity: 0.95 }); pl.bringToFront(); }
+      else { pl.setStyle({ color: "#8b93a7", weight: 5, opacity: 0.5 }); }
+    });
+  }
+  function selectRoute(i) { setRouteIdx(i); styleRoutes(i); }
   function clearRoute() {
-    [routeLine, startMk, endMk].forEach(r => { if (r.current) { r.current.remove(); r.current = null; } });
-    setRoute(null);
+    routeLayers.current.forEach(l => l.remove()); routeLayers.current = [];
+    [startMk, endMk].forEach(r => { if (r.current) { r.current.remove(); r.current = null; } });
+    setRoutes([]); setRouteIdx(0); setEnds(null);
   }
   // ── Directions autocomplete (Photon) ──
   async function resolveEndpoint(text, sel) {
@@ -198,19 +208,30 @@ export function AtlasApp({ AC, showToast }) {
       const [s, en] = await Promise.all([resolveEndpoint(a, startSel.current), resolveEndpoint(b, endSel.current)]);
       if (!s) { showToast?.("Couldn't find the start"); setBusy(false); return; }
       if (!en) { showToast?.("Couldn't find the destination"); setBusy(false); return; }
-      const url = OSRM + `/route/v1/driving/${s.lon},${s.lat};${en.lon},${en.lat}?overview=full&geometries=geojson`;
+      const url = OSRM + `/route/v1/driving/${s.lon},${s.lat};${en.lon},${en.lat}?overview=full&geometries=geojson&alternatives=3`;
       const d = await (await fetch(url)).json();
       if (!d.routes || !d.routes.length) { showToast?.("No driving route found between those points"); setBusy(false); return; }
-      const rt = d.routes[0];
+      const list = d.routes
+        .map(r => ({ distanceM: r.distance, durationS: r.duration, latlngs: r.geometry.coordinates.map(([lon, lat]) => [lat, lon]) }))
+        .sort((x, y) => x.durationS - y.durationS);
       clearRoute();
       if (searchMk.current) { searchMk.current.remove(); searchMk.current = null; }
       setPlace(null);
       const m = mapRef.current;
-      routeLine.current = L.polyline(rt.geometry.coordinates.map(([lon, lat]) => [lat, lon]), { color: AC, weight: 6, opacity: 0.85, lineJoin: "round" }).addTo(m);
+      // Draw every alternative; the fastest is highlighted, the rest are greyed
+      // and tappable to switch to them (Google Maps style).
+      routeLayers.current = list.map((rt, i) => {
+        const pl = L.polyline(rt.latlngs, { color: i === 0 ? AC : "#8b93a7", weight: i === 0 ? 7 : 5, opacity: i === 0 ? 0.95 : 0.5, lineJoin: "round" }).addTo(m);
+        pl.on("click", (ev) => { L.DomEvent.stop(ev); selectRoute(i); });
+        return pl;
+      });
+      routeLayers.current[0].bringToFront();
       startMk.current = L.marker([s.lat, s.lon], { icon: dotIcon("#2ecc71", "A") }).addTo(m).bindPopup((s.label || a).split(",")[0]);
       endMk.current = L.marker([en.lat, en.lon], { icon: dotIcon("#e74c3c", "B") }).addTo(m).bindPopup((en.label || b).split(",")[0]);
-      m.fitBounds(routeLine.current.getBounds(), { padding: [50, 50] });
-      setRoute({ distanceM: rt.distance, durationS: rt.duration, from: (s.label || a).split(",")[0], to: (en.label || b).split(",")[0] });
+      m.fitBounds(L.featureGroup(routeLayers.current).getBounds(), { padding: [50, 50] });
+      setRoutes(list.map(r => ({ distanceM: r.distanceM, durationS: r.durationS })));
+      setRouteIdx(0);
+      setEnds({ from: (s.label || a).split(",")[0], to: (en.label || b).split(",")[0] });
     } catch { showToast?.("Routing failed — check your connection"); }
     setBusy(false);
   }
@@ -289,7 +310,7 @@ export function AtlasApp({ AC, showToast }) {
               </div>
             ))}
             <button type="submit" disabled={busy} style={goBtn}>{busy ? "…" : "Route"}</button>
-            {route && <button type="button" onClick={clearRoute} style={ghost}>Clear</button>}
+            {routes.length > 0 && <button type="button" onClick={clearRoute} style={ghost}>Clear</button>}
           </form>
         )}
 
@@ -343,19 +364,26 @@ export function AtlasApp({ AC, showToast }) {
         )}
 
         {/* Route summary (directions mode) */}
-        {mode === "directions" && route && (
+        {mode === "directions" && routes.length > 0 && (
           <div style={panel}>
             <div style={{ padding: "12px 14px" }}>
-              <div style={{ fontFamily: FFB, fontWeight: 800, fontSize: 15, color: "var(--nv-text-strong)" }}>Driving route</div>
-              <div style={{ display: "flex", gap: 14, marginTop: 8, alignItems: "baseline" }}>
-                <div style={{ fontFamily: FFB, fontWeight: 800, fontSize: 22, color: AC }}>{fmtDur(route.durationS)}</div>
-                <div style={{ fontFamily: FFM, fontSize: 14, color: "var(--nv-text)" }}>{fmtDist(route.distanceM)}</div>
-              </div>
-              <div style={{ marginTop: 10, fontSize: 12, lineHeight: 1.6 }}>
-                <div><span style={{ color: "#2ecc71", fontWeight: 800 }}>A</span> <span style={{ color: "var(--nv-text)" }}>{route.from}</span></div>
-                <div><span style={{ color: "#e74c3c", fontWeight: 800 }}>B</span> <span style={{ color: "var(--nv-text)" }}>{route.to}</span></div>
-              </div>
-              <button onClick={clearRoute} style={{ ...ghost, marginTop: 12, width: "100%" }}>Clear route</button>
+              <div style={{ fontFamily: FFB, fontWeight: 800, fontSize: 15, color: "var(--nv-text-strong)", marginBottom: 8 }}>{routes.length > 1 ? routes.length + " routes" : "Driving route"}</div>
+              {routes.map((rt, i) => (
+                <button key={i} onClick={() => selectRoute(i)} style={{ display: "flex", alignItems: "baseline", gap: 10, width: "100%", textAlign: "left", padding: "9px 11px", marginBottom: 6, borderRadius: 9, cursor: "pointer", background: i === routeIdx ? fill(AC) : "rgba(255,255,255,0.04)", border: "1px solid " + (i === routeIdx ? bdr(AC) : "rgba(255,255,255,0.08)") }}>
+                  <span style={{ fontFamily: FFB, fontWeight: 800, fontSize: 18, color: i === routeIdx ? AC : "var(--nv-text-strong)" }}>{fmtDur(rt.durationS)}</span>
+                  <span style={{ fontFamily: FFM, fontSize: 12.5, color: "var(--nv-text)" }}>{fmtDist(rt.distanceM)}</span>
+                  <span style={{ flex: 1 }} />
+                  <span style={{ fontFamily: FFB, fontSize: 10, letterSpacing: 0.5, color: i === 0 ? "#4cef90" : "var(--nv-text-dim)" }}>{i === 0 ? "FASTEST" : "ALT " + i}</span>
+                </button>
+              ))}
+              {ends && (
+                <div style={{ marginTop: 4, fontSize: 11.5, lineHeight: 1.6 }}>
+                  <div><span style={{ color: "#2ecc71", fontWeight: 800 }}>A</span> <span style={{ color: "var(--nv-text)" }}>{ends.from}</span></div>
+                  <div><span style={{ color: "#e74c3c", fontWeight: 800 }}>B</span> <span style={{ color: "var(--nv-text)" }}>{ends.to}</span></div>
+                </div>
+              )}
+              <div style={{ marginTop: 8, fontSize: 10, color: "var(--nv-text-dim)", fontStyle: "italic", lineHeight: 1.5 }}>Estimates are free-flow — no live traffic.</div>
+              <button onClick={clearRoute} style={{ ...ghost, marginTop: 10, width: "100%" }}>Clear route</button>
             </div>
           </div>
         )}
