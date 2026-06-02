@@ -31,3 +31,13 @@ export async function isKioskSession() {
   if (!isDesktop()) return false;
   try { return !!(await call("kiosk_mode")); } catch { return false; }
 }
+
+/** Quit the desktop (Tauri) app by closing its window. No-op off Tauri. */
+export async function quitApp() {
+  if (!isDesktop()) return false;
+  try {
+    const { getCurrentWindow } = await import("@tauri-apps/api/window");
+    await getCurrentWindow().close();
+    return true;
+  } catch { return false; }
+}

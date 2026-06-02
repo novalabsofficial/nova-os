@@ -7,6 +7,8 @@ import { getSoundConfig, setSoundConfig, playSound, setSoundWallpaper } from "..
 import { db } from "../lib/db.js";
 import { isFullscreen, toggleFullscreen, onFullscreenChange } from "../lib/fullscreen.js";
 import { isNative, exitApp } from "../lib/native.js";
+import { isDesktop, quitApp } from "../lib/system.js";
+import { getLitePref, setLitePref } from "../lib/lite.js";
 
 // ── v9.0 sidebar glyphs ──────────────────────────────────────────────────
 // Small monochrome line-icons for the left rail. Stroke uses currentColor so
@@ -61,6 +63,7 @@ export function SettingsApp({ user, data, updateSettings, showToast, AC, onCusto
   // Mobile master-detail: "list" shows the section list, "detail" shows one
   // section with a Back button (the desktop two-pane has no back on a phone).
   const [mobilePane, setMobilePane] = useState("list");
+  const [lite, setLite] = useState(() => getLitePref());   // v10.7 lite-mode toggle
   const [section, setSection] = useState(initialSection || "appearance");
   useEffect(() => { if (initialSection) setSection(initialSection); }, [initialSection]);
 
@@ -239,6 +242,8 @@ export function SettingsApp({ user, data, updateSettings, showToast, AC, onCusto
           <Toggle label="24-Hour Clock" value={!!settings.clock24h} onChange={v => updateSettings({ clock24h: v })} ac={AC} />
           <Toggle label="Large Text" value={!!settings.largeFont} onChange={v => updateSettings({ largeFont: v })} ac={AC} />
           <Toggle label="Restore open apps on sign-in" value={!!settings.restoreOnSignin} onChange={v => updateSettings({ restoreOnSignin: v })} ac={AC} />
+          <Toggle label="Lite Mode" value={lite} onChange={v => { setLitePref(v); setLite(v); showToast(v ? "Lite mode on" : "Lite mode off"); }} ac={AC} />
+          <div style={{ fontSize: 10, color: "var(--nv-text-dim)", marginBottom: 10, fontStyle: "italic", marginTop: -4 }}>⚠ For <strong style={{ color: "var(--nv-text)" }}>very low-end devices only</strong> — turns off background blur and wallpaper animation for smoother performance.</div>
 
           <div style={{ ...SEC, marginTop: 16 }}>Screen Saver</div>
           <div style={{ fontSize: 11, color: "var(--nv-text-dim)", marginBottom: 9 }}>Show a clock over a blurred desktop after you're idle. Move the mouse or press a key to wake.</div>
@@ -372,6 +377,9 @@ export function SettingsApp({ user, data, updateSettings, showToast, AC, onCusto
           )}
           {isNative() && (
             <button onClick={() => exitApp()} style={{ width: "100%", marginTop: 8, padding: "10px", background: "rgba(255,255,255,0.05)", border: "1px solid var(--nv-border)", borderRadius: 8, cursor: "pointer", fontFamily: FFB, fontWeight: 600, fontSize: 12, color: "var(--nv-text)" }}>Close Nova OS</button>
+          )}
+          {isDesktop() && (
+            <button onClick={() => quitApp()} style={{ width: "100%", marginTop: 8, padding: "10px", background: "rgba(255,255,255,0.05)", border: "1px solid var(--nv-border)", borderRadius: 8, cursor: "pointer", fontFamily: FFB, fontWeight: 600, fontSize: 12, color: "var(--nv-text)" }}>Close Nova OS</button>
           )}
         </>)}
 
