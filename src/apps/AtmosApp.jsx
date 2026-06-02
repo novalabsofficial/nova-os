@@ -5,6 +5,7 @@ import { WMO } from "../ui/constants.js";
 import { AiAssist } from "../ui/AiAssist.jsx";
 import { wmoIcon, wmoLabel, geocodeUrl, parseGeocode, forecastUrl, parseForecast, alertsUrl, parseAlerts, isLikelyUS } from "../lib/weather.js";
 import { speak, cancelSpeech, playSound } from "../lib/audio.js";
+import { ATMOS_TRACKS } from "../lib/atmosMusic.js";
 
 const ALERT_COLOR = {
   Extreme:  {bg:"rgba(255,80,80,0.18)",  border:"rgba(255,80,80,0.55)",  fg:"#ff8080"},
@@ -31,6 +32,45 @@ export function AtmosApp({AC,showToast,pushNotification,openNovaAi,data,updateSe
   const [units,setUnits]=useState(()=>data?.settings?.weatherUnits||"imperial");
   const [expandedAlert,setExpandedAlert]=useState(null);
   const debounceRef=useRef(null);
+  // ── v10.9: Atmos background music ──────────────────────────────────
+  // Optional looping background tracks while the app is open. Starts only
+  // on an explicit toggle (avoids browser autoplay blocks) and stops when
+  // the app closes. Tracks auto-load from src/assets/atmos-music/ — see
+  // lib/atmosMusic.js. Volume persists; on/off resets each open.
+  const musicAudioRef = useRef(null);
+  const musicOrderRef = useRef(null);          // shuffled play order (indices)
+  const [musicOn,setMusicOn]=useState(false);
+  const [musicPos,setMusicPos]=useState(0);    // position within musicOrderRef
+  const [musicVol,setMusicVol]=useState(()=>{
+    const v=parseFloat(localStorage.getItem("nova-atmos-music-vol"));
+    return isNaN(v)?0.5:Math.min(1,Math.max(0,v));
+  });
+  const musicTrack = musicOn && musicOrderRef.current
+    ? ATMOS_TRACKS[musicOrderRef.current[musicPos]] : null;
+  const toggleMusic=()=>{
+    if(musicOn){ setMusicOn(false); return; }
+    if(!ATMOS_TRACKS.length) return;
+    const order=[...ATMOS_TRACKS.keys()];
+    for(let i=order.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[order[i],order[j]]=[order[j],order[i]];}
+    musicOrderRef.current=order;
+    setMusicPos(0);
+    setMusicOn(true);
+  };
+  const nextTrack=()=>{ if(ATMOS_TRACKS.length) setMusicPos(p=>(p+1)%ATMOS_TRACKS.length); };
+  // play / pause when on-state or current track changes
+  useEffect(()=>{
+    const a=musicAudioRef.current; if(!a) return;
+    if(musicOn && musicTrack){ a.volume=musicVol; const p=a.play(); if(p&&p.catch) p.catch(()=>{}); }
+    else { a.pause(); }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[musicOn,musicPos]);
+  // live volume + persist
+  useEffect(()=>{
+    if(musicAudioRef.current) musicAudioRef.current.volume=musicVol;
+    localStorage.setItem("nova-atmos-music-vol",String(musicVol));
+  },[musicVol]);
+  // stop music when the app closes
+  useEffect(()=>()=>{ if(musicAudioRef.current){ try{musicAudioRef.current.pause();}catch(e){} } },[]);
   // v6.4: the user can pin a default location that persists across sessions
   // AND drives the Weather desktop widget. Saved at data.settings.weatherLocation.
   const savedLoc = data?.settings?.weatherLocation || null;
@@ -224,6 +264,8 @@ export function AtmosApp({AC,showToast,pushNotification,openNovaAi,data,updateSe
 
   return(
     <div style={{display:"flex",flexDirection:"column",gap:12,height:"100%",fontFamily:FF,minHeight:0}}>
+      {/* v10.9: hidden audio element drives Atmos background music */}
+      <audio ref={musicAudioRef} src={musicTrack?musicTrack.src:undefined} onEnded={nextTrack} />
       {/* v8.2: wrap search + recents + dropdown in one positioned container
           so the dropdown can `top:100%` and float below the recents row
           rather than on top of it. Click-outside listener (scoped to this
@@ -248,7 +290,22 @@ export function AtmosApp({AC,showToast,pushNotification,openNovaAi,data,updateSe
             if(updateSettings) updateSettings({weatherUnits:next});
             return next;
           })} style={{padding:"8px 12px",background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:8,cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:11,color:"rgba(255,255,255,0.7)"}}>{units==="imperial"?"°F":"°C"}</button>
+          {/* v10.9: background-music toggle */}
+          <button onClick={toggleMusic} disabled={!ATMOS_TRACKS.length} title={!ATMOS_TRACKS.length?"No music available":(musicOn?"Stop background music":"Play background music")} style={{padding:"8px 11px",background:musicOn?fill(AC):"rgba(255,255,255,0.05)",border:"1px solid "+(musicOn?bdr(AC):"rgba(255,255,255,0.1)"),borderRadius:8,cursor:ATMOS_TRACKS.length?"pointer":"not-allowed",fontSize:14,lineHeight:1,color:musicOn?AC:"rgba(255,255,255,0.7)",opacity:ATMOS_TRACKS.length?1:0.4}}>{musicOn?"🎶":"🎵"}</button>
         </div>
+        {/* v10.9: now-playing strip — shows while background music is on */}
+        {musicOn && musicTrack && (
+          <div style={{display:"flex",alignItems:"center",gap:10,padding:"7px 11px",background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:10}}>
+            <span style={{fontSize:15,lineHeight:1}}>🎶</span>
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{fontSize:9,fontFamily:FFM,letterSpacing:1.2,color:"rgba(255,255,255,0.38)"}}>NOW PLAYING</div>
+              <div style={{fontSize:12,fontFamily:FFB,fontWeight:600,color:"rgba(255,255,255,0.88)",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{musicTrack.title}</div>
+            </div>
+            <input type="range" min={0} max={1} step={0.01} value={musicVol} onChange={e=>setMusicVol(parseFloat(e.target.value))} title="Music volume" style={{width:72,accentColor:AC,cursor:"pointer"}} />
+            <button onClick={nextTrack} title="Next track" style={{width:28,height:28,borderRadius:7,background:"rgba(255,255,255,0.07)",border:"none",cursor:"pointer",color:"rgba(255,255,255,0.75)",fontSize:12,padding:0,display:"flex",alignItems:"center",justifyContent:"center"}}>⏭</button>
+            <button onClick={()=>setMusicOn(false)} title="Stop music" style={{width:28,height:28,borderRadius:7,background:"rgba(255,255,255,0.07)",border:"none",cursor:"pointer",color:"rgba(255,255,255,0.6)",fontSize:11,padding:0,display:"flex",alignItems:"center",justifyContent:"center"}}>✕</button>
+          </div>
+        )}
 
         {/* Recents row — now inside the same container as search. Dropdown
             floats below this whole region instead of covering it. */}
