@@ -1099,6 +1099,10 @@ export default function NovaOS(){
   // synchronously inside setSoundConfig.
   const [soundCfg, setSoundCfgState] = useState(() => getSoundConfig());
   useEffect(() => subscribeSoundConfig(setSoundCfgState), []);
+  // v10.8 — transient Windows-style toasts in the corner (separate from the
+  // Notification Center log; these auto-dismiss).
+  const [notifToasts, setNotifToasts] = useState([]);
+  const dismissNotifToast = useCallback((id)=>setNotifToasts(t=>t.filter(x=>x.id!==id)),[]);
   const pushNotification = useCallback((n)=>{
     if(!n || !n.title) return;
     const notif = {
@@ -1118,6 +1122,9 @@ export default function NovaOS(){
       return next;
     });
     playSound("notification");
+    // v10.8 — pop a transient corner toast (auto-dismiss after ~6s).
+    setNotifToasts(t => [...t.slice(-3), { id: notif.id, kind: notif.kind, title: notif.title, body: notif.body, appId: notif.appId }]);
+    setTimeout(() => setNotifToasts(t => t.filter(x => x.id !== notif.id)), 6000);
     // In the native Android app, also raise a real system notification.
     if(nativeIsNative()) nativeNotify({ title: notif.title, body: notif.body });
   },[saveData]);
@@ -2934,6 +2941,26 @@ export default function NovaOS(){
           corners) rather than glued to the right edge. Header gains an
           accent-colored bell glyph. Items get a per-kind left accent stripe
           and an unread indicator dot. */}
+      {/* v10.8 — transient notification toasts (bottom-right, above the taskbar).
+          Click opens the related app; ✕ or ~6s dismisses. */}
+      {notifToasts.length>0 && deviceMode!=="mobile" && (
+        <div style={{position:"fixed",right:14,bottom:TASKBAR_H+16,zIndex:9990,display:"flex",flexDirection:"column",gap:10,alignItems:"flex-end",pointerEvents:"none"}}>
+          {notifToasts.map(t=>{
+            const kc = t.kind==="alert"?"#ff8b8b":t.kind==="warning"?"#ffcc66":t.kind==="success"?"#4cef90":AC;
+            return(
+              <div key={t.id} onClick={()=>{dismissNotifToast(t.id); if(t.appId) openApp(t.appId);}}
+                style={{pointerEvents:"auto",cursor:"pointer",width:"min(330px, calc(100vw - 28px))",background:"var(--nv-surface-solid)",backdropFilter:"blur(30px) saturate(170%)",WebkitBackdropFilter:"blur(30px) saturate(170%)",border:"1px solid rgba(255,255,255,0.12)",borderLeft:"3px solid "+kc,borderRadius:12,boxShadow:"0 10px 30px rgba(0,0,0,0.5)",padding:"11px 13px",animation:"panel-in-right 0.3s cubic-bezier(0.22,1,0.36,1)"}}>
+                <div style={{display:"flex",alignItems:"center",gap:8}}>
+                  <span style={{fontSize:14,filter:"drop-shadow(0 0 6px "+kc+"66)"}}>🔔</span>
+                  <div style={{flex:1,minWidth:0,fontFamily:FFB,fontWeight:700,fontSize:13,color:"#fff",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t.title}</div>
+                  <button onClick={e=>{e.stopPropagation();dismissNotifToast(t.id);}} title="Dismiss" style={{background:"none",border:"none",color:"rgba(255,255,255,0.4)",cursor:"pointer",fontSize:14,lineHeight:1,padding:2,flexShrink:0}}>✕</button>
+                </div>
+                {t.body && <div style={{fontSize:12,color:"rgba(255,255,255,0.7)",marginTop:4,lineHeight:1.4,display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical",overflow:"hidden"}}>{t.body}</div>}
+              </div>
+            );
+          })}
+        </div>
+      )}
       {notifsOpen && (
         <>
           <div onClick={()=>setNotifsOpen(false)} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.25)",zIndex:9997}}/>

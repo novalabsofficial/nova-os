@@ -65,6 +65,55 @@ function pieceStyle(color, sizeCss) {
   };
 }
 
+// Inline SVG chess pieces — colored by `fill`, so white is reliably light and
+// black is dark on EVERY platform. (The old Unicode-glyph approach rendered as
+// dark emoji on Windows regardless of CSS color, making white pieces look black.)
+function ChessPiece({ type, color, size }) {
+  const white = color === "w";
+  const fillC = white ? "#f4f3ef" : "#3a3733";
+  const lineC = white ? "#2a2824" : "#e9e7e1";
+  const sz = size || "84%";
+  const g = { fill: fillC, stroke: lineC, strokeWidth: 1.5, strokeLinejoin: "round", strokeLinecap: "round" };
+  const eye = { fill: lineC, stroke: "none" };
+  return (
+    <svg viewBox="0 0 45 45" width={sz} height={sz} style={{ display: "block", overflow: "visible", filter: "drop-shadow(0 1px 1.5px rgba(0,0,0,0.4))", pointerEvents: "none" }}>
+      <g {...g}>
+        {type === "p" && (<>
+          <circle cx="22.5" cy="13.5" r="5" />
+          <path d="M18.5 17 C15.5 20 14.5 26 14.5 32 H30.5 C30.5 26 29.5 20 26.5 17 Z" />
+          <rect x="12.5" y="32" width="20" height="5" rx="2" />
+        </>)}
+        {type === "r" && (<>
+          <path d="M13 13 H17 V15.5 H20 V13 H25 V15.5 H28 V13 H32 V20 L29.5 22 V31 L32 33 H13 L15.5 31 V22 L13 20 Z" />
+          <rect x="11" y="33" width="23" height="5" rx="2" />
+        </>)}
+        {type === "b" && (<>
+          <circle cx="22.5" cy="8.5" r="2.4" />
+          <path d="M22.5 11 C29 15 28.5 26 22.5 30.5 C16.5 26 16 15 22.5 11 Z" />
+          <path d="M19.5 18 H25.5 M22.5 15 V21" />
+          <rect x="13" y="31" width="19" height="5" rx="2" />
+        </>)}
+        {type === "n" && (<>
+          <path d="M15 37 V30 C15 24 17 20 22 17 C20 15 19.5 12 22 9.5 L24.5 12.5 C29 13.5 32 19 32 27 V37 Z" />
+          <circle cx="26.5" cy="18.5" r="1.3" {...eye} />
+          <rect x="13" y="36" width="21" height="2.5" rx="1" />
+        </>)}
+        {type === "q" && (<>
+          <circle cx="11.5" cy="13" r="2.1" /><circle cx="18" cy="10.5" r="2.1" /><circle cx="22.5" cy="9.5" r="2.1" /><circle cx="27" cy="10.5" r="2.1" /><circle cx="33.5" cy="13" r="2.1" />
+          <path d="M12 13 L15.5 30 H29.5 L33 13 L28 21 L24.5 11.5 L22.5 22 L20.5 11.5 L17 21 Z" />
+          <rect x="11.5" y="34" width="22" height="3.5" rx="1.5" />
+        </>)}
+        {type === "k" && (<>
+          <rect x="21.2" y="5" width="2.6" height="8.5" rx="1" />
+          <rect x="18.6" y="7.6" width="7.8" height="2.6" rx="1" />
+          <path d="M16 32 C16 23.5 22.5 21 22.5 21 C22.5 21 29 23.5 29 32 Z" />
+          <rect x="13" y="32" width="19" height="5" rx="2" />
+        </>)}
+      </g>
+    </svg>
+  );
+}
+
 // Tally captured pieces + material advantage from the live board.
 //   capByWhite = black pieces white has taken; capByBlack = vice-versa.
 function computeCaptured(chess) {
@@ -260,7 +309,7 @@ export function ChessApp({ user, AC }) {
                 }}
                 title={sqName}
               >
-                {piece && <span style={pieceStyle(square.color, "clamp(20px, 5.5vmin, 40px)")}>{piece}</span>}
+                {square && <ChessPiece type={square.type} color={square.color} />}
                 {/* legal-move dot (empty square) or capture ring (occupied) */}
                 {isLegal && !square && (
                   <div style={{ position:"absolute", width:"30%", height:"30%", borderRadius:"50%", background:"rgba(0,0,0,0.22)", pointerEvents:"none" }} />
@@ -285,7 +334,7 @@ export function ChessApp({ user, AC }) {
       <div style={{ display:"flex", alignItems:"center", gap:1, minHeight:18, flexWrap:"wrap" }}>
         {pieces.length === 0 && <span style={{ fontSize:10, color:"rgba(255,255,255,0.2)", fontFamily:FFM }}>—</span>}
         {pieces.map((t, i) => (
-          <span key={i} style={{ ...pieceStyle(color, "16px"), marginRight:-3 }}>{PIECE_SOLID[t]}</span>
+          <span key={i} style={{ marginRight:-3, display:"inline-flex" }}><ChessPiece type={t} color={color} size={16} /></span>
         ))}
         {adv > 0 && <span style={{ marginLeft:6, fontFamily:FFM, fontSize:11, color:"rgba(255,255,255,0.55)" }}>+{adv}</span>}
       </div>
@@ -334,7 +383,7 @@ export function ChessApp({ user, AC }) {
                   <span style={{ fontFamily:FFB, fontWeight:600, fontSize:12, color: isActive ? AC : "rgba(255,255,255,0.9)", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap", flex:1 }}>
                     @{opponentName}
                   </span>
-                  <span style={{ fontFamily:FFM, fontSize:9, color: c === "w" ? "#fff" : "rgba(255,255,255,0.55)" }}>{c === "w" ? "♔" : "♚"}</span>
+                  <ChessPiece type="k" color={c} size={13} />
                 </div>
                 <span style={{ fontSize:9, color:"rgba(255,255,255,0.4)", lineHeight:1.3 }}>
                   {describeStatus(g, c)}
@@ -405,7 +454,7 @@ export function ChessApp({ user, AC }) {
           const playerRow = (name, color, tray, youTag) => (
             <div style={{ width:"100%", maxWidth:440, display:"flex", alignItems:"center", gap:10, padding:"6px 4px" }}>
               <div style={{ width:30, height:30, borderRadius:7, flexShrink:0, background: color==="w"?"#f0f0ec":"#2b2926", border:"1px solid rgba(255,255,255,0.12)", display:"flex", alignItems:"center", justifyContent:"center" }}>
-                <span style={pieceStyle(color, "18px")}>♚</span>
+                <ChessPiece type="k" color={color} size={18} />
               </div>
               <div style={{ minWidth:0 }}>
                 <div style={{ fontFamily:FFB, fontWeight:600, fontSize:12.5, color:"#fff", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>@{name}{youTag && <span style={{ marginLeft:6, fontSize:9, color:AC, fontFamily:FFM }}>YOU</span>}</div>
