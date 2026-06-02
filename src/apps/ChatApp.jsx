@@ -76,8 +76,41 @@ export function ChatApp({ user, AC, data, updateData }) {
   // ── Shared composer state ────────────────────────────────────────────
   const [input,   setInput]   = useState("");
   const [sending, setSending] = useState(false);
+  const [mention, setMention] = useState(null);   // v10.8 @-mention autocomplete
   const bottomRef = useRef(null);
   const inputRef  = useRef(null);
+
+  // v10.8 — @mention autocomplete. Candidates = people in the current
+  // conversation (message authors + server roster + the DM partner).
+  function mentionCandidates() {
+    const set = new Set();
+    messages.forEach(m => { if (m.user) set.add(m.user); });
+    if (view === "server" && activeServer) {
+      (activeServer.memberUids || []).forEach((uid, i) => {
+        const u = (activeServer.members && activeServer.members[uid] && activeServer.members[uid].user) || (activeServer.memberUsernames && activeServer.memberUsernames[i]);
+        if (u) set.add(u);
+      });
+    }
+    if (view === "dm" && active && active.otherUsername) set.add(active.otherUsername);
+    set.delete(user);
+    return [...set];
+  }
+  function computeMention(value, caret) {
+    const before = value.slice(0, caret);
+    const m = before.match(/(^|\s)@(\w{0,20})$/);
+    if (!m) { setMention(null); return; }
+    const token = m[2].toLowerCase();
+    const items = mentionCandidates().filter(u => u.toLowerCase().startsWith(token)).slice(0, 6);
+    if (!items.length) { setMention(null); return; }
+    setMention({ items, active: 0, start: caret - m[2].length - 1, end: caret });
+  }
+  function pickMention(username) {
+    if (!mention) return;
+    const at = mention.start, end = mention.end;
+    setInput(input.slice(0, at) + "@" + username + " " + input.slice(end));
+    setMention(null);
+    requestAnimationFrame(() => { const el = inputRef.current; if (el) { const pos = at + username.length + 2; el.focus(); el.setSelectionRange(pos, pos); } });
+  }
 
   // ── Reactions ────────────────────────────────────────────────────────
   // Global chat reactions — flat list, aggregated per-message at render.
@@ -717,22 +750,42 @@ export function ChatApp({ user, AC, data, updateData }) {
         {/* Input bar — hidden when on the new-DM form */}
         {view !== "new" && (
           <div style={{ padding: "10px 14px 12px", borderTop: "1px solid rgba(255,255,255,0.08)", flexShrink: 0, display: "flex", gap: 8, alignItems: "flex-end" }}>
-            <textarea
-              ref={inputRef}
-              value={input}
-              onChange={e => { setInput(e.target.value); bumpTyping(); }}
-              onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } }}
-              placeholder={
-                view === "global" ? "Message as @" + user + "  (Enter to send, Shift+Enter for newline)"
-                : view === "dm" ? "Message @" + (active?.otherUsername || "...") + "  (Enter to send)"
-                : view === "server" ? "Message #" + (activeChannel?.name || "channel") + " as @" + user
-                : ""
-              }
-              rows={1}
-              maxLength={500}
-              disabled={view === "server" && !activeChannel}
-              style={{ ...INP, flex: 1, resize: "none", minHeight: 38, maxHeight: 100, lineHeight: 1.5, overflow: "auto", fontSize: 13 }}
-            />
+            <div style={{ position: "relative", flex: 1, display: "flex" }}>
+              {mention && mention.items.length > 0 && (
+                <div style={{ position: "absolute", bottom: "calc(100% + 6px)", left: 0, minWidth: 180, maxWidth: 280, maxHeight: 200, overflowY: "auto", background: "var(--nv-surface-solid)", border: "1px solid rgba(255,255,255,0.16)", borderRadius: 10, boxShadow: "0 12px 36px rgba(0,0,0,0.5)", zIndex: 60, padding: 4 }}>
+                  {mention.items.map((u, i) => (
+                    <button key={u} type="button" onMouseDown={e => e.preventDefault()} onClick={() => pickMention(u)}
+                      style={{ display: "flex", alignItems: "center", gap: 7, width: "100%", textAlign: "left", padding: "7px 9px", borderRadius: 7, border: "none", cursor: "pointer", background: i === mention.active ? fill(AC) : "transparent", color: i === mention.active ? AC : "var(--nv-text)", fontFamily: FF, fontSize: 12.5 }}>
+                      <span style={{ fontFamily: FFM, color: "var(--nv-text-dim)" }}>@</span>{u}
+                    </button>
+                  ))}
+                </div>
+              )}
+              <textarea
+                ref={inputRef}
+                value={input}
+                onChange={e => { setInput(e.target.value); bumpTyping(); computeMention(e.target.value, e.target.selectionStart); }}
+                onKeyDown={e => {
+                  if (mention && mention.items.length) {
+                    if (e.key === "ArrowDown") { e.preventDefault(); setMention(m => ({ ...m, active: (m.active + 1) % m.items.length })); return; }
+                    if (e.key === "ArrowUp") { e.preventDefault(); setMention(m => ({ ...m, active: (m.active - 1 + m.items.length) % m.items.length })); return; }
+                    if (e.key === "Enter" || e.key === "Tab") { e.preventDefault(); pickMention(mention.items[mention.active]); return; }
+                    if (e.key === "Escape") { e.preventDefault(); setMention(null); return; }
+                  }
+                  if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); }
+                }}
+                placeholder={
+                  view === "global" ? "Message as @" + user + "  (Enter to send, Shift+Enter for newline)"
+                  : view === "dm" ? "Message @" + (active?.otherUsername || "...") + "  (Enter to send)"
+                  : view === "server" ? "Message #" + (activeChannel?.name || "channel") + " as @" + user
+                  : ""
+                }
+                rows={1}
+                maxLength={500}
+                disabled={view === "server" && !activeChannel}
+                style={{ ...INP, width: "100%", resize: "none", minHeight: 38, maxHeight: 100, lineHeight: 1.5, overflow: "auto", fontSize: 13 }}
+              />
+            </div>
             <button
               onClick={send}
               disabled={sending || !input.trim() || (view === "dm" && !active) || (view === "server" && !activeChannel)}

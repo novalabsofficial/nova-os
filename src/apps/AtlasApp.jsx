@@ -184,7 +184,8 @@ export function AtlasApp({ AC, showToast }) {
   }
   function queueSuggest(field, value) {
     if (field === "start") { setStartQ(value); startSel.current = null; }
-    else { setEndQ(value); endSel.current = null; }
+    else if (field === "end") { setEndQ(value); endSel.current = null; }
+    else { setQuery(value); }   // search box
     clearTimeout(sugTimer.current);
     const v = value.trim();
     if (v.length < 3) { setSug({ field: null, items: [] }); return; }
@@ -194,9 +195,14 @@ export function AtlasApp({ AC, showToast }) {
     }, 380);   // debounce — respectful of the geocoder + avoids per-keystroke calls
   }
   function pickSuggest(field, it) {
-    if (field === "start") { setStartQ(it.label); startSel.current = it; }
-    else { setEndQ(it.label); endSel.current = it; }
-    setSug({ field: null, items: [] });
+    if (field === "start") { setStartQ(it.label); startSel.current = it; setSug({ field: null, items: [] }); }
+    else if (field === "end") { setEndQ(it.label); endSel.current = it; setSug({ field: null, items: [] }); }
+    else {
+      // search box: fly there + pull the rich detail card from the exact spot
+      setQuery(it.label); setSug({ field: null, items: [] });
+      mapRef.current?.flyTo([it.lat, it.lon], 15, { duration: 0.8 });
+      reverseGeocode(it.lat, it.lon);
+    }
   }
 
   async function doRoute(e) {
@@ -251,6 +257,14 @@ export function AtlasApp({ AC, showToast }) {
     setSug({ field: null, items: [] });
     showToast?.("Destination set — enter a starting point");
   }
+  function directionsFromPlace() {
+    setMode("directions");
+    setEndQ(""); endSel.current = null;
+    setStartQ(place.name);
+    startSel.current = (place.lat != null && place.lon != null) ? { lat: place.lat, lon: place.lon, label: place.name } : null;
+    setSug({ field: null, items: [] });
+    showToast?.("Start set — enter a destination");
+  }
 
   // ── styles ──
   const tabBtn = (active) => ({ flex: 1, padding: "8px 10px", borderRadius: 8, cursor: "pointer", fontFamily: FFB, fontWeight: 700, fontSize: 12.5, border: "1px solid " + (active ? bdr(AC) : "rgba(255,255,255,0.12)"), background: active ? fill(AC) : "rgba(255,255,255,0.05)", color: active ? AC : "var(--nv-text-dim)" });
@@ -280,7 +294,21 @@ export function AtlasApp({ AC, showToast }) {
 
         {mode === "search" ? (
           <form onSubmit={doSearch} style={{ display: "flex", gap: 6 }}>
-            <input value={query} onChange={e => setQuery(e.target.value)} placeholder="Search places, addresses…" style={input} />
+            <div style={{ position: "relative", flex: 1, minWidth: 0 }}>
+              <input value={query} onChange={e => queueSuggest("search", e.target.value)}
+                onBlur={() => setTimeout(() => setSug(s => (s.field === "search" ? { field: null, items: [] } : s)), 160)}
+                placeholder="Search places, addresses…" autoComplete="off" style={{ ...input, width: "100%" }} />
+              {sug.field === "search" && sug.items.length > 0 && (
+                <div style={{ position: "absolute", top: "100%", left: 0, right: 0, marginTop: 4, maxHeight: 240, overflowY: "auto", background: "var(--nv-surface-solid)", border: "1px solid var(--nv-border-strong)", borderRadius: 10, boxShadow: "0 14px 40px rgba(0,0,0,0.5)", zIndex: 1200 }}>
+                  {sug.items.map((it, i) => (
+                    <button key={i} type="button" onMouseDown={e => e.preventDefault()} onClick={() => pickSuggest("search", it)}
+                      style={{ display: "block", width: "100%", textAlign: "left", padding: "8px 11px", background: "transparent", border: "none", borderBottom: i < sug.items.length - 1 ? "1px solid var(--nv-border)" : "none", color: "var(--nv-text)", cursor: "pointer", fontFamily: FF, fontSize: 12, lineHeight: 1.35 }}
+                      onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,0.05)"}
+                      onMouseLeave={e => e.currentTarget.style.background = "transparent"}>{it.label}</button>
+                  ))}
+                </div>
+              )}
+            </div>
             <button type="submit" disabled={busy} style={goBtn}>{busy ? "…" : "Search"}</button>
             <button type="button" onClick={locate} title="My location" style={{ ...ghost, fontSize: 15 }}>📍</button>
           </form>
@@ -358,7 +386,10 @@ export function AtlasApp({ AC, showToast }) {
                 </div>
               )}
 
-              <button onClick={directionsToPlace} style={{ ...goBtn, marginTop: 12, width: "100%", opacity: 1, cursor: "pointer" }}>🧭 Directions to here</button>
+              <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+                <button onClick={directionsFromPlace} style={{ ...ghost, flex: 1, textAlign: "center" }}>🧭 From here</button>
+                <button onClick={directionsToPlace} style={{ ...goBtn, flex: 1, opacity: 1, cursor: "pointer", textAlign: "center" }}>To here</button>
+              </div>
             </div>
           </div>
         )}

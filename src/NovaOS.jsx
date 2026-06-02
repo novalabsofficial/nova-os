@@ -25,7 +25,7 @@ import { wmoIcon, wmoLabel, geocodeUrl, parseGeocode, forecastUrl, parseForecast
 import { PROVIDERS as AI_PROVIDERS, streamResponse as aiStream, deriveTitle as aiDeriveTitle } from "./lib/ai.js";
 import { playTone, speak, cancelSpeech, playSound, getSoundConfig, setSoundConfig, setSoundWallpaper, subscribeSoundConfig } from "./lib/audio.js";
 import { db, setDbUid, getDbUid } from "./lib/db.js";
-import { watchMyThreads } from "./lib/dms.js";
+import { watchMyThreads, otherParticipantName } from "./lib/dms.js";
 import { watchMyServers } from "./lib/servers.js";
 import { openExternalUrl } from "./lib/openUrl.js";
 import { isNative as nativeIsNative, notify as nativeNotify } from "./lib/native.js";
@@ -41,6 +41,7 @@ import {
 import { Wallpaper, NovaBg, BlissBg, AuroraBg, MeshBg, SupernovaBg } from "./ui/wallpapers.jsx";
 import { isDesktop, powerOff, quitApp } from "./lib/system.js";
 import { isLiteMode } from "./lib/lite.js";
+import { watchMyGames } from "./lib/chess-game.js";
 import { CommandBar } from "./ui/CommandBar.jsx";
 import { TaskView } from "./ui/TaskView.jsx";
 import { MobileShell } from "./ui/MobileShell.jsx";
@@ -1099,6 +1100,10 @@ export default function NovaOS(){
   // synchronously inside setSoundConfig.
   const [soundCfg, setSoundCfgState] = useState(() => getSoundConfig());
   useEffect(() => subscribeSoundConfig(setSoundCfgState), []);
+  // v10.8 — transient Windows-style toasts in the corner (separate from the
+  // Notification Center log; these auto-dismiss).
+  const [notifToasts, setNotifToasts] = useState([]);
+  const dismissNotifToast = useCallback((id)=>setNotifToasts(t=>t.filter(x=>x.id!==id)),[]);
   const pushNotification = useCallback((n)=>{
     if(!n || !n.title) return;
     const notif = {
@@ -1118,9 +1123,17 @@ export default function NovaOS(){
       return next;
     });
     playSound("notification");
+    // v10.8 — pop a transient corner toast (auto-dismiss after ~6s).
+    setNotifToasts(t => [...t.slice(-3), { id: notif.id, kind: notif.kind, title: notif.title, body: notif.body, appId: notif.appId }]);
+    setTimeout(() => setNotifToasts(t => t.filter(x => x.id !== notif.id)), 6000);
     // In the native Android app, also raise a real system notification.
     if(nativeIsNative()) nativeNotify({ title: notif.title, body: notif.body });
   },[saveData]);
+  // Stable ref so background subscriptions (mentions, chess challenges) can call
+  // the latest pushNotification without listing it as an effect dep (which would
+  // tear down + re-subscribe the listeners).
+  const pushNotifRef = useRef(pushNotification);
+  pushNotifRef.current = pushNotification;
   const dismissNotification = useCallback((id)=>{
     setData(prev=>{
       if(!prev) return prev;
@@ -1223,33 +1236,79 @@ export default function NovaOS(){
     const uid = getDbUid();
     if (!uid || !user) return;
     const mentionRe = new RegExp("@" + user.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\b", "i");
-    const seen = new Set();
-    let first = true;
-    const q = query(collection(firestoreDb, "nova_chat"), orderBy("ts", "asc"), limit(40));
+    const key = "nova-mention-ts-" + user;
+    // Watermark = ts of the newest message already accounted for. Seeded to
+    // "now" the first time (don't notify history); persisted so a ping received
+    // while you were signed OUT still notifies on your next login — previously
+    // the whole backlog was ignored on connect, so offline pings were silent.
+    let lastTs = Number(localStorage.getItem(key)) || Date.now();
+    const notified = new Set();
+    // orderBy DESC: watch the NEWEST 40 messages. (The old "asc" window watched
+    // the 40 oldest, which never change once the chat grows past 40 — so new
+    // pings were never seen and mention notifications never fired.)
+    const q = query(collection(firestoreDb, "nova_chat"), orderBy("ts", "desc"), limit(40));
     const unsub = onSnapshot(q, snap => {
-      if (first) {
-        // Record the backlog ids so a later edit/re-add doesn't notify.
-        snap.docs.forEach(d => seen.add(d.id));
-        first = false;
-        return;
-      }
-      snap.docChanges().forEach(ch => {
-        if (ch.type !== "added") return;
-        if (seen.has(ch.doc.id)) return;
-        seen.add(ch.doc.id);
-        const m = ch.doc.data();
-        if (!m || m.uid === uid) return;            // not my own message
-        if (!mentionRe.test(m.text || "")) return;   // must mention me
-        pushNotification({
-          appId: "chat",
-          kind: "info",
-          title: "@" + (m.user || "someone") + " mentioned you",
-          body: (m.text || "").slice(0, 140),
-        });
+      snap.docs.forEach(d => {
+        const m = d.data();
+        if (!m || m.uid === uid) return;
+        const ts = m.ts || 0;
+        if (ts <= lastTs || notified.has(d.id)) return;
+        if (!mentionRe.test(m.text || "")) return;
+        notified.add(d.id);
+        pushNotifRef.current({ appId: "chat", kind: "info", title: "@" + (m.user || "someone") + " mentioned you", body: (m.text || "").slice(0, 140) });
       });
+      const newest = snap.docs.reduce((mx, d) => Math.max(mx, d.data()?.ts || 0), lastTs);
+      if (newest > lastTs) { lastTs = newest; try { localStorage.setItem(key, String(lastTs)); } catch {} }
     }, () => {});
     return () => unsub();
-  }, [user, pushNotification]);
+  }, [user]);
+
+  // v10.8 — notify the challenged player when someone starts a chess game with
+  // them. Same watermark approach (so a challenge received while away notifies
+  // on next login). I'm the challenged player when I'm participantUids[1].
+  useEffect(() => {
+    const uid = getDbUid();
+    if (!uid || !user) return;
+    const key = "nova-chess-ts-" + user;
+    let lastTs = Number(localStorage.getItem(key)) || Date.now();
+    const notified = new Set();
+    const unsub = watchMyGames(uid, games => {
+      games.forEach(g => {
+        if (!g || !Array.isArray(g.participantUids) || g.participantUids[1] !== uid) return;
+        const ts = g.createdAt || 0;
+        if (ts <= lastTs || notified.has(g.id)) return;
+        notified.add(g.id);
+        pushNotifRef.current({ appId: "chess", kind: "info", title: "♟ Chess challenge", body: "@" + (g.participantUsernames?.[0] || "Someone") + " challenged you to a game of chess." });
+      });
+      const newest = games.reduce((mx, g) => Math.max(mx, g.createdAt || 0), lastTs);
+      if (newest > lastTs) { lastTs = newest; try { localStorage.setItem(key, String(lastTs)); } catch {} }
+    });
+    return () => unsub && unsub();
+  }, [user]);
+
+  // v10.8 — notify on incoming DMs. Watch my threads; a thread whose last
+  // message is newer than the watermark and was sent by the OTHER person is a
+  // new DM. Same offline-safe watermark as mentions/chess.
+  useEffect(() => {
+    const uid = getDbUid();
+    if (!uid || !user) return;
+    const key = "nova-dm-ts-" + user;
+    let lastTs = Number(localStorage.getItem(key)) || Date.now();
+    const notified = new Set();
+    const unsub = watchMyThreads(uid, threads => {
+      threads.forEach(th => {
+        const ts = th.lastTs || 0;
+        if (!th.lastMessage || th.lastSenderUid === uid) return;   // no msg, or my own
+        const k = th.id + ":" + ts;
+        if (ts <= lastTs || notified.has(k)) return;
+        notified.add(k);
+        pushNotifRef.current({ appId: "chat", kind: "info", title: "@" + (otherParticipantName(th, uid) || "Someone") + " messaged you", body: (th.lastMessage || "").slice(0, 140) });
+      });
+      const newest = threads.reduce((mx, th) => Math.max(mx, th.lastTs || 0), lastTs);
+      if (newest > lastTs) { lastTs = newest; try { localStorage.setItem(key, String(lastTs)); } catch {} }
+    });
+    return () => unsub && unsub();
+  }, [user]);
 
   // Compute badge counts. The map is { appId: count } so the renderer
   // can look up by app id with O(1).
@@ -2934,6 +2993,33 @@ export default function NovaOS(){
           corners) rather than glued to the right edge. Header gains an
           accent-colored bell glyph. Items get a per-kind left accent stripe
           and an unread indicator dot. */}
+      {/* v10.8 — transient notification toasts (bottom-right, above the taskbar).
+          Click opens the related app; ✕ or ~6s dismisses. */}
+      {notifToasts.length>0 && deviceMode!=="mobile" && (
+        <div style={{position:"fixed",right:14,bottom:TASKBAR_H+16,zIndex:9990,display:"flex",flexDirection:"column",gap:10,alignItems:"flex-end",pointerEvents:"none"}}>
+          {notifToasts.map(t=>{
+            const kc = t.kind==="alert"?"#ff8b8b":t.kind==="warning"?"#ffcc66":t.kind==="success"?"#4cef90":AC;
+            const appObj = t.appId ? APPS.find(a=>a.id===t.appId) : null;
+            return(
+              <div key={t.id} onClick={()=>{dismissNotifToast(t.id); if(t.appId) openApp(t.appId);}}
+                style={{position:"relative",pointerEvents:"auto",cursor:"pointer",width:"min(360px, calc(100vw - 28px))",display:"flex",gap:12,alignItems:"flex-start",padding:"13px 30px 13px 15px",background:"var(--nv-surface-solid)",backdropFilter:"blur(44px) saturate(180%)",WebkitBackdropFilter:"blur(44px) saturate(180%)",border:"1px solid rgba(255,255,255,0.12)",borderRadius:16,boxShadow:"0 8px 18px rgba(0,0,0,0.32), 0 26px 64px rgba(0,0,0,0.5), 0 1px 0 rgba(255,255,255,0.09) inset",animation:"panel-in-right 0.34s cubic-bezier(0.22,1,0.36,1)",overflow:"hidden"}}>
+                <div style={{position:"absolute",left:0,top:0,bottom:0,width:3,background:kc,boxShadow:"0 0 12px "+kc+"99"}}/>
+                <div style={{flexShrink:0,width:38,height:38,borderRadius:11,display:"flex",alignItems:"center",justifyContent:"center",background:fill(kc),border:"1px solid "+bdr(kc)}}>
+                  {appObj ? <AppIconDisplay app={{id:appObj.id,icon:appObj.icon}} size={24} glass={glass}/> : <span style={{fontSize:18}}>🔔</span>}
+                </div>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{display:"flex",alignItems:"baseline",gap:8}}>
+                    <div style={{flex:1,minWidth:0,fontFamily:FFB,fontWeight:700,fontSize:13,color:"var(--nv-text-strong)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t.title}</div>
+                    <span style={{fontFamily:FFM,fontSize:9.5,color:"var(--nv-text-dim)",flexShrink:0}}>now</span>
+                  </div>
+                  {t.body && <div style={{fontSize:12,color:"var(--nv-text)",opacity:0.82,marginTop:3,lineHeight:1.42,display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical",overflow:"hidden"}}>{t.body}</div>}
+                </div>
+                <button onClick={e=>{e.stopPropagation();dismissNotifToast(t.id);}} title="Dismiss" style={{position:"absolute",top:8,right:8,width:19,height:19,borderRadius:6,background:"rgba(255,255,255,0.07)",border:"none",color:"rgba(255,255,255,0.55)",cursor:"pointer",fontSize:10,lineHeight:1,display:"flex",alignItems:"center",justifyContent:"center",padding:0}}>✕</button>
+              </div>
+            );
+          })}
+        </div>
+      )}
       {notifsOpen && (
         <>
           <div onClick={()=>setNotifsOpen(false)} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.25)",zIndex:9997}}/>
