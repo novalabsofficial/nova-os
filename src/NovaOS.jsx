@@ -41,6 +41,7 @@ import {
 import { Wallpaper, NovaBg, BlissBg, AuroraBg, MeshBg, SupernovaBg } from "./ui/wallpapers.jsx";
 import { isDesktop, powerOff, quitApp } from "./lib/system.js";
 import { isLiteMode } from "./lib/lite.js";
+import { watchMyGames } from "./lib/chess-game.js";
 import { CommandBar } from "./ui/CommandBar.jsx";
 import { TaskView } from "./ui/TaskView.jsx";
 import { MobileShell } from "./ui/MobileShell.jsx";
@@ -1128,6 +1129,11 @@ export default function NovaOS(){
     // In the native Android app, also raise a real system notification.
     if(nativeIsNative()) nativeNotify({ title: notif.title, body: notif.body });
   },[saveData]);
+  // Stable ref so background subscriptions (mentions, chess challenges) can call
+  // the latest pushNotification without listing it as an effect dep (which would
+  // tear down + re-subscribe the listeners).
+  const pushNotifRef = useRef(pushNotification);
+  pushNotifRef.current = pushNotification;
   const dismissNotification = useCallback((id)=>{
     setData(prev=>{
       if(!prev) return prev;
@@ -1230,33 +1236,52 @@ export default function NovaOS(){
     const uid = getDbUid();
     if (!uid || !user) return;
     const mentionRe = new RegExp("@" + user.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\b", "i");
-    const seen = new Set();
-    let first = true;
+    const key = "nova-mention-ts-" + user;
+    // Watermark = ts of the newest message already accounted for. Seeded to
+    // "now" the first time (don't notify history); persisted so a ping received
+    // while you were signed OUT still notifies on your next login — previously
+    // the whole backlog was ignored on connect, so offline pings were silent.
+    let lastTs = Number(localStorage.getItem(key)) || Date.now();
+    const notified = new Set();
     const q = query(collection(firestoreDb, "nova_chat"), orderBy("ts", "asc"), limit(40));
     const unsub = onSnapshot(q, snap => {
-      if (first) {
-        // Record the backlog ids so a later edit/re-add doesn't notify.
-        snap.docs.forEach(d => seen.add(d.id));
-        first = false;
-        return;
-      }
-      snap.docChanges().forEach(ch => {
-        if (ch.type !== "added") return;
-        if (seen.has(ch.doc.id)) return;
-        seen.add(ch.doc.id);
-        const m = ch.doc.data();
-        if (!m || m.uid === uid) return;            // not my own message
-        if (!mentionRe.test(m.text || "")) return;   // must mention me
-        pushNotification({
-          appId: "chat",
-          kind: "info",
-          title: "@" + (m.user || "someone") + " mentioned you",
-          body: (m.text || "").slice(0, 140),
-        });
+      snap.docs.forEach(d => {
+        const m = d.data();
+        if (!m || m.uid === uid) return;
+        const ts = m.ts || 0;
+        if (ts <= lastTs || notified.has(d.id)) return;
+        if (!mentionRe.test(m.text || "")) return;
+        notified.add(d.id);
+        pushNotifRef.current({ appId: "chat", kind: "info", title: "@" + (m.user || "someone") + " mentioned you", body: (m.text || "").slice(0, 140) });
       });
+      const newest = snap.docs.reduce((mx, d) => Math.max(mx, d.data()?.ts || 0), lastTs);
+      if (newest > lastTs) { lastTs = newest; try { localStorage.setItem(key, String(lastTs)); } catch {} }
     }, () => {});
     return () => unsub();
-  }, [user, pushNotification]);
+  }, [user]);
+
+  // v10.8 — notify the challenged player when someone starts a chess game with
+  // them. Same watermark approach (so a challenge received while away notifies
+  // on next login). I'm the challenged player when I'm participantUids[1].
+  useEffect(() => {
+    const uid = getDbUid();
+    if (!uid || !user) return;
+    const key = "nova-chess-ts-" + user;
+    let lastTs = Number(localStorage.getItem(key)) || Date.now();
+    const notified = new Set();
+    const unsub = watchMyGames(uid, games => {
+      games.forEach(g => {
+        if (!g || !Array.isArray(g.participantUids) || g.participantUids[1] !== uid) return;
+        const ts = g.createdAt || 0;
+        if (ts <= lastTs || notified.has(g.id)) return;
+        notified.add(g.id);
+        pushNotifRef.current({ appId: "chess", kind: "info", title: "♟ Chess challenge", body: "@" + (g.participantUsernames?.[0] || "Someone") + " challenged you to a game of chess." });
+      });
+      const newest = games.reduce((mx, g) => Math.max(mx, g.createdAt || 0), lastTs);
+      if (newest > lastTs) { lastTs = newest; try { localStorage.setItem(key, String(lastTs)); } catch {} }
+    });
+    return () => unsub && unsub();
+  }, [user]);
 
   // Compute badge counts. The map is { appId: count } so the renderer
   // can look up by app id with O(1).
