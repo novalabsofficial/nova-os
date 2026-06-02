@@ -39,7 +39,7 @@ import {
   WALLPAPERS, WMO, HAS_SVG_ICON, NOVA_VERSION,
 } from "./ui/constants.js";
 import { Wallpaper, NovaBg, BlissBg, AuroraBg, MeshBg, SupernovaBg } from "./ui/wallpapers.jsx";
-import { isDesktop, powerOff } from "./lib/system.js";
+import { isDesktop, powerOff, quitApp } from "./lib/system.js";
 import { isLiteMode } from "./lib/lite.js";
 import { CommandBar } from "./ui/CommandBar.jsx";
 import { TaskView } from "./ui/TaskView.jsx";
@@ -1631,7 +1631,8 @@ export default function NovaOS(){
   // on every render would work too, just slightly noisier.
   const kbHandlersRef = useRef(null);
   kbHandlersRef.current = { openApp, closeWin, minimizeWin, setMenuOpen, setSpotlightOpen, setCommandOpen, setTaskViewOpen, screen, applySnap, snapDown,
-    switchDeskBy:(d)=>setCurDesk(c=>Math.max(0,Math.min(deskCount-1,c+d))) };
+    switchDeskBy:(d)=>setCurDesk(c=>Math.max(0,Math.min(deskCount-1,c+d))),
+    goToDesk:(n)=>setCurDesk(()=>Math.max(0,Math.min(deskCount-1,n))) };
   useEffect(()=>{
     function onKey(e){
       const h = kbHandlersRef.current;
@@ -1691,6 +1692,12 @@ export default function NovaOS(){
       if(e.key === "F11" && !isTyping){
         e.preventDefault();
         toggleFullscreen();
+        return;
+      }
+      // v10.7 — Ctrl/Cmd+Alt+1–9 jumps straight to that virtual desktop.
+      if(mod && e.altKey && /^[1-9]$/.test(e.key)){
+        e.preventDefault();
+        h.goToDesk(parseInt(e.key,10)-1);
         return;
       }
       // v10.0 — Ctrl/Cmd+Alt+Arrow drives virtual desktops (checked BEFORE the
@@ -1836,6 +1843,12 @@ export default function NovaOS(){
           const maxDesk = valid.reduce((m,w) => Math.max(m, w.desk||0), 0);
           setDeskCount(Math.max(1, Math.min(MAX_DESKTOPS, maxDesk + 1)));
           setCurDesk(0);
+          // v10.7: restored windows/desktops could paint stale (black background,
+          // unaligned) until each was clicked — clicking calls focusWin, which
+          // forces a re-render. Re-create the window object refs once the desktop
+          // has mounted so every window subtree re-renders and settles on its
+          // own, instead of the user having to click each one.
+          setTimeout(() => setWins(ws => ws.map(w => ({ ...w }))), 160);
         }
       }
       setScreen("desktop");playSound("login");
@@ -2437,6 +2450,10 @@ export default function NovaOS(){
               exit point. */}
           <button onClick={()=>{setMenuOpen(false);toggleFullscreen();}} title={isFs?"Exit fullscreen (F11)":"Enter fullscreen (F11)"} style={{width:34,height:34,borderRadius:8,background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.1)",cursor:"pointer",fontSize:13,color:"rgba(255,255,255,0.7)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,transition:"all 0.15s"}}>{isFs?"🗗":"⛶"}</button>
           <button onClick={logout} title="Sign out" style={{padding:"7px 13px",background:"rgba(255,80,80,0.1)",border:"1px solid rgba(255,80,80,0.28)",borderRadius:8,cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:11,color:"rgba(255,140,140,0.95)",transition:"all 0.18s cubic-bezier(0.4,0,0.2,1)"}}>Logout</button>
+          {/* v10.7 — Quit the desktop (Tauri) app, for users who don't know about Settings → Close. */}
+          {isDesktop()&&(
+            <button onClick={()=>{setMenuOpen(false);playSound("logout");quitApp();}} title="Quit Nova OS" style={{padding:"7px 11px",background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.14)",borderRadius:8,cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:11,color:"rgba(255,255,255,0.85)",transition:"all 0.18s cubic-bezier(0.4,0,0.2,1)",display:"flex",alignItems:"center",gap:5}}>⏻ Quit</button>
+          )}
           {/* v10.5 — Shut Down (powers off the host). Only the Nova Linux Tauri
               kiosk can actually do this, so it's shown only there
               (Tauri + lite/kiosk mode); hidden on web, PWA, Android, and the
@@ -2626,7 +2643,6 @@ export default function NovaOS(){
           }}>
             <span style={{fontSize:14,lineHeight:1}}>🔍</span>
             <span>Search</span>
-            <span style={{fontFamily:FFM,fontSize:10,padding:"1px 6px",background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.09)",borderRadius:4,marginLeft:4,letterSpacing:0.3}}>Ctrl+K</span>
           </button>
         )}
         {/* v10.0 Supernova — Nova AI command bar launcher. Accent-tinted so it
@@ -2640,7 +2656,6 @@ export default function NovaOS(){
         }}>
           <span style={{fontSize:14,lineHeight:1,filter:commandOpen?"drop-shadow(0 0 8px rgba("+hexRgb(AC)+",0.5))":"none"}}>✨</span>
           {deviceMode!=="mobile" && <span>Ask Nova</span>}
-          {deviceMode!=="mobile" && <span style={{fontFamily:FFM,fontSize:10,padding:"1px 6px",background:commandOpen?"rgba("+hexRgb(AC)+",0.18)":"rgba(255,255,255,0.06)",border:"1px solid "+(commandOpen?bdr(AC):"rgba(255,255,255,0.09)"),borderRadius:4,marginLeft:2,letterSpacing:0.3}}>Ctrl+J</span>}
         </button>
         {/* v10.0 Supernova — Task View launcher (virtual desktops). Shows the
             current/total desktop count; opens the Task View overview. */}
@@ -2839,6 +2854,10 @@ export default function NovaOS(){
           height:44,display:"flex",alignItems:"center",gap:3,padding:"0 4px",
           background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.06)",borderRadius:13,
         }}>
+          {/* v9.3 (#22) — Dedicated volume button so the slider is one click
+              away without opening Settings. Same flyout as the network
+              button; both are at-a-glance indicators that share quick
+              settings. The icon reflects the current mute state. */}
           {/* v9.3 (#22) — Dedicated volume button so the slider is one click
               away without opening Settings. Same flyout as the network
               button; both are at-a-glance indicators that share quick

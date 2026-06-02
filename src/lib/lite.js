@@ -35,7 +35,22 @@ export function isLiteMode() {
  */
 export function initLite() {
   try {
-    if (isLiteMode()) document.documentElement.classList.add("nova-lite");
+    if (isLiteMode() || litePrefOn()) document.documentElement.classList.add("nova-lite");
+  } catch {}
+}
+
+// ── User preference (Settings toggle) ───────────────────────────────────────
+// Kept SEPARATE from the URL/kiosk detection above: a normal user turning on
+// "Lite mode" for performance must NOT flip on the kiosk-only power controls
+// that key off isLiteMode(). This preference only drives the `nova-lite` CSS
+// class (which disables backdrop blur + wallpaper drift), applied live.
+function litePrefOn() { try { return localStorage.getItem("nova-lite-pref") === "1"; } catch { return false; } }
+export function getLitePref() { return litePrefOn(); }
+export function setLitePref(on) {
+  try {
+    localStorage.setItem("nova-lite-pref", on ? "1" : "0");
+    // keep the class on if the URL/kiosk path also wants lite
+    document.documentElement.classList.toggle("nova-lite", !!on || isLiteMode());
   } catch {}
 }
 
