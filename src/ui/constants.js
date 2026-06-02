@@ -8,7 +8,7 @@ export const COLL = "nova_storage";
 // header. Update this when you do a version sweep — package.json /
 // tauri.conf.json still need their own bumps but at least *display* text
 // won't drift again. Format: "<major>.<minor>".
-export const NOVA_VERSION = "10.5";
+export const NOVA_VERSION = "10.6";
 
 // Widget metadata: label/emoji + minimum size constraints used by WidgetShell.
 export const WIDGET_CONFIGS = {
@@ -73,6 +73,8 @@ export const DEFAULT_SIZES = {
   slides:{w:880,h:620},
   // v10.x — Asset Studio (decal/asset editor)
   assetstudio:{w:980,h:700},
+  // v10.6 — Atlas (maps)
+  atlas:{w:880,h:640},
 };
 
 // The master app list — drives the desktop, start menu, and store icons.
@@ -115,6 +117,7 @@ export const APPS = [
   // v9.7
   {id:"slides",     icon:"📊",label:"Slides",      desc:"Build & present slide decks"},
   {id:"assetstudio",icon:"🪄",label:"Asset Studio", desc:"Decals, shapes & transparent PNGs"},
+  {id:"atlas",      icon:"🗺️",label:"Atlas",        desc:"Maps, search & your location"},
 ];
 
 // Curated catalog of external apps shown in the Store's "Official" tab.

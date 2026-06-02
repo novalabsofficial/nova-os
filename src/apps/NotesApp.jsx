@@ -39,6 +39,11 @@ export function NotesApp({ data, updateData, showToast, AC, openNovaAi }) {
   const [previewMode, setPreviewMode] = useState(false);
   const bodyRef = useRef(null);
 
+  // Mobile: master-detail — "list" shows the note list, "editor" the open note
+  // (the desktop three-pane overflowed a phone, hiding the + button and editor).
+  const isMobile = typeof window !== "undefined" && window.innerWidth < 600;
+  const [mobilePane, setMobilePane] = useState("list");
+
   // Derived view: the notes that belong in the middle column right now.
   const viewNotes = (() => {
     if (view.kind === "all") return notes;
@@ -85,6 +90,33 @@ export function NotesApp({ data, updateData, showToast, AC, openNovaAi }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editTitle, editBody]);
 
+  // Flush any in-progress edit when the app is backgrounded or unmounted.
+  // Mobile webviews can suspend/close before the 600ms debounce fires, which
+  // dropped the last edits — that was the "notes don't save on mobile" report.
+  const latestRef = useRef({ selectedId, editTitle, editBody });
+  latestRef.current = { selectedId, editTitle, editBody };
+  function flushSave() {
+    const { selectedId: sid, editTitle: t, editBody: b } = latestRef.current;
+    if (sid == null) return;
+    if (saveTimerRef.current) { clearTimeout(saveTimerRef.current); saveTimerRef.current = null; }
+    updateData(p => {
+      const cur = (p.notes || []).find(n => n.id === sid);
+      if (!cur || ((cur.title || "") === t && (cur.body || "") === b)) return p;
+      return { ...p, notes: p.notes.map(n => n.id === sid ? { ...n, title: t, body: b, ts: Date.now() } : n) };
+    });
+  }
+  useEffect(() => {
+    const onHide = () => { if (document.visibilityState === "hidden") flushSave(); };
+    document.addEventListener("visibilitychange", onHide);
+    window.addEventListener("pagehide", flushSave);
+    return () => {
+      document.removeEventListener("visibilitychange", onHide);
+      window.removeEventListener("pagehide", flushSave);
+      flushSave();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // ── Actions ──────────────────────────────────────────────────────────
   function createNote() {
     const folderId = view.kind === "folder" ? view.id : null;
@@ -92,12 +124,14 @@ export function NotesApp({ data, updateData, showToast, AC, openNovaAi }) {
     const fresh = { id, title: "", body: "", ts: id, folderId };
     updateData(p => ({ ...p, notes: [fresh, ...(p.notes || [])] }));
     setSelectedId(id);
+    if (isMobile) setMobilePane("editor");
     showToast("New note");
   }
   function deleteNote(id) {
     if (!window.confirm("Delete this note?")) return;
     updateData(p => ({ ...p, notes: (p.notes || []).filter(n => n.id !== id) }));
     if (selectedId === id) setSelectedId(null);
+    if (isMobile) setMobilePane("list");
     showToast("Deleted");
   }
   function moveNoteToFolder(noteId, folderId) {
@@ -167,7 +201,7 @@ export function NotesApp({ data, updateData, showToast, AC, openNovaAi }) {
       <div style={{
         width: 196, flexShrink: 0, borderRight: "1px solid var(--nv-border)",
         padding: "16px 10px", overflowY: "auto",
-        display: "flex", flexDirection: "column", gap: 2,
+        display: isMobile ? "none" : "flex", flexDirection: "column", gap: 2,
         background: "rgba(255,255,255,0.02)",
       }}>
         <div style={{ padding: "2px 10px 12px", fontFamily: FFB, fontWeight: 700, fontSize: 12, letterSpacing: 1.2, color: "var(--nv-text-dim)", textTransform: "uppercase" }}>Notes</div>
@@ -216,8 +250,8 @@ export function NotesApp({ data, updateData, showToast, AC, openNovaAi }) {
 
       {/* ───────── MIDDLE COLUMN — note list ───────── */}
       <div style={{
-        width: 288, flexShrink: 0, borderRight: "1px solid var(--nv-border)",
-        display: "flex", flexDirection: "column", minHeight: 0,
+        width: isMobile ? "100%" : 288, flexShrink: 0, borderRight: isMobile ? "none" : "1px solid var(--nv-border)",
+        display: (isMobile && mobilePane !== "list") ? "none" : "flex", flexDirection: "column", minHeight: 0,
         background: "rgba(255,255,255,0.012)",
       }}>
         <div style={{ padding: "14px 14px 10px", display: "flex", alignItems: "center", gap: 8, borderBottom: "1px solid var(--nv-border)", flexShrink: 0 }}>
@@ -227,6 +261,14 @@ export function NotesApp({ data, updateData, showToast, AC, openNovaAi }) {
             </div>
             <div style={{ fontSize: 10, color: "var(--nv-text-dim)", marginTop: 2 }}>{sortedNotes.length} {sortedNotes.length === 1 ? "note" : "notes"}</div>
           </div>
+          {isMobile && (
+            <select value={view.kind === "all" ? "" : view.id}
+              onChange={e => setView(e.target.value ? { kind: "folder", id: e.target.value } : { kind: "all" })}
+              style={{ ...INP, padding: "5px 8px", fontSize: 11, width: "auto", maxWidth: 130, cursor: "pointer" }} title="Folder">
+              <option value="">All Notes</option>
+              {folders.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
+            </select>
+          )}
           <button onClick={createNote} title="New note" style={{ width: 30, height: 30, borderRadius: 8, background: fill(AC), border: "1px solid " + bdr(AC), cursor: "pointer", color: AC, fontFamily: FFB, fontWeight: 700, fontSize: 17, lineHeight: 1, padding: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>+</button>
         </div>
 
@@ -239,7 +281,7 @@ export function NotesApp({ data, updateData, showToast, AC, openNovaAi }) {
           ) : sortedNotes.map(n => {
             const isSel = n.id === selectedId;
             return (
-              <button key={n.id} onClick={() => setSelectedId(n.id)} className="fr" style={{
+              <button key={n.id} onClick={() => { setSelectedId(n.id); if (isMobile) setMobilePane("editor"); }} className="fr" style={{
                 display: "block", textAlign: "left", width: "100%",
                 padding: "10px 12px", marginBottom: 3, borderRadius: 8,
                 background: isSel ? fill(AC) : "transparent",
@@ -262,11 +304,12 @@ export function NotesApp({ data, updateData, showToast, AC, openNovaAi }) {
       </div>
 
       {/* ───────── RIGHT PANE — editor ───────── */}
-      <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", minHeight: 0 }}>
+      <div style={{ flex: 1, minWidth: 0, display: (isMobile && mobilePane !== "editor") ? "none" : "flex", flexDirection: "column", minHeight: 0 }}>
         {selected ? (
           <>
             {/* Editor toolbar — folder picker, AI assist, delete */}
             <div style={{ padding: "12px 18px", borderBottom: "1px solid var(--nv-border)", flexShrink: 0, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+              {isMobile && <button onClick={() => { flushSave(); setMobilePane("list"); }} style={{ background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.14)", borderRadius: 8, padding: "5px 10px", color: "var(--nv-text-strong)", cursor: "pointer", fontFamily: FFB, fontWeight: 700, fontSize: 12 }}>← Notes</button>}
               <div style={{ fontSize: 11, color: "var(--nv-text-dim)", fontFamily: FFM }}>
                 {new Date(selected.ts || 0).toLocaleString()}
                 {saveTimerRef.current && <span style={{ marginLeft: 8, fontStyle: "italic", color: "var(--nv-text-dim)" }}>· saving…</span>}

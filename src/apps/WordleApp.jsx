@@ -1,14 +1,19 @@
 import { useState, useEffect } from "react";
 import { FF, FFB, FFM } from "../ui/styles.js";
 import { fill, bdr } from "../lib/format.js";
-import { dailyWord, scoreGuess, normalizeGuess } from "../lib/wordle.js";
+import { dailyWord, scoreGuess, normalizeGuess, randomWord } from "../lib/wordle.js";
 
 export function WordleApp({AC,showToast}){
-  const [answer]=useState(()=>dailyWord());
+  const [mode,setMode]=useState("daily");             // daily | infinite
+  const [answer,setAnswer]=useState(()=>dailyWord());
   const [guesses,setGuesses]=useState([]);            // array of {word, score}
   const [current,setCurrent]=useState("");
   const [status,setStatus]=useState("playing");       // playing | won | lost
   const MAX=6;
+
+  function reset(newAnswer){ setAnswer(newAnswer); setGuesses([]); setCurrent(""); setStatus("playing"); }
+  function pickMode(m){ if(m===mode)return; setMode(m); reset(m==="daily"?dailyWord():randomWord()); }
+  function newWord(){ reset(randomWord()); }
 
   function submitGuess(){
     if(status!=="playing")return;
@@ -64,7 +69,20 @@ export function WordleApp({AC,showToast}){
 
   return(
     <div tabIndex={0} onKeyDown={onKey} style={{display:"flex",flexDirection:"column",height:"100%",fontFamily:FF,outline:"none",alignItems:"center",gap:14,minHeight:0}}>
-      <div style={{fontFamily:FFB,fontWeight:700,fontSize:14,color:"rgba(255,255,255,0.55)",letterSpacing:1.5,textTransform:"uppercase"}}>Daily Wordle</div>
+      <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",justifyContent:"center"}}>
+        {[["daily","Daily"],["infinite","Infinite"]].map(([m,label])=>(
+          <button key={m} onClick={()=>pickMode(m)} style={{
+            padding:"5px 14px",borderRadius:18,cursor:"pointer",fontFamily:FFB,fontWeight:700,fontSize:12,letterSpacing:0.5,
+            background:mode===m?fill(AC):"rgba(255,255,255,0.05)",
+            border:"1px solid "+(mode===m?bdr(AC):"rgba(255,255,255,0.1)"),
+            color:mode===m?AC:"rgba(255,255,255,0.55)",
+          }}>{label}</button>
+        ))}
+        {mode==="infinite" && <button onClick={newWord} title="New random word" style={{
+          padding:"5px 12px",borderRadius:18,cursor:"pointer",fontFamily:FFB,fontWeight:700,fontSize:12,
+          background:"rgba(255,255,255,0.07)",border:"1px solid rgba(255,255,255,0.12)",color:"var(--nv-text)",
+        }}>↻ New word</button>}
+      </div>
 
       {status==="won" && <div style={{padding:"7px 14px",background:"rgba(76,239,144,0.12)",border:"1px solid rgba(76,239,144,0.4)",borderRadius:7,fontFamily:FFB,fontWeight:700,fontSize:13,color:"#4cef90"}}>🎉 Got it in {guesses.length}!</div>}
       {status==="lost" && <div style={{padding:"7px 14px",background:"rgba(255,80,80,0.12)",border:"1px solid rgba(255,80,80,0.4)",borderRadius:7,fontFamily:FFB,fontWeight:700,fontSize:13,color:"#ff8b8b"}}>Answer: {answer}</div>}
@@ -113,7 +131,7 @@ export function WordleApp({AC,showToast}){
         ))}
       </div>
 
-      <div style={{fontSize:10,color:"rgba(255,255,255,0.3)",textAlign:"center",fontStyle:"italic"}}>Type letters or tap keys · Enter to submit · New word every UTC day</div>
+      <div style={{fontSize:10,color:"rgba(255,255,255,0.3)",textAlign:"center",fontStyle:"italic"}}>Type letters or tap keys · Enter to submit · {mode==="daily"?"New word every UTC day":"Infinite practice — endless random words"}</div>
     </div>
   );
 }

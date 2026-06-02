@@ -29,7 +29,10 @@ import {
 // outline white pieces ♔ with filled black pieces ♚, which looked
 // inconsistent and rendered differently across fonts). Same silhouette for
 // both colors; we distinguish purely by fill + outline, the chess.com way.
-const PIECE_SOLID = { k: "♚", q: "♛", r: "♜", b: "♝", n: "♞", p: "♟" };
+// The trailing ︎ (variation selector-15) forces TEXT presentation so the
+// CSS `color` fill below actually applies. Without it, Windows renders these
+// glyphs as emoji (always dark), which made white's pieces look black.
+const PIECE_SOLID = { k: "♚︎", q: "♛︎", r: "♜︎", b: "♝︎", n: "♞︎", p: "♟︎" };
 const PIECE_VALUE = { q: 9, r: 5, b: 3, n: 3, p: 1, k: 0 };
 
 // chess.com board palette.
@@ -52,6 +55,7 @@ function pieceStyle(color, sizeCss) {
     fontFamily: "'Georgia','Times New Roman',serif",
     fontSize: sizeCss,
     lineHeight: 1,
+    fontVariantEmoji: "text",   // belt-and-suspenders with the ︎ in PIECE_SOLID
     color: white ? "#f7f7f5" : "#262421",
     textShadow: white
       ? "0 0 1px #1f1f1f,1px 1px 0 #1f1f1f,-1px 1px 0 #1f1f1f,1px -1px 0 #1f1f1f,-1px -1px 0 #1f1f1f"

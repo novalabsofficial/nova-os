@@ -48,6 +48,11 @@ export function dailyWord(date = new Date()) {
   return WORDS[idx];
 }
 
+/** Pick a random word from the pool — powers the app's Infinite practice mode. */
+export function randomWord() {
+  return WORDS[Math.floor(Math.random() * WORDS.length)];
+}
+
 /**
  * Score a single guess against the answer. Returns an array of 5 strings,
  * one per letter: "correct" (green), "present" (yellow), or "absent" (gray).

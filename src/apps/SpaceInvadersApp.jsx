@@ -225,6 +225,11 @@ export function SpaceInvadersApp({ AC, data, updateSettings }) {
     setPhase("playing");
   }
 
+  // Mobile: on-screen hold buttons drive the same keysRef the keyboard does.
+  const isTouch = typeof window !== "undefined" && (("ontouchstart" in window) || (navigator.maxTouchPoints || 0) > 0);
+  const hold = (key, val) => (e) => { e.preventDefault(); if (val) e.currentTarget.setPointerCapture?.(e.pointerId); keysRef.current[key] = val; };
+  const ctrlBtn = { flexShrink: 0, minWidth: 66, padding: "16px 20px", fontSize: 20, fontFamily: FFB, fontWeight: 800, color: "#fff", background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.16)", borderRadius: 12, cursor: "pointer", touchAction: "none", userSelect: "none", WebkitUserSelect: "none" };
+
   return (
     <div style={{ width:"100%", display:"flex", flexDirection:"column", alignItems:"center", gap:10, fontFamily:FF }}>
       <div style={SEC}>Space Invaders</div>
@@ -256,8 +261,16 @@ export function SpaceInvadersApp({ AC, data, updateSettings }) {
         )}
       </div>
 
+      {isTouch && phase === "playing" && (
+        <div style={{ display:"flex", gap:10, width:"100%", maxWidth:460, alignItems:"center" }}>
+          <button onPointerDown={hold("left", true)} onPointerUp={hold("left", false)} onPointerCancel={hold("left", false)} style={ctrlBtn} aria-label="Move left">◀</button>
+          <button onPointerDown={hold("fire", true)} onPointerUp={hold("fire", false)} onPointerCancel={hold("fire", false)} style={{ ...ctrlBtn, flex:1, color:"#4cef90" }} aria-label="Fire">FIRE</button>
+          <button onPointerDown={hold("right", true)} onPointerUp={hold("right", false)} onPointerCancel={hold("right", false)} style={ctrlBtn} aria-label="Move right">▶</button>
+        </div>
+      )}
+
       <div style={{ fontFamily:FF, fontStyle:"italic", fontSize:10, color:"rgba(255,255,255,0.3)", textAlign:"center", maxWidth:340, lineHeight:1.5, marginTop:4 }}>
-        <strong style={{color:"rgba(255,255,255,0.55)"}}>← →</strong> or <strong style={{color:"rgba(255,255,255,0.55)"}}>A / D</strong> to move · <strong style={{color:"rgba(255,255,255,0.55)"}}>Space</strong> to fire. Top-row aliens are worth more points.
+        <strong style={{color:"rgba(255,255,255,0.55)"}}>← →</strong> or <strong style={{color:"rgba(255,255,255,0.55)"}}>A / D</strong> to move · <strong style={{color:"rgba(255,255,255,0.55)"}}>Space</strong> to fire. On touch, use the on-screen buttons. Top-row aliens are worth more points.
       </div>
     </div>
   );

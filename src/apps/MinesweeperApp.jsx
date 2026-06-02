@@ -196,7 +196,7 @@ export function MinesweeperApp({AC, user}){
                   touchAction:"none",
                   background: isRev ? (showMine ? "rgba(255,80,80,0.25)" : "rgba(255,255,255,0.04)") : "rgba(255,255,255,0.1)",
                   border:"1px solid "+(isRev ? "rgba(255,255,255,0.05)" : "rgba(255,255,255,0.15)"),
-                  color: showMine ? "#ff7878" : num>0 ? MINE_NUM_COLOR[num] : "transparent",
+                  color: isFlag ? "#ff5b5b" : showMine ? "#ff7878" : num>0 ? MINE_NUM_COLOR[num] : "transparent",
                 }}>
                 {showMine ? "💣" : isFlag ? "🚩" : num>0 ? num : ""}
               </div>

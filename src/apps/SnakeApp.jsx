@@ -16,6 +16,7 @@ import { playSound } from "../lib/audio.js";
 
 const SIZES = { Small: 13, Medium: 17, Large: 21 };
 const APPLE_OPTS = [1, 3, 5];
+const SPEEDS = { Slow: 130, Normal: 85, Fast: 55 };  // ms per step — lower is faster
 const BOARD_PX = 400;        // target board size; cell size derives from this
 const STEP_MS = 85;          // constant tempo (Google Snake doesn't speed up)
 
@@ -27,6 +28,7 @@ const APPLE   = "#e7471d";
 export function SnakeApp({ AC }) {
   const [grid, setGrid] = useState(17);        // current map size
   const [apples, setApples] = useState(1);     // apples on the board at once
+  const [speedMs, setSpeedMs] = useState(STEP_MS); // ms per step (default Normal); see SPEEDS
   const [phase, setPhase] = useState("idle");  // idle | playing | over
   const [score, setScore] = useState(0);
   const [best, setBest] = useState(0);
@@ -144,8 +146,27 @@ export function SnakeApp({ AC }) {
     setScore(0);
     setPhase("playing");
     clearInterval(intv.current);
-    intv.current = setInterval(tick, STEP_MS);
+    intv.current = setInterval(tick, speedMs);
     draw();
+  }
+
+  // Queue a direction (shared by keyboard + touch); de-dupes and blocks reversals.
+  function queueDir(d) {
+    const s = st.current; if (!s) return;
+    const lastQ = s.queue.length ? s.queue[s.queue.length - 1] : s.dir;
+    if (lastQ.x === d.x && lastQ.y === d.y) return;
+    if (s.queue.length < 2) s.queue.push(d);
+  }
+  // Mobile: swipe the board to steer.
+  function onSwipeDown(e) {
+    const sx = e.clientX, sy = e.clientY;
+    const up = (ev) => {
+      window.removeEventListener("pointerup", up);
+      const dx = ev.clientX - sx, dy = ev.clientY - sy, ax = Math.abs(dx), ay = Math.abs(dy);
+      if (Math.max(ax, ay) < 20) return;
+      queueDir(ax > ay ? { x: dx > 0 ? 1 : -1, y: 0 } : { x: 0, y: dy > 0 ? 1 : -1 });
+    };
+    window.addEventListener("pointerup", up);
   }
 
   // Input — push into the queue (max 2 buffered) for responsive turns.
@@ -160,11 +181,7 @@ export function SnakeApp({ AC }) {
     function onKey(e) {
       const d = DM[e.key]; if (!d) return;
       e.preventDefault();
-      const s = st.current; if (!s) return;
-      // de-dupe against the last queued (or current) direction
-      const lastQ = s.queue.length ? s.queue[s.queue.length - 1] : s.dir;
-      if (lastQ.x === d.x && lastQ.y === d.y) return;
-      if (s.queue.length < 2) s.queue.push(d);
+      queueDir(d);
     }
     window.addEventListener("keydown", onKey);
     return () => { window.removeEventListener("keydown", onKey); clearInterval(intv.current); };
@@ -187,12 +204,13 @@ export function SnakeApp({ AC }) {
       <div style={{ display: "flex", gap: 14, flexWrap: "wrap", justifyContent: "center", opacity: phase === "playing" ? 0.4 : 1, pointerEvents: phase === "playing" ? "none" : "auto" }}>
         <Segment label="Board" options={Object.keys(SIZES)} value={Object.keys(SIZES).find(k => SIZES[k] === grid)} onPick={k => setGrid(SIZES[k])} AC={AC} />
         <Segment label="Apples" options={APPLE_OPTS} value={apples} onPick={n => setApples(n)} AC={AC} />
+        <Segment label="Speed" options={Object.keys(SPEEDS)} value={Object.keys(SPEEDS).find(k => SPEEDS[k] === speedMs)} onPick={k => setSpeedMs(SPEEDS[k])} AC={AC} />
       </div>
 
       {/* Board */}
       <div style={{ position: "relative", width: "100%", maxWidth: PX }}>
-        <canvas ref={canvasRef} width={PX} height={PX}
-          style={{ width: "100%", height: "auto", display: "block", borderRadius: 10, boxShadow: "0 8px 30px rgba(0,0,0,0.35)" }} />
+        <canvas ref={canvasRef} width={PX} height={PX} onPointerDown={onSwipeDown}
+          style={{ width: "100%", height: "auto", display: "block", borderRadius: 10, boxShadow: "0 8px 30px rgba(0,0,0,0.35)", touchAction: "none" }} />
         {(phase === "idle" || phase === "over") && (
           <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 14, background: "rgba(7,8,15,0.66)", borderRadius: 10 }}>
             {phase === "over" && <>
@@ -202,7 +220,7 @@ export function SnakeApp({ AC }) {
             <button onClick={start} style={{ padding: "11px 32px", background: fill(AC), border: "1px solid " + bdr(AC), borderRadius: 9, cursor: "pointer", fontFamily: FFB, fontWeight: 700, fontSize: 15, color: AC }}>
               {phase === "over" ? "Play Again" : "Start Game"}
             </button>
-            {phase === "idle" && <div style={{ fontSize: 11, color: "rgba(255,255,255,0.55)", fontFamily: FF }}>Arrow keys or WASD to move</div>}
+            {phase === "idle" && <div style={{ fontSize: 11, color: "rgba(255,255,255,0.55)", fontFamily: FF }}>Swipe, arrow keys, or WASD to move</div>}
           </div>
         )}
       </div>
