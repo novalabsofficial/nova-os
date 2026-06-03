@@ -131,6 +131,12 @@ const ScreenshotApp   = lazyApp(() => import("./apps/ScreenshotApp.jsx").then(m 
 const SlidesApp       = lazyApp(() => import("./apps/SlidesApp.jsx").then(m       => ({default: m.SlidesApp})));
 const AssetStudioApp  = lazyApp(() => import("./apps/AssetStudioApp.jsx").then(m  => ({default: m.AssetStudioApp})));
 const AtlasApp        = lazyApp(() => import("./apps/AtlasApp.jsx").then(m        => ({default: m.AtlasApp})));
+// v10.9 — utilities pack
+const CurrencyApp     = lazyApp(() => import("./apps/CurrencyApp.jsx").then(m     => ({default: m.CurrencyApp})));
+const DictionaryApp   = lazyApp(() => import("./apps/DictionaryApp.jsx").then(m   => ({default: m.DictionaryApp})));
+const TranslatorApp   = lazyApp(() => import("./apps/TranslatorApp.jsx").then(m   => ({default: m.TranslatorApp})));
+const CryptoApp       = lazyApp(() => import("./apps/CryptoApp.jsx").then(m       => ({default: m.CryptoApp})));
+const QrApp           = lazyApp(() => import("./apps/QrApp.jsx").then(m           => ({default: m.QrApp})));
 
 // ─── v9.0 taskbar glyphs ────────────────────────────────────────────────
 // Monochrome line-glyphs for the system tray, replacing the old emoji
@@ -1568,6 +1574,11 @@ export default function NovaOS(){
         {appId==="slides"     &&<SlidesApp AC={AC} data={data} updateData={updateData} showToast={showToast}/>}
         {appId==="assetstudio"&&<AssetStudioApp AC={AC} showToast={showToast}/>}
         {appId==="atlas"      &&<AtlasApp AC={AC} showToast={showToast}/>}
+        {appId==="currency"   &&<CurrencyApp AC={AC}/>}
+        {appId==="dictionary" &&<DictionaryApp AC={AC}/>}
+        {appId==="translate"  &&<TranslatorApp AC={AC} showToast={showToast}/>}
+        {appId==="crypto"     &&<CryptoApp AC={AC}/>}
+        {appId==="qr"         &&<QrApp AC={AC} showToast={showToast}/>}
       </Suspense>
     );
   }
