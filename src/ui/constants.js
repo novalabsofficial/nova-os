@@ -8,7 +8,7 @@ export const COLL = "nova_storage";
 // header. Update this when you do a version sweep — package.json /
 // tauri.conf.json still need their own bumps but at least *display* text
 // won't drift again. Format: "<major>.<minor>".
-export const NOVA_VERSION = "10.8";
+export const NOVA_VERSION = "10.9";
 
 // Widget metadata: label/emoji + minimum size constraints used by WidgetShell.
 export const WIDGET_CONFIGS = {
@@ -75,6 +75,9 @@ export const DEFAULT_SIZES = {
   assetstudio:{w:980,h:700},
   // v10.6 — Atlas (maps)
   atlas:{w:880,h:640},
+  // v10.9 — utilities pack
+  currency:{w:440,h:560},dictionary:{w:540,h:600},translate:{w:560,h:560},
+  crypto:{w:560,h:640},qr:{w:480,h:660},
 };
 
 // The master app list — drives the desktop, start menu, and store icons.
@@ -118,6 +121,12 @@ export const APPS = [
   {id:"slides",     icon:"📊",label:"Slides",      desc:"Build & present slide decks"},
   {id:"assetstudio",icon:"🪄",label:"Asset Studio", desc:"Decals, shapes & transparent PNGs"},
   {id:"atlas",      icon:"🗺️",label:"Atlas",        desc:"Maps, search & your location"},
+  // v10.9 — utilities pack
+  {id:"currency",   icon:"💱",label:"Currency",    desc:"Convert world currencies"},
+  {id:"dictionary", icon:"📖",label:"Dictionary",  desc:"Definitions, synonyms & audio"},
+  {id:"translate",  icon:"🗣️",label:"Translate",    desc:"Translate between languages"},
+  {id:"crypto",     icon:"🪙",label:"Crypto",      desc:"Live cryptocurrency prices"},
+  {id:"qr",         icon:"🔳",label:"QR Codes",    desc:"Generate & scan QR codes"},
 ];
 
 // Curated catalog of external apps shown in the Store's "Official" tab.
