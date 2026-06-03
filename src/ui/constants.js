@@ -8,7 +8,7 @@ export const COLL = "nova_storage";
 // header. Update this when you do a version sweep — package.json /
 // tauri.conf.json still need their own bumps but at least *display* text
 // won't drift again. Format: "<major>.<minor>".
-export const NOVA_VERSION = "10.9";
+export const NOVA_VERSION = "10.10";
 
 // Widget metadata: label/emoji + minimum size constraints used by WidgetShell.
 export const WIDGET_CONFIGS = {
@@ -78,6 +78,11 @@ export const DEFAULT_SIZES = {
   // v10.9 — utilities pack
   currency:{w:440,h:560},dictionary:{w:540,h:600},translate:{w:560,h:560},
   crypto:{w:560,h:640},qr:{w:480,h:660},
+  // v10.10 — games
+  sudoku:{w:520,h:700},typing:{w:700,h:520},
+  // v10.10 — media
+  camera:{w:600,h:660},recorder:{w:460,h:600},
+  solitaire:{w:720,h:680},
 };
 
 // The master app list — drives the desktop, start menu, and store icons.
@@ -127,6 +132,12 @@ export const APPS = [
   {id:"translate",  icon:"🗣️",label:"Translate",    desc:"Translate between languages"},
   {id:"crypto",     icon:"🪙",label:"Crypto",      desc:"Live cryptocurrency prices"},
   {id:"qr",         icon:"🔳",label:"QR Codes",    desc:"Generate & scan QR codes"},
+  // v10.10 — games & media
+  {id:"sudoku",     icon:"🧩",label:"Sudoku",      desc:"Number placement puzzle"},
+  {id:"typing",     icon:"⌨️",label:"Typing Test", desc:"Measure your words per minute"},
+  {id:"camera",     icon:"📸",label:"Camera",      desc:"Take photos with your webcam"},
+  {id:"recorder",   icon:"🎙️",label:"Voice Recorder", desc:"Record & play back audio"},
+  {id:"solitaire",  icon:"🃏",label:"Solitaire",   desc:"Classic Klondike card game"},
 ];
 
 // Curated catalog of external apps shown in the Store's "Official" tab.

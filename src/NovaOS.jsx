@@ -137,6 +137,13 @@ const DictionaryApp   = lazyApp(() => import("./apps/DictionaryApp.jsx").then(m 
 const TranslatorApp   = lazyApp(() => import("./apps/TranslatorApp.jsx").then(m   => ({default: m.TranslatorApp})));
 const CryptoApp       = lazyApp(() => import("./apps/CryptoApp.jsx").then(m       => ({default: m.CryptoApp})));
 const QrApp           = lazyApp(() => import("./apps/QrApp.jsx").then(m           => ({default: m.QrApp})));
+// v10.10 — games
+const SudokuApp       = lazyApp(() => import("./apps/SudokuApp.jsx").then(m       => ({default: m.SudokuApp})));
+const TypingApp       = lazyApp(() => import("./apps/TypingApp.jsx").then(m       => ({default: m.TypingApp})));
+// v10.10 — media
+const CameraApp       = lazyApp(() => import("./apps/CameraApp.jsx").then(m       => ({default: m.CameraApp})));
+const VoiceRecorderApp= lazyApp(() => import("./apps/VoiceRecorderApp.jsx").then(m=> ({default: m.VoiceRecorderApp})));
+const SolitaireApp    = lazyApp(() => import("./apps/SolitaireApp.jsx").then(m    => ({default: m.SolitaireApp})));
 
 // ─── v9.0 taskbar glyphs ────────────────────────────────────────────────
 // Monochrome line-glyphs for the system tray, replacing the old emoji
@@ -1547,7 +1554,7 @@ export default function NovaOS(){
         {appId==="paint"    &&<PaintApp    showToast={showToast} AC={AC} onSetWallpaper={handleCustomWallpaper}/>}
         {appId==="browser"  &&<BrowserApp  AC={AC} active={browserActive}/>}
         {appId==="snake"    &&<SnakeApp    AC={AC}/>}
-        {appId==="2048"     &&<Game2048App AC={AC}/>}
+        {appId==="2048"     &&<Game2048App AC={AC} user={user}/>}
         {appId==="store"    &&<StoreApp    user={user} data={data} updateData={updateData} showToast={showToast} AC={AC}/>}
         {appId==="terminal" &&<TerminalApp user={user} AC={AC} openApp={openApp} showToast={showToast}/>}
         {appId==="chat"     &&<ChatApp     user={user} AC={AC} data={data} updateData={updateData}/>}
@@ -1560,14 +1567,14 @@ export default function NovaOS(){
         {appId==="pdf"        &&<PdfApp AC={AC} showToast={showToast}/>}
         {appId==="atmos"      &&<AtmosApp AC={AC} showToast={showToast} pushNotification={pushNotification} openNovaAi={()=>openApp("novaai")} data={data} updateSettings={updateSettings} onSevereAlert={alert=>setSevereAlert(alert)}/>}
         {appId==="minesweeper"&&<MinesweeperApp AC={AC} user={user}/>}
-        {appId==="wordle"     &&<WordleApp AC={AC} showToast={showToast}/>}
-        {appId==="tetris"     &&<TetrisApp AC={AC}/>}
+        {appId==="wordle"     &&<WordleApp AC={AC} showToast={showToast} user={user}/>}
+        {appId==="tetris"     &&<TetrisApp AC={AC} user={user}/>}
         {appId==="novaai"     &&<NovaAiApp AC={AC} showToast={showToast}/>}
         {appId==="tictactoe"  &&<TicTacToeApp AC={AC}/>}
-        {appId==="pong"       &&<PongApp AC={AC}/>}
+        {appId==="pong"       &&<PongApp AC={AC} user={user}/>}
         {appId==="flappy"     &&<FlappyBirdApp AC={AC} data={data} updateSettings={updateSettings} user={user}/>}
-        {appId==="invaders"   &&<SpaceInvadersApp AC={AC} data={data} updateSettings={updateSettings}/>}
-        {appId==="pacman"     &&<PacManApp AC={AC} data={data} updateSettings={updateSettings}/>}
+        {appId==="invaders"   &&<SpaceInvadersApp AC={AC} data={data} updateSettings={updateSettings} user={user}/>}
+        {appId==="pacman"     &&<PacManApp AC={AC} data={data} updateSettings={updateSettings} user={user}/>}
         {appId==="chess"      &&<ChessApp user={user} AC={AC}/>}
         {appId==="photos"     &&<PhotosApp AC={AC} showToast={showToast} onSetWallpaper={handleCustomWallpaper}/>}
         {appId==="screenshot" &&<ScreenshotApp AC={AC} showToast={showToast} onSetWallpaper={handleCustomWallpaper}/>}
@@ -1579,6 +1586,11 @@ export default function NovaOS(){
         {appId==="translate"  &&<TranslatorApp AC={AC} showToast={showToast}/>}
         {appId==="crypto"     &&<CryptoApp AC={AC}/>}
         {appId==="qr"         &&<QrApp AC={AC} showToast={showToast}/>}
+        {appId==="sudoku"     &&<SudokuApp AC={AC} user={user}/>}
+        {appId==="typing"     &&<TypingApp AC={AC} user={user}/>}
+        {appId==="camera"     &&<CameraApp AC={AC} showToast={showToast}/>}
+        {appId==="recorder"   &&<VoiceRecorderApp AC={AC} showToast={showToast}/>}
+        {appId==="solitaire"  &&<SolitaireApp AC={AC} user={user}/>}
       </Suspense>
     );
   }

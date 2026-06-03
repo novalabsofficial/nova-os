@@ -5,6 +5,46 @@ not committed to. Living document — add to it freely.
 
 ---
 
+# 🔭 Planned — 11.0 (UI refresh)
+
+Not yet built. The big 11.0 release: a **design system** (shared spacing /
+radius / shadow / type tokens + reusable components), an **all-SVG icon set**
+(professional like Windows 10, keeping Nova personality), **unified window
+chrome + dialogs** (one window frame, a Nova-styled confirm/alert replacing the
+browser's native boxes), a **motion language** (one set of easing/durations),
+and **light mode** — plus the desktop-power features (app folders, snap saved
+workspaces, drag Files/Photos → desktop, multi-select icon move, more widgets,
+sticky notes/clipboard, Backup/Export). Items captured here as they come up:
+
+- **Desktop pinning → whitelist model + first-run wizard.** Now that there are
+  30+ apps, flip desktop pinning from the current *blacklist* (every app shows
+  on the desktop unless explicitly hidden) to a Windows-style *whitelist*
+  (nothing on the desktop unless the user adds it). On new-account registration,
+  show a quick setup **wizard** asking which apps to place on the desktop, with
+  a clear note that more can always be added later (right-click a Store/Start
+  item → Add to desktop). Existing accounts migrate gracefully — keep their
+  current desktop set so nothing disappears on upgrade.
+
+- **Full UI visual redesign — make it look like a real, shipped OS.** Beyond the
+  design-system tokens: a deliberate visual overhaul so Nova reads as a serious,
+  professional operating system rather than an AI-generated mockup. More
+  intentional layout + alignment everywhere, real material depth, a refined
+  typography hierarchy, considered spacing, and cohesive icon + motion craft —
+  while keeping Nova's unique personality (accent system, wallpapers, sounds).
+  The bar: *"looks shipped, not generated."*
+
+- **Video editor app (CapCut-style).** Timeline-based video editor in the spirit
+  of CapCut — import clips, trim/split, a multi-track timeline, text overlays,
+  transitions, an audio track, and export. Match CapCut's exact UI typeface for
+  authenticity. Heavy lift (canvas + WebCodecs / ffmpeg.wasm for export) —
+  likely a flagship piece or an 11.x stretch.
+
+- **Asset Studio — paste & drop images.** Paste an image straight from the
+  clipboard (Ctrl/Cmd+V) and drag-drop image files onto the canvas, so a copied
+  screenshot or saved image can be edited / cut out immediately.
+
+---
+
 # ✅ v9.8 — shipped ("Game revamps + leaderboards")
 
 - **Snake — Google Snake style.** Input buffering (queues up to 2 turns) so

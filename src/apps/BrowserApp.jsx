@@ -39,9 +39,37 @@ const newTab = () => ({ id: "t" + (TAB_SEQ++), bar: "", view: "home", frameUrl: 
 
 function hostOf(u) { try { return new URL(u).hostname.replace(/^www\./, ""); } catch { return u; } }
 
+// v10.10 — Chrome-style session restore. Open tabs are saved to localStorage
+// and rehydrated when the browser is reopened, so they persist until you
+// close them with × . Search result payloads aren't stored (they're large and
+// go stale) — restored "results" tabs simply re-run their search on open.
+const SESSION_KEY = "nova-browser-session";
+function loadSession() {
+  try {
+    const data = JSON.parse(localStorage.getItem(SESSION_KEY) || "null");
+    if (!data || !Array.isArray(data.tabs) || !data.tabs.length) return null;
+    let maxN = 0;
+    const tabs = data.tabs.map(s => {
+      const n = parseInt(String(s.id).replace(/\D/g, ""), 10);
+      if (!isNaN(n)) maxN = Math.max(maxN, n);
+      return {
+        id: s.id, bar: s.bar || "", view: s.view || "home", frameUrl: s.frameUrl || "",
+        results: null, loading: false,
+        hist: Array.isArray(s.hist) ? s.hist : [], hIdx: typeof s.hIdx === "number" ? s.hIdx : -1,
+        reloadKey: 0, title: s.title || "New Tab",
+      };
+    });
+    TAB_SEQ = Math.max(TAB_SEQ, maxN + 1);   // avoid id collisions with new tabs
+    const activeId = data.activeId && tabs.some(t => t.id === data.activeId) ? data.activeId : tabs[0].id;
+    return { tabs, activeId };
+  } catch { return null; }
+}
+
 export function BrowserApp({ AC, active = true }) {
-  const [tabs, setTabs] = useState(() => [newTab()]);
-  const [activeId, setActiveId] = useState(() => tabs[0].id);
+  const restored = useRef(undefined);
+  if (restored.current === undefined) restored.current = loadSession();   // once, before first render
+  const [tabs, setTabs] = useState(() => (restored.current ? restored.current.tabs : [newTab()]));
+  const [activeId, setActiveId] = useState(() => (restored.current ? restored.current.activeId : tabs[0].id));
   const stageRef = useRef(null);           // content-area placeholder (native bounds target)
   const nativeRef = useRef(null);          // NativeTabs controller (Tauri only)
 
@@ -93,6 +121,23 @@ export function BrowserApp({ AC, active = true }) {
     });
     nativeRef.current?.close(id);
   }
+
+  // ── session restore ───────────────────────────────────────────────────────
+  // Persist the open tabs (slim form) whenever they change, so closing and
+  // reopening the browser brings them back. Closing a tab via × drops it here.
+  useEffect(() => {
+    try {
+      const slim = tabs.map(t => ({ id: t.id, bar: t.bar, view: t.view, frameUrl: t.frameUrl, title: t.title, hist: t.hist, hIdx: t.hIdx }));
+      localStorage.setItem(SESSION_KEY, JSON.stringify({ tabs: slim, activeId }));
+    } catch (e) { /* storage full / unavailable — non-fatal */ }
+  }, [tabs, activeId]);
+
+  // On open, re-run Nova Search for any restored "results" tab (their payload
+  // wasn't persisted). Runs once on mount.
+  useEffect(() => {
+    tabs.forEach(t => { if (t.view === "results" && !t.results && t.bar && t.bar.trim()) novaSearch(t.id, t.bar.trim()); });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // ── native webview backend (Tauri) ───────────────────────────────────────
   useEffect(() => {

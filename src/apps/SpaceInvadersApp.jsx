@@ -8,6 +8,9 @@
 import { useState, useEffect, useRef } from "react";
 import { FF, FFB, FFM, SEC } from "../ui/styles.js";
 import { fill, bdr } from "../lib/format.js";
+import { submitScore } from "../lib/scores.js";
+import { getDbUid } from "../lib/db.js";
+import { Leaderboard } from "../ui/Leaderboard.jsx";
 
 const CW = 520, CH = 560;
 const PLAYER_W = 36, PLAYER_H = 14;
@@ -16,7 +19,8 @@ const ALIEN_COLS = 8, ALIEN_ROWS = 5;
 const ALIEN_GAP_X = 12, ALIEN_GAP_Y = 14;
 const ALIEN_OFFSET_X = 40, ALIEN_OFFSET_Y = 60;
 
-export function SpaceInvadersApp({ AC, data, updateSettings }) {
+export function SpaceInvadersApp({ AC, data, updateSettings, user }) {
+  const myUid = getDbUid();
   const canvasRef = useRef(null);
   const stateRef  = useRef(null);
   const keysRef   = useRef({ left: false, right: false, fire: false });
@@ -215,6 +219,7 @@ export function SpaceInvadersApp({ AC, data, updateSettings }) {
     if (phase === "playing" && lives <= 0) {
       setPhase("gameover");
       if (updateSettings && score > high) updateSettings({ invadersHigh: score });
+      if (myUid && score > 0) submitScore("invaders", score, "high", myUid, user);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lives, phase]);
@@ -257,6 +262,7 @@ export function SpaceInvadersApp({ AC, data, updateSettings }) {
               style={{ padding:"8px 22px", background:fill(AC), border:"1px solid "+bdr(AC), borderRadius:8, cursor:"pointer", fontFamily:FFB, fontWeight:700, fontSize:13, color:AC }}>
               {phase === "gameover" ? "Play Again" : "Start"}
             </button>
+            <Leaderboard gameId="invaders" dir="high" AC={AC} />
           </div>
         )}
       </div>
