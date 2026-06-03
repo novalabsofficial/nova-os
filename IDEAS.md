@@ -25,6 +25,24 @@ sticky notes/clipboard, Backup/Export). Items captured here as they come up:
   item → Add to desktop). Existing accounts migrate gracefully — keep their
   current desktop set so nothing disappears on upgrade.
 
+- **Full UI visual redesign — make it look like a real, shipped OS.** Beyond the
+  design-system tokens: a deliberate visual overhaul so Nova reads as a serious,
+  professional operating system rather than an AI-generated mockup. More
+  intentional layout + alignment everywhere, real material depth, a refined
+  typography hierarchy, considered spacing, and cohesive icon + motion craft —
+  while keeping Nova's unique personality (accent system, wallpapers, sounds).
+  The bar: *"looks shipped, not generated."*
+
+- **Video editor app (CapCut-style).** Timeline-based video editor in the spirit
+  of CapCut — import clips, trim/split, a multi-track timeline, text overlays,
+  transitions, an audio track, and export. Match CapCut's exact UI typeface for
+  authenticity. Heavy lift (canvas + WebCodecs / ffmpeg.wasm for export) —
+  likely a flagship piece or an 11.x stretch.
+
+- **Asset Studio — paste & drop images.** Paste an image straight from the
+  clipboard (Ctrl/Cmd+V) and drag-drop image files onto the canvas, so a copied
+  screenshot or saved image can be edited / cut out immediately.
+
 ---
 
 # ✅ v9.8 — shipped ("Game revamps + leaderboards")

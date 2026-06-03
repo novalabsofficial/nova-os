@@ -22,7 +22,13 @@ const TARGET_SCORE = 7;
 const AI_SPEEDS = { easy: 1.8, normal: 3.0, hard: 4.2 };
 const AI_DEADZONE = 12;
 
-export function PongApp({ AC }) {
+import { submitScore } from "../lib/scores.js";
+import { getDbUid } from "../lib/db.js";
+import { Leaderboard } from "../ui/Leaderboard.jsx";
+
+export function PongApp({ AC, user }) {
+  const myUid = getDbUid();
+  const pongWinsRef = useRef(parseInt(localStorage.getItem("nova-pong-wins"), 10) || 0);
   const canvasRef = useRef(null);
   const [running, setRunning] = useState(false);
   const [score, setScore] = useState({ left: 0, right: 0 });
@@ -193,6 +199,16 @@ export function PongApp({ AC }) {
     if (score.right >= TARGET_SCORE) { setWinner("right"); setRunning(false); }
   }, [score]);
 
+  // Beat the AI -> bump the personal win count and submit it (leaderboard).
+  useEffect(() => {
+    if (winner === "left" && mode === "ai") {
+      pongWinsRef.current += 1;
+      localStorage.setItem("nova-pong-wins", String(pongWinsRef.current));
+      if (myUid) submitScore("pong", pongWinsRef.current, "high", myUid, user);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [winner]);
+
   function startGame() {
     stateRef.current = initGame();
     setScore({ left: 0, right: 0 });
@@ -220,6 +236,8 @@ export function PongApp({ AC }) {
           </button>
         ))}
       </div>
+      <Leaderboard gameId="pong" dir="high" AC={AC} title="Pong — most AI wins" unit="wins" />
+
 
       {/* Score */}
       <div style={{ display:"flex", alignItems:"center", justifyContent:"center", gap:24, fontFamily:FFM }}>

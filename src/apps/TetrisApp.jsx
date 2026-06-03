@@ -2,8 +2,12 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { FF, FFB, FFM } from "../ui/styles.js";
 import { fill, bdr } from "../lib/format.js";
 import { emptyGrid as tetrisEmpty, randomPiece as tetrisRandom, shapeOf, fits as tetrisFits, lockPiece as tetrisLock, clearLines as tetrisClearLines, scoreForLines, tickInterval, PIECE_COLORS, BOARD_W as TETRIS_W, BOARD_H as TETRIS_H } from "../lib/tetris.js";
+import { submitScore } from "../lib/scores.js";
+import { getDbUid } from "../lib/db.js";
+import { Leaderboard } from "../ui/Leaderboard.jsx";
 
-export function TetrisApp({AC}){
+export function TetrisApp({AC, user}){
+  const myUid=getDbUid();
   const [grid,setGrid]=useState(()=>tetrisEmpty());
   const [piece,setPiece]=useState(()=>tetrisRandom());
   const [next,setNext]=useState(()=>tetrisRandom());
@@ -127,6 +131,7 @@ export function TetrisApp({AC}){
     }}>{label}</button>
   );
 
+  useEffect(()=>{ if(over&&myUid&&score>0) submitScore("tetris",score,"high",myUid,user); /* eslint-disable-next-line */ },[over]);
   return(
     <div style={{display:"flex",flexDirection:"column",gap:10,height:"100%",fontFamily:FF,minHeight:0,alignItems:"center"}}>
       {/* Top info */}
@@ -165,6 +170,7 @@ export function TetrisApp({AC}){
       <div style={{display:"flex",gap:6,flexShrink:0}}>
         {ctrlBtn(paused?"▶":"⏸",()=>setPaused(p=>!p),{w:60})}
         {ctrlBtn("↻ New",newGame,{w:80,danger:over})}
+        <Leaderboard gameId="tetris" dir="high" AC={AC} compact buttonStyle={{padding:"0 14px",height:38,borderRadius:8,border:"1px solid rgba(255,255,255,0.12)",background:"rgba(255,255,255,0.05)",color:"#fff",fontFamily:FFB,fontWeight:600,fontSize:14,cursor:"pointer"}} />
       </div>
       <div style={{fontSize:10,color:"rgba(255,255,255,0.28)",textAlign:"center",fontStyle:"italic",flexShrink:0}}>← → move · ↑ rotate · ↓ soft drop · Space hard drop · P pause</div>
     </div>

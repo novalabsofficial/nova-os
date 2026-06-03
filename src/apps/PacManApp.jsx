@@ -80,7 +80,12 @@ function isWall(ch)         { return ch === "1"; }
 function isPellet(ch)       { return ch === "0"; }
 function isPowerPellet(ch)  { return ch === "2"; }
 
-export function PacManApp({ AC, data, updateSettings }) {
+import { submitScore } from "../lib/scores.js";
+import { getDbUid } from "../lib/db.js";
+import { Leaderboard } from "../ui/Leaderboard.jsx";
+
+export function PacManApp({ AC, data, updateSettings, user }) {
+  const myUid = getDbUid();
   const canvasRef = useRef(null);
   const stateRef  = useRef(null);
   const queuedDirRef = useRef("right");
@@ -392,12 +397,14 @@ export function PacManApp({ AC, data, updateSettings }) {
     if (phase === "playing" && lives <= 0) {
       setPhase("lost");
       if (updateSettings && score > high) updateSettings({ pacmanHigh: score });
+      if (myUid && score > 0) submitScore("pacman", score, "high", myUid, user);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lives, phase]);
   useEffect(() => {
-    if (phase === "won" && updateSettings && score > high) {
-      updateSettings({ pacmanHigh: score });
+    if (phase === "won") {
+      if (updateSettings && score > high) updateSettings({ pacmanHigh: score });
+      if (myUid && score > 0) submitScore("pacman", score, "high", myUid, user);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase]);
@@ -447,6 +454,7 @@ export function PacManApp({ AC, data, updateSettings }) {
               style={{ padding:"8px 22px", background:fill(AC), border:"1px solid "+bdr(AC), borderRadius:8, cursor:"pointer", fontFamily:FFB, fontWeight:700, fontSize:13, color:AC }}>
               {phase === "title" ? "Start" : "Play Again"}
             </button>
+            <Leaderboard gameId="pacman" dir="high" AC={AC} />
           </div>
         )}
       </div>
