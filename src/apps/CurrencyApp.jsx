@@ -3,11 +3,28 @@ import { FF, FFB } from "../ui/styles.js";
 import { fill, bdr } from "../lib/format.js";
 
 // v10.9 — Currency converter.
-// Keyless + CORS-friendly ECB reference rates via frankfurter.app (no API
-// key, no ToS gotchas). Covers ~31 major fiat currencies. Crypto lives in
-// the separate Crypto app since these rates are fiat-only.
-const API = "https://api.frankfurter.app";
+// Keyless + CORS-enabled rates via the fawazahmed0 currency-api, served from
+// the jsDelivr CDN (with a pages.dev fallback host) — guaranteed CORS + great
+// uptime, no API key. (frankfurter.app returns no CORS header, so browsers /
+// the Tauri webview block it — that was the original "Network error".)
+const HOSTS = [
+  "https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1",
+  "https://latest.currency-api.pages.dev/v1",
+];
+async function fetchCur(path) {
+  let lastErr;
+  for (const h of HOSTS) {
+    try {
+      const r = await fetch(h + path);
+      if (r.ok) return await r.json();
+      lastErr = new Error("HTTP " + r.status);
+    } catch (e) { lastErr = e; }
+  }
+  throw lastErr || new Error("fetch failed");
+}
 
+// Curated set of major fiat currencies (and their flags). Names come from the
+// API; this set keeps the picker clean instead of dumping 200+ incl. crypto.
 const FLAG = {
   USD:"🇺🇸",EUR:"🇪🇺",GBP:"🇬🇧",JPY:"🇯🇵",AUD:"🇦🇺",CAD:"🇨🇦",CHF:"🇨🇭",CNY:"🇨🇳",
   HKD:"🇭🇰",NZD:"🇳🇿",SEK:"🇸🇪",KRW:"🇰🇷",SGD:"🇸🇬",NOK:"🇳🇴",MXN:"🇲🇽",INR:"🇮🇳",
@@ -16,50 +33,56 @@ const FLAG = {
 };
 
 export function CurrencyApp({ AC }) {
-  const [currencies, setCurrencies] = useState(null); // { code: name }
+  const [currencies, setCurrencies] = useState(null); // { CODE: Name }
   const [amount, setAmount] = useState("1");
   const [from, setFrom] = useState(() => localStorage.getItem("nova-cur-from") || "USD");
   const [to, setTo] = useState(() => localStorage.getItem("nova-cur-to") || "EUR");
-  const [result, setResult] = useState(null);
-  const [rate, setRate] = useState(null);
+  const [rates, setRates] = useState(null); // { codeLower: rate } for current `from`
   const [date, setDate] = useState(null);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState(null);
-  const debRef = useRef(null);
+  const reqRef = useRef(0);
 
+  // currency names — fetched once, filtered to our curated fiat set
   useEffect(() => {
     let alive = true;
-    fetch(API + "/currencies")
-      .then((r) => r.json())
-      .then((d) => { if (alive) setCurrencies(d); })
-      .catch(() => { if (alive) setCurrencies({}); });
+    const fallback = () => { const o = {}; Object.keys(FLAG).forEach((c) => (o[c] = c)); return o; };
+    fetchCur("/currencies.min.json")
+      .then((all) => {
+        if (!alive) return;
+        const out = {};
+        Object.keys(FLAG).forEach((code) => {
+          const lc = code.toLowerCase();
+          out[code] = all && all[lc] ? all[lc] : code;
+        });
+        setCurrencies(out);
+      })
+      .catch(() => { if (alive) setCurrencies(fallback()); });
     return () => { alive = false; };
   }, []);
 
   useEffect(() => { localStorage.setItem("nova-cur-from", from); }, [from]);
   useEffect(() => { localStorage.setItem("nova-cur-to", to); }, [to]);
 
+  // rate table for the chosen base — one fetch per `from`; all conversions
+  // are then computed locally, so changing `to`/amount is instant.
   useEffect(() => {
-    const amt = parseFloat(amount);
-    if (isNaN(amt)) { setResult(null); setErr(null); return; }
-    if (from === to) { setResult(amt); setRate(1); setDate(null); setErr(null); return; }
-    clearTimeout(debRef.current);
-    debRef.current = setTimeout(() => {
-      setLoading(true); setErr(null);
-      fetch(`${API}/latest?amount=${encodeURIComponent(amt)}&from=${from}&to=${to}`)
-        .then((r) => r.json())
-        .then((d) => {
-          if (d && d.rates && d.rates[to] != null) {
-            setResult(d.rates[to]);
-            setRate(amt ? d.rates[to] / amt : null);
-            setDate(d.date || null);
-          } else { setErr("No rate available for that pair."); setResult(null); }
-        })
-        .catch(() => setErr("Network error — check your connection."))
-        .finally(() => setLoading(false));
-    }, 350);
-    return () => clearTimeout(debRef.current);
-  }, [amount, from, to]);
+    const id = ++reqRef.current;
+    setLoading(true); setErr(null);
+    fetchCur("/currencies/" + from.toLowerCase() + ".min.json")
+      .then((d) => {
+        if (id !== reqRef.current) return;
+        const table = d && d[from.toLowerCase()];
+        if (table) { setRates(table); setDate(d.date || null); }
+        else { setErr("Couldn't load rates for " + from + "."); setRates(null); }
+      })
+      .catch(() => { if (id === reqRef.current) { setErr("Network error — check your connection."); setRates(null); } })
+      .finally(() => { if (id === reqRef.current) setLoading(false); });
+  }, [from]);
+
+  const amt = parseFloat(amount);
+  const rate = from === to ? 1 : rates ? rates[to.toLowerCase()] : null;
+  const result = !isNaN(amt) && rate != null ? amt * rate : null;
 
   const swap = () => { setFrom(to); setTo(from); };
   const fmt = (n) =>
@@ -85,7 +108,7 @@ export function CurrencyApp({ AC }) {
     <div style={{ display: "flex", flexDirection: "column", gap: 16, height: "100%", fontFamily: FF, minHeight: 0, overflowY: "auto" }}>
       <div>
         <div style={{ fontFamily: FFB, fontWeight: 700, fontSize: 21, color: "var(--nv-text-strong)" }}>Currency</div>
-        <div style={{ fontSize: 12, color: "var(--nv-text-dim)", marginTop: 2 }}>Live mid-market rates · European Central Bank</div>
+        <div style={{ fontSize: 12, color: "var(--nv-text-dim)", marginTop: 2 }}>Live daily exchange rates</div>
       </div>
 
       <div>
