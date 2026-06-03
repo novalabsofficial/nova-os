@@ -82,6 +82,7 @@ export const DEFAULT_SIZES = {
   sudoku:{w:520,h:700},typing:{w:700,h:520},
   // v10.10 — media
   camera:{w:600,h:660},recorder:{w:460,h:600},
+  solitaire:{w:720,h:680},
 };
 
 // The master app list — drives the desktop, start menu, and store icons.
@@ -136,6 +137,7 @@ export const APPS = [
   {id:"typing",     icon:"⌨️",label:"Typing Test", desc:"Measure your words per minute"},
   {id:"camera",     icon:"📸",label:"Camera",      desc:"Take photos with your webcam"},
   {id:"recorder",   icon:"🎙️",label:"Voice Recorder", desc:"Record & play back audio"},
+  {id:"solitaire",  icon:"🃏",label:"Solitaire",   desc:"Classic Klondike card game"},
 ];
 
 // Curated catalog of external apps shown in the Store's "Official" tab.

@@ -143,6 +143,7 @@ const TypingApp       = lazyApp(() => import("./apps/TypingApp.jsx").then(m     
 // v10.10 — media
 const CameraApp       = lazyApp(() => import("./apps/CameraApp.jsx").then(m       => ({default: m.CameraApp})));
 const VoiceRecorderApp= lazyApp(() => import("./apps/VoiceRecorderApp.jsx").then(m=> ({default: m.VoiceRecorderApp})));
+const SolitaireApp    = lazyApp(() => import("./apps/SolitaireApp.jsx").then(m    => ({default: m.SolitaireApp})));
 
 // ─── v9.0 taskbar glyphs ────────────────────────────────────────────────
 // Monochrome line-glyphs for the system tray, replacing the old emoji
@@ -1589,6 +1590,7 @@ export default function NovaOS(){
         {appId==="typing"     &&<TypingApp AC={AC} user={user}/>}
         {appId==="camera"     &&<CameraApp AC={AC} showToast={showToast}/>}
         {appId==="recorder"   &&<VoiceRecorderApp AC={AC} showToast={showToast}/>}
+        {appId==="solitaire"  &&<SolitaireApp AC={AC} user={user}/>}
       </Suspense>
     );
   }
