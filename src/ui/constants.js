@@ -78,6 +78,8 @@ export const DEFAULT_SIZES = {
   // v10.9 — utilities pack
   currency:{w:440,h:560},dictionary:{w:540,h:600},translate:{w:560,h:560},
   crypto:{w:560,h:640},qr:{w:480,h:660},
+  // v10.10 — games
+  sudoku:{w:520,h:700},typing:{w:700,h:520},
 };
 
 // The master app list — drives the desktop, start menu, and store icons.
@@ -127,6 +129,9 @@ export const APPS = [
   {id:"translate",  icon:"🗣️",label:"Translate",    desc:"Translate between languages"},
   {id:"crypto",     icon:"🪙",label:"Crypto",      desc:"Live cryptocurrency prices"},
   {id:"qr",         icon:"🔳",label:"QR Codes",    desc:"Generate & scan QR codes"},
+  // v10.10 — games & media
+  {id:"sudoku",     icon:"🧩",label:"Sudoku",      desc:"Number placement puzzle"},
+  {id:"typing",     icon:"⌨️",label:"Typing Test", desc:"Measure your words per minute"},
 ];
 
 // Curated catalog of external apps shown in the Store's "Official" tab.

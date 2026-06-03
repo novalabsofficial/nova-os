@@ -5,6 +5,28 @@ not committed to. Living document — add to it freely.
 
 ---
 
+# 🔭 Planned — 11.0 (UI refresh)
+
+Not yet built. The big 11.0 release: a **design system** (shared spacing /
+radius / shadow / type tokens + reusable components), an **all-SVG icon set**
+(professional like Windows 10, keeping Nova personality), **unified window
+chrome + dialogs** (one window frame, a Nova-styled confirm/alert replacing the
+browser's native boxes), a **motion language** (one set of easing/durations),
+and **light mode** — plus the desktop-power features (app folders, snap saved
+workspaces, drag Files/Photos → desktop, multi-select icon move, more widgets,
+sticky notes/clipboard, Backup/Export). Items captured here as they come up:
+
+- **Desktop pinning → whitelist model + first-run wizard.** Now that there are
+  30+ apps, flip desktop pinning from the current *blacklist* (every app shows
+  on the desktop unless explicitly hidden) to a Windows-style *whitelist*
+  (nothing on the desktop unless the user adds it). On new-account registration,
+  show a quick setup **wizard** asking which apps to place on the desktop, with
+  a clear note that more can always be added later (right-click a Store/Start
+  item → Add to desktop). Existing accounts migrate gracefully — keep their
+  current desktop set so nothing disappears on upgrade.
+
+---
+
 # ✅ v9.8 — shipped ("Game revamps + leaderboards")
 
 - **Snake — Google Snake style.** Input buffering (queues up to 2 turns) so

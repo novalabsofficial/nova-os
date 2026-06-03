@@ -137,6 +137,9 @@ const DictionaryApp   = lazyApp(() => import("./apps/DictionaryApp.jsx").then(m 
 const TranslatorApp   = lazyApp(() => import("./apps/TranslatorApp.jsx").then(m   => ({default: m.TranslatorApp})));
 const CryptoApp       = lazyApp(() => import("./apps/CryptoApp.jsx").then(m       => ({default: m.CryptoApp})));
 const QrApp           = lazyApp(() => import("./apps/QrApp.jsx").then(m           => ({default: m.QrApp})));
+// v10.10 — games
+const SudokuApp       = lazyApp(() => import("./apps/SudokuApp.jsx").then(m       => ({default: m.SudokuApp})));
+const TypingApp       = lazyApp(() => import("./apps/TypingApp.jsx").then(m       => ({default: m.TypingApp})));
 
 // ─── v9.0 taskbar glyphs ────────────────────────────────────────────────
 // Monochrome line-glyphs for the system tray, replacing the old emoji
@@ -1579,6 +1582,8 @@ export default function NovaOS(){
         {appId==="translate"  &&<TranslatorApp AC={AC} showToast={showToast}/>}
         {appId==="crypto"     &&<CryptoApp AC={AC}/>}
         {appId==="qr"         &&<QrApp AC={AC} showToast={showToast}/>}
+        {appId==="sudoku"     &&<SudokuApp AC={AC} user={user}/>}
+        {appId==="typing"     &&<TypingApp AC={AC} user={user}/>}
       </Suspense>
     );
   }
