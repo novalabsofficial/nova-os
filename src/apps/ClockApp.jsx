@@ -179,14 +179,14 @@ export function ClockApp({AC, data, updateSettings}){
   }
 
   const tabBtn=(id,label)=>(
-    <button onClick={()=>selectTab(id)} style={{flex:1,padding:"10px 8px",background:"none",border:"none",borderBottom:tab===id?"2px solid "+AC:"2px solid transparent",cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:12,color:tab===id?AC:"rgba(255,255,255,0.4)"}}>{label}</button>
+    <button onClick={()=>selectTab(id)} style={{flex:1,padding:"10px 8px",background:"none",border:"none",borderBottom:tab===id?"2px solid "+AC:"2px solid transparent",cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:12,color:tab===id?AC:"var(--nv-text-dim)"}}>{label}</button>
   );
   const ctrlBtn=(label,onClick,active=false,danger=false)=>(
     <button onClick={onClick} style={{
       flex:1,padding:"12px 0",borderRadius:9,cursor:"pointer",fontFamily:FFB,fontWeight:700,fontSize:13,touchAction:"manipulation",
       background:danger?"rgba(255,80,80,0.1)":active?fill(AC):"rgba(255,255,255,0.07)",
       border:"1px solid "+(danger?"rgba(255,80,80,0.4)":active?bdr(AC):"rgba(255,255,255,0.12)"),
-      color:danger?"#ff8b8b":active?AC:"rgba(255,255,255,0.8)",
+      color:danger?"#ff8b8b":active?AC:"var(--nv-text)",
     }}>{label}</button>
   );
 
@@ -245,7 +245,7 @@ export function ClockApp({AC, data, updateSettings}){
             </>
           ):(
             <div style={{textAlign:"center",marginBottom:22}}>
-              <div style={{fontFamily:FFM,fontWeight:400,fontSize:56,color:tRunning?"#fff":AC,letterSpacing:2}}>{fmtTimer(tRemaining)}</div>
+              <div style={{fontFamily:FFM,fontWeight:400,fontSize:56,color:tRunning?"var(--nv-text-strong)":AC,letterSpacing:2}}>{fmtTimer(tRemaining)}</div>
               {!tRunning&&tRemaining===0&&<div style={{fontSize:14,fontFamily:FFB,fontWeight:700,color:AC,marginTop:8}}>Done ✓</div>}
             </div>
           )}
@@ -283,16 +283,16 @@ export function ClockApp({AC, data, updateSettings}){
                     <span style={{fontSize:11}}>Tap + to add one</span>
                   </div>
                 ) : alarms.map(a => (
-                  <div key={a.id} style={{display:"flex",alignItems:"center",gap:11,padding:"11px 12px",marginBottom:7,background:a.enabled?"rgba(255,255,255,0.05)":"rgba(255,255,255,0.02)",border:"1px solid "+(a.enabled?"rgba(255,255,255,0.1)":"rgba(255,255,255,0.05)"),borderRadius:9,opacity:a.enabled?1:0.55}}>
+                  <div key={a.id} style={{display:"flex",alignItems:"center",gap:11,padding:"11px 12px",marginBottom:7,background:a.enabled?"var(--nv-elevated)":"rgba(255,255,255,0.02)",border:"1px solid "+(a.enabled?"var(--nv-border)":"rgba(255,255,255,0.05)"),borderRadius:9,opacity:a.enabled?1:0.55}}>
                     <div style={{flex:1,minWidth:0,cursor:"pointer"}} onClick={() => setEditAlarm({ ...a })}>
-                      <div style={{fontFamily:FFM,fontWeight:500,fontSize:24,color:a.enabled?"#fff":"rgba(255,255,255,0.55)",letterSpacing:1,lineHeight:1.1}}>{a.time}</div>
+                      <div style={{fontFamily:FFM,fontWeight:500,fontSize:24,color:a.enabled?"var(--nv-text-strong)":"var(--nv-text-dim)",letterSpacing:1,lineHeight:1.1}}>{a.time}</div>
                       <div style={{fontSize:11,color:"var(--nv-text-dim)",marginTop:3}}>
                         {a.label || "Alarm"} · {daysSummary(a.days)}
                       </div>
                     </div>
                     {/* Toggle */}
-                    <button onClick={() => toggleAlarm(a.id)} title={a.enabled?"Turn off":"Turn on"} style={{width:42,height:24,borderRadius:14,background:a.enabled?fill(AC):"rgba(255,255,255,0.06)",border:"1px solid "+(a.enabled?bdr(AC):"rgba(255,255,255,0.12)"),cursor:"pointer",position:"relative",padding:0}}>
-                      <div style={{position:"absolute",top:1,left:a.enabled?20:1,width:20,height:20,borderRadius:"50%",background:a.enabled?AC:"rgba(255,255,255,0.4)",transition:"left 0.18s"}}/>
+                    <button onClick={() => toggleAlarm(a.id)} title={a.enabled?"Turn off":"Turn on"} style={{width:42,height:24,borderRadius:14,background:a.enabled?fill(AC):"var(--nv-elevated)",border:"1px solid "+(a.enabled?bdr(AC):"var(--nv-border)"),cursor:"pointer",position:"relative",padding:0}}>
+                      <div style={{position:"absolute",top:1,left:a.enabled?20:1,width:20,height:20,borderRadius:"50%",background:a.enabled?AC:"var(--nv-elevated)",transition:"left 0.18s"}}/>
                     </button>
                     <button className="dl" onClick={() => deleteAlarm(a.id)} title="Delete alarm" style={{background:"none",border:"none",cursor:"pointer",color:"rgba(255,80,80,0.4)",fontSize:14,padding:"4px 6px"}}>✕</button>
                   </div>
@@ -350,9 +350,9 @@ function AlarmEditor({ ac, draft, onChange, onSave, onCancel }) {
               title={DAY_NAMES[i]}
               style={{
                 width: 36, height: 36, borderRadius: "50%", cursor: "pointer",
-                background: draft.days[i] ? fill(ac) : "rgba(255,255,255,0.06)",
-                border: "1px solid " + (draft.days[i] ? bdr(ac) : "rgba(255,255,255,0.12)"),
-                color: draft.days[i] ? ac : "rgba(255,255,255,0.5)",
+                background: draft.days[i] ? fill(ac) : "var(--nv-elevated)",
+                border: "1px solid " + (draft.days[i] ? bdr(ac) : "var(--nv-border)"),
+                color: draft.days[i] ? ac : "var(--nv-text-dim)",
                 fontFamily: FFB, fontWeight: 700, fontSize: 12,
               }}
             >{d}</button>
@@ -382,9 +382,9 @@ function AlarmEditor({ ac, draft, onChange, onSave, onCancel }) {
           {ALARM_SOUNDS.map(s => {
             const active = draft.sound === s.id;
             return (
-              <div key={s.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 12px", background: active ? fill(ac) : "rgba(255,255,255,0.04)", border: "1px solid " + (active ? bdr(ac) : "rgba(255,255,255,0.08)"), borderRadius: 8, cursor: "pointer" }} onClick={() => set({ sound: s.id })}>
-                <div style={{ width: 14, height: 14, borderRadius: "50%", border: "2px solid " + (active ? ac : "rgba(255,255,255,0.25)"), background: active ? ac : "transparent", flexShrink: 0 }} />
-                <div style={{ flex: 1, fontFamily: FF, fontSize: 12, color: active ? ac : "rgba(255,255,255,0.8)" }}>{s.label}</div>
+              <div key={s.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 12px", background: active ? fill(ac) : "var(--nv-elevated)", border: "1px solid " + (active ? bdr(ac) : "var(--nv-border)"), borderRadius: 8, cursor: "pointer" }} onClick={() => set({ sound: s.id })}>
+                <div style={{ width: 14, height: 14, borderRadius: "50%", border: "2px solid " + (active ? ac : "var(--nv-border)"), background: active ? ac : "transparent", flexShrink: 0 }} />
+                <div style={{ flex: 1, fontFamily: FF, fontSize: 12, color: active ? ac : "var(--nv-text)" }}>{s.label}</div>
                 <button onClick={e => { e.stopPropagation(); playSound(s.id); }} title="Preview" style={{ padding: "3px 9px", borderRadius: 14, cursor: "pointer", fontFamily: FFB, fontWeight: 600, fontSize: 10.5, background:"var(--nv-elevated)", border: "1px solid var(--nv-border)", color: "var(--nv-text)" }}>▶ Preview</button>
               </div>
             );

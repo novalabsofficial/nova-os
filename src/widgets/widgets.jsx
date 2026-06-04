@@ -41,7 +41,7 @@ export function WidgetShell({ id, state, onDragStart, onResizeStart, onClose, ch
         style={{
           height:28,display:"flex",alignItems:"center",padding:"0 6px 0 12px",gap:6,
           background:"linear-gradient(180deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.01) 100%)",
-          borderBottom:"1px solid rgba(255,255,255,0.05)",
+          borderBottom:"1px solid var(--nv-border)",
           cursor:"grab",userSelect:"none",flexShrink:0,zIndex:11,touchAction:"none",
         }}>
         {cfg?.emoji && <span style={{fontSize:10,opacity:0.6,lineHeight:1}}>{cfg.emoji}</span>}
@@ -187,7 +187,7 @@ export function WeatherWidgetContent({ state, data, updateSettings }) {
           re-fetches in the new unit. */}
       {updateSettings && (
         <button onClick={toggleUnits} title={"Switch to "+(units==="imperial"?"Celsius":"Fahrenheit")}
-          style={{position:"absolute",top:4,right:6,background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.12)",borderRadius:4,cursor:"pointer",fontFamily:FFM,fontSize:9,fontWeight:600,color:"rgba(255,255,255,0.6)",padding:"1px 5px",lineHeight:1.2}}>
+          style={{position:"absolute",top:4,right:6,background:"var(--nv-elevated)",border:"1px solid var(--nv-border)",borderRadius:4,cursor:"pointer",fontFamily:FFM,fontSize:9,fontWeight:600,color:"var(--nv-text)",padding:"1px 5px",lineHeight:1.2}}>
           {tempSymbol}
         </button>
       )}
@@ -225,7 +225,7 @@ export function NotesWidgetContent({ data, state }) {
         <div key={n.id} style={{
           padding:"8px 11px",
           background:"linear-gradient(135deg, rgba(255,255,255,0.06), rgba(255,255,255,0.03))",
-          border:"1px solid rgba(255,255,255,0.07)",
+          border:"1px solid var(--nv-border)",
           borderRadius:9,flexShrink:0,
           transition:"background 0.18s",
         }}>
@@ -247,14 +247,14 @@ export function TasksWidgetContent({ data, updateData, state, AC }) {
         <div key={t.id} className="fr" style={{
           display:"flex",alignItems:"center",gap:9,
           padding:"7px 10px",
-          background:"rgba(255,255,255,0.04)",
+          background:"var(--nv-elevated)",
           borderRadius:8,flexShrink:0,cursor:"pointer",
           transition:"background 0.15s",
         }} onClick={() => toggle(t.id)}>
           <div style={{
             width:15,height:15,borderRadius:5,
             border:"1.5px solid rgba(255,255,255,0.3)",
-            background:"rgba(255,255,255,0.03)",
+            background:"var(--nv-elevated)",
             flexShrink:0,
             transition:"border-color 0.18s, background 0.18s",
           }}/>
@@ -295,7 +295,7 @@ export function CalendarWidgetContent({ tick, state, AC }) {
               textAlign:"center",
               fontFamily:isToday?FFB:FF,
               fontSize:Math.max(9,cellSz*0.48),
-              color:isToday?"#fff":isWeekend?"var(--nv-text-dim)":"var(--nv-text)",
+              color:isToday?"var(--nv-text-strong)":isWeekend?"var(--nv-text-dim)":"var(--nv-text)",
               background:isToday?"linear-gradient(135deg,"+AC+","+AC+")":"transparent",
               borderRadius:6,
               padding:"2px 0",
@@ -342,7 +342,7 @@ export function SysInfoWidgetContent({ state }) {
   // shadow for depth; labels are uppercase + spaced for that "system monitor"
   // typographic vibe.
   const Bar = ({pct, col = "#4f9eff"}) => (
-    <div style={{flex:1,height:6,background:"rgba(255,255,255,0.06)",borderRadius:4,overflow:"hidden",boxShadow:"0 1px 2px rgba(0,0,0,0.2) inset"}}>
+    <div style={{flex:1,height:6,background:"var(--nv-elevated)",borderRadius:4,overflow:"hidden",boxShadow:"0 1px 2px rgba(0,0,0,0.2) inset"}}>
       <div style={{width:pct+"%",height:"100%",background:"linear-gradient(90deg,"+col+"88,"+col+")",borderRadius:4,transition:"width 1s cubic-bezier(0.4,0,0.2,1)",boxShadow:"0 0 6px "+col+"55"}}/>
     </div>
   );
@@ -360,7 +360,7 @@ export function SysInfoWidgetContent({ state }) {
           {h > 120 && <div style={{fontFamily:FF,fontSize:fs*0.88,color:"var(--nv-text-dim)",marginTop:2}}>{sub}</div>}
         </div>
       ))}
-      {h > 110 && <div style={{fontFamily:FFM,fontSize:fs*0.95,color:"var(--nv-text-dim)",letterSpacing:0.4,paddingTop:2,borderTop:"1px solid rgba(255,255,255,0.05)"}}>⏱ {fmtUp(uptime)}&nbsp;·&nbsp;{window.innerWidth}×{window.innerHeight}</div>}
+      {h > 110 && <div style={{fontFamily:FFM,fontSize:fs*0.95,color:"var(--nv-text-dim)",letterSpacing:0.4,paddingTop:2,borderTop:"1px solid var(--nv-border)"}}>⏱ {fmtUp(uptime)}&nbsp;·&nbsp;{window.innerWidth}×{window.innerHeight}</div>}
     </div>
   );
 }
@@ -463,7 +463,7 @@ export function BatteryWidgetContent({ state, AC }) {
       <div style={{display:"flex",alignItems:"center",gap:10}}>
         {/* Horizontal battery glyph */}
         <div style={{position:"relative",width:38,height:18,border:"1.5px solid rgba(255,255,255,0.55)",borderRadius:4,padding:1.5,flexShrink:0}}>
-          <div style={{position:"absolute",right:-4,top:5,width:2.5,height:6,background:"rgba(255,255,255,0.55)",borderRadius:1}}/>
+          <div style={{position:"absolute",right:-4,top:5,width:2.5,height:6,background:"var(--nv-elevated)",borderRadius:1}}/>
           <div style={{width:Math.max(2,pct)+"%",height:"100%",background:fillColor,borderRadius:1.5,transition:"width 0.6s, background 0.3s"}}/>
         </div>
         <div style={{display:"flex",flexDirection:"column",minWidth:0,flex:1}}>
@@ -611,7 +611,7 @@ export function PomodoroWidgetContent({ state, AC }) {
       <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: 0 }}>
         <div style={{ fontFamily: FFM, fontSize: timeSize, color: "var(--nv-text-strong)", letterSpacing: 1.5, lineHeight: 1 }}>{fmt(msLeft)}</div>
         {/* Progress arc — pure-CSS, no SVG needed */}
-        <div style={{ width: "100%", height: 4, background: "rgba(255,255,255,0.06)", borderRadius: 2, marginTop: 10, overflow: "hidden" }}>
+        <div style={{ width: "100%", height: 4, background: "var(--nv-elevated)", borderRadius: 2, marginTop: 10, overflow: "hidden" }}>
           <div style={{ width: pct * 100 + "%", height: "100%", background: color, transition: "width 0.4s linear", boxShadow: `0 0 8px ${color}88` }}/>
         </div>
       </div>
