@@ -158,23 +158,23 @@ export const CSS = `
     /* Soft cool-grey, not stark white — easier on the eyes. Panels are fairly
        opaque so the wallpaper doesn't muddy them; borders + text carry a touch
        more contrast so cards stay defined instead of washing out. */
-    --nv-body-bg:#dadee7;
-    --nv-surface:rgba(237,240,246,0.86);
-    --nv-surface-solid:rgba(236,239,244,0.97);
-    --nv-elevated:rgba(21,28,46,0.05);
-    --nv-border:rgba(21,28,46,0.13);
-    --nv-border-strong:rgba(21,28,46,0.24);
-    --nv-text-strong:rgba(23,27,37,0.95);
-    --nv-text:rgba(40,46,60,0.74);
-    --nv-text-dim:rgba(54,62,78,0.56);
-    --nv-hover:rgba(21,28,46,0.07);
-    --nv-input-bg:rgba(21,28,46,0.055);
-    --nv-scroll:rgba(21,28,46,0.22);
-    --nv-scroll-hover:rgba(21,28,46,0.34);
+    --nv-body-bg:#d7dbe4;
+    --nv-surface:rgba(244,246,250,0.93);
+    --nv-surface-solid:rgba(246,248,251,0.99);
+    --nv-elevated:rgba(20,28,48,0.05);
+    --nv-border:rgba(20,28,48,0.16);
+    --nv-border-strong:rgba(20,28,48,0.28);
+    --nv-text-strong:rgba(28,34,48,0.92);
+    --nv-text:rgba(45,53,70,0.82);
+    --nv-text-dim:rgba(60,69,88,0.66);
+    --nv-hover:rgba(20,28,48,0.07);
+    --nv-input-bg:rgba(20,28,48,0.05);
+    --nv-scroll:rgba(20,28,48,0.24);
+    --nv-scroll-hover:rgba(20,28,48,0.36);
   }
   html[data-theme="light"][data-glass="on"]{
-    --nv-surface:rgba(237,240,246,0.62);
-    --nv-surface-solid:rgba(236,239,244,0.74);
+    --nv-surface:rgba(244,246,250,0.66);
+    --nv-surface-solid:rgba(246,248,251,0.8);
   }
 
   /* ── v9.0 Liquid Glass. When enabled (html[data-glass="on"]), surfaces get

@@ -2689,7 +2689,7 @@ export default function NovaOS(){
         // token so it flips light/dark. A user-picked color still wins.
         const tbBg=tbColor
           ?"linear-gradient(180deg, rgba("+hexRgb(tbColor)+",0.78) 0%, rgba("+hexRgb(tbColor)+",0.86) 100%)"
-          :"var(--nv-surface)";
+          :"linear-gradient(180deg, rgba(18,20,32,0.72) 0%, rgba(11,13,22,0.82) 100%)";   // v11: dock stays dark in BOTH themes so its light text/icons always read (macOS-dock style)
         // The Nova taskbar is always visible — including in fullscreen.
         //
         // v9.0 — floating glass dock. Detached from the screen edge (8px inset
