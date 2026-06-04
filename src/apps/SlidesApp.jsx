@@ -53,6 +53,8 @@ function newDeck() {
   return { id: uid("d"), title: "Untitled deck", theme, createdAt: Date.now(), updatedAt: Date.now(), slides: [titleSlide(theme)] };
 }
 
+import { novaConfirm } from "../ui/dialogs.jsx";
+
 export function SlidesApp({ AC, data, updateData, showToast }) {
   // Local working copy of all decks, initialised from the user doc.
   const [decks, setDecks] = useState(() => (data?.slides && Array.isArray(data.slides)) ? data.slides : []);
@@ -86,8 +88,8 @@ export function SlidesApp({ AC, data, updateData, showToast }) {
     setDecks(prev => [d, ...prev]);
     setActiveDeckId(d.id); setSelSlide(0); setSelEl(null);
   }
-  function deleteDeck(id) {
-    if (!window.confirm("Delete this deck? This can't be undone.")) return;
+  async function deleteDeck(id) {
+    if (!(await novaConfirm({ title: "Delete deck", message: "Delete this deck? This can't be undone.", danger: true, confirmText: "Delete", accent: AC }))) return;
     setDecks(prev => prev.filter(d => d.id !== id));
     if (activeDeckId === id) setActiveDeckId(null);
   }

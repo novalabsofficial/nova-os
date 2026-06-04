@@ -14,6 +14,8 @@ import { renderMarkdown, applyMarkdownAction } from "../lib/markdown.jsx";
 // into the editor; edits live in local state and write back to
 // `data.notes` via a 600ms debounce so typing doesn't spam updateData.
 
+import { novaConfirm } from "../ui/dialogs.jsx";
+
 export function NotesApp({ data, updateData, showToast, AC, openNovaAi }) {
   const folders = data?.folders || [];
   const notes   = data?.notes   || [];
@@ -127,8 +129,8 @@ export function NotesApp({ data, updateData, showToast, AC, openNovaAi }) {
     if (isMobile) setMobilePane("editor");
     showToast("New note");
   }
-  function deleteNote(id) {
-    if (!window.confirm("Delete this note?")) return;
+  async function deleteNote(id) {
+    if (!(await novaConfirm({ title: "Delete note", message: "Delete this note?", danger: true, confirmText: "Delete", accent: AC }))) return;
     updateData(p => ({ ...p, notes: (p.notes || []).filter(n => n.id !== id) }));
     if (selectedId === id) setSelectedId(null);
     if (isMobile) setMobilePane("list");

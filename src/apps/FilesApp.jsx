@@ -38,6 +38,8 @@ const SECTIONS = [
   { id: "apps",      label: "Applications" },
 ];
 
+import { novaConfirm } from "../ui/dialogs.jsx";
+
 export function FilesApp({ data, updateData, showToast, AC, commApps = [], openApp }) {
   const ac = AC || DEFAULT_AC;
   const [section, setSection] = useState("myfiles");
@@ -78,10 +80,10 @@ export function FilesApp({ data, updateData, showToast, AC, commApps = [], openA
     updateData(p => ({ ...p, folders: [...(p.folders || []), f] }));
     setNewFolderName(""); setShowNewFolder(false); showToast("Folder created ✓");
   }
-  function deleteFolder(fid) {
+  async function deleteFolder(fid) {
     function desc(id) { const ch = folders.filter(f => f.parentId === id); return [id, ...ch.flatMap(c => desc(c.id))]; }
     const dead = new Set(desc(fid));
-    if (!window.confirm("Delete this folder and move its contents to root?")) return;
+    if (!(await novaConfirm({ title: "Delete folder", message: "Delete this folder and move its contents to root?", danger: true, confirmText: "Delete", accent: AC }))) return;
     updateData(p => ({
       ...p,
       folders: p.folders.filter(f => !dead.has(f.id)),

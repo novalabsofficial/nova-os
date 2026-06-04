@@ -27,6 +27,8 @@ const CLOCK_ZONES = [
   {label:"São Paulo",  tz:"America/Sao_Paulo"},
 ];
 
+import { novaConfirm } from "../ui/dialogs.jsx";
+
 export function ClockApp({AC, data, updateSettings}){
   // v6.4: last-used tab persists per-account so Clock opens to whichever pane
   // (World / Stopwatch / Timer) you were last using. selectTab() is the
@@ -57,8 +59,8 @@ export function ClockApp({AC, data, updateSettings}){
   function toggleAlarm(id) {
     saveAlarmsList(alarms.map(a => a.id === id ? { ...a, enabled: !a.enabled } : a));
   }
-  function deleteAlarm(id) {
-    if (!window.confirm("Delete this alarm?")) return;
+  async function deleteAlarm(id) {
+    if (!(await novaConfirm({ title: "Delete alarm", message: "Delete this alarm?", danger: true, confirmText: "Delete", accent: AC }))) return;
     saveAlarmsList(alarms.filter(a => a.id !== id));
   }
   function newAlarmDraft() {

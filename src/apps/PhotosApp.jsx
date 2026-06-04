@@ -24,6 +24,8 @@ import { startDrag, moveDrag } from "../lib/dragStore.js";
 
 const MAX_PHOTO_SIZE = 20 * 1024 * 1024;  // 20 MB soft cap
 
+import { novaConfirm } from "../ui/dialogs.jsx";
+
 export function PhotosApp({ AC, showToast, onSetWallpaper }) {
   const [photos, setPhotos] = useState([]);
   const [albums, setAlbums] = useState([]);
@@ -156,8 +158,8 @@ export function PhotosApp({ AC, showToast, onSetWallpaper }) {
     setView({ kind: "album", id: a.id });
     showToast?.("Album created ✓");
   }
-  function doDeleteAlbum(id) {
-    if (!window.confirm("Delete this album? The photos stay in your library.")) return;
+  async function doDeleteAlbum(id) {
+    if (!(await novaConfirm({ title: "Delete album", message: "Delete this album? The photos stay in your library.", danger: true, confirmText: "Delete", accent: AC }))) return;
     deleteAlbum(id);
     if (view.kind === "album" && view.id === id) setView({ kind: "library" });
   }

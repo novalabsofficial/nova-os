@@ -56,6 +56,8 @@ function isOverdue(key) {
   return !!key && key < todayKey();
 }
 
+import { novaConfirm } from "../ui/dialogs.jsx";
+
 export function TasksApp({ data, updateData, showToast, AC, openNovaAi }) {
   const tasks = data?.tasks || [];
   const lists = data?.taskLists || [];
@@ -147,8 +149,8 @@ export function TasksApp({ data, updateData, showToast, AC, openNovaAi }) {
     updateData(p => ({ ...p, tasks: (p.tasks || []).filter(t => t.id !== id) }));
     if (expandedId === id) setExpandedId(null);
   }
-  function clearCompleted() {
-    if (!window.confirm("Delete all completed tasks?")) return;
+  async function clearCompleted() {
+    if (!(await novaConfirm({ title: "Clear completed", message: "Delete all completed tasks?", danger: true, confirmText: "Delete", accent: AC }))) return;
     updateData(p => ({ ...p, tasks: (p.tasks || []).filter(t => !t.done) }));
     showToast?.("Cleared completed");
   }
@@ -162,8 +164,8 @@ export function TasksApp({ data, updateData, showToast, AC, openNovaAi }) {
     setView({ kind: "list", id });
     showToast?.("List created ✓");
   }
-  function deleteList(id) {
-    if (!window.confirm("Delete this list? Its tasks will stay but lose the label.")) return;
+  async function deleteList(id) {
+    if (!(await novaConfirm({ title: "Delete list", message: "Delete this list? Its tasks will stay but lose the label.", danger: true, confirmText: "Delete", accent: AC }))) return;
     updateData(p => ({
       ...p,
       taskLists: (p.taskLists || []).filter(l => l.id !== id),

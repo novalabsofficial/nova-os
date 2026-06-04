@@ -29,6 +29,8 @@ import { fill, bdr, hexRgb } from "../lib/format.js";
 //   • else              → playPos + 1; if past end, wrap when repeat === "all",
 //                         otherwise stop.
 
+import { novaConfirm } from "../ui/dialogs.jsx";
+
 export function MusicApp({ AC, showToast }) {
   // ── State ─────────────────────────────────────────────────────────────
   const [tracks, setTracks] = useState([]);          // [{ id, name, url, size, addedAt }]
@@ -140,8 +142,8 @@ export function MusicApp({ AC, showToast }) {
       return out;
     });
   }
-  function clearQueue() {
-    if (!window.confirm("Clear the queue? The currently playing track stays.")) return;
+  async function clearQueue() {
+    if (!(await novaConfirm({ title: "Clear queue", message: "Clear the queue? The currently playing track stays.", confirmText: "Clear queue", accent: AC }))) return;
     setPlayIds(curId ? [curId] : []);
     setPlayPos(curId ? 0 : -1);
   }

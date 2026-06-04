@@ -26,6 +26,8 @@ const TOOLS = [
 ];
 const CAP_MAX = 2200; // cap captured width for memory/undo sanity
 
+import { novaPrompt } from "../ui/dialogs.jsx";
+
 export function ScreenshotApp({ AC, showToast, onSetWallpaper }) {
   const [shot, setShot] = useState(null);     // captured image dataURL
   const [tool, setTool] = useState("pen");
@@ -146,13 +148,13 @@ export function ScreenshotApp({ AC, showToast, onSetWallpaper }) {
     ctx.closePath(); ctx.fill();
   }
 
-  function onDown(e) {
+  async function onDown(e) {
     const ctx = ctxOf(); if (!ctx || !shot) return;
     e.preventDefault();
     try { canvasRef.current.setPointerCapture(e.pointerId); } catch { /* noop */ }
     const p = ptr(e);
     if (tool === "text") {
-      const text = window.prompt("Annotation text:", "");
+      const text = await novaPrompt({ title: "Add text", message: "Annotation text:", placeholder: "Type your annotation…", accent: AC });
       if (!text) return;
       pushUndo();
       ctx.fillStyle = color; ctx.font = "700 " + Math.max(16, lineWidth * 6) + "px 'Space Grotesk',sans-serif";

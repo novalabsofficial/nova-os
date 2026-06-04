@@ -38,6 +38,8 @@ import {
   ROLE_OWNER, ROLE_ADMIN, ROLE_MEMBER,
 } from "../lib/servers.js";
 
+import { novaConfirm } from "../ui/dialogs.jsx";
+
 export function ChatApp({ user, AC, data, updateData }) {
   const myUid = getDbUid();
   const isMod = isAdmin(user);
@@ -291,21 +293,21 @@ export function ChatApp({ user, AC, data, updateData }) {
   // ── Deleting ─────────────────────────────────────────────────────────
   async function deleteGlobalMessage(id, authorName) {
     if (authorName && authorName !== user) {
-      if (!window.confirm(`Delete this message from @${authorName}?\n\nUse this only for content that breaks the TOS.`)) return;
+      if (!(await novaConfirm({ title: "Delete message", message: `Delete this message from @${authorName}?\n\nUse this only for content that breaks the TOS.`, danger: true, confirmText: "Delete", accent: AC }))) return;
     }
     try { await deleteDoc(doc(firestoreDb, "nova_chat", id)); } catch {}
   }
   async function deleteDmMessage(msgId, authorName) {
     if (!active?.threadId) return;
     if (authorName && authorName !== user) {
-      if (!window.confirm(`Delete this message from @${authorName}?\n\nThe other user will see it disappear in real time.`)) return;
+      if (!(await novaConfirm({ title: "Delete message", message: `Delete this message from @${authorName}?\n\nThe other user will see it disappear in real time.`, danger: true, confirmText: "Delete", accent: AC }))) return;
     }
     try { await deleteDoc(doc(firestoreDb, "nova_dm_threads", active.threadId, "messages", msgId)); } catch {}
   }
   async function deleteServerMsg(msgId, authorName) {
     if (!active?.serverId) return;
     if (authorName && authorName !== user) {
-      if (!window.confirm(`Delete this message from @${authorName}?`)) return;
+      if (!(await novaConfirm({ title: "Delete message", message: `Delete this message from @${authorName}?`, danger: true, confirmText: "Delete", accent: AC }))) return;
     }
     try { await deleteServerMessage(active.serverId, msgId); } catch {}
   }
@@ -952,7 +954,7 @@ function ServerOwnerPanel({ server, isOwner, myRole, myUid, myUsername, AC, onCl
     catch (e) { setErr(e?.message || "Couldn't change role"); }
   }
   async function doKick(uid, username) {
-    if (!window.confirm("Remove @" + username + " from the server? They'll need a new invite to rejoin.")) return;
+    if (!(await novaConfirm({ title: "Remove member", message: "Remove @" + username + " from the server? They'll need a new invite to rejoin.", danger: true, confirmText: "Remove" }))) return;
     setErr("");
     try { await kickMember(server.id, uid, username); }
     catch (e) { setErr(e?.message || "Couldn't remove member"); }
@@ -969,24 +971,24 @@ function ServerOwnerPanel({ server, isOwner, myRole, myUid, myUsername, AC, onCl
     catch (e) { setErr(e?.message || "Couldn't add channel"); }
   }
   async function doRemoveChannel(channelId) {
-    if (!window.confirm("Remove this channel? Messages stay in the database but become invisible.")) return;
+    if (!(await novaConfirm({ title: "Remove channel", message: "Remove this channel? Messages stay in the database but become invisible.", danger: true, confirmText: "Remove" }))) return;
     setErr("");
     try { await removeChannel(server.id, channelId, server.channels); }
     catch (e) { setErr(e?.message || "Couldn't remove channel"); }
   }
   async function doRegenerate() {
-    if (!window.confirm("Generate a new invite code? The old one will stop working immediately.")) return;
+    if (!(await novaConfirm({ title: "New invite code", message: "Generate a new invite code? The old one will stop working immediately.", confirmText: "Regenerate" }))) return;
     setErr("");
     try { await regenerateInvite(server.id); }
     catch (e) { setErr(e?.message || "Couldn't regenerate"); }
   }
   async function doDelete() {
-    if (!window.confirm("Delete this server forever? All channels, messages, and the invite will be removed for every member.")) return;
+    if (!(await novaConfirm({ title: "Delete server", message: "Delete this server forever? All channels, messages, and the invite will be removed for every member.", danger: true, confirmText: "Delete server" }))) return;
     try { await deleteServer(server.id); onSwitchView(); }
     catch (e) { setErr(e?.message || "Delete failed"); }
   }
   async function doLeave() {
-    if (!window.confirm("Leave this server? You'll need a new invite to come back.")) return;
+    if (!(await novaConfirm({ title: "Leave server", message: "Leave this server? You'll need a new invite to come back.", confirmText: "Leave server" }))) return;
     try { await leaveServer(server.id, myUid, myUsername); onSwitchView(); }
     catch (e) { setErr(e?.message || "Couldn't leave"); }
   }

@@ -29,6 +29,8 @@ const STARTERS = [
   { icon: "✨", label: "Surprise me with something interesting to learn today." },
 ];
 
+import { novaConfirm } from "../ui/dialogs.jsx";
+
 export function NovaAiApp({ AC, showToast }) {
   // ── persistent state ─────────────────────────────────────────────────
   const [keys, setKeys] = useState(() => ({ claude: "", openai: "", gemini: "", ...aiLoad(AI_LS_KEYS, {}) }));
@@ -81,8 +83,8 @@ export function NovaAiApp({ AC, showToast }) {
   // ── chat helpers ─────────────────────────────────────────────────────
   function newChat() { setActiveId(null); setInput(""); setError(null); setStreamBuf(""); setView("chat"); }
   function selectChat(id) { setActiveId(id); setError(null); setStreamBuf(""); setView("chat"); }
-  function deleteChat(id) {
-    if (!window.confirm("Delete this conversation?")) return;
+  async function deleteChat(id) {
+    if (!(await novaConfirm({ title: "Delete conversation", message: "Delete this conversation?", danger: true, confirmText: "Delete", accent: AC }))) return;
     setChats(prev => prev.filter(c => c.id !== id));
     if (id === activeId) setActiveId(null);
   }

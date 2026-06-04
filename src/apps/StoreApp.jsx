@@ -316,6 +316,8 @@ function AppDetail({ app, ratings, ac, isIn, user, onBack, toggleInstall, rateAn
   );
 }
 
+import { novaConfirm, novaPrompt } from "../ui/dialogs.jsx";
+
 export function StoreApp({ user, data, updateData, showToast, AC }) {
   const ac = AC || DEFAULT_AC;
   const [view, setView] = useState("home"); // home | games | apps | community | submit | moderation
@@ -420,7 +422,7 @@ export function StoreApp({ user, data, updateData, showToast, AC }) {
   // user's rating doc (stars + text); the Firestore rule permits mod deletes.
   async function deleteReview(appId, reviewUser) {
     if (!isAdmin(user)) return;
-    if (!window.confirm("Delete @" + reviewUser + "'s review? This removes their rating and text.")) return;
+    if (!(await novaConfirm({ title: "Delete review", message: "Delete @" + reviewUser + "'s review? This removes their rating and text.", danger: true, confirmText: "Delete", accent: AC }))) return;
     try {
       await deleteDoc(doc(firestoreDb, "nova_ratings", appId + "_" + reviewUser));
       showToast("Review removed ✓");
@@ -452,7 +454,7 @@ export function StoreApp({ user, data, updateData, showToast, AC }) {
   }
   async function rejectApp(app) {
     if (!isAdmin(user)) return;
-    const reason = window.prompt("Reject \"" + app.name + "\" — optional reason (visible to submitter):", "");
+    const reason = await novaPrompt({ title: "Reject app", message: "Reject \"" + app.name + "\" — optional reason (visible to the submitter):", placeholder: "Reason (optional)", confirmText: "Reject", accent: AC });
     if (reason === null) return;
     try { await updateDoc(doc(firestoreDb, "nova_user_apps", app.id), { status: "rejected", rejectReason: reason || null, reviewedBy: user, reviewedAt: Date.now() }); showToast("Rejected \"" + app.name + "\""); }
     catch { showToast("Reject failed"); }
@@ -483,7 +485,7 @@ export function StoreApp({ user, data, updateData, showToast, AC }) {
       fresh = snap.data();
     } catch { showToast("Couldn't verify owner — try again"); return; }
     if (!fresh.submitter || fresh.submitter !== user) { showToast("Only @" + (fresh.submitter || "the submitter") + " can delete this app"); return; }
-    if (!window.confirm("Remove \"" + (fresh.name || app.name) + "\" from the store? This can't be undone.")) return;
+    if (!(await novaConfirm({ title: "Remove app", message: "Remove \"" + (fresh.name || app.name) + "\" from the store? This can't be undone.", danger: true, confirmText: "Remove", accent: AC }))) return;
     try { await deleteDoc(doc(firestoreDb, "nova_user_apps", app.id)); showToast("App removed from store ✓"); if (detail && detail.id === app.id) setDetail(null); }
     catch { showToast("Delete failed"); }
   }

@@ -16,6 +16,7 @@
 // check, checkmate, stalemate, draw detection). We never re-implement chess.
 
 import { useState, useEffect, useRef } from "react";
+import { novaConfirm } from "../ui/dialogs.jsx";
 import { Chess } from "chess.js";
 import { FF, FFB, FFM, INP, SEC } from "../ui/styles.js";
 import { fill, bdr, hexRgb } from "../lib/format.js";
@@ -238,14 +239,14 @@ export function ChessApp({ user, AC }) {
     }
   }
 
-  function handleResign() {
+  async function handleResign() {
     if (!game || game.status !== "active") return;
-    if (!window.confirm("Resign this game? Your opponent wins.")) return;
+    if (!(await novaConfirm({ title: "Resign game", message: "Resign this game? Your opponent wins.", danger: true, confirmText: "Resign", accent: AC }))) return;
     resignGame(activeGameId, myColor);
   }
-  function handleDelete() {
+  async function handleDelete() {
     if (!game) return;
-    if (!window.confirm("Remove this finished game from your list?")) return;
+    if (!(await novaConfirm({ title: "Remove game", message: "Remove this finished game from your list?", danger: true, confirmText: "Remove", accent: AC }))) return;
     deleteGame(activeGameId);
     setActiveGameId(null);
     setView("list");
