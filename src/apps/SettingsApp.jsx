@@ -237,8 +237,14 @@ export function SettingsApp({ user, data, updateSettings, showToast, AC, onCusto
           <div style={PANE_SUB}>Screen behavior, clock format, text size and how Nova sizes for your device.</div>
 
           <div style={SEC}>Appearance</div>
-          <Toggle label="🌗 Light mode" value={settings.theme === "light"} onChange={v => { updateSettings({ theme: v ? "light" : "dark" }); showToast(v ? "Light mode on ☀️" : "Dark mode on 🌙"); }} ac={AC} />
-          <div style={{ fontSize: 10, color: "var(--nv-text-dim)", marginBottom: 10, fontStyle: "italic", marginTop: -4 }}>New in 11.0 — a few apps are still being polished for light mode.</div>
+          <div style={{ display: "flex", gap: 8, marginBottom: 6 }}>
+            {[{ id: "dark", label: "🌙 Dark" }, { id: "light", label: "☀️ Light" }].map(t => {
+              const active = (settings.theme === "light" ? "light" : "dark") === t.id;
+              return (<button key={t.id} onClick={() => { updateSettings({ theme: t.id }); showToast(t.id === "light" ? "Light mode on ☀️" : "Dark mode on 🌙"); }}
+                style={{ flex: 1, padding: "11px 12px", borderRadius: 10, cursor: "pointer", fontFamily: FFB, fontWeight: 600, fontSize: 13, background: active ? fill(AC) : "var(--nv-elevated)", border: "1px solid " + (active ? bdr(AC) : "var(--nv-border)"), color: active ? AC : "var(--nv-text)", transition: "all 0.15s" }}>{t.label}</button>);
+            })}
+          </div>
+          <div style={{ fontSize: 10, color: "var(--nv-text-dim)", marginBottom: 10, fontStyle: "italic", marginTop: -2 }}>New in 11.0 — light mode is rolling out; some apps are still being polished. (The new-account setup wizard will offer this too.)</div>
 
           <div style={SEC}>Screen</div>
           <Toggle label="Fullscreen Mode" value={fs} onChange={() => { toggleFullscreen(); }} ac={AC} />
