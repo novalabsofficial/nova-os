@@ -9,6 +9,7 @@
 import { useState } from "react";
 import { HAS_SVG_ICON, STORE_META } from "./constants.js";
 import { fill, bdr } from "../lib/format.js";
+import { NovaAppIcon, NOVA_ICONS } from "./appicons.jsx";
 
 // v8.5 — shared user avatar. Renders the user's saved profile picture
 // (a base64 data URL in `img`) when present, otherwise the classic
@@ -524,6 +525,9 @@ function GlassMonogram({ name, size }) {
 }
 
 export function AppIconDisplay({ app, size = 26, glass = false }) {
+  // v11.0 — new macOS-style icon set takes precedence as apps are migrated.
+  // (Falls through to legacy NovaSvgIcon / emoji for ids not yet redrawn.)
+  if (!app.storeApp && NOVA_ICONS.has(app.id)) return <NovaAppIcon id={app.id} size={size} />;
   let inner;
   if (app.storeApp) {
     // v8.4: route store apps through the unified brand-icon set (was Clearbit).
