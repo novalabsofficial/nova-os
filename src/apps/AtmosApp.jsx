@@ -282,28 +282,28 @@ export function AtmosApp({AC,showToast,pushNotification,openNovaAi,data,updateSe
             />
             <span style={{position:"absolute",left:11,top:"50%",transform:"translateY(-50%)",fontSize:14,opacity:0.5,pointerEvents:"none"}}>🔍</span>
             {query && (
-              <button onClick={()=>{setQuery("");setSuggestions([]);setOpenSuggest(false);}} title="Clear" style={{position:"absolute",right:8,top:"50%",transform:"translateY(-50%)",width:22,height:22,borderRadius:6,background:"rgba(255,255,255,0.08)",border:"none",cursor:"pointer",color:"var(--nv-text-dim)",fontSize:11,padding:0,display:"flex",alignItems:"center",justifyContent:"center"}}>✕</button>
+              <button onClick={()=>{setQuery("");setSuggestions([]);setOpenSuggest(false);}} title="Clear" style={{position:"absolute",right:8,top:"50%",transform:"translateY(-50%)",width:22,height:22,borderRadius:6,background:"var(--nv-elevated)",border:"none",cursor:"pointer",color:"var(--nv-text-dim)",fontSize:11,padding:0,display:"flex",alignItems:"center",justifyContent:"center"}}>✕</button>
             )}
           </div>
           <button onClick={()=>setUnits(u=>{
             const next = u==="imperial"?"metric":"imperial";
             if(updateSettings) updateSettings({weatherUnits:next});
             return next;
-          })} style={{padding:"8px 12px",background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:8,cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:11,color:"var(--nv-text)"}}>{units==="imperial"?"°F":"°C"}</button>
+          })} style={{padding:"8px 12px",background:"var(--nv-elevated)",border:"1px solid var(--nv-border)",borderRadius:8,cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:11,color:"var(--nv-text)"}}>{units==="imperial"?"°F":"°C"}</button>
           {/* v10.9: background-music toggle */}
           <button onClick={toggleMusic} disabled={!ATMOS_TRACKS.length} title={!ATMOS_TRACKS.length?"No music available":(musicOn?"Stop background music":"Play background music")} style={{padding:"8px 11px",background:musicOn?fill(AC):"rgba(255,255,255,0.05)",border:"1px solid "+(musicOn?bdr(AC):"rgba(255,255,255,0.1)"),borderRadius:8,cursor:ATMOS_TRACKS.length?"pointer":"not-allowed",fontSize:14,lineHeight:1,color:musicOn?AC:"rgba(255,255,255,0.7)",opacity:ATMOS_TRACKS.length?1:0.4}}>{musicOn?"🎶":"🎵"}</button>
         </div>
         {/* v10.9: now-playing strip — shows while background music is on */}
         {musicOn && musicTrack && (
-          <div style={{display:"flex",alignItems:"center",gap:10,padding:"7px 11px",background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:10}}>
+          <div style={{display:"flex",alignItems:"center",gap:10,padding:"7px 11px",background:"var(--nv-elevated)",border:"1px solid var(--nv-border)",borderRadius:10}}>
             <span style={{fontSize:15,lineHeight:1}}>🎶</span>
             <div style={{flex:1,minWidth:0}}>
               <div style={{fontSize:9,fontFamily:FFM,letterSpacing:1.2,color:"var(--nv-text-dim)"}}>NOW PLAYING</div>
               <div style={{fontSize:12,fontFamily:FFB,fontWeight:600,color:"var(--nv-text)",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{musicTrack.title}</div>
             </div>
             <input type="range" min={0} max={1} step={0.01} value={musicVol} onChange={e=>setMusicVol(parseFloat(e.target.value))} title="Music volume" style={{width:72,accentColor:AC,cursor:"pointer"}} />
-            <button onClick={nextTrack} title="Next track" style={{width:28,height:28,borderRadius:7,background:"rgba(255,255,255,0.07)",border:"none",cursor:"pointer",color:"var(--nv-text)",fontSize:12,padding:0,display:"flex",alignItems:"center",justifyContent:"center"}}>⏭</button>
-            <button onClick={()=>setMusicOn(false)} title="Stop music" style={{width:28,height:28,borderRadius:7,background:"rgba(255,255,255,0.07)",border:"none",cursor:"pointer",color:"var(--nv-text)",fontSize:11,padding:0,display:"flex",alignItems:"center",justifyContent:"center"}}>✕</button>
+            <button onClick={nextTrack} title="Next track" style={{width:28,height:28,borderRadius:7,background:"var(--nv-elevated)",border:"none",cursor:"pointer",color:"var(--nv-text)",fontSize:12,padding:0,display:"flex",alignItems:"center",justifyContent:"center"}}>⏭</button>
+            <button onClick={()=>setMusicOn(false)} title="Stop music" style={{width:28,height:28,borderRadius:7,background:"var(--nv-elevated)",border:"none",cursor:"pointer",color:"var(--nv-text)",fontSize:11,padding:0,display:"flex",alignItems:"center",justifyContent:"center"}}>✕</button>
           </div>
         )}
 
@@ -317,7 +317,7 @@ export function AtmosApp({AC,showToast,pushNotification,openNovaAi,data,updateSe
               const shortLabel = (r.label || "").split(",")[0].trim();
               return (
                 <button key={r.lat+","+r.lon+","+i} onClick={()=>pickLocation(r)} title={r.label}
-                  style={{padding:"4px 10px",background:isActive?fill(AC):"rgba(255,255,255,0.05)",border:"1px solid "+(isActive?bdr(AC):"rgba(255,255,255,0.1)"),borderRadius:14,cursor:"pointer",fontFamily:FF,fontSize:11,color:isActive?AC:"rgba(255,255,255,0.7)",whiteSpace:"nowrap",maxWidth:140,overflow:"hidden",textOverflow:"ellipsis",transition:"all 0.15s"}}>
+                  style={{padding:"4px 10px",background:isActive?fill(AC):"rgba(255,255,255,0.05)",border:"1px solid "+(isActive?bdr(AC):"rgba(255,255,255,0.1)"),borderRadius:14,cursor:"pointer",fontFamily:FF,fontSize:11,color:isActive?AC:"var(--nv-text)",whiteSpace:"nowrap",maxWidth:140,overflow:"hidden",textOverflow:"ellipsis",transition:"all 0.15s"}}>
                   📍 {shortLabel}
                 </button>
               );
@@ -329,11 +329,11 @@ export function AtmosApp({AC,showToast,pushNotification,openNovaAi,data,updateSe
             the WHOLE search region (input + recents), so it appears BELOW
             both rather than covering recents. */}
         {openSuggest && (loadingSuggest||suggestions.length>0) && (
-          <div style={{position:"absolute",top:"calc(100% + 5px)",left:0,right:0,background:"rgba(15,18,32,0.97)",backdropFilter:"blur(16px)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:9,boxShadow:"0 20px 60px rgba(0,0,0,0.5)",maxHeight:220,overflowY:"auto",zIndex:20}}>
+          <div style={{position:"absolute",top:"calc(100% + 5px)",left:0,right:0,background:"var(--nv-surface-solid)",backdropFilter:"blur(16px)",border:"1px solid var(--nv-border)",borderRadius:9,boxShadow:"0 20px 60px rgba(0,0,0,0.5)",maxHeight:220,overflowY:"auto",zIndex:20}}>
             {loadingSuggest && <div style={{padding:"10px 13px",fontSize:11,color:"var(--nv-text-dim)",fontStyle:"italic"}}>Searching…</div>}
             {!loadingSuggest && suggestions.length===0 && <div style={{padding:"10px 13px",fontSize:11,color:"var(--nv-text-dim)",fontStyle:"italic"}}>No matches</div>}
             {!loadingSuggest && suggestions.map((s,i)=>(
-              <div key={i} className="sr" onClick={()=>pickLocation(s)} style={{padding:"9px 13px",cursor:"pointer",fontSize:13,color:"var(--nv-text)",borderBottom:i<suggestions.length-1?"1px solid rgba(255,255,255,0.05)":"none"}}>
+              <div key={i} className="sr" onClick={()=>pickLocation(s)} style={{padding:"9px 13px",cursor:"pointer",fontSize:13,color:"var(--nv-text)",borderBottom:i<suggestions.length-1?"1px solid var(--nv-border)":"none"}}>
                 📍 {s.label}
               </div>
             ))}
@@ -344,7 +344,7 @@ export function AtmosApp({AC,showToast,pushNotification,openNovaAi,data,updateSe
       {/* Body */}
       <div style={{flex:1,overflowY:"auto",minHeight:0,display:"flex",flexDirection:"column",gap:12}}>
         {!loc && !loadingForecast && (
-          <div style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:14,padding:30,textAlign:"center",border:"1px solid rgba(255,255,255,0.06)",borderRadius:12,background:"linear-gradient(180deg,rgba(255,255,255,0.025),rgba(255,255,255,0.005))"}}>
+          <div style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:14,padding:30,textAlign:"center",border:"1px solid var(--nv-border)",borderRadius:12,background:"linear-gradient(180deg,rgba(255,255,255,0.025),rgba(255,255,255,0.005))"}}>
             <div style={{fontSize:60,filter:"drop-shadow(0 0 16px rgba(79,158,255,0.4))"}}>🌤️</div>
             <div style={{fontFamily:FFB,fontWeight:700,fontSize:22,color:"var(--nv-text-strong)",letterSpacing:0.4}}>Atmos</div>
             <div style={{fontSize:12,color:"var(--nv-text-dim)",maxWidth:340,lineHeight:1.7}}>Search any location to see current conditions, live radar, hourly + 7-day forecast, and active NWS alerts for US locations. US locations with active alerts also trigger an audible 607 Hz tone followed by a TTS read-out of each alert.</div>
@@ -428,7 +428,7 @@ export function AtmosApp({AC,showToast,pushNotification,openNovaAi,data,updateSe
               <div style={{display:"flex",alignItems:"center",gap:16,marginTop:6}}>
                 <div style={{fontSize:72,lineHeight:1,filter:"drop-shadow(0 2px 14px rgba("+wRgb+",0.45))"}}>{wmoIcon(forecast.current.code)}</div>
                 <div style={{flex:1,minWidth:0}}>
-                  <div style={{fontFamily:FFM,fontWeight:200,fontSize:56,color:"#fff",lineHeight:1,letterSpacing:-1}}>{Math.round(forecast.current.temp)}<span style={{fontSize:28,opacity:0.7,letterSpacing:0}}>{forecast.units.temp}</span></div>
+                  <div style={{fontFamily:FFM,fontWeight:200,fontSize:56,color:"var(--nv-text-strong)",lineHeight:1,letterSpacing:-1}}>{Math.round(forecast.current.temp)}<span style={{fontSize:28,opacity:0.7,letterSpacing:0}}>{forecast.units.temp}</span></div>
                   <div style={{fontSize:14,color:"var(--nv-text)",marginTop:4,fontFamily:FFB,fontWeight:500,letterSpacing:0.3}}>{wmoLabel(forecast.current.code)}</div>
                 </div>
               </div>
@@ -439,8 +439,8 @@ export function AtmosApp({AC,showToast,pushNotification,openNovaAi,data,updateSe
                   ["Humidity",   forecast.current.humidity + "%"],
                   ["Wind",       Math.round(forecast.current.wind) + " " + forecast.units.wind],
                 ].map(([label, value]) => (
-                  <div key={label} style={{padding:"6px 11px",background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.07)",borderRadius:8,fontSize:11,color:"var(--nv-text)"}}>
-                    {label} <span style={{color:"#fff",fontFamily:FFM,fontWeight:500,marginLeft:4}}>{value}</span>
+                  <div key={label} style={{padding:"6px 11px",background:"var(--nv-elevated)",border:"1px solid var(--nv-border)",borderRadius:8,fontSize:11,color:"var(--nv-text)"}}>
+                    {label} <span style={{color:"var(--nv-text-strong)",fontFamily:FFM,fontWeight:500,marginLeft:4}}>{value}</span>
                   </div>
                 ))}
               </div>
@@ -479,12 +479,12 @@ export function AtmosApp({AC,showToast,pushNotification,openNovaAi,data,updateSe
                     <div key={a.id} onClick={()=>setExpandedAlert(expanded?null:a.id)} style={{padding:"10px 13px",marginBottom:6,background:col.bg,border:"1px solid "+col.border,borderRadius:8,cursor:"pointer"}}>
                       <div style={{display:"flex",alignItems:"center",gap:8}}>
                         <span style={{fontFamily:FFB,fontWeight:700,fontSize:12,color:col.fg,padding:"2px 7px",border:"1px solid "+col.border,borderRadius:4,whiteSpace:"nowrap"}}>{a.severity}</span>
-                        <span style={{fontFamily:FFB,fontWeight:600,fontSize:13,color:"#fff",flex:1,minWidth:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{a.event}</span>
+                        <span style={{fontFamily:FFB,fontWeight:600,fontSize:13,color:"var(--nv-text-strong)",flex:1,minWidth:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{a.event}</span>
                         <span style={{fontSize:11,color:"var(--nv-text-dim)"}}>{expanded?"▲":"▼"}</span>
                       </div>
                       {expanded && (
                         <div style={{marginTop:10,fontSize:12,color:"var(--nv-text)",lineHeight:1.6,whiteSpace:"pre-wrap"}}>
-                          {a.headline && <div style={{fontFamily:FFB,fontWeight:600,fontSize:13,color:"#fff",marginBottom:6}}>{a.headline}</div>}
+                          {a.headline && <div style={{fontFamily:FFB,fontWeight:600,fontSize:13,color:"var(--nv-text-strong)",marginBottom:6}}>{a.headline}</div>}
                           {a.description}
                           {a.sender && <div style={{fontSize:10,color:"var(--nv-text-dim)",marginTop:8,fontStyle:"italic"}}>— {a.sender}</div>}
                         </div>
@@ -501,10 +501,10 @@ export function AtmosApp({AC,showToast,pushNotification,openNovaAi,data,updateSe
                 <div style={SEC}>Next 24 Hours</div>
                 <div style={{display:"flex",overflowX:"auto",gap:5,paddingBottom:6}}>
                   {forecast.hourly.map((h,i)=>(
-                    <div key={i} style={{flex:"0 0 auto",minWidth:62,padding:"8px 6px",background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.07)",borderRadius:8,textAlign:"center"}}>
+                    <div key={i} style={{flex:"0 0 auto",minWidth:62,padding:"8px 6px",background:"var(--nv-elevated)",border:"1px solid var(--nv-border)",borderRadius:8,textAlign:"center"}}>
                       <div style={{fontSize:10,fontFamily:FFM,color:"var(--nv-text-dim)"}}>{i===0?"Now":fmtHour(h.time)}</div>
                       <div style={{fontSize:20,marginTop:2}}>{wmoIcon(h.code)}</div>
-                      <div style={{fontFamily:FFM,fontSize:13,fontWeight:500,color:"#fff",marginTop:1}}>{Math.round(h.temp)}°</div>
+                      <div style={{fontFamily:FFM,fontSize:13,fontWeight:500,color:"var(--nv-text-strong)",marginTop:1}}>{Math.round(h.temp)}°</div>
                       {h.pop>0&&<div style={{fontSize:9,color:"#88c8ff",fontFamily:FFM}}>{h.pop}%</div>}
                     </div>
                   ))}
@@ -531,14 +531,14 @@ export function AtmosApp({AC,showToast,pushNotification,openNovaAi,data,updateSe
                   const dayHiPct = ((d.high - weekLo) / span) * 100;
                   // Color gradient from cool (low) to warm (high)
                   return (
-                    <div key={d.date} style={{display:"flex",alignItems:"center",gap:10,padding:"9px 12px",marginBottom:4,background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.06)",borderRadius:8}}>
+                    <div key={d.date} style={{display:"flex",alignItems:"center",gap:10,padding:"9px 12px",marginBottom:4,background:"var(--nv-elevated)",border:"1px solid var(--nv-border)",borderRadius:8}}>
                       <div style={{width:54,fontFamily:FFB,fontWeight:600,fontSize:12,color:"var(--nv-text)"}}>{i===0?"Today":fmtDay(d.date)}</div>
                       <div style={{fontSize:22,width:34,textAlign:"center",filter:"drop-shadow(0 2px 4px rgba(0,0,0,0.4))"}}>{wmoIcon(d.code)}</div>
                       <div style={{fontFamily:FFM,fontSize:12,color:"var(--nv-text-dim)",minWidth:32,textAlign:"right"}}>{Math.round(d.low)}°</div>
-                      <div style={{flex:1,position:"relative",height:6,background:"rgba(255,255,255,0.06)",borderRadius:3,overflow:"hidden"}}>
+                      <div style={{flex:1,position:"relative",height:6,background:"var(--nv-elevated)",borderRadius:3,overflow:"hidden"}}>
                         <div style={{position:"absolute",left:dayLoPct+"%",width:Math.max(8,dayHiPct-dayLoPct)+"%",top:0,bottom:0,background:"linear-gradient(90deg, #60a5fa, #fbbf24, #f87171)",borderRadius:3}}/>
                       </div>
-                      <div style={{fontFamily:FFM,fontSize:13,color:"#fff",minWidth:32,fontWeight:500}}>{Math.round(d.high)}°</div>
+                      <div style={{fontFamily:FFM,fontSize:13,color:"var(--nv-text-strong)",minWidth:32,fontWeight:500}}>{Math.round(d.high)}°</div>
                     </div>
                   );
                 });
@@ -549,7 +549,7 @@ export function AtmosApp({AC,showToast,pushNotification,openNovaAi,data,updateSe
         })()}
 
         {/* Attribution — required by Nominatim's usage policy */}
-        <div style={{textAlign:"center",fontSize:10,color:"var(--nv-text-dim)",paddingTop:10,borderTop:"1px solid rgba(255,255,255,0.05)",marginTop:"auto"}}>
+        <div style={{textAlign:"center",fontSize:10,color:"var(--nv-text-dim)",paddingTop:10,borderTop:"1px solid var(--nv-border)",marginTop:"auto"}}>
           Location data © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer" style={{color:"var(--nv-text-dim)"}}>OpenStreetMap</a> contributors · Forecast by <a href="https://open-meteo.com" target="_blank" rel="noreferrer" style={{color:"var(--nv-text-dim)"}}>Open-Meteo</a> · Radar by <a href="https://www.windy.com" target="_blank" rel="noreferrer" style={{color:"var(--nv-text-dim)"}}>Windy</a> · Alerts by <a href="https://www.weather.gov" target="_blank" rel="noreferrer" style={{color:"var(--nv-text-dim)"}}>NWS</a>
         </div>
       </div>
