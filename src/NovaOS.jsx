@@ -2625,7 +2625,7 @@ export default function NovaOS(){
             {/* v8.3 F1: title bar is now draggable even when maximized —
                 dragging restores the window and tears it off (Windows-style),
                 so the cursor is always grab/grabbing rather than default. */}
-            <div onPointerDown={e=>startDrag(e,win.id)} style={{height:40,display:"flex",alignItems:"center",padding:"0 6px 0 14px",gap:10,background:isFocused?"linear-gradient(180deg, rgba(255,255,255,0.07) 0%, rgba(255,255,255,0.02) 100%)":"linear-gradient(180deg, rgba(255,255,255,0.025) 0%, rgba(255,255,255,0.008) 100%)",borderBottom:"1px solid rgba(255,255,255,0.06)",borderRadius:isMax?"0":winRadius+"px "+winRadius+"px 0 0",cursor:isDrg?"grabbing":"grab",userSelect:"none",flexShrink:0,touchAction:"none",transition:"background 0.18s"}}>
+            <div onPointerDown={e=>startDrag(e,win.id)} style={{height:40,display:"flex",alignItems:"center",padding:"0 6px 0 14px",gap:10,background:isFocused?"linear-gradient(180deg, rgba(255,255,255,0.07) 0%, rgba(255,255,255,0.02) 100%)":"linear-gradient(180deg, rgba(255,255,255,0.025) 0%, rgba(255,255,255,0.008) 100%)",borderBottom:"1px solid var(--nv-border)",borderRadius:isMax?"0":winRadius+"px "+winRadius+"px 0 0",cursor:isDrg?"grabbing":"grab",userSelect:"none",flexShrink:0,touchAction:"none",transition:"background 0.18s"}}>
               <div style={{display:"flex",alignItems:"center",justifyContent:"center",opacity:isFocused?1:0.55,transition:"opacity 0.18s"}}><AppIconDisplay app={{id:win.app,icon:app?.icon||"📦"}} size={18} glass={glass}/></div>
               <span style={{flex:1,fontFamily:FFB,fontWeight:600,fontSize:13,color:isFocused?"var(--nv-text-strong)":"var(--nv-text-dim)",letterSpacing:0.2,transition:"color 0.18s"}}>{app?.label}</span>
               {/* v8.0 round 3 — proper SVG window controls. Unicode glyphs
@@ -2689,7 +2689,7 @@ export default function NovaOS(){
         // token so it flips light/dark. A user-picked color still wins.
         const tbBg=tbColor
           ?"linear-gradient(180deg, rgba("+hexRgb(tbColor)+",0.78) 0%, rgba("+hexRgb(tbColor)+",0.86) 100%)"
-          :"linear-gradient(180deg, rgba(18,20,32,0.72) 0%, rgba(11,13,22,0.82) 100%)";   // v11: dock stays dark in BOTH themes so its light text/icons always read (macOS-dock style)
+          :"var(--nv-surface)";   // v11.0 light mode: theme glass surface so the dock flips light/dark with the OS theme
         // The Nova taskbar is always visible — including in fullscreen.
         //
         // v9.0 — floating glass dock. Detached from the screen edge (8px inset
@@ -2718,8 +2718,8 @@ export default function NovaOS(){
             lights up with the accent color when the menu is open. */}
         <button className="sb" onClick={()=>{setMenuOpen(o=>!o);setMenuSrch("");}} title="Nova OS" style={{
           width:46,height:46,borderRadius:13,
-          background:menuOpen?fill(AC):"rgba(255,255,255,0.06)",
-          border:"1px solid "+(menuOpen?bdr(AC):"rgba(255,255,255,0.09)"),
+          background:menuOpen?fill(AC):"var(--nv-hover)",
+          border:"1px solid "+(menuOpen?bdr(AC):"var(--nv-border)"),
           boxShadow:menuOpen?"0 0 16px "+fill(AC)+", 0 2px 8px rgba(0,0,0,0.3) inset":"none",
           cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,
           transition:"all 0.2s cubic-bezier(0.4,0,0.2,1)",
@@ -2727,12 +2727,12 @@ export default function NovaOS(){
         }}>
           <NovaLogo size={30}/>
         </button>
-        <div style={{width:1,height:26,background:"linear-gradient(180deg, transparent, rgba(255,255,255,0.12) 50%, transparent)",margin:"0 3px"}}/>
+        <div style={{width:1,height:26,background:"linear-gradient(180deg, transparent, var(--nv-border-strong) 50%, transparent)",margin:"0 3px"}}/>
         {/* v9.4 — Spotlight launcher. Opens the global-search palette. */}
         {deviceMode!=="mobile" && (
           <button className="sb" onClick={()=>setSpotlightOpen(true)} title="Search (Ctrl+K)" style={{
             height:42,display:"flex",alignItems:"center",gap:8,padding:"0 14px",borderRadius:12,
-            background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.07)",
+            background:"var(--nv-elevated)",border:"1px solid var(--nv-border)",
             cursor:"pointer",fontFamily:FF,fontSize:12.5,color:"var(--nv-text-dim)",
             transition:"all 0.18s cubic-bezier(0.4,0,0.2,1)",flexShrink:0,
           }}>
@@ -2744,8 +2744,8 @@ export default function NovaOS(){
             stands out; opens the natural-language command palette (Ctrl/Cmd+J). */}
         <button className="sb" onClick={()=>setCommandOpen(o=>!o)} title="Nova AI command bar (Ctrl+J)" style={{
           height:42,display:"flex",alignItems:"center",gap:7,padding:deviceMode==="mobile"?"0 11px":"0 13px",borderRadius:12,
-          background:commandOpen?fill(AC):"rgba(255,255,255,0.04)",
-          border:"1px solid "+(commandOpen?bdr(AC):"rgba(255,255,255,0.07)"),
+          background:commandOpen?fill(AC):"var(--nv-elevated)",
+          border:"1px solid "+(commandOpen?bdr(AC):"var(--nv-border)"),
           cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:12.5,color:commandOpen?AC:"var(--nv-text-dim)",
           transition:"all 0.18s cubic-bezier(0.4,0,0.2,1)",flexShrink:0,
         }}>
@@ -2756,8 +2756,8 @@ export default function NovaOS(){
             current/total desktop count; opens the Task View overview. */}
         <button className="sb" onClick={()=>setTaskViewOpen(o=>!o)} title="Task View — virtual desktops (Ctrl+Alt+↑)" style={{
           height:42,display:"flex",alignItems:"center",gap:8,padding:deviceMode==="mobile"?"0 11px":"0 13px",borderRadius:12,
-          background:taskViewOpen?fill(AC):"rgba(255,255,255,0.04)",
-          border:"1px solid "+(taskViewOpen?bdr(AC):"rgba(255,255,255,0.07)"),
+          background:taskViewOpen?fill(AC):"var(--nv-elevated)",
+          border:"1px solid "+(taskViewOpen?bdr(AC):"var(--nv-border)"),
           cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:12.5,color:taskViewOpen?AC:"var(--nv-text-dim)",
           transition:"all 0.18s cubic-bezier(0.4,0,0.2,1)",flexShrink:0,
         }}>
@@ -2878,8 +2878,8 @@ export default function NovaOS(){
                   title={app.label + (badgeCount > 0 ? " — " + badgeCount + " unread" : "")}
                   style={{
                     width:46,height:46,padding:0,
-                    background:"rgba(255,255,255,0.05)",
-                    border:"1px solid rgba(255,255,255,0.07)",
+                    background:"var(--nv-elevated)",
+                    border:"1px solid var(--nv-border)",
                     borderRadius:12,cursor:isDragging?"grabbing":"pointer",
                     display:"flex",alignItems:"center",justifyContent:"center",
                     transition:"all 0.18s cubic-bezier(0.4,0,0.2,1)",
@@ -2904,11 +2904,11 @@ export default function NovaOS(){
                 onContextMenu={e=>openContextMenu(e,buildMenu())}
                 style={{
                   height:46,padding:"0 14px",
-                  background:isTop?"rgba(255,255,255,0.14)":"rgba(255,255,255,0.05)",
-                  border:"1px solid "+(isTop?"rgba(255,255,255,0.14)":"rgba(255,255,255,0.07)"),
+                  background:isTop?"var(--nv-border-strong)":"var(--nv-elevated)",
+                  border:"1px solid "+(isTop?"var(--nv-border-strong)":"var(--nv-border)"),
                   borderRadius:12,cursor:isDragging?"grabbing":"pointer",
                   fontFamily:FF,fontSize:13,fontWeight:600,
-                  color:allMin?"rgba(255,255,255,0.45)":"rgba(255,255,255,0.88)",
+                  color:allMin?"var(--nv-text-dim)":"var(--nv-text-strong)",
                   whiteSpace:"nowrap",
                   transition:"all 0.22s cubic-bezier(0.4,0,0.2,1)",
                   display:"flex",alignItems:"center",gap:7,position:"relative",
@@ -2937,7 +2937,7 @@ export default function NovaOS(){
           <button className="sb" onClick={()=>openApp("profile")} title="Profile" style={{
             height:44,display:"flex",alignItems:"center",gap:8,
             padding:"0 14px 0 8px",borderRadius:12,
-            background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.07)",
+            background:"var(--nv-elevated)",border:"1px solid var(--nv-border)",
             cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:12.5,color:AC,
             transition:"all 0.18s cubic-bezier(0.4,0,0.2,1)",
           }}>
@@ -2947,7 +2947,7 @@ export default function NovaOS(){
         }
         <div style={{
           height:44,display:"flex",alignItems:"center",gap:3,padding:"0 4px",
-          background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.06)",borderRadius:13,
+          background:"var(--nv-elevated)",border:"1px solid var(--nv-border)",borderRadius:13,
         }}>
           {/* v9.3 (#22) — Dedicated volume button so the slider is one click
               away without opening Settings. Same flyout as the network
@@ -2965,7 +2965,7 @@ export default function NovaOS(){
                 background:qsOpen?fill(AC):"transparent",
                 border:qsOpen?"1px solid "+bdr(AC):"1px solid transparent",
                 cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",
-                color:qsOpen?AC:(muted?"rgba(255,255,255,0.42)":"rgba(255,255,255,0.62)"),
+                color:qsOpen?AC:(muted?"var(--nv-text-dim)":"var(--nv-text)"),
                 transition:"all 0.18s cubic-bezier(0.4,0,0.2,1)",
               }}><VolumeGlyph size={17} muted={muted}/></button>
             );
@@ -2976,7 +2976,7 @@ export default function NovaOS(){
             background:qsOpen?fill(AC):"transparent",
             border:qsOpen?"1px solid "+bdr(AC):"1px solid transparent",
             cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",
-            color:qsOpen?AC:"rgba(255,255,255,0.62)",
+            color:qsOpen?AC:"var(--nv-text)",
             transition:"all 0.18s cubic-bezier(0.4,0,0.2,1)",
           }}><WifiGlyph size={17}/></button>
           {/* Notification bell — badge shows unread count, click toggles the panel.
@@ -2986,7 +2986,7 @@ export default function NovaOS(){
             background:notifsOpen?fill(AC):"transparent",
             border:notifsOpen?"1px solid "+bdr(AC):"1px solid transparent",
             cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",
-            color:notifsOpen?AC:"rgba(255,255,255,0.62)",
+            color:notifsOpen?AC:"var(--nv-text)",
             transition:"all 0.18s cubic-bezier(0.4,0,0.2,1)",
           }}>
             <BellGlyph size={17}/>
@@ -2996,7 +2996,7 @@ export default function NovaOS(){
             width:36,height:36,borderRadius:9,
             background:"transparent",border:"1px solid transparent",
             cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",
-            color:"rgba(255,255,255,0.55)",
+            color:"var(--nv-text)",
             transition:"all 0.18s cubic-bezier(0.4,0,0.2,1)",
           }}><GearGlyph size={17}/></button>
         </div>
@@ -3004,7 +3004,7 @@ export default function NovaOS(){
           height:44,display:"flex",flexDirection:"column",justifyContent:"center",
           textAlign:"right",cursor:"default",
           padding:"0 14px",borderRadius:12,
-          background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.06)",
+          background:"var(--nv-elevated)",border:"1px solid var(--nv-border)",
           minWidth:64,
         }}>
           <div style={{fontFamily:FFM,fontWeight:500,fontSize:13,color:"var(--nv-text-strong)",letterSpacing:0.3,lineHeight:1.1}}>{fmtTime(tick)}</div>
