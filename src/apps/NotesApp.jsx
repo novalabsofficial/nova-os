@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { FF, FFB, FFM, INP, SEC } from "../ui/styles.js";
+import { Button } from "../ui/primitives.jsx";
 import { fill, bdr } from "../lib/format.js";
 import { AiAssist } from "../ui/AiAssist.jsx";
 import { renderMarkdown, applyMarkdownAction } from "../lib/markdown.jsx";
@@ -351,7 +352,7 @@ export function NotesApp({ data, updateData, showToast, AC, openNovaAi }) {
                 if (!t && !b) return "(The user has not written anything yet — say so and ask what they want to write about.)";
                 return (t ? "Title: " + t + "\n\n" : "") + (b || "(empty body)");
               }} />
-              <button onClick={() => deleteNote(selected.id)} className="dl" title="Delete note" style={{ background: "rgba(255,80,80,0.08)", border: "1px solid rgba(255,80,80,0.25)", borderRadius: 7, cursor: "pointer", color: "#ff8b8b", fontSize: 12, fontFamily: FFB, fontWeight: 600, padding: "5px 10px" }}>Delete</button>
+              <Button variant="danger" size="sm" onClick={() => deleteNote(selected.id)} title="Delete note">Delete</Button>
             </div>
 
             {/* v9.5 — Markdown toolbar. Only shows in edit mode. */}
@@ -426,7 +427,7 @@ export function NotesApp({ data, updateData, showToast, AC, openNovaAi }) {
               <div style={{ fontSize: 52, opacity: 0.45, marginBottom: 14 }}>📝</div>
               <div style={{ fontFamily: FFB, fontWeight: 700, fontSize: 16, color: "var(--nv-text-strong)", marginBottom: 6 }}>No note selected</div>
               <div style={{ fontSize: 12.5, color: "var(--nv-text-dim)", lineHeight: 1.6, marginBottom: 16 }}>Pick a note on the left, or create a new one. Folders are shared with the File Explorer — make one here and it appears there too.</div>
-              <button onClick={createNote} style={{ padding: "9px 18px", background: fill(AC), border: "1px solid " + bdr(AC), borderRadius: 9, cursor: "pointer", fontFamily: FFB, fontWeight: 700, fontSize: 12.5, color: AC }}>+ New note</button>
+              <Button variant="accent" accent={AC} onClick={createNote} icon="+">New note</Button>
             </div>
           </div>
         )}
