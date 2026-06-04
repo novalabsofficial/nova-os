@@ -2578,11 +2578,18 @@ export default function NovaOS(){
         // rest recede with a softer shadow, dimmer border + muted title bar so
         // it's always obvious which window is active (real-OS depth).
         const isFocused = win.id===focusedWinId;
+        const lightT = theme === "light";   // softer, blue-grey shadows in light mode
         const winShadow = isDrg
-          ? "0 14px 28px rgba(0,0,0,0.45), 0 40px 100px rgba(0,0,0,0.7), 0 1px 0 rgba(255,255,255,0.1) inset"
+          ? (lightT
+            ? "0 12px 24px rgba(30,41,59,0.16), 0 36px 80px rgba(30,41,59,0.2), 0 1px 0 rgba(255,255,255,0.6) inset"
+            : "0 14px 28px rgba(0,0,0,0.45), 0 40px 100px rgba(0,0,0,0.7), 0 1px 0 rgba(255,255,255,0.1) inset")
           : isFocused
-          ? "0 4px 8px rgba(0,0,0,0.25), 0 18px 60px rgba(0,0,0,0.5), 0 1px 0 rgba(255,255,255,0.08) inset"
-          : "0 2px 6px rgba(0,0,0,0.16), 0 10px 32px rgba(0,0,0,0.3), 0 1px 0 rgba(255,255,255,0.05) inset";
+          ? (lightT
+            ? "0 3px 8px rgba(30,41,59,0.1), 0 16px 44px rgba(30,41,59,0.15), 0 1px 0 rgba(255,255,255,0.6) inset"
+            : "0 4px 8px rgba(0,0,0,0.25), 0 18px 60px rgba(0,0,0,0.5), 0 1px 0 rgba(255,255,255,0.08) inset")
+          : (lightT
+            ? "0 2px 6px rgba(30,41,59,0.07), 0 10px 28px rgba(30,41,59,0.1), 0 1px 0 rgba(255,255,255,0.5) inset"
+            : "0 2px 6px rgba(0,0,0,0.16), 0 10px 32px rgba(0,0,0,0.3), 0 1px 0 rgba(255,255,255,0.05) inset");
         // v10.0: maximized windows are position:absolute (not fixed) so they
         // stay confined to their virtual-desktop panel — a fixed element would
         // anchor to the transformed track and span every desktop at once.

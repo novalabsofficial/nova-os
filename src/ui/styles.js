@@ -155,23 +155,26 @@ export const CSS = `
      tokens in waves.) Toggle in Settings → Display. */
   html[data-theme="light"]{
     color-scheme:light;
-    --nv-body-bg:#e6e8f0;
-    --nv-surface:rgba(255,255,255,0.7);
-    --nv-surface-solid:rgba(249,250,253,0.94);
-    --nv-elevated:rgba(15,23,42,0.045);
-    --nv-border:rgba(15,23,42,0.12);
-    --nv-border-strong:rgba(15,23,42,0.22);
-    --nv-text-strong:rgba(17,20,28,0.96);
-    --nv-text:rgba(28,32,44,0.72);
-    --nv-text-dim:rgba(40,46,60,0.5);
-    --nv-hover:rgba(15,23,42,0.06);
-    --nv-input-bg:rgba(15,23,42,0.05);
-    --nv-scroll:rgba(15,23,42,0.2);
-    --nv-scroll-hover:rgba(15,23,42,0.32);
+    /* Soft cool-grey, not stark white — easier on the eyes. Panels are fairly
+       opaque so the wallpaper doesn't muddy them; borders + text carry a touch
+       more contrast so cards stay defined instead of washing out. */
+    --nv-body-bg:#dadee7;
+    --nv-surface:rgba(237,240,246,0.86);
+    --nv-surface-solid:rgba(236,239,244,0.97);
+    --nv-elevated:rgba(21,28,46,0.05);
+    --nv-border:rgba(21,28,46,0.13);
+    --nv-border-strong:rgba(21,28,46,0.24);
+    --nv-text-strong:rgba(23,27,37,0.95);
+    --nv-text:rgba(40,46,60,0.74);
+    --nv-text-dim:rgba(54,62,78,0.56);
+    --nv-hover:rgba(21,28,46,0.07);
+    --nv-input-bg:rgba(21,28,46,0.055);
+    --nv-scroll:rgba(21,28,46,0.22);
+    --nv-scroll-hover:rgba(21,28,46,0.34);
   }
   html[data-theme="light"][data-glass="on"]{
-    --nv-surface:rgba(255,255,255,0.5);
-    --nv-surface-solid:rgba(249,250,253,0.62);
+    --nv-surface:rgba(237,240,246,0.62);
+    --nv-surface-solid:rgba(236,239,244,0.74);
   }
 
   /* ── v9.0 Liquid Glass. When enabled (html[data-glass="on"]), surfaces get
