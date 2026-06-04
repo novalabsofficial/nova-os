@@ -69,6 +69,49 @@ export const SEC = {
   textTransform: "uppercase",
 };
 
+// ── v11.0 design tokens ─────────────────────────────────────────────────────
+// One source of truth for the values every component should reuse, so the whole
+// OS stays consistent as it's migrated onto the design system. Purely additive:
+// existing hardcoded values keep working; new / refactored code reaches for
+// these. Values are numeric (px / ms) so they drop straight into inline styles.
+// See src/ui/primitives.jsx for the reusable components built on top of them.
+
+// Spacing scale (4px base grid). Use SPACE[n] or sp(n).
+export const SPACE = { 0: 0, 1: 4, 2: 8, 3: 12, 4: 16, 5: 20, 6: 24, 7: 32, 8: 40, 9: 48, 10: 64 };
+export const sp = (n) => (SPACE[n] != null ? SPACE[n] : n);
+
+// Corner-radius scale — the window-chrome radius family.
+export const RADIUS = { xs: 6, sm: 8, md: 10, lg: 12, xl: 16, xxl: 22, pill: 999 };
+
+// Typography presets — spread one into a style object (family + size + weight +
+// line-height tuned together). Keeps headings/body/labels consistent everywhere.
+export const TYPE = {
+  display: { fontFamily: FFB, fontWeight: 800, fontSize: 26, lineHeight: 1.15 },
+  title:   { fontFamily: FFB, fontWeight: 700, fontSize: 20, lineHeight: 1.2 },
+  heading: { fontFamily: FFB, fontWeight: 600, fontSize: 15, lineHeight: 1.3 },
+  body:    { fontFamily: FF,  fontWeight: 400, fontSize: 14, lineHeight: 1.5 },
+  small:   { fontFamily: FF,  fontWeight: 400, fontSize: 12, lineHeight: 1.45 },
+  label:   { fontFamily: FFB, fontWeight: 600, fontSize: 11, letterSpacing: 1.2, textTransform: "uppercase" },
+  mono:    { fontFamily: FFM, fontWeight: 500, fontSize: 12.5, lineHeight: 1.4 },
+};
+
+// Motion tokens — pair a DUR with an EASE for the shared "motion language".
+// These mirror the CSS curves (--nv-ease / --nv-spring) so JS- and CSS-driven
+// transitions feel identical. tx(...props) builds a transition string.
+export const EASE = {
+  standard: "cubic-bezier(0.4,0,0.2,1)",      // Material standard — most UI transitions
+  out:      "cubic-bezier(0.22,1,0.36,1)",    // ease-out-quint — enters / slides (= --nv-ease)
+  spring:   "cubic-bezier(0.34,1.56,0.64,1)", // slight overshoot — playful pops (= --nv-spring)
+};
+export const DUR = { fast: 130, base: 200, slow: 300 };
+export const tx = (...props) => props.map((p) => p + " " + DUR.base + "ms " + EASE.standard).join(", ");
+
+// z-index ladder — keeps stacking order intentional across the OS.
+export const Z = { base: 1, dropdown: 20, sticky: 50, overlay: 9000, modal: 10000, toast: 11000 };
+
+// Semantic status colors (dialogs, toasts, validation).
+export const STATUS = { danger: "#ff6b6b", warn: "#ffcc44", ok: "#4cef90", info: "#4f9eff" };
+
 // Global stylesheet injected once via <style>{CSS}</style> on every screen.
 // Defines hover transitions for class names used throughout the app (.di, .tb,
 // .wx, .wm, .wn, .ma, .ls, .lt, .sb, .dl, .ps, .fr, .sr, .bp, .ad, .ws, .sc,
@@ -273,6 +316,13 @@ export const CSS = `
   @media (prefers-reduced-motion: reduce){
     *{animation-duration:0.01ms!important;transition-duration:0.01ms!important;}
   }
+
+  /* v11.0 design-system primitive: <Button>/<IconButton> share this class for a
+     consistent hover-brighten + press-shrink across the whole OS. */
+  .nv-btn{transition:background 0.18s cubic-bezier(0.4,0,0.2,1),border-color 0.18s cubic-bezier(0.4,0,0.2,1),transform 0.16s var(--nv-ease),opacity 0.18s,filter 0.18s;}
+  .nv-btn:hover:not(:disabled){filter:brightness(1.08);}
+  .nv-btn:active:not(:disabled){transform:scale(0.96);}
+  .nv-btn:disabled{opacity:0.45;cursor:default!important;}
 
   /* Focus rings — only visible from keyboard navigation, never from mouse clicks */
   button:focus-visible,input:focus-visible,textarea:focus-visible{
