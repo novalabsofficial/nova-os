@@ -686,6 +686,49 @@ function NebulaBg() {
   );
 }
 
+// v11.0 — Lumina: the signature LIGHT wallpaper of Nova OS 11 and the auto
+// pick whenever Light mode is on. A soft, near-white canvas warmed by the
+// Nova palette in pastel — indigo, rose, cyan, violet and a touch of amber —
+// all heavily blurred (Mesh-grade) so they melt into one airy field. A faint
+// cool-grey speckle adds fine texture and a soft vignette gives depth without
+// ever going dark, so dark UI text and icon labels read cleanly over it. Built
+// as the light sibling to Mesh (its dark counterpart).
+function LuminaBg() {
+  return (
+    <svg style={{position:"absolute",inset:0,width:"100%",height:"100%"}} viewBox="0 0 1440 900" preserveAspectRatio="xMidYMid slice">
+      <defs>
+        <linearGradient id="lum-base" x1="0" y1="0" x2="0.35" y2="1">
+          <stop offset="0%"   stopColor="#fcfdff"/>
+          <stop offset="52%"  stopColor="#eef1f8"/>
+          <stop offset="100%" stopColor="#e1e7f2"/>
+        </linearGradient>
+        <radialGradient id="lum1" cx="20%" cy="22%" r="56%"><stop offset="0%" stopColor="#9db1fb" stopOpacity="0.55"/><stop offset="55%" stopColor="#c3d0fe" stopOpacity="0.16"/><stop offset="100%" stopColor="#ffffff" stopOpacity="0"/></radialGradient>
+        <radialGradient id="lum2" cx="82%" cy="18%" r="50%"><stop offset="0%" stopColor="#fbb6d4" stopOpacity="0.5"/><stop offset="55%" stopColor="#fcd9e8" stopOpacity="0.16"/><stop offset="100%" stopColor="#ffffff" stopOpacity="0"/></radialGradient>
+        <radialGradient id="lum3" cx="64%" cy="84%" r="54%"><stop offset="0%" stopColor="#92e9f5" stopOpacity="0.5"/><stop offset="55%" stopColor="#c4f4fb" stopOpacity="0.16"/><stop offset="100%" stopColor="#ffffff" stopOpacity="0"/></radialGradient>
+        <radialGradient id="lum4" cx="11%" cy="86%" r="46%"><stop offset="0%" stopColor="#cbb9fb" stopOpacity="0.48"/><stop offset="100%" stopColor="#ffffff" stopOpacity="0"/></radialGradient>
+        <radialGradient id="lum5" cx="95%" cy="60%" r="36%"><stop offset="0%" stopColor="#fcdf9c" stopOpacity="0.34"/><stop offset="100%" stopColor="#ffffff" stopOpacity="0"/></radialGradient>
+        <filter id="lum-blur"><feGaussianBlur stdDeviation="86"/></filter>
+        <radialGradient id="lum-vign" cx="50%" cy="44%" r="80%"><stop offset="56%" stopColor="#b9c4dc" stopOpacity="0"/><stop offset="100%" stopColor="#9aa8c8" stopOpacity="0.30"/></radialGradient>
+      </defs>
+      <rect width="1440" height="900" fill="url(#lum-base)"/>
+      <g filter="url(#lum-blur)">
+        <rect width="1440" height="900" fill="url(#lum1)"/>
+        <rect width="1440" height="900" fill="url(#lum2)"/>
+        <rect width="1440" height="900" fill="url(#lum3)"/>
+        <rect width="1440" height="900" fill="url(#lum4)"/>
+        <rect width="1440" height="900" fill="url(#lum5)"/>
+      </g>
+      {/* fine speckle — subtle cool-grey grain so the canvas has texture, not flat white */}
+      {[...Array(76)].map((_, i) => {
+        const x=(i*173.7+31)%1440, y=(i*97.3+17)%900, r=i%5===0?1.5:i%3===0?1:0.6;
+        const op=0.04+(i%4)*0.025;
+        return <circle key={i} cx={x} cy={y} r={r} fill={"rgba(60,76,128,"+op+")"}/>;
+      })}
+      <rect width="1440" height="900" fill="url(#lum-vign)"/>
+    </svg>
+  );
+}
+
 /**
  * Resolve the concrete background element for a wallpaper id.
  * "custom" requires a customUrl (the user-uploaded base64 image).
@@ -696,6 +739,7 @@ function renderBg(id, customUrl) {
     return <div style={{position:"absolute",inset:0,background:'url("'+customUrl+'") center/cover no-repeat'}}/>;
   }
   if (!id || id === "mesh")  return <MeshBg/>;
+  if (id === "lumina")       return <LuminaBg/>;
   if (id === "supernova")    return <SupernovaBg/>;
   if (id === "nebula")       return <NebulaBg/>;
   if (id === "aurora")       return <AuroraBg/>;

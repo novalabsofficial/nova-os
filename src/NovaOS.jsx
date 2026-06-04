@@ -707,7 +707,12 @@ export default function NovaOS(){
   const winBlur =settings.winBlur   ??18;
   const largeFnt=settings.largeFont ||false;
   const glass    =!!settings.glass;            // v9.0 Liquid Glass surfaces
-  const wpId    =settings.wallpaper ||data?.wallpaper||"mesh";
+  // v11.0 — wallpaper is remembered per-theme: Light mode auto-uses its own
+  // slot (defaulting to the new Lumina light wallpaper), Dark mode keeps the
+  // existing one. Either is still fully changeable in Settings.
+  const wpId    =(settings.theme==="light")
+    ? (settings.wallpaperLight || "lumina")
+    : (settings.wallpaper || data?.wallpaper || "mesh");
   const widgets =settings.widgets   ||{};
   // Resolved device mode: user's saved preference overrides detection. "auto"
   // (or any unset/invalid value) defers to the viewport+touch heuristic.
@@ -1350,7 +1355,7 @@ export default function NovaOS(){
   },[notifsOpen, markAllNotificationsRead]);
   const updateData    =useCallback((patch)=>{setData(prev=>{const next=typeof patch==="function"?patch(prev):{...prev,...patch};saveData(next);return next;});},[saveData]);
   const updateSettings=useCallback((patch)=>{updateData(prev=>({...prev,settings:{...(prev.settings||{}),...patch}}));},[updateData]);
-  const handleCustomWallpaper=useCallback(async(url)=>{setCustomWp(url);await db.set("user:"+user+":wpimg",url);updateSettings({wallpaper:"custom"});showToast("Custom wallpaper set ✓");},[user,updateSettings,showToast]);
+  const handleCustomWallpaper=useCallback(async(url)=>{setCustomWp(url);await db.set("user:"+user+":wpimg",url);updateSettings({[theme==="light"?"wallpaperLight":"wallpaper"]:"custom"});showToast("Custom wallpaper set ✓");},[user,updateSettings,showToast,theme]);
 
   // v10.0 Supernova — AI command-bar executor. Maps a planned {tool, args}
   // step to a real OS action and returns a short result string (or null for
@@ -2408,7 +2413,7 @@ export default function NovaOS(){
             // v8.0: lighter resting background, accent-tinged shadow during
             // drag for a more lifted feel. The .di hover class adds a brighter
             // background + soft outline ring (see styles.js).
-            background:isDrg?"rgba(20,22,40,0.5)":isSel?"rgba("+hexRgb(AC)+",0.22)":(lightT?"rgba(255,255,255,0.07)":"rgba(0,0,0,0.08)"),
+            background:isDrg?"rgba(20,22,40,0.5)":isSel?"rgba("+hexRgb(AC)+",0.22)":(lightT?"rgba(20,28,48,0.05)":"rgba(0,0,0,0.08)"),
             border:"1px solid "+(isDrg?"rgba(255,255,255,0.16)":isSel?"rgba("+hexRgb(AC)+",0.6)":"transparent"),
             backdropFilter:(isDrg||isSel)?"blur(8px)":"none",
             transition:isDrg?"none":"background 0.22s cubic-bezier(0.4,0,0.2,1), border-color 0.22s cubic-bezier(0.4,0,0.2,1), left 0.28s cubic-bezier(0.4,0,0.2,1), top 0.28s cubic-bezier(0.4,0,0.2,1), transform 0.2s cubic-bezier(0.22,1,0.36,1)",
@@ -2455,7 +2460,7 @@ export default function NovaOS(){
                 </div>
               )}
             </div>
-            <span style={{fontFamily:FFB,fontWeight:600,fontSize:10.5,color:"#fff",textAlign:"center",lineHeight:1.25,textShadow:"0 1px 3px rgba(0,0,0,0.9), 0 0 8px rgba(0,0,0,0.5)",pointerEvents:"none",letterSpacing:0.15}}>{app.label}</span>
+            <span style={{fontFamily:FFB,fontWeight:600,fontSize:10.5,color:lightT?"var(--nv-text-strong)":"#fff",textAlign:"center",lineHeight:1.25,textShadow:lightT?"0 1px 2px rgba(255,255,255,0.55)":"0 1px 3px rgba(0,0,0,0.9), 0 0 8px rgba(0,0,0,0.5)",pointerEvents:"none",letterSpacing:0.15}}>{app.label}</span>
           </div>
         );
       }); })()}
