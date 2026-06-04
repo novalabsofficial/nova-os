@@ -44,7 +44,7 @@ const SPECS = {
     </>),
   },
   store: {
-    color: "#5570e6",
+    color: "#ec4899",
     glyph: (<>
       <path d="M15.5 20 h17 v12.4 a3 3 0 0 1 -3 3 H18.5 a3 3 0 0 1 -3 -3 Z" fill="#fff" />
       <path d="M19.6 20 v-1 a4.4 4.4 0 0 1 8.8 0 v1" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" />
@@ -131,7 +131,7 @@ export function NovaAppIcon({ id, size = 26 }) {
   return (
     <svg width={size} height={size} viewBox="0 0 48 48" style={{ display: "block" }}>
       <rect x="2" y="2" width="44" height="44" rx="10" fill={spec.color} />
-      <g transform="translate(24 24) scale(0.88) translate(-24 -24)">{spec.glyph}</g>
+      <g transform="translate(24 24) scale(1.2) translate(-24 -24)">{spec.glyph}</g>
       <rect x="2.5" y="2.5" width="43" height="43" rx="9.6" fill="none" stroke="#000" strokeOpacity="0.07" strokeWidth="1" />
     </svg>
   );
