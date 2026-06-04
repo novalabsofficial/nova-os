@@ -12,6 +12,38 @@ sub-batches on the long-lived `nova-11` branch, shipping as each batch becomes
 solid. This combined release **absorbs everything that was tentatively scoped as
 "10.11"** (the desktop-power features) into one big 11.0.
 
+### 🔗 Build order — the pipeline (each step builds on the one before)
+```
+1 ✅ Design tokens + primitives ── the shared values + components.
+        │                          Unlocks everything below. (DONE)
+        ▼
+2 Unified dialogs ── swap browser-native confirm()/alert() + ad-hoc
+        │             modals for the <Dialog> primitive.        (needs 1)
+        ▼
+3 All-SVG icon set ── replace emoji icons across desktop / Start /
+        │              Store / taskbar. Sets the visual tone.   (independent)
+        ▼
+4 Unified window chrome ── one title-bar + controls frame for every
+        │                   window.                  (needs 1; uses 3's glyphs)
+        ▼
+5 App migration ── sweep the ~35 apps onto the tokens / primitives +
+        │           motion language for consistency. (needs 1; smoother after 3–4)
+        ▼
+6 Light mode ── build the light theme on the tokens.  (AFTER 5 — only works
+        │         once surfaces actually use the tokens)
+        ▼
+7 Full visual-redesign polish ── the holistic "looks shipped, not
+        │   generated" pass once icons + chrome + motion + light are all in.
+        ▼   (this caps Phase A — the UI refresh)
+8 Phase B · Desktop power ── pinning whitelist + first-run wizard, app
+        │   folders, snap workspaces, drag-to-desktop, multi-select, widgets,
+        ▼   sticky notes/clipboard, backup/export. (new UI uses the finished system)
+9 Phase C · Flagship apps ── video editor, code editor, etc. (biggest; last)
+
+   Phase D · Smaller wins (Asset Studio paste/drop, achievements) slots in as
+   filler between the big steps — no dependencies.
+```
+
 ## A · Design foundation — the bedrock everything else sits on
 - **Design system / tokens.** One shared scale for spacing, corner radius,
   shadows, typography and accent usage (extends the existing `--nv-*` vars in
@@ -689,7 +721,7 @@ sensitive areas. Saves directly to the Photos app gallery.
 
 ---
 
-## 9. Wallpaper from your Photos
+## 9. Wallpaper from your Photos — ✅ SHIPPED in v8.1
 
 Pick any photo from the Photos app and use it as your desktop wallpaper.
 Cross-pollinates two existing apps in a really natural way.
@@ -708,7 +740,7 @@ Cross-pollinates two existing apps in a really natural way.
 
 ---
 
-## 10. Notification badges on app icons
+## 10. Notification badges on app icons — ✅ SHIPPED in v8.1
 
 Chat icon shows unread DM count. Atmos icon shows active NWS-alert
 count. Store shows new-app count. Small numeric badge on both the
@@ -728,7 +760,7 @@ desktop icon **and** the taskbar chip.
 
 ---
 
-## 11. Battery widget
+## 11. Battery widget — ✅ SHIPPED in v8.1
 
 Small widget showing current battery percentage + charging state +
 estimated time remaining (when available). Only visible/relevant on
@@ -854,7 +886,7 @@ highlighted portion → straight into the annotation editor.
 
 ---
 
-## 16. Nova OS Mobile — a real phone-OS experience
+## 16. Nova OS Mobile — a real phone-OS experience — ✅ SHIPPED in v10.x (iOS-style mobile shell)
 
 Make Nova OS, on a phone, fullscreen and behave like an actual mobile OS
 (home screen of app icons, one app fullscreen at a time, status bar, swipe
@@ -1070,7 +1102,7 @@ Windows 11 Photos app / Apple Photos.
 
 ---
 
-## 21. Real browser tabs via Tauri webview
+## 21. Real browser tabs via Tauri webview — ✅ SHIPPED in v10.0
 
 The Browser app currently iframes pages, which is why so many store
 entries are flagged `newTab: true` — the big sites set
@@ -1101,7 +1133,7 @@ embedded webviews that don't have iframe restrictions. That unlocks a real
 
 ---
 
-## 22. Calculator — genuine competitor to Windows 11 Calculator
+## 22. Calculator — genuine competitor to Windows 11 Calculator — ✅ SHIPPED in v9.5
 
 The current Calculator is solid for the basics (and got the hold-backspace
 fix in v8.3). v9.x can lift it to feature parity with Windows 11's
@@ -1349,7 +1381,7 @@ system as the "you earned this!" surface.
 
 ---
 
-## 28. High-score leaderboards for the games — ✅ SHIPPED in v9.8 (Minesweeper + Flappy)
+## 28. High-score leaderboards for the games — ✅ SHIPPED (v9.8 start → ALL games in v10.10)
 
 Shipped the `nova_scores` infrastructure + leaderboards for Minesweeper
 (best time) and Flappy (high score) in v9.8. Wiring the same `submitScore`/
@@ -1388,7 +1420,7 @@ progress; soft chime fires at every phase transition. Future polish
 
 ---
 
-## 30. Multiple desktops + Linux-style window overview
+## 30. Multiple desktops + Linux-style window overview — 🚧 PARTIAL (virtual desktops + keyboard switching shipped v10.x; Exposé-style overview still open)
 
 A real virtual-desktops system plus a Mission-Control / GNOME Activities
 style overview. This turns Nova OS from "one big desktop" into a
