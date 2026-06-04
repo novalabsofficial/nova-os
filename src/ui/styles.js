@@ -251,8 +251,6 @@ export const CSS = `
   /* Desktop icon — soft selection ring on hover */
   .di{transition:background 0.2s cubic-bezier(0.4,0,0.2,1),transform 0.2s cubic-bezier(0.4,0,0.2,1),border-color 0.2s cubic-bezier(0.4,0,0.2,1);}
   .di:hover{background:rgba(255,255,255,0.12)!important;border-color:rgba(255,255,255,0.14)!important;}
-  /* v11.0 light mode — desktop icon tiles are light frosted chips, so hover brightens (not dims) and uses a dark hairline */
-  html[data-theme="light"] .di:hover{background:rgba(255,255,255,0.72)!important;border-color:rgba(20,28,48,0.18)!important;}
 
   /* Taskbar window chip — lifts slightly on hover */
   .tb{transition:all 0.2s cubic-bezier(0.4,0,0.2,1);}
