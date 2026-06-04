@@ -28,7 +28,7 @@ export function WidgetShell({ id, state, onDragStart, onResizeStart, onClose, ch
       background:"var(--nv-surface)",
       backdropFilter:"blur(var(--nv-glass-blur)) saturate(160%)",
       WebkitBackdropFilter:"blur(var(--nv-glass-blur)) saturate(160%)",
-      border:"1px solid rgba(255,255,255,0.09)",
+      border:"1px solid var(--nv-border)",
       borderRadius:16,
       overflow:"hidden",
       boxShadow:"0 2px 4px rgba(0,0,0,0.22), 0 10px 30px rgba(0,0,0,0.45), 0 1px 0 rgba(255,255,255,0.08) inset",
@@ -45,10 +45,10 @@ export function WidgetShell({ id, state, onDragStart, onResizeStart, onClose, ch
           cursor:"grab",userSelect:"none",flexShrink:0,zIndex:11,touchAction:"none",
         }}>
         {cfg?.emoji && <span style={{fontSize:10,opacity:0.6,lineHeight:1}}>{cfg.emoji}</span>}
-        <span style={{fontFamily:FFB,fontWeight:600,fontSize:9.5,letterSpacing:1.4,color:"rgba(255,255,255,0.5)",textTransform:"uppercase",flex:1}}>{cfg?.label || id}</span>
+        <span style={{fontFamily:FFB,fontWeight:600,fontSize:9.5,letterSpacing:1.4,color:"var(--nv-text-dim)",textTransform:"uppercase",flex:1}}>{cfg?.label || id}</span>
         <button onClick={e => { e.stopPropagation(); onClose(); }}
           title="Hide widget"
-          style={{width:18,height:18,borderRadius:5,background:"transparent",border:"none",cursor:"pointer",color:"rgba(255,255,255,0.35)",fontSize:10,display:"flex",alignItems:"center",justifyContent:"center",padding:0,transition:"all 0.15s cubic-bezier(0.4,0,0.2,1)"}}
+          style={{width:18,height:18,borderRadius:5,background:"transparent",border:"none",cursor:"pointer",color:"var(--nv-text-dim)",fontSize:10,display:"flex",alignItems:"center",justifyContent:"center",padding:0,transition:"all 0.15s cubic-bezier(0.4,0,0.2,1)"}}
           onMouseEnter={e=>{e.currentTarget.style.background="rgba(255,80,80,0.15)";e.currentTarget.style.color="rgba(255,130,130,0.9)";}}
           onMouseLeave={e=>{e.currentTarget.style.background="transparent";e.currentTarget.style.color="rgba(255,255,255,0.35)";}}>✕</button>
       </div>
@@ -74,7 +74,7 @@ export function ClockWidgetContent({ state, tick, use24h, AC }) {
   return (
     <div style={{width:"100%",height:"100%",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"10px 16px",gap:5}}>
       <div style={{
-        fontFamily:FFM,fontSize,fontWeight:400,color:"#fff",lineHeight:1,letterSpacing:2.5,textAlign:"center",
+        fontFamily:FFM,fontSize,fontWeight:400,color:"var(--nv-text-strong)",lineHeight:1,letterSpacing:2.5,textAlign:"center",
         // Render colons separately by replacing them with a styled span via
         // a subtle CSS trick: we keep the simple text and let the user just
         // see the time. Adding split-rendering would complicate use24h logic
@@ -83,7 +83,7 @@ export function ClockWidgetContent({ state, tick, use24h, AC }) {
       }}>{t}</div>
       <div style={{
         fontFamily:FFB,fontWeight:600,fontSize:Math.max(10,fontSize*0.24),
-        color:"rgba(255,255,255,0.5)",textAlign:"center",letterSpacing:0.4,
+        color:"var(--nv-text-dim)",textAlign:"center",letterSpacing:0.4,
         textTransform:"capitalize",
       }}>{d}</div>
       {/* v8.0: tiny accent-color dot pulses with the seconds — a subtle
@@ -199,17 +199,17 @@ export function WeatherWidgetContent({ state, data, updateSettings }) {
           ⚠ {alerts.length}
         </div>
       )}
-      {status==="loading" && <div style={{display:"flex",alignItems:"center",gap:8}}><div style={{width:16,height:16,border:"2px solid rgba(255,255,255,0.15)",borderTopColor:"#fff",borderRadius:"50%",animation:"spin 0.8s linear infinite"}}/><span style={{fontFamily:FF,fontSize:11,color:"rgba(255,255,255,0.4)"}}>Getting weather…</span></div>}
-      {status==="error" && <div style={{fontFamily:FF,fontSize:11,color:"rgba(255,255,255,0.35)",textAlign:"center"}}>🌡️ Unavailable<br/><span style={{fontSize:9,opacity:0.6}}>Allow location access</span></div>}
+      {status==="loading" && <div style={{display:"flex",alignItems:"center",gap:8}}><div style={{width:16,height:16,border:"2px solid rgba(255,255,255,0.15)",borderTopColor:"#fff",borderRadius:"50%",animation:"spin 0.8s linear infinite"}}/><span style={{fontFamily:FF,fontSize:11,color:"var(--nv-text-dim)"}}>Getting weather…</span></div>}
+      {status==="error" && <div style={{fontFamily:FF,fontSize:11,color:"var(--nv-text-dim)",textAlign:"center"}}>🌡️ Unavailable<br/><span style={{fontSize:9,opacity:0.6}}>Allow location access</span></div>}
       {status==="ok" && weather && (<>
         <div style={{display:"flex",alignItems:"center",gap:10}}>
           <span style={{fontSize:iconSize,lineHeight:1}}>{WMO[weather.weathercode] || "🌡️"}</span>
           <div>
-            <div style={{fontFamily:FFM,fontSize:tempSize,fontWeight:400,color:"#fff",lineHeight:1}}>{Math.round(weather.temperature_2m)}{tempSymbol}</div>
-            {loc && w > 170 && <div style={{fontFamily:FF,fontSize:Math.max(9,tempSize*0.32),color:"rgba(255,255,255,0.42)",marginTop:3}}>{loc}</div>}
+            <div style={{fontFamily:FFM,fontSize:tempSize,fontWeight:400,color:"var(--nv-text-strong)",lineHeight:1}}>{Math.round(weather.temperature_2m)}{tempSymbol}</div>
+            {loc && w > 170 && <div style={{fontFamily:FF,fontSize:Math.max(9,tempSize*0.32),color:"var(--nv-text-dim)",marginTop:3}}>{loc}</div>}
           </div>
         </div>
-        {weather.windspeed_10m != null && h > 120 && <div style={{fontFamily:FF,fontSize:9,color:"rgba(255,255,255,0.3)"}}>💨 {weather.windspeed_10m} {units==="imperial"?"mph":"km/h"}</div>}
+        {weather.windspeed_10m != null && h > 120 && <div style={{fontFamily:FF,fontSize:9,color:"var(--nv-text-dim)"}}>💨 {weather.windspeed_10m} {units==="imperial"?"mph":"km/h"}</div>}
       </>)}
     </div>
   );
@@ -220,7 +220,7 @@ export function NotesWidgetContent({ data, state }) {
   const h = state.h - 28;
   return (
     <div style={{width:"100%",height:"100%",overflowY:"auto",padding:"10px 12px",display:"flex",flexDirection:"column",gap:6}}>
-      {notes.length === 0 && <div style={{fontFamily:FF,fontSize:11,color:"rgba(255,255,255,0.25)",fontStyle:"italic",margin:"auto",textAlign:"center"}}>📝 No notes yet</div>}
+      {notes.length === 0 && <div style={{fontFamily:FF,fontSize:11,color:"var(--nv-text-dim)",fontStyle:"italic",margin:"auto",textAlign:"center"}}>📝 No notes yet</div>}
       {notes.map(n => (
         <div key={n.id} style={{
           padding:"8px 11px",
@@ -229,8 +229,8 @@ export function NotesWidgetContent({ data, state }) {
           borderRadius:9,flexShrink:0,
           transition:"background 0.18s",
         }}>
-          <div style={{fontFamily:FFB,fontWeight:600,fontSize:11,color:"rgba(255,255,255,0.92)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",letterSpacing:0.1}}>{n.title}</div>
-          {n.body && h > 150 && <div style={{fontFamily:FF,fontSize:10,color:"rgba(255,255,255,0.45)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",marginTop:3,lineHeight:1.4}}>{n.body}</div>}
+          <div style={{fontFamily:FFB,fontWeight:600,fontSize:11,color:"var(--nv-text-strong)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",letterSpacing:0.1}}>{n.title}</div>
+          {n.body && h > 150 && <div style={{fontFamily:FF,fontSize:10,color:"var(--nv-text-dim)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",marginTop:3,lineHeight:1.4}}>{n.body}</div>}
         </div>
       ))}
     </div>
@@ -242,7 +242,7 @@ export function TasksWidgetContent({ data, updateData, state, AC }) {
   function toggle(id) { updateData(p => ({...p, tasks: p.tasks.map(t => t.id === id ? {...t, done: !t.done} : t)})); }
   return (
     <div style={{width:"100%",height:"100%",overflowY:"auto",padding:"10px 12px",display:"flex",flexDirection:"column",gap:4}}>
-      {tasks.length === 0 && <div style={{fontFamily:FF,fontSize:11,color:"rgba(255,255,255,0.25)",fontStyle:"italic",margin:"auto",textAlign:"center"}}>✓ All tasks done!</div>}
+      {tasks.length === 0 && <div style={{fontFamily:FF,fontSize:11,color:"var(--nv-text-dim)",fontStyle:"italic",margin:"auto",textAlign:"center"}}>✓ All tasks done!</div>}
       {tasks.map(t => (
         <div key={t.id} className="fr" style={{
           display:"flex",alignItems:"center",gap:9,
@@ -258,10 +258,10 @@ export function TasksWidgetContent({ data, updateData, state, AC }) {
             flexShrink:0,
             transition:"border-color 0.18s, background 0.18s",
           }}/>
-          <span style={{fontFamily:FF,fontSize:11.5,color:"rgba(255,255,255,0.85)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",lineHeight:1.3}}>{t.text}</span>
+          <span style={{fontFamily:FF,fontSize:11.5,color:"var(--nv-text)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",lineHeight:1.3}}>{t.text}</span>
         </div>
       ))}
-      {data?.tasks?.filter(t => !t.done).length > 10 && <div style={{fontFamily:FFM,fontSize:9.5,color:"rgba(255,255,255,0.32)",textAlign:"center",paddingTop:4,letterSpacing:0.3}}>+{data.tasks.filter(t => !t.done).length - 10} more</div>}
+      {data?.tasks?.filter(t => !t.done).length > 10 && <div style={{fontFamily:FFM,fontSize:9.5,color:"var(--nv-text-dim)",textAlign:"center",paddingTop:4,letterSpacing:0.3}}>+{data.tasks.filter(t => !t.done).length - 10} more</div>}
     </div>
   );
 }
@@ -281,11 +281,11 @@ export function CalendarWidgetContent({ tick, state, AC }) {
   // a more typographic feel.
   return (
     <div style={{width:"100%",height:"100%",padding:"8px 12px",display:"flex",flexDirection:"column",gap:5}}>
-      <div style={{fontFamily:FFB,fontWeight:700,fontSize:Math.max(11,cellSz*0.55),color:"rgba(255,255,255,0.82)",textAlign:"center",letterSpacing:0.5}}>
+      <div style={{fontFamily:FFB,fontWeight:700,fontSize:Math.max(11,cellSz*0.55),color:"var(--nv-text)",textAlign:"center",letterSpacing:0.5}}>
         {tick.toLocaleDateString([], {month:"long", year:"numeric"})}
       </div>
       <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:2}}>
-        {DAYS.map((d,i) => <div key={d} style={{textAlign:"center",fontFamily:FFB,fontWeight:600,fontSize:Math.max(8,cellSz*0.42),color:i===0||i===6?"rgba(255,255,255,0.22)":"rgba(255,255,255,0.35)",padding:"2px 0",letterSpacing:0.3}}>{d}</div>)}
+        {DAYS.map((d,i) => <div key={d} style={{textAlign:"center",fontFamily:FFB,fontWeight:600,fontSize:Math.max(8,cellSz*0.42),color:i===0||i===6?"var(--nv-text-dim)":"var(--nv-text-dim)",padding:"2px 0",letterSpacing:0.3}}>{d}</div>)}
         {cells.map((d, i) => {
           const dayOfWeek = i % 7;
           const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
@@ -295,7 +295,7 @@ export function CalendarWidgetContent({ tick, state, AC }) {
               textAlign:"center",
               fontFamily:isToday?FFB:FF,
               fontSize:Math.max(9,cellSz*0.48),
-              color:isToday?"#fff":isWeekend?"rgba(255,255,255,0.42)":"rgba(255,255,255,0.7)",
+              color:isToday?"#fff":isWeekend?"var(--nv-text-dim)":"var(--nv-text)",
               background:isToday?"linear-gradient(135deg,"+AC+","+AC+")":"transparent",
               borderRadius:6,
               padding:"2px 0",
@@ -353,14 +353,14 @@ export function SysInfoWidgetContent({ state }) {
       {[["CPU",cpuSub,cpu,"#4f9eff"],["RAM",ramSub,ram,"#4cef90"]].map(([lbl,sub,pct,col]) => (
         <div key={lbl}>
           <div style={{display:"flex",justifyContent:"space-between",marginBottom:4,alignItems:"baseline"}}>
-            <span style={{fontFamily:FFB,fontWeight:600,fontSize:fs,color:"rgba(255,255,255,0.78)",letterSpacing:1,textTransform:"uppercase"}}>{lbl}</span>
+            <span style={{fontFamily:FFB,fontWeight:600,fontSize:fs,color:"var(--nv-text)",letterSpacing:1,textTransform:"uppercase"}}>{lbl}</span>
             <span style={{fontFamily:FFM,fontWeight:500,fontSize:fs,color:col,letterSpacing:0.3}}>{pct}%</span>
           </div>
           <Bar pct={pct} col={col}/>
-          {h > 120 && <div style={{fontFamily:FF,fontSize:fs*0.88,color:"rgba(255,255,255,0.32)",marginTop:2}}>{sub}</div>}
+          {h > 120 && <div style={{fontFamily:FF,fontSize:fs*0.88,color:"var(--nv-text-dim)",marginTop:2}}>{sub}</div>}
         </div>
       ))}
-      {h > 110 && <div style={{fontFamily:FFM,fontSize:fs*0.95,color:"rgba(255,255,255,0.4)",letterSpacing:0.4,paddingTop:2,borderTop:"1px solid rgba(255,255,255,0.05)"}}>⏱ {fmtUp(uptime)}&nbsp;·&nbsp;{window.innerWidth}×{window.innerHeight}</div>}
+      {h > 110 && <div style={{fontFamily:FFM,fontSize:fs*0.95,color:"var(--nv-text-dim)",letterSpacing:0.4,paddingTop:2,borderTop:"1px solid rgba(255,255,255,0.05)"}}>⏱ {fmtUp(uptime)}&nbsp;·&nbsp;{window.innerWidth}×{window.innerHeight}</div>}
     </div>
   );
 }
@@ -418,7 +418,7 @@ export function BatteryWidgetContent({ state, AC }) {
 
   if (info.status === "loading") {
     return (
-      <div style={{width:"100%",height:"100%",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:FF,fontSize:11,color:"rgba(255,255,255,0.35)"}}>
+      <div style={{width:"100%",height:"100%",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:FF,fontSize:11,color:"var(--nv-text-dim)"}}>
         Reading battery…
       </div>
     );
@@ -427,7 +427,7 @@ export function BatteryWidgetContent({ state, AC }) {
     return (
       <div style={{width:"100%",height:"100%",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:10,gap:4,textAlign:"center"}}>
         <div style={{fontSize:20,opacity:0.55}}>🔌</div>
-        <div style={{fontFamily:FF,fontSize:10.5,color:"rgba(255,255,255,0.45)",lineHeight:1.4}}>Battery info unavailable<br/><span style={{fontSize:9,opacity:0.7}}>your browser doesn't expose it</span></div>
+        <div style={{fontFamily:FF,fontSize:10.5,color:"var(--nv-text-dim)",lineHeight:1.4}}>Battery info unavailable<br/><span style={{fontSize:9,opacity:0.7}}>your browser doesn't expose it</span></div>
       </div>
     );
   }
@@ -467,8 +467,8 @@ export function BatteryWidgetContent({ state, AC }) {
           <div style={{width:Math.max(2,pct)+"%",height:"100%",background:fillColor,borderRadius:1.5,transition:"width 0.6s, background 0.3s"}}/>
         </div>
         <div style={{display:"flex",flexDirection:"column",minWidth:0,flex:1}}>
-          <div style={{fontFamily:FFM,fontWeight:500,fontSize:big,color:"#fff",lineHeight:1,letterSpacing:0.5}}>{pct}%</div>
-          <div style={{fontFamily:FF,fontSize:10,color:"rgba(255,255,255,0.5)",marginTop:3}}>
+          <div style={{fontFamily:FFM,fontWeight:500,fontSize:big,color:"var(--nv-text-strong)",lineHeight:1,letterSpacing:0.5}}>{pct}%</div>
+          <div style={{fontFamily:FF,fontSize:10,color:"var(--nv-text-dim)",marginTop:3}}>
             {stuck100 ? "Plugged in" : info.charging ? (timeStr ? "Charging · " + timeStr : "Charging") : (timeStr ? timeStr + " left" : "On battery")}
           </div>
         </div>
@@ -609,7 +609,7 @@ export function PomodoroWidgetContent({ state, AC }) {
 
       {/* Big time */}
       <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: 0 }}>
-        <div style={{ fontFamily: FFM, fontSize: timeSize, color: "#fff", letterSpacing: 1.5, lineHeight: 1 }}>{fmt(msLeft)}</div>
+        <div style={{ fontFamily: FFM, fontSize: timeSize, color: "var(--nv-text-strong)", letterSpacing: 1.5, lineHeight: 1 }}>{fmt(msLeft)}</div>
         {/* Progress arc — pure-CSS, no SVG needed */}
         <div style={{ width: "100%", height: 4, background: "rgba(255,255,255,0.06)", borderRadius: 2, marginTop: 10, overflow: "hidden" }}>
           <div style={{ width: pct * 100 + "%", height: "100%", background: color, transition: "width 0.4s linear", boxShadow: `0 0 8px ${color}88` }}/>
