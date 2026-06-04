@@ -241,7 +241,7 @@ export function FilesApp({ data, updateData, showToast, AC, commApps = [], openA
             <div style={{ display: "flex", gap: 7, marginBottom: 10 }}>
               <input autoFocus value={newFolderName} onChange={e => setNewFolderName(e.target.value)} onKeyDown={e => e.key === "Enter" && createFolder()} placeholder="Folder name…" style={{ ...INP, flex: 1 }} />
               <button onClick={createFolder} style={{ padding: "7px 14px", background: fill(ac), border: "1px solid " + bdr(ac), borderRadius: 7, cursor: "pointer", fontFamily: FFB, fontWeight: 600, fontSize: 12, color: ac }}>Create</button>
-              <button onClick={() => setShowNewFolder(false)} style={{ padding: "7px 11px", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.11)", borderRadius: 7, cursor: "pointer", color: "rgba(255,255,255,0.5)", fontFamily: FFB, fontSize: 12 }}>✕</button>
+              <button onClick={() => setShowNewFolder(false)} style={{ padding: "7px 11px", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.11)", borderRadius: 7, cursor: "pointer", color: "var(--nv-text-dim)", fontFamily: FFB, fontSize: 12 }}>✕</button>
             </div>
           )}
 
@@ -251,7 +251,7 @@ export function FilesApp({ data, updateData, showToast, AC, commApps = [], openA
               <textarea value={newNoteBody} onChange={e => setNewNoteBody(e.target.value)} placeholder="Content… (optional)" style={{ ...INP, minHeight: 55 }} />
               <div style={{ display: "flex", gap: 7 }}>
                 <button onClick={createNote} style={{ flex: 1, padding: "7px", background: fill(ac), border: "1px solid " + bdr(ac), borderRadius: 7, cursor: "pointer", fontFamily: FFB, fontWeight: 600, fontSize: 12, color: ac }}>Create Note</button>
-                <button onClick={() => setShowNewNote(false)} style={{ padding: "7px 12px", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.11)", borderRadius: 7, cursor: "pointer", color: "rgba(255,255,255,0.5)", fontFamily: FFB, fontSize: 12 }}>Cancel</button>
+                <button onClick={() => setShowNewNote(false)} style={{ padding: "7px 12px", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.11)", borderRadius: 7, cursor: "pointer", color: "var(--nv-text-dim)", fontFamily: FFB, fontSize: 12 }}>Cancel</button>
               </div>
             </div>
           )}
@@ -262,7 +262,7 @@ export function FilesApp({ data, updateData, showToast, AC, commApps = [], openA
               <select onChange={e => { const tid = e.target.value === "null" ? null : e.target.value; movingItem.type === "note" ? moveNote(movingItem.id, tid) : moveTask(movingItem.id, tid); }} style={{ ...INP, cursor: "pointer", marginBottom: 8 }} defaultValue={movingItem.folderId || "null"}>
                 {folderOpts.map(o => <option key={String(o.id)} value={String(o.id)}>{o.label}</option>)}
               </select>
-              <button onClick={() => setMovingItem(null)} style={{ padding: "5px 12px", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.11)", borderRadius: 6, cursor: "pointer", fontFamily: FFB, fontSize: 11, color: "rgba(255,255,255,0.5)" }}>Cancel</button>
+              <button onClick={() => setMovingItem(null)} style={{ padding: "5px 12px", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.11)", borderRadius: 6, cursor: "pointer", fontFamily: FFB, fontSize: 11, color: "var(--nv-text-dim)" }}>Cancel</button>
             </div>
           )}
 

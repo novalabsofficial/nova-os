@@ -460,8 +460,8 @@ export function ChatApp({ user, AC, data, updateData }) {
         </div>
         <div style={{ padding: "0 6px 4px", maxHeight: "30%", overflowY: "auto" }}>
           {servers.length === 0 && (
-            <div style={{ padding: "6px 8px", fontSize: 10, color: "rgba(255,255,255,0.25)", fontStyle: "italic", lineHeight: 1.5 }}>
-              No servers yet. Tap <strong style={{color:"rgba(255,255,255,0.5)"}}>+</strong> to create one or <strong style={{color:"rgba(255,255,255,0.5)"}}>↘</strong> to join.
+            <div style={{ padding: "6px 8px", fontSize: 10, color: "var(--nv-text-dim)", fontStyle: "italic", lineHeight: 1.5 }}>
+              No servers yet. Tap <strong style={{color:"var(--nv-text-dim)"}}>+</strong> to create one or <strong style={{color:"var(--nv-text-dim)"}}>↘</strong> to join.
             </div>
           )}
           {servers.map(s => {
@@ -540,8 +540,8 @@ export function ChatApp({ user, AC, data, updateData }) {
 
         <div style={{ flex: 1, overflowY: "auto", padding: "0 6px 8px" }}>
           {threads.length === 0 && (
-            <div style={{ padding: "6px 8px", fontSize: 10, color: "rgba(255,255,255,0.25)", fontStyle: "italic", lineHeight: 1.5 }}>
-              No DMs yet. Tap <strong style={{color:"rgba(255,255,255,0.5)"}}>+</strong> to start one.
+            <div style={{ padding: "6px 8px", fontSize: 10, color: "var(--nv-text-dim)", fontStyle: "italic", lineHeight: 1.5 }}>
+              No DMs yet. Tap <strong style={{color:"var(--nv-text-dim)"}}>+</strong> to start one.
             </div>
           )}
           {threads.map(t => {
@@ -585,12 +585,12 @@ export function ChatApp({ user, AC, data, updateData }) {
               >👥 {activeServer.memberUids?.length || 1}</button>
             )}
             {view === "global" && (
-              <span style={{ fontSize: 11, color: "rgba(255,255,255,0.3)" }}>
+              <span style={{ fontSize: 11, color: "var(--nv-text-dim)" }}>
                 {loading ? "Connecting…" : messages.length + " messages"}
               </span>
             )}
           </div>
-          <div style={{ fontSize: 10.5, color: "rgba(255,255,255,0.32)", marginTop: 3 }}>{headerSub}</div>
+          <div style={{ fontSize: 10.5, color: "var(--nv-text-dim)", marginTop: 3 }}>{headerSub}</div>
         </div>
 
         {/* Members + server info panel slides down inside the main pane */}
@@ -620,12 +620,12 @@ export function ChatApp({ user, AC, data, updateData }) {
             {view === "global" && loading && (
               <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", gap: 10, flexDirection: "column" }}>
                 <div style={{ width: 24, height: 24, border: "3px solid rgba(255,255,255,0.1)", borderTopColor: AC, borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
-                <span style={{ fontSize: 12, color: "rgba(255,255,255,0.3)" }}>Loading chat…</span>
+                <span style={{ fontSize: 12, color: "var(--nv-text-dim)" }}>Loading chat…</span>
               </div>
             )}
 
             {!loading && activeMessages.length === 0 && (
-              <div style={{ textAlign: "center", color: "rgba(255,255,255,0.2)", fontSize: 13, fontStyle: "italic", margin: "auto" }}>
+              <div style={{ textAlign: "center", color: "var(--nv-text-dim)", fontSize: 13, fontStyle: "italic", margin: "auto" }}>
                 {view === "dm" ? "No messages yet — say hi 👋"
                   : view === "server" ? "Nothing in #" + (activeChannel?.name || "general") + " yet. Be the first!"
                   : "No messages yet — say hello! 👋"}
@@ -657,7 +657,7 @@ export function ChatApp({ user, AC, data, updateData }) {
                   className="rowact"
                   onClick={() => setPickerOpenFor(prev => prev === item.id ? null : item.id)}
                   title="Add reaction"
-                  style={{ background: "rgba(0,0,0,0.25)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 6, cursor: "pointer", color: "rgba(255,255,255,0.7)", fontSize: 12, padding: "2px 6px", flexShrink: 0, opacity: pickerOpenFor === item.id ? 1 : 0, transition: "opacity 0.12s" }}
+                  style={{ background: "rgba(0,0,0,0.25)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 6, cursor: "pointer", color: "var(--nv-text)", fontSize: 12, padding: "2px 6px", flexShrink: 0, opacity: pickerOpenFor === item.id ? 1 : 0, transition: "opacity 0.12s" }}
                 >🙂</button>
               ) : null;
 
@@ -893,11 +893,11 @@ function NewDmForm({ newDmInput, setNewDmInput, startNewDm, opening, newDmError,
       <div style={{ maxWidth: 360, margin: "0 auto", display: "flex", flexDirection: "column", gap: 14 }}>
         <div style={{ fontSize: 48, textAlign: "center", lineHeight: 1, marginBottom: 4 }}>💬</div>
         <div style={{ fontFamily: FFB, fontWeight: 700, fontSize: 18, color: "#fff", textAlign: "center" }}>Start a new DM</div>
-        <div style={{ fontSize: 12, color: "rgba(255,255,255,0.55)", textAlign: "center", lineHeight: 1.6 }}>
+        <div style={{ fontSize: 12, color: "var(--nv-text-dim)", textAlign: "center", lineHeight: 1.6 }}>
           Type any Nova OS user's name to begin a direct message. Only the two of you (and moderators) can see what you send.
         </div>
         <div style={{ display: "flex", gap: 7, marginTop: 8 }}>
-          <span style={{ display: "flex", alignItems: "center", padding: "0 12px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, fontFamily: FFM, color: "rgba(255,255,255,0.5)", fontSize: 14 }}>@</span>
+          <span style={{ display: "flex", alignItems: "center", padding: "0 12px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, fontFamily: FFM, color: "var(--nv-text-dim)", fontSize: 14 }}>@</span>
           <input
             autoFocus
             value={newDmInput}
@@ -1379,7 +1379,7 @@ function ReactionsRow({ msgId, bag, myUid, user, pickerOpen, onClosePicker, onTo
               style={{ background: "none", border: "none", cursor: "pointer", fontSize: 16, padding: "2px 4px", lineHeight: 1 }}
             >{emoji}</button>
           ))}
-          <button onClick={onClosePicker} title="Close" style={{ background: "none", border: "none", cursor: "pointer", color: "rgba(255,255,255,0.45)", fontSize: 12, padding: "2px 4px" }}>✕</button>
+          <button onClick={onClosePicker} title="Close" style={{ background: "none", border: "none", cursor: "pointer", color: "var(--nv-text-dim)", fontSize: 12, padding: "2px 4px" }}>✕</button>
         </div>
       )}
     </div>

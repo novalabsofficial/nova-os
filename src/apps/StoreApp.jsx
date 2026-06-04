@@ -100,11 +100,11 @@ function AppTile({ app, ratings, ac, onOpen }) {
     }}>
       <StoreBrandIcon app={app} size={62} />
       <div style={{ width: "100%" }}>
-        <div style={{ fontFamily: FFB, fontWeight: 600, fontSize: 12.5, color: "rgba(255,255,255,0.92)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{app.name}</div>
-        <div style={{ fontSize: 10, color: "rgba(255,255,255,0.4)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", marginTop: 1 }}>{meta.developer}</div>
+        <div style={{ fontFamily: FFB, fontWeight: 600, fontSize: 12.5, color: "var(--nv-text-strong)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{app.name}</div>
+        <div style={{ fontSize: 10, color: "var(--nv-text-dim)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", marginTop: 1 }}>{meta.developer}</div>
         <div style={{ marginTop: 5, display: "flex", alignItems: "center", justifyContent: "center", gap: 4 }}>
           <StarRow value={r.count ? r.avg : 0} size={11} />
-          <span style={{ fontSize: 9, fontFamily: FFM, color: "rgba(255,255,255,0.35)" }}>{r.count ? r.avg.toFixed(1) : "New"}</span>
+          <span style={{ fontSize: 9, fontFamily: FFM, color: "var(--nv-text-dim)" }}>{r.count ? r.avg.toFixed(1) : "New"}</span>
         </div>
       </div>
     </div>
@@ -122,12 +122,12 @@ function FeaturedCard({ app, ac, onOpen }) {
       border: "1px solid rgba(255,255,255,0.12)", position: "relative", overflow: "hidden",
       boxShadow: "0 8px 26px rgba(0,0,0,0.35)",
     }}>
-      <div style={{ fontFamily: FFB, fontWeight: 700, fontSize: 10, letterSpacing: 1.5, color: "rgba(255,255,255,0.7)", textTransform: "uppercase", marginBottom: 14 }}>Featured</div>
+      <div style={{ fontFamily: FFB, fontWeight: 700, fontSize: 10, letterSpacing: 1.5, color: "var(--nv-text)", textTransform: "uppercase", marginBottom: 14 }}>Featured</div>
       <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
         <StoreBrandIcon app={app} size={64} />
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontFamily: FFB, fontWeight: 700, fontSize: 18, color: "#fff", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{app.name}</div>
-          <div style={{ fontSize: 12, color: "rgba(255,255,255,0.78)", lineHeight: 1.35, marginTop: 2 }}>{meta.tagline || app.desc}</div>
+          <div style={{ fontSize: 12, color: "var(--nv-text)", lineHeight: 1.35, marginTop: 2 }}>{meta.tagline || app.desc}</div>
         </div>
       </div>
       <div style={{ marginTop: 16, display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 16px", borderRadius: 20, background: "rgba(255,255,255,0.92)", color: "#111", fontFamily: FFB, fontWeight: 700, fontSize: 12 }}>View</div>
@@ -149,18 +149,18 @@ function GridCard({ app, ratings, ac, isIn, onOpen, toggleInstall, currentUser, 
       <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
         <StoreBrandIcon app={app} size={50} />
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontFamily: FFB, fontWeight: 600, fontSize: 13.5, color: "rgba(255,255,255,0.94)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{app.name}</div>
-          <div style={{ fontSize: 10.5, color: "rgba(255,255,255,0.42)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", marginTop: 1 }}>{meta.developer}</div>
+          <div style={{ fontFamily: FFB, fontWeight: 600, fontSize: 13.5, color: "var(--nv-text-strong)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{app.name}</div>
+          <div style={{ fontSize: 10.5, color: "var(--nv-text-dim)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", marginTop: 1 }}>{meta.developer}</div>
           <div style={{ display: "flex", alignItems: "center", gap: 5, marginTop: 4 }}>
             <StarRow value={r.count ? r.avg : 0} size={11} />
-            <span style={{ fontSize: 9.5, fontFamily: FFM, color: "rgba(255,255,255,0.35)" }}>{r.count ? r.avg.toFixed(1) + " (" + r.count + ")" : "No ratings"}</span>
+            <span style={{ fontSize: 9.5, fontFamily: FFM, color: "var(--nv-text-dim)" }}>{r.count ? r.avg.toFixed(1) + " (" + r.count + ")" : "No ratings"}</span>
           </div>
         </div>
         {canDelete && (
           <button className="dl" onClick={(e) => { e.stopPropagation(); onDeleteApp(app); }} title="Remove your submission" style={{ background: "none", border: "none", cursor: "pointer", color: "rgba(255,80,80,0.35)", fontSize: 13, padding: "2px 5px", flexShrink: 0 }}>🗑</button>
         )}
       </div>
-      <div style={{ fontSize: 12, color: "rgba(255,255,255,0.48)", lineHeight: 1.5, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", minHeight: 34 }}>{app.desc}</div>
+      <div style={{ fontSize: 12, color: "var(--nv-text-dim)", lineHeight: 1.5, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", minHeight: 34 }}>{app.desc}</div>
       <div style={{ display: "flex", gap: 8 }}>
         <button onClick={(e) => { e.stopPropagation(); toggleInstall(app); }} style={{ flex: 1, padding: "7px", borderRadius: 9, cursor: "pointer", fontFamily: FFB, fontWeight: 600, fontSize: 11.5, background: isIn ? "rgba(255,80,80,0.1)" : "rgba(255,255,255,0.07)", border: "1px solid " + (isIn ? "rgba(255,80,80,0.3)" : "rgba(255,255,255,0.12)"), color: isIn ? "rgba(255,130,130,0.9)" : "rgba(255,255,255,0.7)" }}>{isIn ? "Remove" : "Add"}</button>
         <button onClick={(e) => { e.stopPropagation(); openExternalUrl(app.url); }} title={app.url ? "Open " + app.url : "Open"} style={{ flex: 1, padding: "7px", borderRadius: 9, cursor: "pointer", fontFamily: FFB, fontWeight: 700, fontSize: 11.5, background: fill(ac), border: "1px solid " + bdr(ac), color: ac }}>Open ↗</button>
@@ -174,7 +174,7 @@ function Shelf({ title, apps, ratings, ac, onOpen }) {
   if (!apps.length) return null;
   return (
     <div style={{ marginBottom: 22 }}>
-      <div style={{ fontFamily: FFB, fontWeight: 700, fontSize: 15, color: "rgba(255,255,255,0.92)", marginBottom: 10 }}>{title}</div>
+      <div style={{ fontFamily: FFB, fontWeight: 700, fontSize: 15, color: "var(--nv-text-strong)", marginBottom: 10 }}>{title}</div>
       <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 6 }}>
         {apps.map(a => <AppTile key={a.id} app={a} ratings={ratings} ac={ac} onOpen={onOpen} />)}
       </div>
@@ -208,7 +208,7 @@ function AppDetail({ app, ratings, ac, isIn, user, onBack, toggleInstall, rateAn
   return (
     <div style={{ animation: "boot-in 0.25s ease both" }}>
       {/* Back */}
-      <button onClick={onBack} className="lt" style={{ background: "none", border: "none", cursor: "pointer", fontFamily: FFB, fontWeight: 600, fontSize: 13, color: "rgba(255,255,255,0.55)", padding: "2px 0", marginBottom: 12, display: "inline-flex", alignItems: "center", gap: 6 }}>← Back</button>
+      <button onClick={onBack} className="lt" style={{ background: "none", border: "none", cursor: "pointer", fontFamily: FFB, fontWeight: 600, fontSize: 13, color: "var(--nv-text-dim)", padding: "2px 0", marginBottom: 12, display: "inline-flex", alignItems: "center", gap: 6 }}>← Back</button>
 
       {/* Hero */}
       <div style={{ borderRadius: 18, padding: 22, marginBottom: 18, position: "relative", overflow: "hidden", background: `linear-gradient(140deg, rgba(${rgb},0.4), rgba(${rgb},0.06))`, border: "1px solid rgba(255,255,255,0.1)" }}>
@@ -216,15 +216,15 @@ function AppDetail({ app, ratings, ac, isIn, user, onBack, toggleInstall, rateAn
           <StoreBrandIcon app={app} size={92} />
           <div style={{ flex: 1, minWidth: 200 }}>
             <div style={{ fontFamily: FFB, fontWeight: 700, fontSize: 26, color: "#fff", lineHeight: 1.1 }}>{app.name}</div>
-            <div style={{ fontSize: 13, color: "rgba(255,255,255,0.7)", marginTop: 4 }}>{meta.developer}</div>
-            {meta.tagline && <div style={{ fontSize: 13, color: "rgba(255,255,255,0.6)", marginTop: 2 }}>{meta.tagline}</div>}
+            <div style={{ fontSize: 13, color: "var(--nv-text)", marginTop: 4 }}>{meta.developer}</div>
+            {meta.tagline && <div style={{ fontSize: 13, color: "var(--nv-text)", marginTop: 2 }}>{meta.tagline}</div>}
             <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 12, flexWrap: "wrap" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                 <StarRow value={total ? r.avg : 0} size={15} />
-                <span style={{ fontFamily: FFM, fontSize: 12, color: "rgba(255,255,255,0.6)" }}>{total ? r.avg.toFixed(1) + " · " + total + (total === 1 ? " rating" : " ratings") : "No ratings yet"}</span>
+                <span style={{ fontFamily: FFM, fontSize: 12, color: "var(--nv-text)" }}>{total ? r.avg.toFixed(1) + " · " + total + (total === 1 ? " rating" : " ratings") : "No ratings yet"}</span>
               </div>
               <span style={{ fontSize: 10, fontFamily: FFM, padding: "2px 9px", borderRadius: 20, background: app.newTab ? "rgba(255,180,0,0.14)" : "rgba(79,200,100,0.14)", border: "1px solid " + (app.newTab ? "rgba(255,180,0,0.32)" : "rgba(79,200,100,0.32)"), color: app.newTab ? "rgba(255,200,80,0.95)" : "rgba(120,225,140,0.95)" }}>{app.badge || (app.newTab ? "↗ New Tab" : "✓ In-App")}</span>
-              <span style={{ fontSize: 11, color: "rgba(255,255,255,0.4)" }}>{app.cat}</span>
+              <span style={{ fontSize: 11, color: "var(--nv-text-dim)" }}>{app.cat}</span>
             </div>
           </div>
         </div>
@@ -234,12 +234,12 @@ function AppDetail({ app, ratings, ac, isIn, user, onBack, toggleInstall, rateAn
             URL underneath in a smaller mono font. */}
         {app.url && (
           <div style={{ marginTop: 16, padding: "10px 14px", background: "rgba(0,0,0,0.22)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 10, display: "flex", alignItems: "center", gap: 10 }}>
-            <span style={{ fontSize: 14, color: "rgba(255,255,255,0.5)", flexShrink: 0 }} title="External link">🔗</span>
+            <span style={{ fontSize: 14, color: "var(--nv-text-dim)", flexShrink: 0 }} title="External link">🔗</span>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontFamily: FFB, fontWeight: 600, fontSize: 12.5, color: "#fff", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                 Opens {storeUrlHost(app.url)}
               </div>
-              <div style={{ fontFamily: FFM, fontSize: 10.5, color: "rgba(255,255,255,0.5)", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={app.url}>
+              <div style={{ fontFamily: FFM, fontSize: 10.5, color: "var(--nv-text-dim)", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={app.url}>
                 {app.url}
               </div>
             </div>
@@ -255,7 +255,7 @@ function AppDetail({ app, ratings, ac, isIn, user, onBack, toggleInstall, rateAn
       {/* About */}
       <div style={{ marginBottom: 22 }}>
         <div style={{ ...SEC, marginBottom: 8 }}>About</div>
-        <div style={{ fontSize: 14, color: "rgba(255,255,255,0.7)", lineHeight: 1.6 }}>{app.desc}</div>
+        <div style={{ fontSize: 14, color: "var(--nv-text)", lineHeight: 1.6 }}>{app.desc}</div>
       </div>
 
       {/* Ratings & reviews */}
@@ -264,12 +264,12 @@ function AppDetail({ app, ratings, ac, isIn, user, onBack, toggleInstall, rateAn
         <div style={{ textAlign: "center", minWidth: 92 }}>
           <div style={{ fontFamily: FFB, fontWeight: 700, fontSize: 46, color: "#fff", lineHeight: 1 }}>{total ? r.avg.toFixed(1) : "–"}</div>
           <div style={{ marginTop: 6 }}><StarRow value={total ? r.avg : 0} size={14} /></div>
-          <div style={{ fontSize: 11, color: "rgba(255,255,255,0.4)", marginTop: 4 }}>{total} {total === 1 ? "rating" : "ratings"}</div>
+          <div style={{ fontSize: 11, color: "var(--nv-text-dim)", marginTop: 4 }}>{total} {total === 1 ? "rating" : "ratings"}</div>
         </div>
         <div style={{ flex: 1, minWidth: 180, display: "flex", flexDirection: "column", gap: 4 }}>
           {[5, 4, 3, 2, 1].map(s => (
             <div key={s} style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <span style={{ fontSize: 10, fontFamily: FFM, color: "rgba(255,255,255,0.4)", width: 8 }}>{s}</span>
+              <span style={{ fontSize: 10, fontFamily: FFM, color: "var(--nv-text-dim)", width: 8 }}>{s}</span>
               <div style={{ flex: 1, height: 6, borderRadius: 3, background: "rgba(255,255,255,0.07)", overflow: "hidden" }}>
                 <div style={{ width: ((r.hist[s] || 0) / maxBar * 100) + "%", height: "100%", background: "#ffc83d", borderRadius: 3 }} />
               </div>
@@ -280,7 +280,7 @@ function AppDetail({ app, ratings, ac, isIn, user, onBack, toggleInstall, rateAn
 
       {/* Composer */}
       <div style={{ padding: 16, borderRadius: 14, background: "rgba(255,255,255,0.035)", border: "1px solid rgba(255,255,255,0.08)", marginBottom: 18 }}>
-        <div style={{ fontFamily: FFB, fontWeight: 600, fontSize: 13, color: "rgba(255,255,255,0.85)", marginBottom: 10 }}>{r.mine ? "Edit your review" : "Write a review"}</div>
+        <div style={{ fontFamily: FFB, fontWeight: 600, fontSize: 13, color: "var(--nv-text)", marginBottom: 10 }}>{r.mine ? "Edit your review" : "Write a review"}</div>
         <div style={{ display: "flex", gap: 4, marginBottom: 12 }}>
           {[1, 2, 3, 4, 5].map(s => (
             <span key={s} onClick={() => setStars(s)} onMouseEnter={() => setHoverStar(s)} onMouseLeave={() => setHoverStar(0)}
@@ -289,25 +289,25 @@ function AppDetail({ app, ratings, ac, isIn, user, onBack, toggleInstall, rateAn
         </div>
         <textarea value={text} onChange={e => setText(e.target.value.slice(0, 1000))} placeholder="Share what you think about this app… (optional)" style={{ ...INP, minHeight: 70 }} />
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 10 }}>
-          <span style={{ fontSize: 10, color: "rgba(255,255,255,0.3)", fontFamily: FFM }}>{text.length}/1000</span>
+          <span style={{ fontSize: 10, color: "var(--nv-text-dim)", fontFamily: FFM }}>{text.length}/1000</span>
           <button onClick={save} disabled={!stars || saving} style={{ padding: "8px 20px", borderRadius: 10, cursor: stars && !saving ? "pointer" : "default", fontFamily: FFB, fontWeight: 700, fontSize: 12.5, background: fill(ac), border: "1px solid " + bdr(ac), color: ac, opacity: stars && !saving ? 1 : 0.4 }}>{saving ? "Posting…" : r.mine ? "Update review" : "Post review"}</button>
         </div>
       </div>
 
       {/* Review feed */}
-      {r.reviews.length === 0 && <div style={{ fontSize: 13, color: "rgba(255,255,255,0.3)", fontStyle: "italic", padding: "8px 0 24px" }}>No written reviews yet — be the first to share your thoughts.</div>}
+      {r.reviews.length === 0 && <div style={{ fontSize: 13, color: "var(--nv-text-dim)", fontStyle: "italic", padding: "8px 0 24px" }}>No written reviews yet — be the first to share your thoughts.</div>}
       <div style={{ display: "flex", flexDirection: "column", gap: 14, paddingBottom: 8 }}>
         {r.reviews.map((rv, i) => (
           <div key={i} style={{ display: "flex", gap: 12 }}>
             <Avatar name={rv.user} ac={ac} size={34} />
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                <span style={{ fontFamily: FFB, fontWeight: 600, fontSize: 13, color: "rgba(255,255,255,0.9)" }}>@{rv.user}{rv.user === user && <span style={{ fontSize: 10, color: ac, marginLeft: 5 }}>you</span>}</span>
+                <span style={{ fontFamily: FFB, fontWeight: 600, fontSize: 13, color: "var(--nv-text-strong)" }}>@{rv.user}{rv.user === user && <span style={{ fontSize: 10, color: ac, marginLeft: 5 }}>you</span>}</span>
                 <StarRow value={rv.rating} size={11} />
-                <span style={{ fontSize: 10, fontFamily: FFM, color: "rgba(255,255,255,0.3)" }}>{relTime(rv.ts)}</span>
+                <span style={{ fontSize: 10, fontFamily: FFM, color: "var(--nv-text-dim)" }}>{relTime(rv.ts)}</span>
                 {canModerate && <button onClick={() => onDeleteReview(app.id, rv.user)} title="Delete review (moderator)" style={{ marginLeft: "auto", background: "none", border: "none", cursor: "pointer", color: "rgba(255,90,90,0.6)", fontSize: 12, padding: "0 2px" }}>🗑</button>}
               </div>
-              <div style={{ fontSize: 13, color: "rgba(255,255,255,0.62)", lineHeight: 1.55, marginTop: 4, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{rv.text}</div>
+              <div style={{ fontSize: 13, color: "var(--nv-text)", lineHeight: 1.55, marginTop: 4, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{rv.text}</div>
             </div>
           </div>
         ))}
@@ -538,7 +538,7 @@ export function StoreApp({ user, data, updateData, showToast, AC }) {
         <NovaLogo size={30} />
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontFamily: FFB, fontWeight: 700, fontSize: 20, color: "#fff", lineHeight: 1 }}>Nova Store</div>
-          <div style={{ fontSize: 10, fontFamily: FFM, color: "rgba(255,255,255,0.35)", marginTop: 2 }}>v{NOVA_VERSION}</div>
+          <div style={{ fontSize: 10, fontFamily: FFM, color: "var(--nv-text-dim)", marginTop: 2 }}>v{NOVA_VERSION}</div>
         </div>
       </div>
       <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search apps, games and more…" style={{ ...INP, marginBottom: 14 }} />
@@ -567,8 +567,8 @@ export function StoreApp({ user, data, updateData, showToast, AC }) {
       {/* ── Search results (overrides the active view) ──────────────────── */}
       {!detail && searching && (
         <>
-          <div style={{ fontFamily: FFB, fontWeight: 700, fontSize: 15, color: "rgba(255,255,255,0.9)", marginBottom: 12 }}>{searchResults.length} result{searchResults.length === 1 ? "" : "s"} for “{search.trim()}”</div>
-          {searchResults.length === 0 && <div style={{ color: "rgba(255,255,255,0.25)", fontStyle: "italic", fontSize: 13, textAlign: "center", padding: "40px 0" }}>Nothing matched. Try another search.</div>}
+          <div style={{ fontFamily: FFB, fontWeight: 700, fontSize: 15, color: "var(--nv-text-strong)", marginBottom: 12 }}>{searchResults.length} result{searchResults.length === 1 ? "" : "s"} for “{search.trim()}”</div>
+          {searchResults.length === 0 && <div style={{ color: "var(--nv-text-dim)", fontStyle: "italic", fontSize: 13, textAlign: "center", padding: "40px 0" }}>Nothing matched. Try another search.</div>}
           <div style={gridStyle}>
             {searchResults.map(app => <GridCard key={app.id} app={app} isIn={isInstalled(app)} {...cardProps} />)}
           </div>
@@ -592,7 +592,7 @@ export function StoreApp({ user, data, updateData, showToast, AC }) {
 
           {/* Browse by category */}
           <div style={{ marginBottom: 22 }}>
-            <div style={{ fontFamily: FFB, fontWeight: 700, fontSize: 15, color: "rgba(255,255,255,0.92)", marginBottom: 10 }}>Browse by Category</div>
+            <div style={{ fontFamily: FFB, fontWeight: 700, fontSize: 15, color: "var(--nv-text-strong)", marginBottom: 10 }}>Browse by Category</div>
             <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
               {homeCats.map(c => {
                 const rgb = hexRgb(c.color);
@@ -603,7 +603,7 @@ export function StoreApp({ user, data, updateData, showToast, AC }) {
                   }}>
                     <div style={{ fontSize: 22, marginBottom: 8 }}>{c.emoji}</div>
                     <div style={{ fontFamily: FFB, fontWeight: 700, fontSize: 14, color: "#fff" }}>{c.cat}</div>
-                    <div style={{ fontSize: 11, color: "rgba(255,255,255,0.65)", marginTop: 1 }}>{c.count} app{c.count === 1 ? "" : "s"}</div>
+                    <div style={{ fontSize: 11, color: "var(--nv-text)", marginTop: 1 }}>{c.count} app{c.count === 1 ? "" : "s"}</div>
                   </button>
                 );
               })}
@@ -614,7 +614,7 @@ export function StoreApp({ user, data, updateData, showToast, AC }) {
           <div style={{ borderRadius: 16, padding: "20px 22px", marginBottom: 8, background: `linear-gradient(135deg, ${fill(ac)}, rgba(255,255,255,0.02))`, border: "1px solid " + bdr(ac), display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
             <div>
               <div style={{ fontFamily: FFB, fontWeight: 700, fontSize: 16, color: "#fff" }}>Built something cool? 🚀</div>
-              <div style={{ fontSize: 13, color: "rgba(255,255,255,0.6)", marginTop: 3 }}>Share your web app with the whole Nova community.</div>
+              <div style={{ fontSize: 13, color: "var(--nv-text)", marginTop: 3 }}>Share your web app with the whole Nova community.</div>
             </div>
             <button onClick={() => { setSearch(""); setView("submit"); }} style={{ padding: "10px 22px", borderRadius: 22, cursor: "pointer", fontFamily: FFB, fontWeight: 700, fontSize: 13, whiteSpace: "nowrap", background: "#fff", color: "#111", border: "none" }}>Submit an app →</button>
           </div>
@@ -646,27 +646,27 @@ export function StoreApp({ user, data, updateData, showToast, AC }) {
       {!detail && !searching && view === "community" && (
         <>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
-            <span style={{ fontSize: 11.5, color: "rgba(255,255,255,0.35)" }}>Apps submitted by Nova users</span>
+            <span style={{ fontSize: 11.5, color: "var(--nv-text-dim)" }}>Apps submitted by Nova users</span>
             <button onClick={() => setView("submit")} style={{ padding: "6px 14px", borderRadius: 8, cursor: "pointer", fontFamily: FFB, fontWeight: 600, fontSize: 11.5, background: fill(ac), border: "1px solid " + bdr(ac), color: ac }}>+ Submit App</button>
           </div>
           {mySubmissions.length > 0 && (
             <div style={{ marginBottom: 16, padding: "11px 13px", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 10 }}>
-              <div style={{ fontFamily: FFB, fontWeight: 600, fontSize: 11, color: "rgba(255,255,255,0.55)", marginBottom: 6, letterSpacing: 0.5 }}>YOUR SUBMISSIONS</div>
+              <div style={{ fontFamily: FFB, fontWeight: 600, fontSize: 11, color: "var(--nv-text-dim)", marginBottom: 6, letterSpacing: 0.5 }}>YOUR SUBMISSIONS</div>
               {mySubmissions.map(a => {
                 const isPending = a.status === "pending";
                 const badgeColor = isPending ? "#ffcc44" : "#ff7878";
                 return (
-                  <div key={a.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "4px 0", fontSize: 12, color: "rgba(255,255,255,0.7)" }}>
+                  <div key={a.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "4px 0", fontSize: 12, color: "var(--nv-text)" }}>
                     <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{a.name}</span>
                     <span style={{ fontFamily: FFM, fontSize: 10, padding: "1px 7px", borderRadius: 4, background: "rgba(" + hexRgb(badgeColor) + ",0.15)", border: "1px solid " + badgeColor, color: badgeColor }}>{isPending ? "Pending review" : "Rejected"}</span>
-                    {!isPending && a.rejectReason && <span style={{ fontSize: 11, fontStyle: "italic", color: "rgba(255,255,255,0.4)", marginLeft: 6 }}>"{a.rejectReason}"</span>}
+                    {!isPending && a.rejectReason && <span style={{ fontSize: 11, fontStyle: "italic", color: "var(--nv-text-dim)", marginLeft: 6 }}>"{a.rejectReason}"</span>}
                   </div>
                 );
               })}
             </div>
           )}
           {loadingComm && <div style={{ textAlign: "center", padding: "36px 0" }}><div style={{ width: 24, height: 24, border: "3px solid rgba(255,255,255,0.1)", borderTopColor: ac, borderRadius: "50%", animation: "spin 0.8s linear infinite", margin: "0 auto" }} /></div>}
-          {!loadingComm && visibleComm.length === 0 && <div style={{ color: "rgba(255,255,255,0.18)", fontStyle: "italic", fontSize: 13, textAlign: "center", padding: "40px 0" }}>No community apps yet — be the first! 🚀</div>}
+          {!loadingComm && visibleComm.length === 0 && <div style={{ color: "var(--nv-text-dim)", fontStyle: "italic", fontSize: 13, textAlign: "center", padding: "40px 0" }}>No community apps yet — be the first! 🚀</div>}
           <div style={gridStyle}>
             {visibleComm.map(app => <GridCard key={app.id} app={app} isIn={isInstalled(app)} {...cardProps} />)}
           </div>
@@ -677,7 +677,7 @@ export function StoreApp({ user, data, updateData, showToast, AC }) {
       {!detail && !searching && view === "submit" && (
         <div style={{ maxWidth: 470 }}>
           <div style={{ fontFamily: FFB, fontWeight: 700, fontSize: 17, color: "#fff", marginBottom: 4 }}>Submit Your App</div>
-          <div style={{ fontSize: 12.5, color: "rgba(255,255,255,0.35)", marginBottom: 18 }}>Share any web app or website with the Nova community. Submissions appear in the Community tab after a quick review.</div>
+          <div style={{ fontSize: 12.5, color: "var(--nv-text-dim)", marginBottom: 18 }}>Share any web app or website with the Nova community. Submissions appear in the Community tab after a quick review.</div>
           <div style={{ display: "flex", flexDirection: "column", gap: 11 }}>
             <div style={{ display: "flex", gap: 10 }}>
               <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
@@ -718,7 +718,7 @@ export function StoreApp({ user, data, updateData, showToast, AC }) {
               style={{ padding: "11px", borderRadius: 10, cursor: submitting ? "default" : "pointer", fontFamily: FFB, fontWeight: 700, fontSize: 13, background: fill(ac), border: "1px solid " + bdr(ac), color: ac, opacity: submitting || !sName.trim() || !sUrl.trim() || !sDesc.trim() ? 0.4 : 1 }}>
               {submitting ? "Submitting…" : "Submit App →"}
             </button>
-            <div style={{ fontSize: 10, color: "rgba(255,255,255,0.2)", fontStyle: "italic" }}>Submissions are public and visible to all Nova OS users. Keep it appropriate.</div>
+            <div style={{ fontSize: 10, color: "var(--nv-text-dim)", fontStyle: "italic" }}>Submissions are public and visible to all Nova OS users. Keep it appropriate.</div>
           </div>
         </div>
       )}
@@ -728,9 +728,9 @@ export function StoreApp({ user, data, updateData, showToast, AC }) {
         <>
           <div style={{ marginBottom: 12 }}>
             <div style={{ fontFamily: FFB, fontWeight: 700, fontSize: 14, color: "#fff" }}>🛡 Moderation Queue</div>
-            <div style={{ fontSize: 11, color: "rgba(255,255,255,0.35)", marginTop: 2 }}>{modQueue.length} app{modQueue.length === 1 ? "" : "s"} awaiting review · red flags from auto-filter need extra attention</div>
+            <div style={{ fontSize: 11, color: "var(--nv-text-dim)", marginTop: 2 }}>{modQueue.length} app{modQueue.length === 1 ? "" : "s"} awaiting review · red flags from auto-filter need extra attention</div>
           </div>
-          {modQueue.length === 0 && <div style={{ color: "rgba(255,255,255,0.2)", fontStyle: "italic", fontSize: 13, textAlign: "center", padding: "40px 0" }}>Queue is empty — nothing to review 🎉</div>}
+          {modQueue.length === 0 && <div style={{ color: "var(--nv-text-dim)", fontStyle: "italic", fontSize: 13, textAlign: "center", padding: "40px 0" }}>Queue is empty — nothing to review 🎉</div>}
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             {modQueue.map(app => (
               <div key={app.id} style={{ padding: "12px 14px", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 10 }}>
@@ -738,9 +738,9 @@ export function StoreApp({ user, data, updateData, showToast, AC }) {
                   <div style={{ flexShrink: 0 }}><StoreBrandIcon app={app} size={40}/></div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontFamily: FFB, fontWeight: 600, fontSize: 13, color: "#fff" }}>{app.name}</div>
-                    <div style={{ fontSize: 11, color: "rgba(255,255,255,0.4)", marginTop: 1 }}>by @{app.submitter || "unknown"} · {app.cat || "Uncategorized"}</div>
+                    <div style={{ fontSize: 11, color: "var(--nv-text-dim)", marginTop: 1 }}>by @{app.submitter || "unknown"} · {app.cat || "Uncategorized"}</div>
                     <a href={app.url} target="_blank" rel="noreferrer" style={{ fontSize: 11, fontFamily: FFM, color: ac, textDecoration: "none", marginTop: 3, display: "inline-block", wordBreak: "break-all" }}>{app.url}</a>
-                    <div style={{ fontSize: 12, color: "rgba(255,255,255,0.6)", marginTop: 6, lineHeight: 1.5 }}>{app.desc}</div>
+                    <div style={{ fontSize: 12, color: "var(--nv-text)", marginTop: 6, lineHeight: 1.5 }}>{app.desc}</div>
                     {app.autoFlags && app.autoFlags.length > 0 && (
                       <div style={{ display: "flex", flexWrap: "wrap", gap: 5, marginTop: 8 }}>
                         {app.autoFlags.map((f, i) => (

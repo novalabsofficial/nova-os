@@ -282,14 +282,14 @@ export function AtmosApp({AC,showToast,pushNotification,openNovaAi,data,updateSe
             />
             <span style={{position:"absolute",left:11,top:"50%",transform:"translateY(-50%)",fontSize:14,opacity:0.5,pointerEvents:"none"}}>🔍</span>
             {query && (
-              <button onClick={()=>{setQuery("");setSuggestions([]);setOpenSuggest(false);}} title="Clear" style={{position:"absolute",right:8,top:"50%",transform:"translateY(-50%)",width:22,height:22,borderRadius:6,background:"rgba(255,255,255,0.08)",border:"none",cursor:"pointer",color:"rgba(255,255,255,0.55)",fontSize:11,padding:0,display:"flex",alignItems:"center",justifyContent:"center"}}>✕</button>
+              <button onClick={()=>{setQuery("");setSuggestions([]);setOpenSuggest(false);}} title="Clear" style={{position:"absolute",right:8,top:"50%",transform:"translateY(-50%)",width:22,height:22,borderRadius:6,background:"rgba(255,255,255,0.08)",border:"none",cursor:"pointer",color:"var(--nv-text-dim)",fontSize:11,padding:0,display:"flex",alignItems:"center",justifyContent:"center"}}>✕</button>
             )}
           </div>
           <button onClick={()=>setUnits(u=>{
             const next = u==="imperial"?"metric":"imperial";
             if(updateSettings) updateSettings({weatherUnits:next});
             return next;
-          })} style={{padding:"8px 12px",background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:8,cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:11,color:"rgba(255,255,255,0.7)"}}>{units==="imperial"?"°F":"°C"}</button>
+          })} style={{padding:"8px 12px",background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:8,cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:11,color:"var(--nv-text)"}}>{units==="imperial"?"°F":"°C"}</button>
           {/* v10.9: background-music toggle */}
           <button onClick={toggleMusic} disabled={!ATMOS_TRACKS.length} title={!ATMOS_TRACKS.length?"No music available":(musicOn?"Stop background music":"Play background music")} style={{padding:"8px 11px",background:musicOn?fill(AC):"rgba(255,255,255,0.05)",border:"1px solid "+(musicOn?bdr(AC):"rgba(255,255,255,0.1)"),borderRadius:8,cursor:ATMOS_TRACKS.length?"pointer":"not-allowed",fontSize:14,lineHeight:1,color:musicOn?AC:"rgba(255,255,255,0.7)",opacity:ATMOS_TRACKS.length?1:0.4}}>{musicOn?"🎶":"🎵"}</button>
         </div>
@@ -298,12 +298,12 @@ export function AtmosApp({AC,showToast,pushNotification,openNovaAi,data,updateSe
           <div style={{display:"flex",alignItems:"center",gap:10,padding:"7px 11px",background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:10}}>
             <span style={{fontSize:15,lineHeight:1}}>🎶</span>
             <div style={{flex:1,minWidth:0}}>
-              <div style={{fontSize:9,fontFamily:FFM,letterSpacing:1.2,color:"rgba(255,255,255,0.38)"}}>NOW PLAYING</div>
-              <div style={{fontSize:12,fontFamily:FFB,fontWeight:600,color:"rgba(255,255,255,0.88)",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{musicTrack.title}</div>
+              <div style={{fontSize:9,fontFamily:FFM,letterSpacing:1.2,color:"var(--nv-text-dim)"}}>NOW PLAYING</div>
+              <div style={{fontSize:12,fontFamily:FFB,fontWeight:600,color:"var(--nv-text)",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{musicTrack.title}</div>
             </div>
             <input type="range" min={0} max={1} step={0.01} value={musicVol} onChange={e=>setMusicVol(parseFloat(e.target.value))} title="Music volume" style={{width:72,accentColor:AC,cursor:"pointer"}} />
-            <button onClick={nextTrack} title="Next track" style={{width:28,height:28,borderRadius:7,background:"rgba(255,255,255,0.07)",border:"none",cursor:"pointer",color:"rgba(255,255,255,0.75)",fontSize:12,padding:0,display:"flex",alignItems:"center",justifyContent:"center"}}>⏭</button>
-            <button onClick={()=>setMusicOn(false)} title="Stop music" style={{width:28,height:28,borderRadius:7,background:"rgba(255,255,255,0.07)",border:"none",cursor:"pointer",color:"rgba(255,255,255,0.6)",fontSize:11,padding:0,display:"flex",alignItems:"center",justifyContent:"center"}}>✕</button>
+            <button onClick={nextTrack} title="Next track" style={{width:28,height:28,borderRadius:7,background:"rgba(255,255,255,0.07)",border:"none",cursor:"pointer",color:"var(--nv-text)",fontSize:12,padding:0,display:"flex",alignItems:"center",justifyContent:"center"}}>⏭</button>
+            <button onClick={()=>setMusicOn(false)} title="Stop music" style={{width:28,height:28,borderRadius:7,background:"rgba(255,255,255,0.07)",border:"none",cursor:"pointer",color:"var(--nv-text)",fontSize:11,padding:0,display:"flex",alignItems:"center",justifyContent:"center"}}>✕</button>
           </div>
         )}
 
@@ -311,7 +311,7 @@ export function AtmosApp({AC,showToast,pushNotification,openNovaAi,data,updateSe
             floats below this whole region instead of covering it. */}
         {recentLocations.length > 0 && (
           <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
-            <span style={{fontSize:10,fontFamily:FFM,color:"rgba(255,255,255,0.32)",letterSpacing:1,alignSelf:"center",marginRight:2}}>RECENT</span>
+            <span style={{fontSize:10,fontFamily:FFM,color:"var(--nv-text-dim)",letterSpacing:1,alignSelf:"center",marginRight:2}}>RECENT</span>
             {recentLocations.map((r, i) => {
               const isActive = loc && loc.lat===r.lat && loc.lon===r.lon;
               const shortLabel = (r.label || "").split(",")[0].trim();
@@ -330,10 +330,10 @@ export function AtmosApp({AC,showToast,pushNotification,openNovaAi,data,updateSe
             both rather than covering recents. */}
         {openSuggest && (loadingSuggest||suggestions.length>0) && (
           <div style={{position:"absolute",top:"calc(100% + 5px)",left:0,right:0,background:"rgba(15,18,32,0.97)",backdropFilter:"blur(16px)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:9,boxShadow:"0 20px 60px rgba(0,0,0,0.5)",maxHeight:220,overflowY:"auto",zIndex:20}}>
-            {loadingSuggest && <div style={{padding:"10px 13px",fontSize:11,color:"rgba(255,255,255,0.4)",fontStyle:"italic"}}>Searching…</div>}
-            {!loadingSuggest && suggestions.length===0 && <div style={{padding:"10px 13px",fontSize:11,color:"rgba(255,255,255,0.4)",fontStyle:"italic"}}>No matches</div>}
+            {loadingSuggest && <div style={{padding:"10px 13px",fontSize:11,color:"var(--nv-text-dim)",fontStyle:"italic"}}>Searching…</div>}
+            {!loadingSuggest && suggestions.length===0 && <div style={{padding:"10px 13px",fontSize:11,color:"var(--nv-text-dim)",fontStyle:"italic"}}>No matches</div>}
             {!loadingSuggest && suggestions.map((s,i)=>(
-              <div key={i} className="sr" onClick={()=>pickLocation(s)} style={{padding:"9px 13px",cursor:"pointer",fontSize:13,color:"rgba(255,255,255,0.85)",borderBottom:i<suggestions.length-1?"1px solid rgba(255,255,255,0.05)":"none"}}>
+              <div key={i} className="sr" onClick={()=>pickLocation(s)} style={{padding:"9px 13px",cursor:"pointer",fontSize:13,color:"var(--nv-text)",borderBottom:i<suggestions.length-1?"1px solid rgba(255,255,255,0.05)":"none"}}>
                 📍 {s.label}
               </div>
             ))}
@@ -346,15 +346,15 @@ export function AtmosApp({AC,showToast,pushNotification,openNovaAi,data,updateSe
         {!loc && !loadingForecast && (
           <div style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:14,padding:30,textAlign:"center",border:"1px solid rgba(255,255,255,0.06)",borderRadius:12,background:"linear-gradient(180deg,rgba(255,255,255,0.025),rgba(255,255,255,0.005))"}}>
             <div style={{fontSize:60,filter:"drop-shadow(0 0 16px rgba(79,158,255,0.4))"}}>🌤️</div>
-            <div style={{fontFamily:FFB,fontWeight:700,fontSize:22,color:"rgba(255,255,255,0.9)",letterSpacing:0.4}}>Atmos</div>
-            <div style={{fontSize:12,color:"rgba(255,255,255,0.45)",maxWidth:340,lineHeight:1.7}}>Search any location to see current conditions, live radar, hourly + 7-day forecast, and active NWS alerts for US locations. US locations with active alerts also trigger an audible 607 Hz tone followed by a TTS read-out of each alert.</div>
+            <div style={{fontFamily:FFB,fontWeight:700,fontSize:22,color:"var(--nv-text-strong)",letterSpacing:0.4}}>Atmos</div>
+            <div style={{fontSize:12,color:"var(--nv-text-dim)",maxWidth:340,lineHeight:1.7}}>Search any location to see current conditions, live radar, hourly + 7-day forecast, and active NWS alerts for US locations. US locations with active alerts also trigger an audible 607 Hz tone followed by a TTS read-out of each alert.</div>
           </div>
         )}
 
         {loadingForecast && (
           <div style={{padding:"30px 0",textAlign:"center"}}>
             <div style={{width:30,height:30,border:"3px solid rgba(255,255,255,0.1)",borderTopColor:AC,borderRadius:"50%",animation:"spin 0.8s linear infinite",margin:"0 auto"}}/>
-            <div style={{fontSize:12,color:"rgba(255,255,255,0.4)",marginTop:10}}>Loading forecast for {loc?.label}…</div>
+            <div style={{fontSize:12,color:"var(--nv-text-dim)",marginTop:10}}>Loading forecast for {loc?.label}…</div>
           </div>
         )}
 
@@ -375,7 +375,7 @@ export function AtmosApp({AC,showToast,pushNotification,openNovaAi,data,updateSe
               boxShadow:"0 0 24px rgba("+wRgb+",0.15)",
             }}>
               <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:4}}>
-                <div style={{flex:1,fontSize:11,fontFamily:FFM,color:"rgba(255,255,255,0.6)",letterSpacing:1,display:"flex",alignItems:"center",gap:6}}>
+                <div style={{flex:1,fontSize:11,fontFamily:FFM,color:"var(--nv-text)",letterSpacing:1,display:"flex",alignItems:"center",gap:6}}>
                   {/* v8.2.1: single toggle button. Click 📌 to pin, click
                       again to unpin. Opacity signals state: full opacity =
                       pinned, low opacity = not pinned. Replaces the v8.2
@@ -429,7 +429,7 @@ export function AtmosApp({AC,showToast,pushNotification,openNovaAi,data,updateSe
                 <div style={{fontSize:72,lineHeight:1,filter:"drop-shadow(0 2px 14px rgba("+wRgb+",0.45))"}}>{wmoIcon(forecast.current.code)}</div>
                 <div style={{flex:1,minWidth:0}}>
                   <div style={{fontFamily:FFM,fontWeight:200,fontSize:56,color:"#fff",lineHeight:1,letterSpacing:-1}}>{Math.round(forecast.current.temp)}<span style={{fontSize:28,opacity:0.7,letterSpacing:0}}>{forecast.units.temp}</span></div>
-                  <div style={{fontSize:14,color:"rgba(255,255,255,0.78)",marginTop:4,fontFamily:FFB,fontWeight:500,letterSpacing:0.3}}>{wmoLabel(forecast.current.code)}</div>
+                  <div style={{fontSize:14,color:"var(--nv-text)",marginTop:4,fontFamily:FFB,fontWeight:500,letterSpacing:0.3}}>{wmoLabel(forecast.current.code)}</div>
                 </div>
               </div>
               {/* Metric chips with subtle backdrop for legibility on bright wallpapers */}
@@ -439,7 +439,7 @@ export function AtmosApp({AC,showToast,pushNotification,openNovaAi,data,updateSe
                   ["Humidity",   forecast.current.humidity + "%"],
                   ["Wind",       Math.round(forecast.current.wind) + " " + forecast.units.wind],
                 ].map(([label, value]) => (
-                  <div key={label} style={{padding:"6px 11px",background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.07)",borderRadius:8,fontSize:11,color:"rgba(255,255,255,0.6)"}}>
+                  <div key={label} style={{padding:"6px 11px",background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.07)",borderRadius:8,fontSize:11,color:"var(--nv-text)"}}>
                     {label} <span style={{color:"#fff",fontFamily:FFM,fontWeight:500,marginLeft:4}}>{value}</span>
                   </div>
                 ))}
@@ -465,7 +465,7 @@ export function AtmosApp({AC,showToast,pushNotification,openNovaAi,data,updateSe
               {/* Hint that the radar captures wheel events — encourages users
                   to scroll past it via the side margin or use the page scroll
                   bar rather than getting "stuck" zooming the map. */}
-              <div style={{fontSize:9,color:"rgba(255,255,255,0.3)",marginTop:4,fontStyle:"italic",textAlign:"center"}}>Scroll alongside the radar to continue past it</div>
+              <div style={{fontSize:9,color:"var(--nv-text-dim)",marginTop:4,fontStyle:"italic",textAlign:"center"}}>Scroll alongside the radar to continue past it</div>
             </div>
 
             {/* NWS alerts */}
@@ -480,13 +480,13 @@ export function AtmosApp({AC,showToast,pushNotification,openNovaAi,data,updateSe
                       <div style={{display:"flex",alignItems:"center",gap:8}}>
                         <span style={{fontFamily:FFB,fontWeight:700,fontSize:12,color:col.fg,padding:"2px 7px",border:"1px solid "+col.border,borderRadius:4,whiteSpace:"nowrap"}}>{a.severity}</span>
                         <span style={{fontFamily:FFB,fontWeight:600,fontSize:13,color:"#fff",flex:1,minWidth:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{a.event}</span>
-                        <span style={{fontSize:11,color:"rgba(255,255,255,0.35)"}}>{expanded?"▲":"▼"}</span>
+                        <span style={{fontSize:11,color:"var(--nv-text-dim)"}}>{expanded?"▲":"▼"}</span>
                       </div>
                       {expanded && (
-                        <div style={{marginTop:10,fontSize:12,color:"rgba(255,255,255,0.78)",lineHeight:1.6,whiteSpace:"pre-wrap"}}>
+                        <div style={{marginTop:10,fontSize:12,color:"var(--nv-text)",lineHeight:1.6,whiteSpace:"pre-wrap"}}>
                           {a.headline && <div style={{fontFamily:FFB,fontWeight:600,fontSize:13,color:"#fff",marginBottom:6}}>{a.headline}</div>}
                           {a.description}
-                          {a.sender && <div style={{fontSize:10,color:"rgba(255,255,255,0.35)",marginTop:8,fontStyle:"italic"}}>— {a.sender}</div>}
+                          {a.sender && <div style={{fontSize:10,color:"var(--nv-text-dim)",marginTop:8,fontStyle:"italic"}}>— {a.sender}</div>}
                         </div>
                       )}
                     </div>
@@ -502,7 +502,7 @@ export function AtmosApp({AC,showToast,pushNotification,openNovaAi,data,updateSe
                 <div style={{display:"flex",overflowX:"auto",gap:5,paddingBottom:6}}>
                   {forecast.hourly.map((h,i)=>(
                     <div key={i} style={{flex:"0 0 auto",minWidth:62,padding:"8px 6px",background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.07)",borderRadius:8,textAlign:"center"}}>
-                      <div style={{fontSize:10,fontFamily:FFM,color:"rgba(255,255,255,0.45)"}}>{i===0?"Now":fmtHour(h.time)}</div>
+                      <div style={{fontSize:10,fontFamily:FFM,color:"var(--nv-text-dim)"}}>{i===0?"Now":fmtHour(h.time)}</div>
                       <div style={{fontSize:20,marginTop:2}}>{wmoIcon(h.code)}</div>
                       <div style={{fontFamily:FFM,fontSize:13,fontWeight:500,color:"#fff",marginTop:1}}>{Math.round(h.temp)}°</div>
                       {h.pop>0&&<div style={{fontSize:9,color:"#88c8ff",fontFamily:FFM}}>{h.pop}%</div>}
@@ -532,9 +532,9 @@ export function AtmosApp({AC,showToast,pushNotification,openNovaAi,data,updateSe
                   // Color gradient from cool (low) to warm (high)
                   return (
                     <div key={d.date} style={{display:"flex",alignItems:"center",gap:10,padding:"9px 12px",marginBottom:4,background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.06)",borderRadius:8}}>
-                      <div style={{width:54,fontFamily:FFB,fontWeight:600,fontSize:12,color:"rgba(255,255,255,0.88)"}}>{i===0?"Today":fmtDay(d.date)}</div>
+                      <div style={{width:54,fontFamily:FFB,fontWeight:600,fontSize:12,color:"var(--nv-text)"}}>{i===0?"Today":fmtDay(d.date)}</div>
                       <div style={{fontSize:22,width:34,textAlign:"center",filter:"drop-shadow(0 2px 4px rgba(0,0,0,0.4))"}}>{wmoIcon(d.code)}</div>
-                      <div style={{fontFamily:FFM,fontSize:12,color:"rgba(255,255,255,0.45)",minWidth:32,textAlign:"right"}}>{Math.round(d.low)}°</div>
+                      <div style={{fontFamily:FFM,fontSize:12,color:"var(--nv-text-dim)",minWidth:32,textAlign:"right"}}>{Math.round(d.low)}°</div>
                       <div style={{flex:1,position:"relative",height:6,background:"rgba(255,255,255,0.06)",borderRadius:3,overflow:"hidden"}}>
                         <div style={{position:"absolute",left:dayLoPct+"%",width:Math.max(8,dayHiPct-dayLoPct)+"%",top:0,bottom:0,background:"linear-gradient(90deg, #60a5fa, #fbbf24, #f87171)",borderRadius:3}}/>
                       </div>
@@ -549,8 +549,8 @@ export function AtmosApp({AC,showToast,pushNotification,openNovaAi,data,updateSe
         })()}
 
         {/* Attribution — required by Nominatim's usage policy */}
-        <div style={{textAlign:"center",fontSize:10,color:"rgba(255,255,255,0.25)",paddingTop:10,borderTop:"1px solid rgba(255,255,255,0.05)",marginTop:"auto"}}>
-          Location data © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer" style={{color:"rgba(255,255,255,0.4)"}}>OpenStreetMap</a> contributors · Forecast by <a href="https://open-meteo.com" target="_blank" rel="noreferrer" style={{color:"rgba(255,255,255,0.4)"}}>Open-Meteo</a> · Radar by <a href="https://www.windy.com" target="_blank" rel="noreferrer" style={{color:"rgba(255,255,255,0.4)"}}>Windy</a> · Alerts by <a href="https://www.weather.gov" target="_blank" rel="noreferrer" style={{color:"rgba(255,255,255,0.4)"}}>NWS</a>
+        <div style={{textAlign:"center",fontSize:10,color:"var(--nv-text-dim)",paddingTop:10,borderTop:"1px solid rgba(255,255,255,0.05)",marginTop:"auto"}}>
+          Location data © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer" style={{color:"var(--nv-text-dim)"}}>OpenStreetMap</a> contributors · Forecast by <a href="https://open-meteo.com" target="_blank" rel="noreferrer" style={{color:"var(--nv-text-dim)"}}>Open-Meteo</a> · Radar by <a href="https://www.windy.com" target="_blank" rel="noreferrer" style={{color:"var(--nv-text-dim)"}}>Windy</a> · Alerts by <a href="https://www.weather.gov" target="_blank" rel="noreferrer" style={{color:"var(--nv-text-dim)"}}>NWS</a>
         </div>
       </div>
     </div>

@@ -465,7 +465,7 @@ function HomeView({ tracks, recent, cur, playing, startWithTrack, addToQueue, se
                   <div style={{
                     aspectRatio: "1 / 1", borderRadius: 8, background: trackGradient(t.name),
                     display: "flex", alignItems: "center", justifyContent: "center",
-                    fontSize: 30, color: "rgba(255,255,255,0.85)",
+                    fontSize: 30, color: "var(--nv-text)",
                     boxShadow: "0 6px 20px rgba(0,0,0,0.35)",
                     position: "relative", overflow: "hidden",
                   }}>

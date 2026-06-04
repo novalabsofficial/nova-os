@@ -225,16 +225,16 @@ export function ScreenshotApp({ AC, showToast, onSetWallpaper }) {
     background: active ? fill(AC) : "rgba(255,255,255,0.05)", border: "1px solid " + (active ? bdr(AC) : "rgba(255,255,255,0.1)"),
     color: active ? AC : "rgba(255,255,255,0.6)",
   });
-  const actBtn = { padding: "7px 13px", borderRadius: 8, cursor: "pointer", fontFamily: FFB, fontWeight: 600, fontSize: 12, background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)", color: "rgba(255,255,255,0.75)" };
+  const actBtn = { padding: "7px 13px", borderRadius: 8, cursor: "pointer", fontFamily: FFB, fontWeight: 600, fontSize: 12, background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)", color: "var(--nv-text)" };
 
   return (
     <div style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column", gap: 12, fontFamily: FF, minHeight: 0 }}>
       {!shot && !rawShot && (
-        <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", textAlign: "center", padding: 30, color: "rgba(255,255,255,0.4)" }}>
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", textAlign: "center", padding: 30, color: "var(--nv-text-dim)" }}>
           <div style={{ fontSize: 60, marginBottom: 16, filter: "drop-shadow(0 0 24px " + fill(AC) + ")" }}>📸</div>
-          <div style={{ fontFamily: FFB, fontWeight: 700, fontSize: 17, color: "rgba(255,255,255,0.8)", marginBottom: 8 }}>Screenshot &amp; Annotate</div>
-          <div style={{ fontSize: 12.5, color: "rgba(255,255,255,0.45)", maxWidth: 340, lineHeight: 1.7, marginBottom: 20 }}>
-            Capture your whole screen, or <strong style={{ color: "rgba(255,255,255,0.7)" }}>snip a region</strong>, then draw arrows, boxes, text and blur over it — save it to Photos or set it as your wallpaper.
+          <div style={{ fontFamily: FFB, fontWeight: 700, fontSize: 17, color: "var(--nv-text)", marginBottom: 8 }}>Screenshot &amp; Annotate</div>
+          <div style={{ fontSize: 12.5, color: "var(--nv-text-dim)", maxWidth: 340, lineHeight: 1.7, marginBottom: 20 }}>
+            Capture your whole screen, or <strong style={{ color: "var(--nv-text)" }}>snip a region</strong>, then draw arrows, boxes, text and blur over it — save it to Photos or set it as your wallpaper.
           </div>
           {supported ? (
             <div style={{ display: "flex", flexDirection: "column", gap: 10, alignItems: "center" }}>
@@ -242,11 +242,11 @@ export function ScreenshotApp({ AC, showToast, onSetWallpaper }) {
                 <button onClick={() => capture(true)} disabled={capturing} style={{ padding: "11px 24px", borderRadius: 10, cursor: "pointer", fontFamily: FFB, fontWeight: 700, fontSize: 14, background: fill(AC), border: "1px solid " + bdr(AC), color: AC, opacity: capturing ? 0.5 : 1 }}>
                   {capturing ? "Waiting…" : "✂ Snip a region"}
                 </button>
-                <button onClick={() => capture(false)} disabled={capturing} style={{ padding: "11px 24px", borderRadius: 10, cursor: "pointer", fontFamily: FFB, fontWeight: 700, fontSize: 14, background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.14)", color: "rgba(255,255,255,0.8)", opacity: capturing ? 0.5 : 1 }}>
+                <button onClick={() => capture(false)} disabled={capturing} style={{ padding: "11px 24px", borderRadius: 10, cursor: "pointer", fontFamily: FFB, fontWeight: 700, fontSize: 14, background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.14)", color: "var(--nv-text)", opacity: capturing ? 0.5 : 1 }}>
                   📸 Capture full
                 </button>
               </div>
-              <div style={{ fontSize: 10.5, color: "rgba(255,255,255,0.35)", maxWidth: 360, lineHeight: 1.55 }}>
+              <div style={{ fontSize: 10.5, color: "var(--nv-text-dim)", maxWidth: 360, lineHeight: 1.55 }}>
                 Your browser will ask which screen/window to share — pick one, then drag a box over the part you want. (Browsers can't read the screen without that one-time prompt.)
               </div>
             </div>
@@ -262,7 +262,7 @@ export function ScreenshotApp({ AC, showToast, onSetWallpaper }) {
         <div style={{ position: "fixed", inset: 0, zIndex: 99998, background: "rgba(0,0,0,0.88)", backdropFilter: "blur(6px)", display: "flex", flexDirection: "column", animation: "ss-fade 0.16s" }}>
           <div style={{ flexShrink: 0, textAlign: "center", padding: "14px 16px 8px", fontFamily: FFB, fontWeight: 600, fontSize: 13, color: "#fff" }}>
             ✂ Drag to select the area to keep
-            <span style={{ fontFamily: FF, fontWeight: 400, fontSize: 11, color: "rgba(255,255,255,0.5)", marginLeft: 8 }}>· Esc to cancel</span>
+            <span style={{ fontFamily: FF, fontWeight: 400, fontSize: 11, color: "var(--nv-text-dim)", marginLeft: 8 }}>· Esc to cancel</span>
           </div>
           <div style={{ flex: 1, minHeight: 0, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 16px 12px" }}>
             <div style={{ position: "relative", lineHeight: 0, touchAction: "none", maxWidth: "100%", maxHeight: "100%" }} onPointerDown={cropDown} onPointerMove={cropMove} onPointerUp={cropUp} onPointerCancel={cropUp}>

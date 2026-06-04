@@ -257,7 +257,7 @@ export function SlidesApp({ AC, data, updateData, showToast }) {
                 <button onClick={() => { setSelSlide(i); setSelEl(null); }} style={{ display: "block", width: "100%", padding: 0, borderRadius: 7, overflow: "hidden", cursor: "pointer", border: "2px solid " + (i === selSlide ? AC : "var(--nv-border)"), background: "transparent" }}>
                   <div style={{ position: "relative", width: "100%", aspectRatio: "16/9", background: sl.bg }}>
                     <SlideRender slide={sl} />
-                    <div style={{ position: "absolute", top: 2, left: 4, fontFamily: FFM, fontSize: 9, color: "rgba(255,255,255,0.6)", textShadow: "0 1px 2px #000" }}>{i + 1}</div>
+                    <div style={{ position: "absolute", top: 2, left: 4, fontFamily: FFM, fontSize: 9, color: "var(--nv-text)", textShadow: "0 1px 2px #000" }}>{i + 1}</div>
                   </div>
                 </button>
                 <div style={{ position: "absolute", top: 3, right: 3, display: "flex", flexDirection: "column", gap: 2 }}>
@@ -312,7 +312,7 @@ export function SlidesApp({ AC, data, updateData, showToast }) {
           <div style={{ width: "min(100vw, 177.7vh)", aspectRatio: "16/9", position: "relative", background: activeDeck.slides[presentIdx]?.bg || "#000" }}>
             <SlideRender slide={activeDeck.slides[presentIdx]} />
           </div>
-          <div style={{ position: "fixed", bottom: 16, left: "50%", transform: "translateX(-50%)", display: "flex", alignItems: "center", gap: 12, background: "rgba(15,17,32,0.7)", backdropFilter: "blur(20px)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 10, padding: "7px 14px", fontFamily: FFM, fontSize: 12, color: "rgba(255,255,255,0.8)" }}>
+          <div style={{ position: "fixed", bottom: 16, left: "50%", transform: "translateX(-50%)", display: "flex", alignItems: "center", gap: 12, background: "rgba(15,17,32,0.7)", backdropFilter: "blur(20px)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 10, padding: "7px 14px", fontFamily: FFM, fontSize: 12, color: "var(--nv-text)" }}>
             <button onClick={() => setPresentIdx(i => Math.max(0, i - 1))} style={presBtn()}>‹</button>
             <span>{presentIdx + 1} / {activeDeck.slides.length}</span>
             <button onClick={() => setPresentIdx(i => Math.min(i + 1, activeDeck.slides.length - 1))} style={presBtn()}>›</button>
@@ -561,7 +561,7 @@ function insBtn() {
   return { padding: "8px 6px", borderRadius: 7, cursor: "pointer", background: "var(--nv-elevated)", border: "1px solid var(--nv-border)", color: "var(--nv-text)", fontFamily: FFB, fontWeight: 600, fontSize: 11.5 };
 }
 function railMini() {
-  return { width: 18, height: 16, borderRadius: 4, background: "rgba(0,0,0,0.55)", border: "1px solid rgba(255,255,255,0.12)", cursor: "pointer", color: "rgba(255,255,255,0.8)", fontSize: 9, lineHeight: 1, padding: 0, display: "flex", alignItems: "center", justifyContent: "center" };
+  return { width: 18, height: 16, borderRadius: 4, background: "rgba(0,0,0,0.55)", border: "1px solid rgba(255,255,255,0.12)", cursor: "pointer", color: "var(--nv-text)", fontSize: 9, lineHeight: 1, padding: 0, display: "flex", alignItems: "center", justifyContent: "center" };
 }
 function presBtn() {
   return { width: 28, height: 28, borderRadius: 6, background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.15)", cursor: "pointer", color: "#fff", fontSize: 14, display: "inline-flex", alignItems: "center", justifyContent: "center", padding: 0 };

@@ -106,9 +106,9 @@ export function ProfileApp({ user, data, updateData, showToast, AC }) {
             <span style={{ fontSize: 13 }}>🔍</span>
             <input type="range" min={1} max={3} step={0.01} value={zoom} onChange={(e) => setZoom(+e.target.value)} style={{ flex: 1, accentColor: AC }}/>
           </div>
-          <div style={{ fontSize: 11, color: "rgba(255,255,255,0.35)" }}>Drag to reposition · slide to zoom</div>
+          <div style={{ fontSize: 11, color: "var(--nv-text-dim)" }}>Drag to reposition · slide to zoom</div>
           <div style={{ display: "flex", gap: 8, width: CROP }}>
-            <button onClick={() => setEditing(null)} style={{ flex: 1, padding: "9px", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 8, cursor: "pointer", fontFamily: FFB, fontWeight: 600, fontSize: 12, color: "rgba(255,255,255,0.7)" }}>Cancel</button>
+            <button onClick={() => setEditing(null)} style={{ flex: 1, padding: "9px", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 8, cursor: "pointer", fontFamily: FFB, fontWeight: 600, fontSize: 12, color: "var(--nv-text)" }}>Cancel</button>
             <button onClick={save} style={{ flex: 1, padding: "9px", background: fill(AC), border: "1px solid " + bdr(AC), borderRadius: 8, cursor: "pointer", fontFamily: FFB, fontWeight: 700, fontSize: 12, color: AC }}>Save Photo</button>
           </div>
         </div>
@@ -128,7 +128,7 @@ export function ProfileApp({ user, data, updateData, showToast, AC }) {
         </div>
         <input ref={fileRef} type="file" accept="image/*" onChange={onFile} style={{ display: "none" }}/>
         <div style={{ fontFamily: FFB, fontWeight: 700, fontSize: 20, color: "#fff", marginBottom: 2 }}>@{user}</div>
-        <div style={{ fontFamily: FFM, fontSize: 10, color: "rgba(255,255,255,0.28)" }}>Member since {joined}</div>
+        <div style={{ fontFamily: FFM, fontSize: 10, color: "var(--nv-text-dim)" }}>Member since {joined}</div>
         <div style={{ display: "flex", gap: 12, marginTop: 9 }}>
           <button onClick={() => fileRef.current.click()} style={{ background: "none", border: "none", cursor: "pointer", fontFamily: FFB, fontWeight: 600, fontSize: 11, color: AC }}>{data?.avatar ? "Change photo" : "Add photo"}</button>
           {data?.avatar && <button onClick={removeAvatar} style={{ background: "none", border: "none", cursor: "pointer", fontFamily: FFB, fontWeight: 600, fontSize: 11, color: "rgba(255,120,120,0.8)" }}>Remove</button>}
@@ -139,7 +139,7 @@ export function ProfileApp({ user, data, updateData, showToast, AC }) {
           <div key={k} style={{ padding: "11px 10px", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 8, textAlign: "center" }}>
             <div style={{ fontSize: 10, marginBottom: 3 }}>{ic}</div>
             <div style={{ fontFamily: FFB, fontWeight: 700, fontSize: 20, color: AC }}>{v}</div>
-            <div style={{ fontSize: 10, color: "rgba(255,255,255,0.32)", marginTop: 2 }}>{k}</div>
+            <div style={{ fontSize: 10, color: "var(--nv-text-dim)", marginTop: 2 }}>{k}</div>
           </div>
         ))}
       </div>
