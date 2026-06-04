@@ -2395,6 +2395,7 @@ export default function NovaOS(){
         const pos = positions[app.id] || { x: 0, y: 0 };
         const isDrg=iconDrag?.id===app.id;
         const isSel=selectedIcons.has(app.id);   // v9.7 B1 drag-select highlight
+        const lightT=theme==="light";   // v11.0 light mode — desktop icon tiles flip to light frosted chips with dark labels
         function launch(){if(app.storeApp){if(app.storeApp.newTab)openExternalUrl(app.storeApp.url);else openApp("browser");}else openApp(app.id);}
         return(
           <div key={app.id} style={{
@@ -2407,9 +2408,9 @@ export default function NovaOS(){
             // v8.0: lighter resting background, accent-tinged shadow during
             // drag for a more lifted feel. The .di hover class adds a brighter
             // background + soft outline ring (see styles.js).
-            background:isDrg?"rgba(20,22,40,0.5)":isSel?"rgba("+hexRgb(AC)+",0.22)":"rgba(0,0,0,0.08)",
-            border:"1px solid "+(isDrg?"rgba(255,255,255,0.16)":isSel?"rgba("+hexRgb(AC)+",0.6)":"transparent"),
-            backdropFilter:isDrg||isSel?"blur(8px)":"none",
+            background:isDrg?"rgba(20,22,40,0.5)":isSel?"rgba("+hexRgb(AC)+",0.22)":(lightT?"rgba(255,255,255,0.5)":"rgba(0,0,0,0.08)"),
+            border:"1px solid "+(isDrg?"rgba(255,255,255,0.16)":isSel?"rgba("+hexRgb(AC)+",0.6)":(lightT?"rgba(20,28,48,0.12)":"transparent")),
+            backdropFilter:(isDrg||isSel||lightT)?"blur(8px)":"none",
             transition:isDrg?"none":"background 0.22s cubic-bezier(0.4,0,0.2,1), border-color 0.22s cubic-bezier(0.4,0,0.2,1), left 0.28s cubic-bezier(0.4,0,0.2,1), top 0.28s cubic-bezier(0.4,0,0.2,1), transform 0.2s cubic-bezier(0.22,1,0.36,1)",
             boxShadow:isDrg?"0 10px 30px rgba(0,0,0,0.5), 0 1px 0 rgba(255,255,255,0.08) inset":"none",
             // v10.0 — one-shot staggered reveal on login.
@@ -2454,7 +2455,7 @@ export default function NovaOS(){
                 </div>
               )}
             </div>
-            <span style={{fontFamily:FFB,fontWeight:600,fontSize:10.5,color:"#fff",textAlign:"center",lineHeight:1.25,textShadow:"0 1px 3px rgba(0,0,0,0.9), 0 0 8px rgba(0,0,0,0.5)",pointerEvents:"none",letterSpacing:0.15}}>{app.label}</span>
+            <span style={{fontFamily:FFB,fontWeight:600,fontSize:10.5,color:lightT?"var(--nv-text-strong)":"#fff",textAlign:"center",lineHeight:1.25,textShadow:lightT?"0 1px 2px rgba(255,255,255,0.6)":"0 1px 3px rgba(0,0,0,0.9), 0 0 8px rgba(0,0,0,0.5)",pointerEvents:"none",letterSpacing:0.15}}>{app.label}</span>
           </div>
         );
       }); })()}
