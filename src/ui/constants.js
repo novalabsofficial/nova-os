@@ -301,9 +301,10 @@ export const WALLPAPERS = {
   // shows as a pickable swatch; it has no `grad`, only a preview gradient.
   auto:     {name:"Auto",      semitones: 0,  preview:"linear-gradient(90deg,#0b1026 0%,#1d4ed8 26%,#f59e0b 52%,#7c3aed 76%,#0b1026 100%)"},
   mesh:     {name:"Mesh",      semitones: 0,  preview:"radial-gradient(ellipse at 18% 22%,#6366f1 0%,transparent 45%),radial-gradient(ellipse at 82% 18%,#ec4899 0%,transparent 40%),radial-gradient(ellipse at 60% 85%,#06b6d4 0%,transparent 45%),linear-gradient(135deg,#0a0a14,#050510)"},
-  // v11.0 — Lumina: the signature LIGHT wallpaper (light sibling to Mesh).
-  // Auto-selected whenever Light mode is on; pastel Nova palette on near-white.
-  lumina:   {name:"Lumina",    semitones: 3,  preview:"radial-gradient(ellipse at 20% 22%,#9db1fb 0%,transparent 52%),radial-gradient(ellipse at 82% 18%,#fbb6d4 0%,transparent 46%),radial-gradient(ellipse at 64% 84%,#92e9f5 0%,transparent 50%),linear-gradient(135deg,#fcfdff,#e1e7f2)"},
+  // v11.0 — Bloom: the signature LIGHT wallpaper (Windows-11-Bloom-style light
+  // sibling to Mesh). Auto-selected whenever Light mode is on; layered pastel
+  // Nova petals + luminous core over a graduated cool-white canvas.
+  bloom:    {name:"Bloom",     semitones: 3,  preview:"radial-gradient(circle at 53% 46%,#ffffff 0%,#cbbdfb 13%,#a5b4fc 27%,#f0abce 42%,transparent 62%),linear-gradient(135deg,#f5f7fc,#cfd6e6)"},
   // v10.0 — Supernova Edition signature wallpapers (SVG-backed; see
   // wallpapers.jsx). Supernova: a radiant exploding-star burst. Nebula: a
   // calm, spacious deep-space cloud companion. Both clean + professional.

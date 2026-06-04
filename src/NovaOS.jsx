@@ -711,7 +711,7 @@ export default function NovaOS(){
   // slot (defaulting to the new Lumina light wallpaper), Dark mode keeps the
   // existing one. Either is still fully changeable in Settings.
   const wpId    =(settings.theme==="light")
-    ? (settings.wallpaperLight || "lumina")
+    ? (settings.wallpaperLight || "bloom")
     : (settings.wallpaper || data?.wallpaper || "mesh");
   const widgets =settings.widgets   ||{};
   // Resolved device mode: user's saved preference overrides detection. "auto"

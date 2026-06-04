@@ -686,45 +686,64 @@ function NebulaBg() {
   );
 }
 
-// v11.0 — Lumina: the signature LIGHT wallpaper of Nova OS 11 and the auto
-// pick whenever Light mode is on. A soft, near-white canvas warmed by the
-// Nova palette in pastel — indigo, rose, cyan, violet and a touch of amber —
-// all heavily blurred (Mesh-grade) so they melt into one airy field. A faint
-// cool-grey speckle adds fine texture and a soft vignette gives depth without
-// ever going dark, so dark UI text and icon labels read cleanly over it. Built
-// as the light sibling to Mesh (its dark counterpart).
-function LuminaBg() {
+// v11.0 — Bloom: the signature LIGHT wallpaper of Nova OS 11 (auto-picked in
+// Light mode). A Windows-11-Bloom-inspired abstract flower — layered
+// translucent petals in the Nova palette (indigo · violet · pink · cyan)
+// radiating from a luminous white core, softly blurred for a glassy
+// depth-of-field feel — over a graduated cool-white canvas that deepens
+// toward the edges so it never reads flat or blinding. The bloom sits
+// center-right, leaving the top-left calm for dark icon labels.
+function BloomBg() {
+  const CX = 760, CY = 420;
   return (
     <svg style={{position:"absolute",inset:0,width:"100%",height:"100%"}} viewBox="0 0 1440 900" preserveAspectRatio="xMidYMid slice">
       <defs>
-        <linearGradient id="lum-base" x1="0" y1="0" x2="0.35" y2="1">
-          <stop offset="0%"   stopColor="#fcfdff"/>
-          <stop offset="52%"  stopColor="#eef1f8"/>
-          <stop offset="100%" stopColor="#e1e7f2"/>
-        </linearGradient>
-        <radialGradient id="lum1" cx="20%" cy="22%" r="56%"><stop offset="0%" stopColor="#9db1fb" stopOpacity="0.55"/><stop offset="55%" stopColor="#c3d0fe" stopOpacity="0.16"/><stop offset="100%" stopColor="#ffffff" stopOpacity="0"/></radialGradient>
-        <radialGradient id="lum2" cx="82%" cy="18%" r="50%"><stop offset="0%" stopColor="#fbb6d4" stopOpacity="0.5"/><stop offset="55%" stopColor="#fcd9e8" stopOpacity="0.16"/><stop offset="100%" stopColor="#ffffff" stopOpacity="0"/></radialGradient>
-        <radialGradient id="lum3" cx="64%" cy="84%" r="54%"><stop offset="0%" stopColor="#92e9f5" stopOpacity="0.5"/><stop offset="55%" stopColor="#c4f4fb" stopOpacity="0.16"/><stop offset="100%" stopColor="#ffffff" stopOpacity="0"/></radialGradient>
-        <radialGradient id="lum4" cx="11%" cy="86%" r="46%"><stop offset="0%" stopColor="#cbb9fb" stopOpacity="0.48"/><stop offset="100%" stopColor="#ffffff" stopOpacity="0"/></radialGradient>
-        <radialGradient id="lum5" cx="95%" cy="60%" r="36%"><stop offset="0%" stopColor="#fcdf9c" stopOpacity="0.34"/><stop offset="100%" stopColor="#ffffff" stopOpacity="0"/></radialGradient>
-        <filter id="lum-blur"><feGaussianBlur stdDeviation="86"/></filter>
-        <radialGradient id="lum-vign" cx="50%" cy="44%" r="80%"><stop offset="56%" stopColor="#b9c4dc" stopOpacity="0"/><stop offset="100%" stopColor="#9aa8c8" stopOpacity="0.30"/></radialGradient>
+        <radialGradient id="bl-base" cx="53%" cy="44%" r="80%">
+          <stop offset="0%"   stopColor="#f7f8fc"/>
+          <stop offset="50%"  stopColor="#e8ebf3"/>
+          <stop offset="100%" stopColor="#cfd6e6"/>
+        </radialGradient>
+        <radialGradient id="bl-p1" cx="50%" cy="100%" r="100%"><stop offset="0%" stopColor="#6366f1" stopOpacity="0.55"/><stop offset="55%" stopColor="#818cf8" stopOpacity="0.26"/><stop offset="100%" stopColor="#818cf8" stopOpacity="0"/></radialGradient>
+        <radialGradient id="bl-p2" cx="50%" cy="100%" r="100%"><stop offset="0%" stopColor="#a855f7" stopOpacity="0.52"/><stop offset="55%" stopColor="#c084fc" stopOpacity="0.24"/><stop offset="100%" stopColor="#c084fc" stopOpacity="0"/></radialGradient>
+        <radialGradient id="bl-p3" cx="50%" cy="100%" r="100%"><stop offset="0%" stopColor="#ec4899" stopOpacity="0.5"/><stop offset="55%" stopColor="#f472b6" stopOpacity="0.22"/><stop offset="100%" stopColor="#f472b6" stopOpacity="0"/></radialGradient>
+        <radialGradient id="bl-p4" cx="50%" cy="100%" r="100%"><stop offset="0%" stopColor="#06b6d4" stopOpacity="0.5"/><stop offset="55%" stopColor="#38bdf8" stopOpacity="0.22"/><stop offset="100%" stopColor="#38bdf8" stopOpacity="0"/></radialGradient>
+        <radialGradient id="bl-p5" cx="50%" cy="100%" r="100%"><stop offset="0%" stopColor="#5b8def" stopOpacity="0.5"/><stop offset="55%" stopColor="#93b4fb" stopOpacity="0.22"/><stop offset="100%" stopColor="#93b4fb" stopOpacity="0"/></radialGradient>
+        <radialGradient id="bl-core" cx="50%" cy="50%" r="50%"><stop offset="0%" stopColor="#ffffff" stopOpacity="0.95"/><stop offset="45%" stopColor="#eaf0ff" stopOpacity="0.45"/><stop offset="100%" stopColor="#eaf0ff" stopOpacity="0"/></radialGradient>
+        <filter id="bl-soft"><feGaussianBlur stdDeviation="7"/></filter>
+        <filter id="bl-haze"><feGaussianBlur stdDeviation="26"/></filter>
+        <radialGradient id="bl-vign" cx="53%" cy="44%" r="74%"><stop offset="56%" stopColor="#aab4cd" stopOpacity="0"/><stop offset="100%" stopColor="#93a0bf" stopOpacity="0.36"/></radialGradient>
       </defs>
-      <rect width="1440" height="900" fill="url(#lum-base)"/>
-      <g filter="url(#lum-blur)">
-        <rect width="1440" height="900" fill="url(#lum1)"/>
-        <rect width="1440" height="900" fill="url(#lum2)"/>
-        <rect width="1440" height="900" fill="url(#lum3)"/>
-        <rect width="1440" height="900" fill="url(#lum4)"/>
-        <rect width="1440" height="900" fill="url(#lum5)"/>
+
+      <rect width="1440" height="900" fill="url(#bl-base)"/>
+
+      {/* hazy halo behind the bloom — large, soft, low-contrast for depth */}
+      <g filter="url(#bl-haze)" transform={"translate("+CX+" "+CY+")"} opacity="0.7">
+        {[0,45,90,135,180,225,270,315].map((r,i)=>(
+          <ellipse key={"h"+i} cx="0" cy="-160" rx="170" ry="340" transform={"rotate("+r+")"} fill={"url(#bl-p"+((i%5)+1)+")"}/>
+        ))}
       </g>
-      {/* fine speckle — subtle cool-grey grain so the canvas has texture, not flat white */}
-      {[...Array(76)].map((_, i) => {
-        const x=(i*173.7+31)%1440, y=(i*97.3+17)%900, r=i%5===0?1.5:i%3===0?1:0.6;
-        const op=0.04+(i%4)*0.025;
-        return <circle key={i} cx={x} cy={y} r={r} fill={"rgba(60,76,128,"+op+")"}/>;
+
+      {/* main bloom — crisper layered petals */}
+      <g filter="url(#bl-soft)" transform={"translate("+CX+" "+CY+")"}>
+        {[15,60,105,150,195,240,285,330].map((r,i)=>(
+          <ellipse key={"m"+i} cx="0" cy="-120" rx="98" ry="252" transform={"rotate("+r+")"} fill={"url(#bl-p"+((i%5)+1)+")"}/>
+        ))}
+        {[0,72,144,216,288].map((r,i)=>(
+          <ellipse key={"in"+i} cx="0" cy="-66" rx="56" ry="146" transform={"rotate("+r+")"} fill={"url(#bl-p"+(((i+2)%5)+1)+")"}/>
+        ))}
+      </g>
+
+      {/* luminous center */}
+      <g filter="url(#bl-soft)"><circle cx={CX} cy={CY} r="116" fill="url(#bl-core)"/></g>
+
+      {/* fine speckle for texture so the canvas isn't flat */}
+      {[...Array(64)].map((_, i) => {
+        const x=(i*193.3+37)%1440, y=(i*101.7+23)%900, rr=i%5===0?1.3:0.7;
+        const op=0.03+(i%4)*0.02;
+        return <circle key={"sp"+i} cx={x} cy={y} r={rr} fill={"rgba(60,76,128,"+op+")"}/>;
       })}
-      <rect width="1440" height="900" fill="url(#lum-vign)"/>
+
+      <rect width="1440" height="900" fill="url(#bl-vign)"/>
     </svg>
   );
 }
@@ -739,7 +758,7 @@ function renderBg(id, customUrl) {
     return <div style={{position:"absolute",inset:0,background:'url("'+customUrl+'") center/cover no-repeat'}}/>;
   }
   if (!id || id === "mesh")  return <MeshBg/>;
-  if (id === "lumina")       return <LuminaBg/>;
+  if (id === "bloom" || id === "lumina") return <BloomBg/>;   // "lumina" = pre-release alias
   if (id === "supernova")    return <SupernovaBg/>;
   if (id === "nebula")       return <NebulaBg/>;
   if (id === "aurora")       return <AuroraBg/>;
