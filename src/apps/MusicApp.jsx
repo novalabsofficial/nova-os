@@ -254,7 +254,7 @@ export function MusicApp({ AC, showToast }) {
           width: 208, flexShrink: 0, borderRight: "1px solid var(--nv-border)",
           padding: "16px 10px", overflowY: "auto",
           display: "flex", flexDirection: "column", gap: 2,
-          background: "rgba(255,255,255,0.02)",
+          background:"var(--nv-elevated)",
         }}>
           <div style={{ padding: "2px 10px 14px", display: "flex", alignItems: "center", gap: 9 }}>
             <span style={{ fontSize: 22 }}>🎵</span>
@@ -332,7 +332,7 @@ export function MusicApp({ AC, showToast }) {
         display: "flex", flexDirection: "column",
       }}>
         {/* Progress bar */}
-        <div onClick={seek} style={{ height: 4, background: "rgba(255,255,255,0.06)", cursor: cur ? "pointer" : "default", position: "relative" }}>
+        <div onClick={seek} style={{ height: 4, background:"var(--nv-elevated)", cursor: cur ? "pointer" : "default", position: "relative" }}>
           <div style={{ height: "100%", width: progPct + "%", background: AC, transition: "width 0.1s linear", boxShadow: cur ? `0 0 8px ${AC}` : "none" }} />
         </div>
 
@@ -438,7 +438,7 @@ function HomeView({ tracks, recent, cur, playing, startWithTrack, addToQueue, se
               ? "Pull in audio files from your device — MP3, WAV, OGG, M4A all work. They stay in this session."
               : tracks.length + " track" + (tracks.length === 1 ? "" : "s") + " in your library."}
           </div>
-          <button onClick={() => inputRef.current?.click()} style={{ padding: "9px 18px", background: "rgba(255,255,255,0.95)", border: "none", borderRadius: 22, cursor: "pointer", fontFamily: FFB, fontWeight: 700, fontSize: 12.5, color: "#111", boxShadow: "0 4px 14px rgba(0,0,0,0.25)" }}>
+          <button onClick={() => inputRef.current?.click()} style={{ padding: "9px 18px", background:"var(--nv-elevated)", border: "none", borderRadius: 22, cursor: "pointer", fontFamily: FFB, fontWeight: 700, fontSize: 12.5, color: "#111", boxShadow: "0 4px 14px rgba(0,0,0,0.25)" }}>
             + Add music
           </button>
         </div>
@@ -456,7 +456,7 @@ function HomeView({ tracks, recent, cur, playing, startWithTrack, addToQueue, se
               return (
                 <button key={t.id} onClick={() => startWithTrack(t.id)} style={{
                   display: "flex", flexDirection: "column", gap: 9, padding: 10,
-                  background: "rgba(255,255,255,0.04)", border: "1px solid var(--nv-border)",
+                  background:"var(--nv-elevated)", border: "1px solid var(--nv-border)",
                   borderRadius: 11, cursor: "pointer", textAlign: "left", fontFamily: FF,
                   color: "var(--nv-text)", transition: "background 0.15s",
                 }}
@@ -494,7 +494,7 @@ function LibraryView({ tracks, cur, curId, playing, startWithTrack, addToQueue, 
           <div style={{ fontFamily: FFB, fontWeight: 800, fontSize: 22, color: "var(--nv-text-strong)", letterSpacing: 0.3 }}>Your Library</div>
           <div style={{ fontSize: 12, color: "var(--nv-text-dim)", marginTop: 3 }}>{tracks.length} {tracks.length === 1 ? "track" : "tracks"}</div>
         </div>
-        <button onClick={() => inputRef.current?.click()} style={{ marginLeft: "auto", padding: "7px 14px", background: "rgba(255,255,255,0.06)", border: "1px solid var(--nv-border)", borderRadius: 8, cursor: "pointer", fontFamily: FFB, fontWeight: 600, fontSize: 12, color: "var(--nv-text-strong)" }}>+ Add files</button>
+        <button onClick={() => inputRef.current?.click()} style={{ marginLeft: "auto", padding: "7px 14px", background:"var(--nv-elevated)", border: "1px solid var(--nv-border)", borderRadius: 8, cursor: "pointer", fontFamily: FFB, fontWeight: 600, fontSize: 12, color: "var(--nv-text-strong)" }}>+ Add files</button>
       </div>
 
       {tracks.length === 0 ? (

@@ -119,18 +119,18 @@ function FeaturedCard({ app, ac, onOpen }) {
     <div className="ws" onClick={() => onOpen(app)} style={{
       width: 300, flexShrink: 0, cursor: "pointer", borderRadius: 18, padding: "20px 20px 18px",
       background: `linear-gradient(135deg, rgba(${rgb},0.55), rgba(${rgb},0.12))`,
-      border: "1px solid rgba(255,255,255,0.12)", position: "relative", overflow: "hidden",
+      border: "1px solid var(--nv-border)", position: "relative", overflow: "hidden",
       boxShadow: "0 8px 26px rgba(0,0,0,0.35)",
     }}>
       <div style={{ fontFamily: FFB, fontWeight: 700, fontSize: 10, letterSpacing: 1.5, color: "var(--nv-text)", textTransform: "uppercase", marginBottom: 14 }}>Featured</div>
       <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
         <StoreBrandIcon app={app} size={64} />
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontFamily: FFB, fontWeight: 700, fontSize: 18, color: "#fff", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{app.name}</div>
+          <div style={{ fontFamily: FFB, fontWeight: 700, fontSize: 18, color:"var(--nv-text-strong)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{app.name}</div>
           <div style={{ fontSize: 12, color: "var(--nv-text)", lineHeight: 1.35, marginTop: 2 }}>{meta.tagline || app.desc}</div>
         </div>
       </div>
-      <div style={{ marginTop: 16, display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 16px", borderRadius: 20, background: "rgba(255,255,255,0.92)", color: "#111", fontFamily: FFB, fontWeight: 700, fontSize: 12 }}>View</div>
+      <div style={{ marginTop: 16, display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 16px", borderRadius: 20, background:"var(--nv-elevated)", color: "#111", fontFamily: FFB, fontWeight: 700, fontSize: 12 }}>View</div>
     </div>
   );
 }
@@ -143,7 +143,7 @@ function GridCard({ app, ratings, ac, isIn, onOpen, toggleInstall, currentUser, 
   return (
     <div className="sc" onClick={() => onOpen(app)} style={{
       cursor: "pointer", padding: 14, borderRadius: 14,
-      background: "rgba(255,255,255,0.035)", border: "1px solid rgba(255,255,255,0.08)",
+      background:"var(--nv-elevated)", border: "1px solid var(--nv-border)",
       display: "flex", flexDirection: "column", gap: 11,
     }}>
       <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
@@ -211,11 +211,11 @@ function AppDetail({ app, ratings, ac, isIn, user, onBack, toggleInstall, rateAn
       <button onClick={onBack} className="lt" style={{ background: "none", border: "none", cursor: "pointer", fontFamily: FFB, fontWeight: 600, fontSize: 13, color: "var(--nv-text-dim)", padding: "2px 0", marginBottom: 12, display: "inline-flex", alignItems: "center", gap: 6 }}>← Back</button>
 
       {/* Hero */}
-      <div style={{ borderRadius: 18, padding: 22, marginBottom: 18, position: "relative", overflow: "hidden", background: `linear-gradient(140deg, rgba(${rgb},0.4), rgba(${rgb},0.06))`, border: "1px solid rgba(255,255,255,0.1)" }}>
+      <div style={{ borderRadius: 18, padding: 22, marginBottom: 18, position: "relative", overflow: "hidden", background: `linear-gradient(140deg, rgba(${rgb},0.4), rgba(${rgb},0.06))`, border: "1px solid var(--nv-border)" }}>
         <div style={{ display: "flex", gap: 18, alignItems: "center", flexWrap: "wrap" }}>
           <StoreBrandIcon app={app} size={92} />
           <div style={{ flex: 1, minWidth: 200 }}>
-            <div style={{ fontFamily: FFB, fontWeight: 700, fontSize: 26, color: "#fff", lineHeight: 1.1 }}>{app.name}</div>
+            <div style={{ fontFamily: FFB, fontWeight: 700, fontSize: 26, color:"var(--nv-text-strong)", lineHeight: 1.1 }}>{app.name}</div>
             <div style={{ fontSize: 13, color: "var(--nv-text)", marginTop: 4 }}>{meta.developer}</div>
             {meta.tagline && <div style={{ fontSize: 13, color: "var(--nv-text)", marginTop: 2 }}>{meta.tagline}</div>}
             <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 12, flexWrap: "wrap" }}>
@@ -233,10 +233,10 @@ function AppDetail({ app, ratings, ac, isIn, user, onBack, toggleInstall, rateAn
             a phishing site before clicking. Host shown prominently; full
             URL underneath in a smaller mono font. */}
         {app.url && (
-          <div style={{ marginTop: 16, padding: "10px 14px", background: "rgba(0,0,0,0.22)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 10, display: "flex", alignItems: "center", gap: 10 }}>
+          <div style={{ marginTop: 16, padding: "10px 14px", background: "rgba(0,0,0,0.22)", border: "1px solid var(--nv-border)", borderRadius: 10, display: "flex", alignItems: "center", gap: 10 }}>
             <span style={{ fontSize: 14, color: "var(--nv-text-dim)", flexShrink: 0 }} title="External link">🔗</span>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontFamily: FFB, fontWeight: 600, fontSize: 12.5, color: "#fff", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              <div style={{ fontFamily: FFB, fontWeight: 600, fontSize: 12.5, color:"var(--nv-text-strong)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                 Opens {storeUrlHost(app.url)}
               </div>
               <div style={{ fontFamily: FFM, fontSize: 10.5, color: "var(--nv-text-dim)", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={app.url}>
@@ -262,7 +262,7 @@ function AppDetail({ app, ratings, ac, isIn, user, onBack, toggleInstall, rateAn
       <div style={{ ...SEC, marginBottom: 12 }}>Ratings &amp; Reviews</div>
       <div style={{ display: "flex", gap: 26, alignItems: "center", flexWrap: "wrap", marginBottom: 20 }}>
         <div style={{ textAlign: "center", minWidth: 92 }}>
-          <div style={{ fontFamily: FFB, fontWeight: 700, fontSize: 46, color: "#fff", lineHeight: 1 }}>{total ? r.avg.toFixed(1) : "–"}</div>
+          <div style={{ fontFamily: FFB, fontWeight: 700, fontSize: 46, color:"var(--nv-text-strong)", lineHeight: 1 }}>{total ? r.avg.toFixed(1) : "–"}</div>
           <div style={{ marginTop: 6 }}><StarRow value={total ? r.avg : 0} size={14} /></div>
           <div style={{ fontSize: 11, color: "var(--nv-text-dim)", marginTop: 4 }}>{total} {total === 1 ? "rating" : "ratings"}</div>
         </div>
@@ -270,7 +270,7 @@ function AppDetail({ app, ratings, ac, isIn, user, onBack, toggleInstall, rateAn
           {[5, 4, 3, 2, 1].map(s => (
             <div key={s} style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <span style={{ fontSize: 10, fontFamily: FFM, color: "var(--nv-text-dim)", width: 8 }}>{s}</span>
-              <div style={{ flex: 1, height: 6, borderRadius: 3, background: "rgba(255,255,255,0.07)", overflow: "hidden" }}>
+              <div style={{ flex: 1, height: 6, borderRadius: 3, background:"var(--nv-elevated)", overflow: "hidden" }}>
                 <div style={{ width: ((r.hist[s] || 0) / maxBar * 100) + "%", height: "100%", background: "#ffc83d", borderRadius: 3 }} />
               </div>
             </div>
@@ -279,7 +279,7 @@ function AppDetail({ app, ratings, ac, isIn, user, onBack, toggleInstall, rateAn
       </div>
 
       {/* Composer */}
-      <div style={{ padding: 16, borderRadius: 14, background: "rgba(255,255,255,0.035)", border: "1px solid rgba(255,255,255,0.08)", marginBottom: 18 }}>
+      <div style={{ padding: 16, borderRadius: 14, background:"var(--nv-elevated)", border: "1px solid var(--nv-border)", marginBottom: 18 }}>
         <div style={{ fontFamily: FFB, fontWeight: 600, fontSize: 13, color: "var(--nv-text)", marginBottom: 10 }}>{r.mine ? "Edit your review" : "Write a review"}</div>
         <div style={{ display: "flex", gap: 4, marginBottom: 12 }}>
           {[1, 2, 3, 4, 5].map(s => (
@@ -537,7 +537,7 @@ export function StoreApp({ user, data, updateData, showToast, AC }) {
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14 }}>
         <NovaLogo size={30} />
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontFamily: FFB, fontWeight: 700, fontSize: 20, color: "#fff", lineHeight: 1 }}>Nova Store</div>
+          <div style={{ fontFamily: FFB, fontWeight: 700, fontSize: 20, color:"var(--nv-text-strong)", lineHeight: 1 }}>Nova Store</div>
           <div style={{ fontSize: 10, fontFamily: FFM, color: "var(--nv-text-dim)", marginTop: 2 }}>v{NOVA_VERSION}</div>
         </div>
       </div>
@@ -599,10 +599,10 @@ export function StoreApp({ user, data, updateData, showToast, AC }) {
                 return (
                   <button key={c.cat} onClick={() => goCategory(c.cat)} className="ws" style={{
                     flex: "1 1 130px", minWidth: 130, textAlign: "left", cursor: "pointer", padding: "14px 16px", borderRadius: 14,
-                    background: `linear-gradient(135deg, rgba(${rgb},0.5), rgba(${rgb},0.14))`, border: "1px solid rgba(255,255,255,0.1)",
+                    background: `linear-gradient(135deg, rgba(${rgb},0.5), rgba(${rgb},0.14))`, border: "1px solid var(--nv-border)",
                   }}>
                     <div style={{ fontSize: 22, marginBottom: 8 }}>{c.emoji}</div>
-                    <div style={{ fontFamily: FFB, fontWeight: 700, fontSize: 14, color: "#fff" }}>{c.cat}</div>
+                    <div style={{ fontFamily: FFB, fontWeight: 700, fontSize: 14, color:"var(--nv-text-strong)" }}>{c.cat}</div>
                     <div style={{ fontSize: 11, color: "var(--nv-text)", marginTop: 1 }}>{c.count} app{c.count === 1 ? "" : "s"}</div>
                   </button>
                 );
@@ -613,7 +613,7 @@ export function StoreApp({ user, data, updateData, showToast, AC }) {
           {/* Submit call-to-action */}
           <div style={{ borderRadius: 16, padding: "20px 22px", marginBottom: 8, background: `linear-gradient(135deg, ${fill(ac)}, rgba(255,255,255,0.02))`, border: "1px solid " + bdr(ac), display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
             <div>
-              <div style={{ fontFamily: FFB, fontWeight: 700, fontSize: 16, color: "#fff" }}>Built something cool? 🚀</div>
+              <div style={{ fontFamily: FFB, fontWeight: 700, fontSize: 16, color:"var(--nv-text-strong)" }}>Built something cool? 🚀</div>
               <div style={{ fontSize: 13, color: "var(--nv-text)", marginTop: 3 }}>Share your web app with the whole Nova community.</div>
             </div>
             <button onClick={() => { setSearch(""); setView("submit"); }} style={{ padding: "10px 22px", borderRadius: 22, cursor: "pointer", fontFamily: FFB, fontWeight: 700, fontSize: 13, whiteSpace: "nowrap", background: "#fff", color: "#111", border: "none" }}>Submit an app →</button>
@@ -650,7 +650,7 @@ export function StoreApp({ user, data, updateData, showToast, AC }) {
             <button onClick={() => setView("submit")} style={{ padding: "6px 14px", borderRadius: 8, cursor: "pointer", fontFamily: FFB, fontWeight: 600, fontSize: 11.5, background: fill(ac), border: "1px solid " + bdr(ac), color: ac }}>+ Submit App</button>
           </div>
           {mySubmissions.length > 0 && (
-            <div style={{ marginBottom: 16, padding: "11px 13px", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 10 }}>
+            <div style={{ marginBottom: 16, padding: "11px 13px", background:"var(--nv-elevated)", border: "1px solid var(--nv-border)", borderRadius: 10 }}>
               <div style={{ fontFamily: FFB, fontWeight: 600, fontSize: 11, color: "var(--nv-text-dim)", marginBottom: 6, letterSpacing: 0.5 }}>YOUR SUBMISSIONS</div>
               {mySubmissions.map(a => {
                 const isPending = a.status === "pending";
@@ -676,7 +676,7 @@ export function StoreApp({ user, data, updateData, showToast, AC }) {
       {/* ── Submit ──────────────────────────────────────────────────────── */}
       {!detail && !searching && view === "submit" && (
         <div style={{ maxWidth: 470 }}>
-          <div style={{ fontFamily: FFB, fontWeight: 700, fontSize: 17, color: "#fff", marginBottom: 4 }}>Submit Your App</div>
+          <div style={{ fontFamily: FFB, fontWeight: 700, fontSize: 17, color:"var(--nv-text-strong)", marginBottom: 4 }}>Submit Your App</div>
           <div style={{ fontSize: 12.5, color: "var(--nv-text-dim)", marginBottom: 18 }}>Share any web app or website with the Nova community. Submissions appear in the Community tab after a quick review.</div>
           <div style={{ display: "flex", flexDirection: "column", gap: 11 }}>
             <div style={{ display: "flex", gap: 10 }}>
@@ -684,8 +684,8 @@ export function StoreApp({ user, data, updateData, showToast, AC }) {
                 <label style={{ ...SEC, marginBottom: 0 }}>Icon</label>
                 {sIconImg ? (
                   <div style={{ position: "relative", width: 56, height: 56 }}>
-                    <img src={sIconImg} alt="" style={{ width: 56, height: 56, borderRadius: 12, objectFit: "cover", border: "1px solid rgba(255,255,255,0.15)" }} />
-                    <button onClick={() => setSIconImg(null)} title="Remove logo" style={{ position: "absolute", top: -6, right: -6, width: 20, height: 20, borderRadius: "50%", background: "rgba(255,80,80,0.92)", border: "none", cursor: "pointer", color: "#fff", fontSize: 11, lineHeight: 1, padding: 0 }}>✕</button>
+                    <img src={sIconImg} alt="" style={{ width: 56, height: 56, borderRadius: 12, objectFit: "cover", border: "1px solid var(--nv-border)" }} />
+                    <button onClick={() => setSIconImg(null)} title="Remove logo" style={{ position: "absolute", top: -6, right: -6, width: 20, height: 20, borderRadius: "50%", background: "rgba(255,80,80,0.92)", border: "none", cursor: "pointer", color:"var(--nv-text-strong)", fontSize: 11, lineHeight: 1, padding: 0 }}>✕</button>
                   </div>
                 ) : (
                   <input value={sIcon} onChange={e => setSIcon(e.target.value)} maxLength={2} style={{ ...INP, width: 56, textAlign: "center", fontSize: 22, padding: "6px 4px" }} />
@@ -727,17 +727,17 @@ export function StoreApp({ user, data, updateData, showToast, AC }) {
       {!detail && !searching && view === "moderation" && userIsAdmin && (
         <>
           <div style={{ marginBottom: 12 }}>
-            <div style={{ fontFamily: FFB, fontWeight: 700, fontSize: 14, color: "#fff" }}>🛡 Moderation Queue</div>
+            <div style={{ fontFamily: FFB, fontWeight: 700, fontSize: 14, color:"var(--nv-text-strong)" }}>🛡 Moderation Queue</div>
             <div style={{ fontSize: 11, color: "var(--nv-text-dim)", marginTop: 2 }}>{modQueue.length} app{modQueue.length === 1 ? "" : "s"} awaiting review · red flags from auto-filter need extra attention</div>
           </div>
           {modQueue.length === 0 && <div style={{ color: "var(--nv-text-dim)", fontStyle: "italic", fontSize: 13, textAlign: "center", padding: "40px 0" }}>Queue is empty — nothing to review 🎉</div>}
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             {modQueue.map(app => (
-              <div key={app.id} style={{ padding: "12px 14px", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 10 }}>
+              <div key={app.id} style={{ padding: "12px 14px", background:"var(--nv-elevated)", border: "1px solid var(--nv-border)", borderRadius: 10 }}>
                 <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
                   <div style={{ flexShrink: 0 }}><StoreBrandIcon app={app} size={40}/></div>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontFamily: FFB, fontWeight: 600, fontSize: 13, color: "#fff" }}>{app.name}</div>
+                    <div style={{ fontFamily: FFB, fontWeight: 600, fontSize: 13, color:"var(--nv-text-strong)" }}>{app.name}</div>
                     <div style={{ fontSize: 11, color: "var(--nv-text-dim)", marginTop: 1 }}>by @{app.submitter || "unknown"} · {app.cat || "Uncategorized"}</div>
                     <a href={app.url} target="_blank" rel="noreferrer" style={{ fontSize: 11, fontFamily: FFM, color: ac, textDecoration: "none", marginTop: 3, display: "inline-block", wordBreak: "break-all" }}>{app.url}</a>
                     <div style={{ fontSize: 12, color: "var(--nv-text)", marginTop: 6, lineHeight: 1.5 }}>{app.desc}</div>

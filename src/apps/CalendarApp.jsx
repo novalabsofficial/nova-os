@@ -111,7 +111,7 @@ export function CalendarApp({ data, updateData, showToast, AC }) {
         width: 232, flexShrink: 0, borderRight: "1px solid var(--nv-border)",
         padding: "14px 12px", overflowY: "auto",
         display: "flex", flexDirection: "column", gap: 12,
-        background: "rgba(255,255,255,0.02)",
+        background:"var(--nv-elevated)",
       }}>
         {/* New event button */}
         <button onClick={() => openNew(selectedKey)} style={{

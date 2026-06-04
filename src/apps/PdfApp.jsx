@@ -93,7 +93,7 @@ export function PdfApp({ AC, showToast }) {
       {/* ───── SIDEBAR — recents ───── */}
       <div style={{
         width: 220, flexShrink: 0, borderRight: "1px solid var(--nv-border)",
-        background: "rgba(255,255,255,0.02)",
+        background:"var(--nv-elevated)",
         display: "flex", flexDirection: "column", minHeight: 0,
       }}>
         <div style={{ padding: "14px 12px 10px", borderBottom: "1px solid var(--nv-border)" }}>

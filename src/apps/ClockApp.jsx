@@ -192,23 +192,23 @@ export function ClockApp({AC, data, updateSettings}){
 
   return(
     <div style={{display:"flex",flexDirection:"column",height:"100%",fontFamily:FF,minHeight:0}}>
-      <div style={{display:"flex",borderBottom:"1px solid rgba(255,255,255,0.08)",marginBottom:14,flexShrink:0}}>
+      <div style={{display:"flex",borderBottom:"1px solid var(--nv-border)",marginBottom:14,flexShrink:0}}>
         {tabBtn("world","🌍 World")}{tabBtn("stop","⏱ Stopwatch")}{tabBtn("timer","⏲ Timer")}{tabBtn("alarms","🔔 Alarms")}
       </div>
       {tab==="world"&&(
         <div style={{flex:1,overflowY:"auto",minHeight:0,display:"flex",flexDirection:"column",gap:6}}>
           <div style={{padding:"14px 14px",background:fill(AC),border:"1px solid "+bdr(AC),borderRadius:10,marginBottom:6}}>
             <div style={{fontSize:11,fontFamily:FFB,fontWeight:600,color:AC,letterSpacing:1,marginBottom:5}}>LOCAL TIME</div>
-            <div style={{fontFamily:FFM,fontWeight:500,fontSize:30,color:"#fff",letterSpacing:1.5}}>{tick.toLocaleTimeString([],{hour:"2-digit",minute:"2-digit",second:"2-digit",hour12:false})}</div>
+            <div style={{fontFamily:FFM,fontWeight:500,fontSize:30,color:"var(--nv-text-strong)",letterSpacing:1.5}}>{tick.toLocaleTimeString([],{hour:"2-digit",minute:"2-digit",second:"2-digit",hour12:false})}</div>
             <div style={{fontFamily:FF,fontSize:11,color:"var(--nv-text-dim)",marginTop:2}}>{tick.toLocaleDateString([],{weekday:"long",month:"long",day:"numeric",year:"numeric"})}</div>
           </div>
           {CLOCK_ZONES.map(z=>(
-            <div key={z.tz} style={{padding:"10px 14px",background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.06)",borderRadius:8,display:"flex",alignItems:"center",gap:10}}>
+            <div key={z.tz} style={{padding:"10px 14px",background:"var(--nv-elevated)",border:"1px solid var(--nv-border)",borderRadius:8,display:"flex",alignItems:"center",gap:10}}>
               <div style={{flex:1,minWidth:0}}>
                 <div style={{fontFamily:FFB,fontWeight:600,fontSize:13,color:"var(--nv-text)"}}>{z.label}</div>
                 <div style={{fontSize:10,color:"var(--nv-text-dim)",fontFamily:FFM}}>{fmtDateTZ(tick,z.tz)}</div>
               </div>
-              <div style={{fontFamily:FFM,fontWeight:500,fontSize:18,color:"#fff",letterSpacing:1}}>{fmtTimeTZ(tick,z.tz)}</div>
+              <div style={{fontFamily:FFM,fontWeight:500,fontSize:18,color:"var(--nv-text-strong)",letterSpacing:1}}>{fmtTimeTZ(tick,z.tz)}</div>
             </div>
           ))}
         </div>
@@ -216,7 +216,7 @@ export function ClockApp({AC, data, updateSettings}){
       {tab==="stop"&&(
         <div style={{flex:1,display:"flex",flexDirection:"column",minHeight:0}}>
           <div style={{textAlign:"center",padding:"30px 0 24px"}}>
-            <div style={{fontFamily:FFM,fontWeight:400,fontSize:46,color:"#fff",letterSpacing:1.5}}>{fmtStopwatch(liveElapsed)}</div>
+            <div style={{fontFamily:FFM,fontWeight:400,fontSize:46,color:"var(--nv-text-strong)",letterSpacing:1.5}}>{fmtStopwatch(liveElapsed)}</div>
           </div>
           <div style={{display:"flex",gap:8,marginBottom:12,flexShrink:0}}>
             {ctrlBtn(swRunning?"Pause":liveElapsed>0?"Resume":"Start",startStopwatch,true)}
@@ -225,7 +225,7 @@ export function ClockApp({AC, data, updateSettings}){
           </div>
           <div style={{flex:1,overflowY:"auto",minHeight:0}}>
             {swLaps.length===0?<div style={{textAlign:"center",color:"var(--nv-text-dim)",fontStyle:"italic",fontSize:12,padding:"24px 0"}}>No laps yet</div>:swLaps.map((ms,i)=>(
-              <div key={i} style={{display:"flex",justifyContent:"space-between",padding:"7px 12px",borderBottom:"1px solid rgba(255,255,255,0.05)",fontFamily:FFM,fontSize:13,color:"var(--nv-text)"}}>
+              <div key={i} style={{display:"flex",justifyContent:"space-between",padding:"7px 12px",borderBottom:"1px solid var(--nv-border)",fontFamily:FFM,fontSize:13,color:"var(--nv-text)"}}>
                 <span style={{color:"var(--nv-text-dim)"}}>Lap {swLaps.length-i}</span><span>{fmtStopwatch(ms)}</span>
               </div>
             ))}
@@ -269,7 +269,7 @@ export function ClockApp({AC, data, updateSettings}){
             <>
               <div style={{display:"flex",alignItems:"center",marginBottom:10,flexShrink:0}}>
                 <div style={{flex:1}}>
-                  <div style={{fontFamily:FFB,fontWeight:700,fontSize:14,color:"#fff"}}>Alarms</div>
+                  <div style={{fontFamily:FFB,fontWeight:700,fontSize:14,color:"var(--nv-text-strong)"}}>Alarms</div>
                   <div style={{fontSize:10.5,color:"var(--nv-text-dim)",marginTop:2}}>
                     {alarms.length === 0 ? "No alarms yet" : alarms.length + " alarm" + (alarms.length === 1 ? "" : "s") + " · ring even when Clock isn't open"}
                   </div>
@@ -325,7 +325,7 @@ function AlarmEditor({ ac, draft, onChange, onSave, onCancel }) {
       {/* Top bar — back + title */}
       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
         <button onClick={onCancel} className="lt" style={{ background: "none", border: "none", cursor: "pointer", color: "var(--nv-text-dim)", fontFamily: FFB, fontWeight: 600, fontSize: 13, padding: "2px 6px" }}>← Back</button>
-        <div style={{ fontFamily: FFB, fontWeight: 700, fontSize: 14, color: "#fff" }}>{draft.id ? "Edit alarm" : "New alarm"}</div>
+        <div style={{ fontFamily: FFB, fontWeight: 700, fontSize: 14, color:"var(--nv-text-strong)" }}>{draft.id ? "Edit alarm" : "New alarm"}</div>
       </div>
 
       {/* Time */}
@@ -364,7 +364,7 @@ function AlarmEditor({ ac, draft, onChange, onSave, onCancel }) {
             { label: "Weekdays", val: [false,true,true,true,true,true,false] },
             { label: "Weekends", val: [true,false,false,false,false,false,true] },
           ].map(p => (
-            <button key={p.label} onClick={() => setDays(p.val)} style={{ padding: "4px 10px", borderRadius: 14, cursor: "pointer", fontFamily: FFB, fontWeight: 600, fontSize: 10.5, background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", color: "var(--nv-text)" }}>{p.label}</button>
+            <button key={p.label} onClick={() => setDays(p.val)} style={{ padding: "4px 10px", borderRadius: 14, cursor: "pointer", fontFamily: FFB, fontWeight: 600, fontSize: 10.5, background:"var(--nv-elevated)", border: "1px solid var(--nv-border)", color: "var(--nv-text)" }}>{p.label}</button>
           ))}
         </div>
       </div>
@@ -385,7 +385,7 @@ function AlarmEditor({ ac, draft, onChange, onSave, onCancel }) {
               <div key={s.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 12px", background: active ? fill(ac) : "rgba(255,255,255,0.04)", border: "1px solid " + (active ? bdr(ac) : "rgba(255,255,255,0.08)"), borderRadius: 8, cursor: "pointer" }} onClick={() => set({ sound: s.id })}>
                 <div style={{ width: 14, height: 14, borderRadius: "50%", border: "2px solid " + (active ? ac : "rgba(255,255,255,0.25)"), background: active ? ac : "transparent", flexShrink: 0 }} />
                 <div style={{ flex: 1, fontFamily: FF, fontSize: 12, color: active ? ac : "rgba(255,255,255,0.8)" }}>{s.label}</div>
-                <button onClick={e => { e.stopPropagation(); playSound(s.id); }} title="Preview" style={{ padding: "3px 9px", borderRadius: 14, cursor: "pointer", fontFamily: FFB, fontWeight: 600, fontSize: 10.5, background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.14)", color: "var(--nv-text)" }}>▶ Preview</button>
+                <button onClick={e => { e.stopPropagation(); playSound(s.id); }} title="Preview" style={{ padding: "3px 9px", borderRadius: 14, cursor: "pointer", fontFamily: FFB, fontWeight: 600, fontSize: 10.5, background:"var(--nv-elevated)", border: "1px solid var(--nv-border)", color: "var(--nv-text)" }}>▶ Preview</button>
               </div>
             );
           })}
@@ -395,7 +395,7 @@ function AlarmEditor({ ac, draft, onChange, onSave, onCancel }) {
       {/* Actions */}
       <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
         <button onClick={onSave} disabled={!canSave} style={{ flex: 1, padding: "11px", borderRadius: 9, cursor: canSave ? "pointer" : "default", fontFamily: FFB, fontWeight: 700, fontSize: 13, background: fill(ac), border: "1px solid " + bdr(ac), color: ac, opacity: canSave ? 1 : 0.5 }}>{draft.id ? "Save changes" : "Create alarm"}</button>
-        <button onClick={onCancel} style={{ padding: "11px 18px", borderRadius: 9, cursor: "pointer", fontFamily: FFB, fontWeight: 600, fontSize: 12.5, background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)", color: "var(--nv-text)" }}>Cancel</button>
+        <button onClick={onCancel} style={{ padding: "11px 18px", borderRadius: 9, cursor: "pointer", fontFamily: FFB, fontWeight: 600, fontSize: 12.5, background:"var(--nv-elevated)", border: "1px solid var(--nv-border)", color: "var(--nv-text)" }}>Cancel</button>
       </div>
     </div>
   );

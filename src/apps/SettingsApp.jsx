@@ -152,7 +152,7 @@ export function SettingsApp({ user, data, updateSettings, showToast, AC, onCusto
         padding: "16px 10px", overflowY: "auto",
         display: (isMobile && mobilePane !== "list") ? "none" : "flex",
         flexDirection: "column", gap: 2,
-        background: "rgba(255,255,255,0.02)",
+        background:"var(--nv-elevated)",
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: 9, padding: "4px 8px 14px" }}>
           <UserBubble user={user} ac={AC} />
@@ -185,7 +185,7 @@ export function SettingsApp({ user, data, updateSettings, showToast, AC, onCusto
 
         {isMobile && (
           <div style={{ position: "sticky", top: 0, zIndex: 2, display: "flex", alignItems: "center", gap: 10, padding: "12px 0", marginBottom: 6, background: "var(--nv-surface-solid)", borderBottom: "1px solid var(--nv-border)" }}>
-            <button onClick={() => setMobilePane("list")} style={{ background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.14)", borderRadius: 8, padding: "7px 12px", color: "var(--nv-text-strong)", cursor: "pointer", fontFamily: FFB, fontWeight: 700, fontSize: 13 }}>← Settings</button>
+            <button onClick={() => setMobilePane("list")} style={{ background:"var(--nv-elevated)", border: "1px solid var(--nv-border)", borderRadius: 8, padding: "7px 12px", color: "var(--nv-text-strong)", cursor: "pointer", fontFamily: FFB, fontWeight: 700, fontSize: 13 }}>← Settings</button>
             <span style={{ fontFamily: FFB, fontWeight: 700, fontSize: 14, color: "var(--nv-text-strong)" }}>{(SECTIONS.find(s => s.id === section) || {}).label}</span>
           </div>
         )}
@@ -199,7 +199,7 @@ export function SettingsApp({ user, data, updateSettings, showToast, AC, onCusto
           <div style={{ fontSize: 10, color: "var(--nv-text-dim)", fontStyle: "italic", marginBottom: 20, marginTop: 2 }}>Frosts windows, the taskbar, menus &amp; widgets so the wallpaper glows through.</div>
 
           <div style={SEC}>Accent Color</div>
-          <div style={{ display: "flex", gap: 7, marginBottom: 6, flexWrap: "wrap" }}>{ACCENT_PRESETS.map(c => <div key={c} className="ad" onClick={() => { updateSettings({ accent: c }); showToast("Accent updated ✓"); }} style={{ width: 28, height: 28, borderRadius: 7, background: c, cursor: "pointer", border: AC === c ? "2.5px solid #fff" : "2.5px solid transparent", transition: "transform 0.12s,border 0.12s", boxSizing: "border-box" }} />)}<input type="color" value={AC} onChange={e => updateSettings({ accent: e.target.value })} style={{ width: 28, height: 28, borderRadius: 7, border: "1px solid rgba(255,255,255,0.15)", cursor: "pointer", background: "none" }} title="Custom color" /></div>
+          <div style={{ display: "flex", gap: 7, marginBottom: 6, flexWrap: "wrap" }}>{ACCENT_PRESETS.map(c => <div key={c} className="ad" onClick={() => { updateSettings({ accent: c }); showToast("Accent updated ✓"); }} style={{ width: 28, height: 28, borderRadius: 7, background: c, cursor: "pointer", border: AC === c ? "2.5px solid #fff" : "2.5px solid transparent", transition: "transform 0.12s,border 0.12s", boxSizing: "border-box" }} />)}<input type="color" value={AC} onChange={e => updateSettings({ accent: e.target.value })} style={{ width: 28, height: 28, borderRadius: 7, border: "1px solid var(--nv-border)", cursor: "pointer", background: "none" }} title="Custom color" /></div>
           <div style={{ fontSize: 10, color: "var(--nv-text-dim)", marginBottom: 20, fontFamily: FFM }}>Current: {AC}</div>
 
           <div style={SEC}>Wallpaper</div>
@@ -224,7 +224,7 @@ export function SettingsApp({ user, data, updateSettings, showToast, AC, onCusto
               const active = (settings.taskbarColor || null) === c.color;
               return (<div key={c.id} className="ad" onClick={() => { updateSettings({ taskbarColor: c.color }); showToast("Taskbar color set ✓"); }} title={c.id} style={{ width: 28, height: 28, borderRadius: 7, background: c.preview, cursor: "pointer", border: active ? "2.5px solid #fff" : "2.5px solid transparent", transition: "transform 0.12s,border 0.12s", boxSizing: "border-box" }} />);
             })}
-            <input type="color" value={typeof settings.taskbarColor === "string" ? settings.taskbarColor : "#0a0a14"} onChange={e => updateSettings({ taskbarColor: e.target.value })} style={{ width: 28, height: 28, borderRadius: 7, border: "1px solid rgba(255,255,255,0.15)", cursor: "pointer", background: "none" }} title="Custom color" />
+            <input type="color" value={typeof settings.taskbarColor === "string" ? settings.taskbarColor : "#0a0a14"} onChange={e => updateSettings({ taskbarColor: e.target.value })} style={{ width: 28, height: 28, borderRadius: 7, border: "1px solid var(--nv-border)", cursor: "pointer", background: "none" }} title="Custom color" />
           </div>
           <div style={{ fontSize: 10, color: "var(--nv-text-dim)", marginBottom: 20, fontFamily: FFM }}>{settings.taskbarColor ? "Current: " + settings.taskbarColor : "System default"}</div>
 
@@ -298,7 +298,7 @@ export function SettingsApp({ user, data, updateSettings, showToast, AC, onCusto
           <div style={SEC}>Preview</div>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 5, marginBottom: 8, opacity: soundCfg.enabled ? 1 : 0.4 }}>
             {["startup", "login", "logout", "notification", "appLaunch", "windowOpen", "windowClose", "toast", "error", "success", "message", "focus", "alert", "achievement", "click"].map(s => (
-              <button key={s} onClick={() => playSound(s)} style={{ padding: "4px 10px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 6, cursor: "pointer", fontFamily: FFM, fontWeight: 500, fontSize: 10, color: "var(--nv-text)" }}>▶ {s}</button>
+              <button key={s} onClick={() => playSound(s)} style={{ padding: "4px 10px", background:"var(--nv-elevated)", border: "1px solid var(--nv-border)", borderRadius: 6, cursor: "pointer", fontFamily: FFM, fontWeight: 500, fontSize: 10, color: "var(--nv-text)" }}>▶ {s}</button>
             ))}
           </div>
         </>)}
@@ -308,7 +308,7 @@ export function SettingsApp({ user, data, updateSettings, showToast, AC, onCusto
           <div style={PANE_SUB}>Your current connection status.</div>
 
           {/* Status card */}
-          <div style={{ display: "flex", alignItems: "center", gap: 14, padding: "16px 18px", background: "rgba(255,255,255,0.04)", border: "1px solid var(--nv-border)", borderRadius: 12, marginBottom: 16 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 14, padding: "16px 18px", background:"var(--nv-elevated)", border: "1px solid var(--nv-border)", borderRadius: 12, marginBottom: 16 }}>
             <div style={{ width: 42, height: 42, borderRadius: 11, display: "flex", alignItems: "center", justifyContent: "center", background: net.online ? fill(AC) : "rgba(255,90,90,0.12)", border: "1px solid " + (net.online ? bdr(AC) : "rgba(255,90,90,0.3)"), color: net.online ? AC : "#ff8b8b" }}>
               <svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M5 12.55a11 11 0 0 1 14 0M1.42 9a16 16 0 0 1 21.16 0M8.53 16.11a6 6 0 0 1 6.95 0"/><path d="M12 20h.01"/>
@@ -323,7 +323,7 @@ export function SettingsApp({ user, data, updateSettings, showToast, AC, onCusto
 
           {/* Details (only what the browser exposes) */}
           <div style={SEC}>Details</div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 1, marginBottom: 16, padding: "4px 0", background: "rgba(255,255,255,0.03)", border: "1px solid var(--nv-border)", borderRadius: 10 }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 1, marginBottom: 16, padding: "4px 0", background:"var(--nv-elevated)", border: "1px solid var(--nv-border)", borderRadius: 10 }}>
             {[
               ["Status", net.online ? "Connected" : "Offline"],
               ["Connection", net.type ? connLabel : "Unknown (not exposed by browser)"],
@@ -331,7 +331,7 @@ export function SettingsApp({ user, data, updateSettings, showToast, AC, onCusto
               ["Quality", net.effectiveType ? net.effectiveType.toUpperCase() : "Not available"],
               ["Latency", net.rtt != null ? net.rtt + " ms" : "Not available"],
             ].map(([k, v]) => (
-              <div key={k} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 14px", borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
+              <div key={k} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 14px", borderBottom: "1px solid var(--nv-border)" }}>
                 <span style={{ fontSize: 12, color: "var(--nv-text)" }}>{k}</span>
                 <span style={{ fontFamily: FFM, fontSize: 11.5, color: "var(--nv-text-strong)" }}>{v}</span>
               </div>
@@ -358,7 +358,7 @@ export function SettingsApp({ user, data, updateSettings, showToast, AC, onCusto
           <div style={PANE_SUB}>Global shortcuts. Browsers reserve ⌘/Ctrl combos like Cmd+W, so Nova uses Alt-based bindings.</div>
 
           <div style={SEC}>Shortcuts</div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 5, padding: "10px 12px", background: "rgba(255,255,255,0.03)", border: "1px solid var(--nv-border)", borderRadius: 8 }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 5, padding: "10px 12px", background:"var(--nv-elevated)", border: "1px solid var(--nv-border)", borderRadius: 8 }}>
             {[
               ["⌘/Ctrl + K", "Spotlight global search"],
               ["⌘/Ctrl + ,", "Open Settings"],
@@ -370,7 +370,7 @@ export function SettingsApp({ user, data, updateSettings, showToast, AC, onCusto
               ["F11", "Toggle fullscreen"],
             ].map(([combo, action]) => (
               <div key={combo} style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 12, color: "var(--nv-text)" }}>
-                <span style={{ fontFamily: FFM, fontSize: 11, padding: "2px 7px", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 4, color: "var(--nv-text-strong)", minWidth: 120, textAlign: "center" }}>{combo}</span>
+                <span style={{ fontFamily: FFM, fontSize: 11, padding: "2px 7px", background:"var(--nv-elevated)", border: "1px solid var(--nv-border)", borderRadius: 4, color: "var(--nv-text-strong)", minWidth: 120, textAlign: "center" }}>{combo}</span>
                 <span style={{ fontFamily: FF, opacity: 0.85 }}>{action}</span>
               </div>
             ))}
@@ -381,15 +381,15 @@ export function SettingsApp({ user, data, updateSettings, showToast, AC, onCusto
           <div style={PANE_TITLE}>Account</div>
           <div style={PANE_SUB}>Your Nova OS sign-in. Your data syncs across devices.</div>
 
-          <div style={{ padding: "11px 14px", background: "rgba(255,255,255,0.04)", border: "1px solid var(--nv-border)", borderRadius: 8, marginBottom: 8 }}><div style={{ fontSize: 11, color: "var(--nv-text-dim)", marginBottom: 2 }}>Signed in as</div><div style={{ fontFamily: FFB, fontWeight: 600, fontSize: 16, color: "var(--nv-text-strong)" }}>@{user}</div></div>
+          <div style={{ padding: "11px 14px", background:"var(--nv-elevated)", border: "1px solid var(--nv-border)", borderRadius: 8, marginBottom: 8 }}><div style={{ fontSize: 11, color: "var(--nv-text-dim)", marginBottom: 2 }}>Signed in as</div><div style={{ fontFamily: FFB, fontWeight: 600, fontSize: 16, color: "var(--nv-text-strong)" }}>@{user}</div></div>
           {onLogout && (
             <button onClick={onLogout} style={{ width: "100%", padding: "10px", background: "rgba(255,80,80,0.08)", border: "1px solid rgba(255,80,80,0.3)", borderRadius: 8, cursor: "pointer", fontFamily: FFB, fontWeight: 600, fontSize: 12, color: "#ff8b8b" }}>Sign Out</button>
           )}
           {isNative() && (
-            <button onClick={() => exitApp()} style={{ width: "100%", marginTop: 8, padding: "10px", background: "rgba(255,255,255,0.05)", border: "1px solid var(--nv-border)", borderRadius: 8, cursor: "pointer", fontFamily: FFB, fontWeight: 600, fontSize: 12, color: "var(--nv-text)" }}>Close Nova OS</button>
+            <button onClick={() => exitApp()} style={{ width: "100%", marginTop: 8, padding: "10px", background:"var(--nv-elevated)", border: "1px solid var(--nv-border)", borderRadius: 8, cursor: "pointer", fontFamily: FFB, fontWeight: 600, fontSize: 12, color: "var(--nv-text)" }}>Close Nova OS</button>
           )}
           {isDesktop() && (
-            <button onClick={() => quitApp()} style={{ width: "100%", marginTop: 8, padding: "10px", background: "rgba(255,255,255,0.05)", border: "1px solid var(--nv-border)", borderRadius: 8, cursor: "pointer", fontFamily: FFB, fontWeight: 600, fontSize: 12, color: "var(--nv-text)" }}>Close Nova OS</button>
+            <button onClick={() => quitApp()} style={{ width: "100%", marginTop: 8, padding: "10px", background:"var(--nv-elevated)", border: "1px solid var(--nv-border)", borderRadius: 8, cursor: "pointer", fontFamily: FFB, fontWeight: 600, fontSize: 12, color: "var(--nv-text)" }}>Close Nova OS</button>
           )}
         </>)}
 
@@ -397,20 +397,20 @@ export function SettingsApp({ user, data, updateSettings, showToast, AC, onCusto
           <div style={PANE_TITLE}>About</div>
           <div style={PANE_SUB}>About this copy of Nova OS.</div>
 
-          <div style={{ display: "flex", alignItems: "center", gap: 16, padding: "20px 18px", background: "rgba(255,255,255,0.04)", border: "1px solid var(--nv-border)", borderRadius: 12, marginBottom: 16 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 16, padding: "20px 18px", background:"var(--nv-elevated)", border: "1px solid var(--nv-border)", borderRadius: 12, marginBottom: 16 }}>
             <div style={{ width: 56, height: 56, borderRadius: 16, background: fill(AC), border: "1px solid " + bdr(AC), display: "flex", alignItems: "center", justifyContent: "center", fontFamily: FFB, fontWeight: 800, fontSize: 30, color: AC }}>N</div>
             <div>
               <div style={{ fontFamily: FFB, fontWeight: 800, fontSize: 20, color: "var(--nv-text-strong)", letterSpacing: 0.4 }}>Nova OS</div>
               <div style={{ fontSize: 12, color: "var(--nv-text-dim)", marginTop: 2, fontFamily: FFM }}>Version {NOVA_VERSION}</div>
             </div>
           </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 1, padding: "4px 0", background: "rgba(255,255,255,0.03)", border: "1px solid var(--nv-border)", borderRadius: 10, marginBottom: 18 }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 1, padding: "4px 0", background:"var(--nv-elevated)", border: "1px solid var(--nv-border)", borderRadius: 10, marginBottom: 18 }}>
             {[
               ["Edition", "Web + Desktop (Tauri)"],
               ["Built with", "React · Vite · Firebase"],
               ["Sync", "Firestore (cross-device)"],
             ].map(([k, v]) => (
-              <div key={k} style={{ display: "flex", justifyContent: "space-between", padding: "10px 14px", borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
+              <div key={k} style={{ display: "flex", justifyContent: "space-between", padding: "10px 14px", borderBottom: "1px solid var(--nv-border)" }}>
                 <span style={{ fontSize: 12, color: "var(--nv-text)" }}>{k}</span>
                 <span style={{ fontFamily: FFM, fontSize: 11.5, color: "var(--nv-text-strong)" }}>{v}</span>
               </div>
@@ -422,7 +422,7 @@ export function SettingsApp({ user, data, updateSettings, showToast, AC, onCusto
               under nominative-fair-use; this footer makes the relationship
               explicit and disclaims any sponsorship/endorsement. */}
           <div style={SEC}>Trademarks &amp; Attributions</div>
-          <div style={{ padding: "12px 14px", background: "rgba(255,255,255,0.03)", border: "1px solid var(--nv-border)", borderRadius: 10, fontSize: 11.5, lineHeight: 1.6, color: "var(--nv-text-dim)" }}>
+          <div style={{ padding: "12px 14px", background:"var(--nv-elevated)", border: "1px solid var(--nv-border)", borderRadius: 10, fontSize: 11.5, lineHeight: 1.6, color: "var(--nv-text-dim)" }}>
             Nova OS provides launchers to third-party services. All trademarks, logos and brand names are property of their respective owners. Nova OS is not affiliated with, endorsed by, or sponsored by any service listed in the Store.
           </div>
         </>)}

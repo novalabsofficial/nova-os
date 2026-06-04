@@ -77,7 +77,7 @@ export function DictionaryApp({ AC }) {
             />
             <span style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", fontSize: 14, opacity: 0.5, pointerEvents: "none" }}>📖</span>
           </div>
-          <button onClick={() => lookup(q)} style={{ padding: "0 18px", background: AC, border: "none", borderRadius: 11, color: "#fff", fontFamily: FFB, fontWeight: 600, fontSize: 14, cursor: "pointer" }}>Define</button>
+          <button onClick={() => lookup(q)} style={{ padding: "0 18px", background: AC, border: "none", borderRadius: 11, color:"var(--nv-text-strong)", fontFamily: FFB, fontWeight: 600, fontSize: 14, cursor: "pointer" }}>Define</button>
         </div>
         {recent.length > 0 && !entries && !loading && (
           <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 10 }}>

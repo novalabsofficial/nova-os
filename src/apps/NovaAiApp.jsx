@@ -156,7 +156,7 @@ export function NovaAiApp({ AC, showToast }) {
       <div style={{
         width: 232, flexShrink: 0, borderRight: "1px solid var(--nv-border)",
         display: "flex", flexDirection: "column", minHeight: 0,
-        background: "rgba(255,255,255,0.02)",
+        background:"var(--nv-elevated)",
       }}>
         <div style={{ padding: "14px 12px 10px", borderBottom: "1px solid var(--nv-border)", display: "flex", flexDirection: "column", gap: 9 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>

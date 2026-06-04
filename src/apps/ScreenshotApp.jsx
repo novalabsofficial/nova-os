@@ -225,7 +225,7 @@ export function ScreenshotApp({ AC, showToast, onSetWallpaper }) {
     background: active ? fill(AC) : "rgba(255,255,255,0.05)", border: "1px solid " + (active ? bdr(AC) : "rgba(255,255,255,0.1)"),
     color: active ? AC : "rgba(255,255,255,0.6)",
   });
-  const actBtn = { padding: "7px 13px", borderRadius: 8, cursor: "pointer", fontFamily: FFB, fontWeight: 600, fontSize: 12, background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)", color: "var(--nv-text)" };
+  const actBtn = { padding: "7px 13px", borderRadius: 8, cursor: "pointer", fontFamily: FFB, fontWeight: 600, fontSize: 12, background:"var(--nv-elevated)", border: "1px solid var(--nv-border)", color: "var(--nv-text)" };
 
   return (
     <div style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column", gap: 12, fontFamily: FF, minHeight: 0 }}>
@@ -242,7 +242,7 @@ export function ScreenshotApp({ AC, showToast, onSetWallpaper }) {
                 <button onClick={() => capture(true)} disabled={capturing} style={{ padding: "11px 24px", borderRadius: 10, cursor: "pointer", fontFamily: FFB, fontWeight: 700, fontSize: 14, background: fill(AC), border: "1px solid " + bdr(AC), color: AC, opacity: capturing ? 0.5 : 1 }}>
                   {capturing ? "Waiting…" : "✂ Snip a region"}
                 </button>
-                <button onClick={() => capture(false)} disabled={capturing} style={{ padding: "11px 24px", borderRadius: 10, cursor: "pointer", fontFamily: FFB, fontWeight: 700, fontSize: 14, background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.14)", color: "var(--nv-text)", opacity: capturing ? 0.5 : 1 }}>
+                <button onClick={() => capture(false)} disabled={capturing} style={{ padding: "11px 24px", borderRadius: 10, cursor: "pointer", fontFamily: FFB, fontWeight: 700, fontSize: 14, background:"var(--nv-elevated)", border: "1px solid var(--nv-border)", color: "var(--nv-text)", opacity: capturing ? 0.5 : 1 }}>
                   📸 Capture full
                 </button>
               </div>
@@ -260,7 +260,7 @@ export function ScreenshotApp({ AC, showToast, onSetWallpaper }) {
         // frame fills the viewport dimmed; drag a crosshair box over the
         // part to keep, with a live W×H badge. Esc / Back cancels.
         <div style={{ position: "fixed", inset: 0, zIndex: 99998, background: "rgba(0,0,0,0.88)", backdropFilter: "blur(6px)", display: "flex", flexDirection: "column", animation: "ss-fade 0.16s" }}>
-          <div style={{ flexShrink: 0, textAlign: "center", padding: "14px 16px 8px", fontFamily: FFB, fontWeight: 600, fontSize: 13, color: "#fff" }}>
+          <div style={{ flexShrink: 0, textAlign: "center", padding: "14px 16px 8px", fontFamily: FFB, fontWeight: 600, fontSize: 13, color:"var(--nv-text-strong)" }}>
             ✂ Drag to select the area to keep
             <span style={{ fontFamily: FF, fontWeight: 400, fontSize: 11, color: "var(--nv-text-dim)", marginLeft: 8 }}>· Esc to cancel</span>
           </div>
@@ -292,13 +292,13 @@ export function ScreenshotApp({ AC, showToast, onSetWallpaper }) {
           {/* Toolbar */}
           <div style={{ display: "flex", alignItems: "center", gap: 7, flexWrap: "wrap", flexShrink: 0 }}>
             {TOOLS.map(t => <button key={t.id} onClick={() => setTool(t.id)} style={toolBtn(tool === t.id)}>{t.label}</button>)}
-            <input type="color" value={color} onChange={e => setColor(e.target.value)} title="Color" style={{ width: 30, height: 30, borderRadius: 7, border: "1px solid rgba(255,255,255,0.15)", background: "none", cursor: "pointer", padding: 0 }}/>
+            <input type="color" value={color} onChange={e => setColor(e.target.value)} title="Color" style={{ width: 30, height: 30, borderRadius: 7, border: "1px solid var(--nv-border)", background: "none", cursor: "pointer", padding: 0 }}/>
             <input type="range" min={1} max={24} value={lineWidth} onChange={e => setLineWidth(+e.target.value)} title="Size" style={{ width: 90, accentColor: AC }}/>
             <button onClick={undo} style={actBtn}>↶ Undo</button>
           </div>
 
           {/* Canvas */}
-          <div style={{ flex: 1, minHeight: 0, overflow: "auto", display: "flex", alignItems: "flex-start", justifyContent: "center", background: "rgba(0,0,0,0.3)", borderRadius: 10, border: "1px solid rgba(255,255,255,0.07)", padding: 10 }}>
+          <div style={{ flex: 1, minHeight: 0, overflow: "auto", display: "flex", alignItems: "flex-start", justifyContent: "center", background: "rgba(0,0,0,0.3)", borderRadius: 10, border: "1px solid var(--nv-border)", padding: 10 }}>
             <canvas ref={canvasRef}
               onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={onUp}
               style={{ maxWidth: "100%", height: "auto", borderRadius: 6, cursor: "crosshair", touchAction: "none", boxShadow: "0 8px 30px rgba(0,0,0,0.4)" }}/>

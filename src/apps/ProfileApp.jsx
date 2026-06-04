@@ -108,7 +108,7 @@ export function ProfileApp({ user, data, updateData, showToast, AC }) {
           </div>
           <div style={{ fontSize: 11, color: "var(--nv-text-dim)" }}>Drag to reposition · slide to zoom</div>
           <div style={{ display: "flex", gap: 8, width: CROP }}>
-            <button onClick={() => setEditing(null)} style={{ flex: 1, padding: "9px", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 8, cursor: "pointer", fontFamily: FFB, fontWeight: 600, fontSize: 12, color: "var(--nv-text)" }}>Cancel</button>
+            <button onClick={() => setEditing(null)} style={{ flex: 1, padding: "9px", background:"var(--nv-elevated)", border: "1px solid var(--nv-border)", borderRadius: 8, cursor: "pointer", fontFamily: FFB, fontWeight: 600, fontSize: 12, color: "var(--nv-text)" }}>Cancel</button>
             <button onClick={save} style={{ flex: 1, padding: "9px", background: fill(AC), border: "1px solid " + bdr(AC), borderRadius: 8, cursor: "pointer", fontFamily: FFB, fontWeight: 700, fontSize: 12, color: AC }}>Save Photo</button>
           </div>
         </div>
@@ -120,14 +120,14 @@ export function ProfileApp({ user, data, updateData, showToast, AC }) {
   return (
     <div style={{ width: "100%", fontFamily: FF }}>
       <div style={SEC}>Profile</div>
-      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", paddingBottom: 16, marginBottom: 16, borderBottom: "1px solid rgba(255,255,255,0.07)" }}>
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", paddingBottom: 16, marginBottom: 16, borderBottom: "1px solid var(--nv-border)" }}>
         <div style={{ position: "relative", marginBottom: 11 }}>
           <UserAvatar name={user} img={data?.avatar} ac={AC} size={84}/>
           <button onClick={() => fileRef.current.click()} title="Change photo"
-            style={{ position: "absolute", right: -2, bottom: -2, width: 28, height: 28, borderRadius: "50%", background: AC, border: "2px solid #0a0c18", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, color: "#fff", padding: 0 }}>✎</button>
+            style={{ position: "absolute", right: -2, bottom: -2, width: 28, height: 28, borderRadius: "50%", background: AC, border: "2px solid #0a0c18", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, color:"var(--nv-text-strong)", padding: 0 }}>✎</button>
         </div>
         <input ref={fileRef} type="file" accept="image/*" onChange={onFile} style={{ display: "none" }}/>
-        <div style={{ fontFamily: FFB, fontWeight: 700, fontSize: 20, color: "#fff", marginBottom: 2 }}>@{user}</div>
+        <div style={{ fontFamily: FFB, fontWeight: 700, fontSize: 20, color:"var(--nv-text-strong)", marginBottom: 2 }}>@{user}</div>
         <div style={{ fontFamily: FFM, fontSize: 10, color: "var(--nv-text-dim)" }}>Member since {joined}</div>
         <div style={{ display: "flex", gap: 12, marginTop: 9 }}>
           <button onClick={() => fileRef.current.click()} style={{ background: "none", border: "none", cursor: "pointer", fontFamily: FFB, fontWeight: 600, fontSize: 11, color: AC }}>{data?.avatar ? "Change photo" : "Add photo"}</button>
@@ -136,7 +136,7 @@ export function ProfileApp({ user, data, updateData, showToast, AC }) {
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 8, marginBottom: 18 }}>
         {[["📝", data?.notes?.length || 0, "Notes"], ["✅", (data?.tasks?.filter((t) => t.done).length || 0) + "/" + (data?.tasks?.length || 0), "Tasks"], ["🏪", installed, "Installed"]].map(([ic, v, k]) => (
-          <div key={k} style={{ padding: "11px 10px", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 8, textAlign: "center" }}>
+          <div key={k} style={{ padding: "11px 10px", background:"var(--nv-elevated)", border: "1px solid var(--nv-border)", borderRadius: 8, textAlign: "center" }}>
             <div style={{ fontSize: 10, marginBottom: 3 }}>{ic}</div>
             <div style={{ fontFamily: FFB, fontWeight: 700, fontSize: 20, color: AC }}>{v}</div>
             <div style={{ fontSize: 10, color: "var(--nv-text-dim)", marginTop: 2 }}>{k}</div>

@@ -250,7 +250,7 @@ export function SlidesApp({ AC, data, updateData, showToast }) {
 
       <div style={{ flex: 1, display: "flex", minHeight: 0 }}>
         {/* Slide rail */}
-        <div style={{ width: 150, flexShrink: 0, borderRight: "1px solid var(--nv-border)", background: "rgba(255,255,255,0.02)", display: "flex", flexDirection: "column", minHeight: 0 }}>
+        <div style={{ width: 150, flexShrink: 0, borderRight: "1px solid var(--nv-border)", background:"var(--nv-elevated)", display: "flex", flexDirection: "column", minHeight: 0 }}>
           <div style={{ flex: 1, overflowY: "auto", padding: 8, display: "flex", flexDirection: "column", gap: 7 }}>
             {activeDeck.slides.map((sl, i) => (
               <div key={sl.id} style={{ position: "relative" }}>
@@ -283,7 +283,7 @@ export function SlidesApp({ AC, data, updateData, showToast }) {
         </div>
 
         {/* Properties */}
-        <div style={{ width: 256, flexShrink: 0, borderLeft: "1px solid var(--nv-border)", background: "rgba(255,255,255,0.02)", display: "flex", flexDirection: "column", minHeight: 0 }}>
+        <div style={{ width: 256, flexShrink: 0, borderLeft: "1px solid var(--nv-border)", background:"var(--nv-elevated)", display: "flex", flexDirection: "column", minHeight: 0 }}>
           <div style={{ padding: "10px 12px", borderBottom: "1px solid var(--nv-border)", fontFamily: FFB, fontWeight: 700, fontSize: 12, color: "var(--nv-text-strong)" }}>Insert</div>
           <div style={{ padding: "10px 12px", display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, borderBottom: "1px solid var(--nv-border)" }}>
             <button onClick={() => addElement("text")} style={insBtn()}>＋ Text</button>
@@ -312,7 +312,7 @@ export function SlidesApp({ AC, data, updateData, showToast }) {
           <div style={{ width: "min(100vw, 177.7vh)", aspectRatio: "16/9", position: "relative", background: activeDeck.slides[presentIdx]?.bg || "#000" }}>
             <SlideRender slide={activeDeck.slides[presentIdx]} />
           </div>
-          <div style={{ position: "fixed", bottom: 16, left: "50%", transform: "translateX(-50%)", display: "flex", alignItems: "center", gap: 12, background: "rgba(15,17,32,0.7)", backdropFilter: "blur(20px)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 10, padding: "7px 14px", fontFamily: FFM, fontSize: 12, color: "var(--nv-text)" }}>
+          <div style={{ position: "fixed", bottom: 16, left: "50%", transform: "translateX(-50%)", display: "flex", alignItems: "center", gap: 12, background: "rgba(15,17,32,0.7)", backdropFilter: "blur(20px)", border: "1px solid var(--nv-border)", borderRadius: 10, padding: "7px 14px", fontFamily: FFM, fontSize: 12, color: "var(--nv-text)" }}>
             <button onClick={() => setPresentIdx(i => Math.max(0, i - 1))} style={presBtn()}>‹</button>
             <span>{presentIdx + 1} / {activeDeck.slides.length}</span>
             <button onClick={() => setPresentIdx(i => Math.min(i + 1, activeDeck.slides.length - 1))} style={presBtn()}>›</button>
@@ -355,7 +355,7 @@ function DeckHome({ decks, AC, onOpen, onCreate, onDelete }) {
                   <div style={{ fontFamily: FFM, fontSize: 10, color: "var(--nv-text-dim)", marginTop: 2 }}>{d.slides.length} slide{d.slides.length === 1 ? "" : "s"}</div>
                 </div>
               </button>
-              <button className="dl" onClick={() => onDelete(d.id)} title="Delete deck" style={{ position: "absolute", top: 6, right: 6, width: 24, height: 24, borderRadius: 6, background: "rgba(0,0,0,0.55)", border: "1px solid rgba(255,255,255,0.12)", cursor: "pointer", color: "rgba(255,120,120,0.9)", fontSize: 12, display: "flex", alignItems: "center", justifyContent: "center", padding: 0 }}>✕</button>
+              <button className="dl" onClick={() => onDelete(d.id)} title="Delete deck" style={{ position: "absolute", top: 6, right: 6, width: 24, height: 24, borderRadius: 6, background: "rgba(0,0,0,0.55)", border: "1px solid var(--nv-border)", cursor: "pointer", color: "rgba(255,120,120,0.9)", fontSize: 12, display: "flex", alignItems: "center", justifyContent: "center", padding: 0 }}>✕</button>
             </div>
           ))}
         </div>
@@ -561,10 +561,10 @@ function insBtn() {
   return { padding: "8px 6px", borderRadius: 7, cursor: "pointer", background: "var(--nv-elevated)", border: "1px solid var(--nv-border)", color: "var(--nv-text)", fontFamily: FFB, fontWeight: 600, fontSize: 11.5 };
 }
 function railMini() {
-  return { width: 18, height: 16, borderRadius: 4, background: "rgba(0,0,0,0.55)", border: "1px solid rgba(255,255,255,0.12)", cursor: "pointer", color: "var(--nv-text)", fontSize: 9, lineHeight: 1, padding: 0, display: "flex", alignItems: "center", justifyContent: "center" };
+  return { width: 18, height: 16, borderRadius: 4, background: "rgba(0,0,0,0.55)", border: "1px solid var(--nv-border)", cursor: "pointer", color: "var(--nv-text)", fontSize: 9, lineHeight: 1, padding: 0, display: "flex", alignItems: "center", justifyContent: "center" };
 }
 function presBtn() {
-  return { width: 28, height: 28, borderRadius: 6, background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.15)", cursor: "pointer", color: "#fff", fontSize: 14, display: "inline-flex", alignItems: "center", justifyContent: "center", padding: 0 };
+  return { width: 28, height: 28, borderRadius: 6, background:"var(--nv-elevated)", border: "1px solid var(--nv-border)", cursor: "pointer", color:"var(--nv-text-strong)", fontSize: 14, display: "inline-flex", alignItems: "center", justifyContent: "center", padding: 0 };
 }
 function propToggle(active, AC) {
   return { flex: 1, padding: "6px 0", borderRadius: 6, cursor: "pointer", background: active ? fill(AC) : "var(--nv-elevated)", border: "1px solid " + (active ? bdr(AC) : "var(--nv-border)"), color: active ? AC : "var(--nv-text)", fontFamily: FF, fontSize: 12 };

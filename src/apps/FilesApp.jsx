@@ -157,7 +157,7 @@ export function FilesApp({ data, updateData, showToast, AC, commApps = [], openA
       <div style={{
         width: 184, flexShrink: 0, borderRight: "1px solid var(--nv-border)",
         padding: "16px 10px", overflowY: "auto", display: "flex", flexDirection: "column", gap: 2,
-        background: "rgba(255,255,255,0.02)",
+        background:"var(--nv-elevated)",
       }}>
         <div style={{ padding: "2px 10px 14px", fontFamily: FFB, fontWeight: 700, fontSize: 12, letterSpacing: 1.2, color: "var(--nv-text-dim)", textTransform: "uppercase" }}>This PC</div>
         {SECTIONS.map(s => {
@@ -195,7 +195,7 @@ export function FilesApp({ data, updateData, showToast, AC, commApps = [], openA
             ].map(t => (
               <button key={t.id} onClick={() => setSection(t.id)} className="fr" style={{
                 display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 6,
-                padding: "16px 14px", background: "rgba(255,255,255,0.04)",
+                padding: "16px 14px", background:"var(--nv-elevated)",
                 border: "1px solid var(--nv-border)", borderRadius: 11, cursor: "pointer",
                 fontFamily: FF, color: "var(--nv-text)", transition: "background 0.15s",
               }}>
@@ -209,7 +209,7 @@ export function FilesApp({ data, updateData, showToast, AC, commApps = [], openA
             <div style={SEC}>Recent Notes</div>
             <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
               {[...notes].sort((a, b) => (b.ts || 0) - (a.ts || 0)).slice(0, 5).map(n => (
-                <button key={n.id} onClick={() => { setSection("documents"); setPreview(n); }} className="fr" style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 12px", background: "rgba(255,255,255,0.03)", border: "1px solid var(--nv-border)", borderRadius: 8, cursor: "pointer", textAlign: "left", fontFamily: FF }}>
+                <button key={n.id} onClick={() => { setSection("documents"); setPreview(n); }} className="fr" style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 12px", background:"var(--nv-elevated)", border: "1px solid var(--nv-border)", borderRadius: 8, cursor: "pointer", textAlign: "left", fontFamily: FF }}>
                   <span style={{ fontSize: 14 }}>📄</span>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontFamily: FFB, fontWeight: 600, fontSize: 12.5, color: "var(--nv-text-strong)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{n.title}</div>
@@ -241,28 +241,28 @@ export function FilesApp({ data, updateData, showToast, AC, commApps = [], openA
             <div style={{ display: "flex", gap: 7, marginBottom: 10 }}>
               <input autoFocus value={newFolderName} onChange={e => setNewFolderName(e.target.value)} onKeyDown={e => e.key === "Enter" && createFolder()} placeholder="Folder name…" style={{ ...INP, flex: 1 }} />
               <button onClick={createFolder} style={{ padding: "7px 14px", background: fill(ac), border: "1px solid " + bdr(ac), borderRadius: 7, cursor: "pointer", fontFamily: FFB, fontWeight: 600, fontSize: 12, color: ac }}>Create</button>
-              <button onClick={() => setShowNewFolder(false)} style={{ padding: "7px 11px", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.11)", borderRadius: 7, cursor: "pointer", color: "var(--nv-text-dim)", fontFamily: FFB, fontSize: 12 }}>✕</button>
+              <button onClick={() => setShowNewFolder(false)} style={{ padding: "7px 11px", background:"var(--nv-elevated)", border: "1px solid var(--nv-border)", borderRadius: 7, cursor: "pointer", color: "var(--nv-text-dim)", fontFamily: FFB, fontSize: 12 }}>✕</button>
             </div>
           )}
 
           {showNewNote && (
-            <div style={{ padding: 12, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, marginBottom: 10, display: "flex", flexDirection: "column", gap: 7 }}>
+            <div style={{ padding: 12, background:"var(--nv-elevated)", border: "1px solid var(--nv-border)", borderRadius: 8, marginBottom: 10, display: "flex", flexDirection: "column", gap: 7 }}>
               <input autoFocus value={newNoteTitle} onChange={e => setNewNoteTitle(e.target.value)} onKeyDown={e => e.key === "Enter" && createNote()} placeholder="Note title…" style={INP} />
               <textarea value={newNoteBody} onChange={e => setNewNoteBody(e.target.value)} placeholder="Content… (optional)" style={{ ...INP, minHeight: 55 }} />
               <div style={{ display: "flex", gap: 7 }}>
                 <button onClick={createNote} style={{ flex: 1, padding: "7px", background: fill(ac), border: "1px solid " + bdr(ac), borderRadius: 7, cursor: "pointer", fontFamily: FFB, fontWeight: 600, fontSize: 12, color: ac }}>Create Note</button>
-                <button onClick={() => setShowNewNote(false)} style={{ padding: "7px 12px", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.11)", borderRadius: 7, cursor: "pointer", color: "var(--nv-text-dim)", fontFamily: FFB, fontSize: 12 }}>Cancel</button>
+                <button onClick={() => setShowNewNote(false)} style={{ padding: "7px 12px", background:"var(--nv-elevated)", border: "1px solid var(--nv-border)", borderRadius: 7, cursor: "pointer", color: "var(--nv-text-dim)", fontFamily: FFB, fontSize: 12 }}>Cancel</button>
               </div>
             </div>
           )}
 
           {movingItem && (
-            <div style={{ padding: 12, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, marginBottom: 10 }}>
+            <div style={{ padding: 12, background:"var(--nv-elevated)", border: "1px solid var(--nv-border)", borderRadius: 8, marginBottom: 10 }}>
               <div style={{ fontSize: 12, color: "var(--nv-text)", marginBottom: 7 }}>Move "<b>{movingItem.name}</b>" to:</div>
               <select onChange={e => { const tid = e.target.value === "null" ? null : e.target.value; movingItem.type === "note" ? moveNote(movingItem.id, tid) : moveTask(movingItem.id, tid); }} style={{ ...INP, cursor: "pointer", marginBottom: 8 }} defaultValue={movingItem.folderId || "null"}>
                 {folderOpts.map(o => <option key={String(o.id)} value={String(o.id)}>{o.label}</option>)}
               </select>
-              <button onClick={() => setMovingItem(null)} style={{ padding: "5px 12px", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.11)", borderRadius: 6, cursor: "pointer", fontFamily: FFB, fontSize: 11, color: "var(--nv-text-dim)" }}>Cancel</button>
+              <button onClick={() => setMovingItem(null)} style={{ padding: "5px 12px", background:"var(--nv-elevated)", border: "1px solid var(--nv-border)", borderRadius: 6, cursor: "pointer", fontFamily: FFB, fontSize: 11, color: "var(--nv-text-dim)" }}>Cancel</button>
             </div>
           )}
 
@@ -275,7 +275,7 @@ export function FilesApp({ data, updateData, showToast, AC, commApps = [], openA
 
           {subFolders.length > 0 && <div style={SEC}>Folders ({subFolders.length})</div>}
           {subFolders.map(f => (
-            <div key={f.id} className="fr" style={{ display: "flex", alignItems: "center", gap: 9, padding: "9px 12px", marginBottom: 4, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 8, cursor: "pointer", transition: "background 0.12s" }}>
+            <div key={f.id} className="fr" style={{ display: "flex", alignItems: "center", gap: 9, padding: "9px 12px", marginBottom: 4, background:"var(--nv-elevated)", border: "1px solid var(--nv-border)", borderRadius: 8, cursor: "pointer", transition: "background 0.12s" }}>
               <span style={{ fontSize: 20, pointerEvents: "none" }}>📁</span>
               {editingFolder?.id === f.id ? (
                 <input autoFocus value={editingFolder.name} onChange={e => setEditingFolder(x => ({ ...x, name: e.target.value }))} onKeyDown={e => { if (e.key === "Enter") renameFolder(f.id, editingFolder.name); if (e.key === "Escape") setEditingFolder(null); }} onBlur={() => renameFolder(f.id, editingFolder.name)} style={{ ...INP, flex: 1, padding: "3px 8px", fontSize: 13 }} />
@@ -303,7 +303,7 @@ export function FilesApp({ data, updateData, showToast, AC, commApps = [], openA
                 <button className="dl" onClick={e => { e.stopPropagation(); deleteNote(n.id); }} style={{ background: "none", border: "none", cursor: "pointer", color: "rgba(255,80,80,0.28)", fontSize: 12, padding: "3px 5px", transition: "color 0.12s" }}>✕</button>
               </div>
               {preview?.id === n.id && (
-                <div style={{ marginBottom: 6, padding: "11px 14px", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 7 }}>
+                <div style={{ marginBottom: 6, padding: "11px 14px", background:"var(--nv-elevated)", border: "1px solid var(--nv-border)", borderRadius: 7 }}>
                   <div style={{ fontWeight: 600, fontSize: 13, color: "var(--nv-text-strong)", marginBottom: 5 }}>{n.title}</div>
                   <div style={{ fontSize: 12, color: "var(--nv-text)", lineHeight: 1.65, whiteSpace: "pre-wrap" }}>{n.body || "(no content)"}</div>
                 </div>
@@ -313,7 +313,7 @@ export function FilesApp({ data, updateData, showToast, AC, commApps = [], openA
 
           {curTasks.length > 0 && <div style={{ ...SEC, marginTop: curNotes.length > 0 || subFolders.length > 0 ? 12 : 0 }}>Tasks ({curTasks.length})</div>}
           {curTasks.map(t => (
-            <div key={t.id} style={{ display: "flex", alignItems: "center", gap: 9, padding: "8px 12px", marginBottom: 4, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 7, opacity: t.done ? 0.45 : 1 }}>
+            <div key={t.id} style={{ display: "flex", alignItems: "center", gap: 9, padding: "8px 12px", marginBottom: 4, background:"var(--nv-elevated)", border: "1px solid var(--nv-border)", borderRadius: 7, opacity: t.done ? 0.45 : 1 }}>
               <div onClick={() => toggleTask(t.id)} style={{ width: 17, height: 17, borderRadius: 5, border: "1.5px solid " + (t.done ? ac : "rgba(255,255,255,0.22)"), background: t.done ? ac : "transparent", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                 {t.done && <span style={{ color: "#000", fontSize: 9, fontWeight: 900 }}>✓</span>}
               </div>
@@ -344,7 +344,7 @@ export function FilesApp({ data, updateData, showToast, AC, commApps = [], openA
                 <button className="dl" onClick={e => { e.stopPropagation(); deleteNote(n.id); }} style={{ background: "none", border: "none", cursor: "pointer", color: "rgba(255,80,80,0.3)", fontSize: 12, padding: "3px 6px" }}>✕</button>
               </div>
               {preview?.id === n.id && (
-                <div style={{ marginBottom: 8, padding: "12px 14px", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8 }}>
+                <div style={{ marginBottom: 8, padding: "12px 14px", background:"var(--nv-elevated)", border: "1px solid var(--nv-border)", borderRadius: 8 }}>
                   <div style={{ fontWeight: 600, fontSize: 13, color: "var(--nv-text-strong)", marginBottom: 6 }}>{n.title}</div>
                   <div style={{ fontSize: 12, color: "var(--nv-text)", lineHeight: 1.65, whiteSpace: "pre-wrap" }}>{n.body || "(no content)"}</div>
                 </div>
@@ -363,7 +363,7 @@ export function FilesApp({ data, updateData, showToast, AC, commApps = [], openA
               <span style={{ fontSize: 11 }}>Open the Tasks app to add some</span>
             </div>
           ) : tasks.map(t => (
-            <div key={t.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 12px", marginBottom: 4, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 8, opacity: t.done ? 0.45 : 1 }}>
+            <div key={t.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 12px", marginBottom: 4, background:"var(--nv-elevated)", border: "1px solid var(--nv-border)", borderRadius: 8, opacity: t.done ? 0.45 : 1 }}>
               <div onClick={() => toggleTask(t.id)} style={{ width: 18, height: 18, borderRadius: 5, border: "1.5px solid " + (t.done ? ac : "rgba(255,255,255,0.22)"), background: t.done ? ac : "transparent", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                 {t.done && <span style={{ color: "#000", fontSize: 9, fontWeight: 900 }}>✓</span>}
               </div>
@@ -377,7 +377,7 @@ export function FilesApp({ data, updateData, showToast, AC, commApps = [], openA
         {section === "pictures" && (<>
           <div style={PANE_TITLE}>Pictures</div>
           <div style={PANE_SUB}>Browse your photos in the dedicated Photos app.</div>
-          <div style={{ textAlign: "center", padding: "50px 24px", background: "rgba(255,255,255,0.03)", border: "1px solid var(--nv-border)", borderRadius: 12 }}>
+          <div style={{ textAlign: "center", padding: "50px 24px", background:"var(--nv-elevated)", border: "1px solid var(--nv-border)", borderRadius: 12 }}>
             <div style={{ fontSize: 42, opacity: 0.45, marginBottom: 12 }}>🖼️</div>
             <div style={{ fontFamily: FFB, fontWeight: 600, fontSize: 14, color: "var(--nv-text-strong)", marginBottom: 6 }}>Open in Photos</div>
             <div style={{ fontSize: 11.5, color: "var(--nv-text-dim)", lineHeight: 1.6, maxWidth: 280, margin: "0 auto 14px" }}>Photos live in the Photos app for now. Open it to view, set a wallpaper, or save screenshots.</div>
@@ -396,7 +396,7 @@ export function FilesApp({ data, updateData, showToast, AC, commApps = [], openA
                 {byCategory[cat].map(a => (
                   <button key={a.id} onClick={() => launchApp(a)} onDoubleClick={() => launchApp(a)} className="fr" title={a.label + (a.desc ? " — " + a.desc : "")} style={{
                     display: "flex", flexDirection: "column", alignItems: "center", gap: 7,
-                    padding: "14px 8px", background: "rgba(255,255,255,0.04)",
+                    padding: "14px 8px", background:"var(--nv-elevated)",
                     border: "1px solid var(--nv-border)", borderRadius: 11, cursor: "pointer",
                     fontFamily: FF, color: "var(--nv-text-strong)", transition: "background 0.15s",
                   }}>

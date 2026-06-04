@@ -429,7 +429,7 @@ export function ChatApp({ user, AC, data, updateData }) {
     <div style={{ width: "100%", height: "100%", display: "flex", fontFamily: FF, minHeight: 0 }}>
 
       {/* ───────── Sidebar ───────── */}
-      <div style={{ width: 232, flexShrink: 0, borderRight: "1px solid var(--nv-border)", display: "flex", flexDirection: "column", background: "rgba(255,255,255,0.02)", minHeight: 0 }}>
+      <div style={{ width: 232, flexShrink: 0, borderRight: "1px solid var(--nv-border)", display: "flex", flexDirection: "column", background:"var(--nv-elevated)", minHeight: 0 }}>
 
         {/* Global */}
         <div style={{ padding: "8px 8px 0" }}>
@@ -529,7 +529,7 @@ export function ChatApp({ user, AC, data, updateData }) {
         <div style={{ padding: "12px 12px 4px", display: "flex", alignItems: "center", gap: 6 }}>
           <span style={{ ...SEC, marginBottom: 0, fontSize: 9 }}>Direct Messages</span>
           {unreadDmCount > 0 && (
-            <span style={{ minWidth: 16, height: 16, padding: "0 4px", borderRadius: 8, background: "#ff5a5a", color: "#fff", fontFamily: FFB, fontWeight: 700, fontSize: 9.5, display: "inline-flex", alignItems: "center", justifyContent: "center" }}>{unreadDmCount}</span>
+            <span style={{ minWidth: 16, height: 16, padding: "0 4px", borderRadius: 8, background: "#ff5a5a", color:"var(--nv-text-strong)", fontFamily: FFB, fontWeight: 700, fontSize: 9.5, display: "inline-flex", alignItems: "center", justifyContent: "center" }}>{unreadDmCount}</span>
           )}
           <button
             onClick={() => { setView("new"); setActive(null); setNewDmError(""); }}
@@ -566,10 +566,10 @@ export function ChatApp({ user, AC, data, updateData }) {
       {/* ───────── Main pane ───────── */}
       <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
         {/* Header */}
-        <div style={{ padding: "10px 16px 8px", borderBottom: "1px solid rgba(255,255,255,0.08)", flexShrink: 0 }}>
+        <div style={{ padding: "10px 16px 8px", borderBottom: "1px solid var(--nv-border)", flexShrink: 0 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <div style={{ width: 8, height: 8, borderRadius: "50%", background: view === "global" ? (loading ? "#888" : "#4cef90") : view === "dm" ? "#4f9eff" : "#a78bfa", flexShrink: 0, boxShadow: view === "global" && !loading ? "0 0 6px #4cef90" : "none" }} />
-            <span style={{ fontFamily: FFB, fontWeight: 700, fontSize: 15, color: "#fff", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{headerTitle}</span>
+            <span style={{ fontFamily: FFB, fontWeight: 700, fontSize: 15, color:"var(--nv-text-strong)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{headerTitle}</span>
             {isMod && (
               <span title="You're a moderator" style={{ fontFamily: FFB, fontWeight: 700, fontSize: 9, letterSpacing: 1, padding: "2px 7px", borderRadius: 4, background: "rgba(255,200,80,0.16)", border: "1px solid rgba(255,200,80,0.5)", color: "#ffd060" }}>MOD</span>
             )}
@@ -636,9 +636,9 @@ export function ChatApp({ user, AC, data, updateData }) {
               if (item.type === "day") {
                 return (
                   <div key={item.key} style={{ display: "flex", alignItems: "center", gap: 10, margin: "14px 0 8px" }}>
-                    <div style={{ flex: 1, height: 1, background: "rgba(255,255,255,0.08)" }} />
-                    <span style={{ fontFamily: FFB, fontSize: 10, color: "var(--nv-text-dim)", letterSpacing: 1, padding: "2px 10px", background: "rgba(255,255,255,0.04)", borderRadius: 10, border: "1px solid rgba(255,255,255,0.06)" }}>{item.label}</span>
-                    <div style={{ flex: 1, height: 1, background: "rgba(255,255,255,0.08)" }} />
+                    <div style={{ flex: 1, height: 1, background:"var(--nv-elevated)" }} />
+                    <span style={{ fontFamily: FFB, fontSize: 10, color: "var(--nv-text-dim)", letterSpacing: 1, padding: "2px 10px", background:"var(--nv-elevated)", borderRadius: 10, border: "1px solid var(--nv-border)" }}>{item.label}</span>
+                    <div style={{ flex: 1, height: 1, background:"var(--nv-elevated)" }} />
                   </div>
                 );
               }
@@ -657,7 +657,7 @@ export function ChatApp({ user, AC, data, updateData }) {
                   className="rowact"
                   onClick={() => setPickerOpenFor(prev => prev === item.id ? null : item.id)}
                   title="Add reaction"
-                  style={{ background: "rgba(0,0,0,0.25)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 6, cursor: "pointer", color: "var(--nv-text)", fontSize: 12, padding: "2px 6px", flexShrink: 0, opacity: pickerOpenFor === item.id ? 1 : 0, transition: "opacity 0.12s" }}
+                  style={{ background: "rgba(0,0,0,0.25)", border: "1px solid var(--nv-border)", borderRadius: 6, cursor: "pointer", color: "var(--nv-text)", fontSize: 12, padding: "2px 6px", flexShrink: 0, opacity: pickerOpenFor === item.id ? 1 : 0, transition: "opacity 0.12s" }}
                 >🙂</button>
               ) : null;
 
@@ -674,7 +674,7 @@ export function ChatApp({ user, AC, data, updateData }) {
                             className="dl rowact"
                             onClick={onDelete}
                             title={isMe ? "Delete message" : "Delete — mod/owner"}
-                            style={{ background: "rgba(0,0,0,0.25)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 6, cursor: "pointer", color: isMe ? "rgba(255,80,80,0.6)" : "rgba(255,200,80,0.7)", fontSize: 11, padding: "2px 6px", flexShrink: 0, opacity: 0, transition: "opacity 0.12s" }}
+                            style={{ background: "rgba(0,0,0,0.25)", border: "1px solid var(--nv-border)", borderRadius: 6, cursor: "pointer", color: isMe ? "rgba(255,80,80,0.6)" : "rgba(255,200,80,0.7)", fontSize: 11, padding: "2px 6px", flexShrink: 0, opacity: 0, transition: "opacity 0.12s" }}
                           >{isMe ? "✕" : "🛡"}</button>
                         )}
                       </div>
@@ -702,7 +702,7 @@ export function ChatApp({ user, AC, data, updateData }) {
                 <div key={item.id} className="msgrow" style={{ display: "flex", padding: "5px 8px", borderRadius: 4, marginTop: 8, flexDirection: "column", background: pingsMe ? "rgba(255,200,80,0.07)" : "transparent", borderLeft: pingsMe ? "2px solid rgba(255,200,80,0.6)" : "2px solid transparent" }}>
                   <div style={{ display: "flex" }}>
                     <div style={{ width: 40, flexShrink: 0, display: "flex", justifyContent: "center", paddingTop: 1 }}>
-                      <div style={{ width: 32, height: 32, borderRadius: "50%", background: `rgba(${hexRgb(uc)},0.22)`, border: `1.5px solid ${uc}`, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: FFB, fontWeight: 700, fontSize: 13, color: "#fff" }}>
+                      <div style={{ width: 32, height: 32, borderRadius: "50%", background: `rgba(${hexRgb(uc)},0.22)`, border: `1.5px solid ${uc}`, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: FFB, fontWeight: 700, fontSize: 13, color:"var(--nv-text-strong)" }}>
                         {(displayName || "?")[0].toUpperCase()}
                       </div>
                     </div>
@@ -724,7 +724,7 @@ export function ChatApp({ user, AC, data, updateData }) {
                             className="dl rowact"
                             onClick={onDelete}
                             title={isMe ? "Delete message" : "Delete — mod/owner"}
-                            style={{ background: "rgba(0,0,0,0.25)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 6, cursor: "pointer", color: isMe ? "rgba(255,80,80,0.6)" : "rgba(255,200,80,0.7)", fontSize: 11, padding: "2px 6px", opacity: 0, transition: "opacity 0.12s" }}
+                            style={{ background: "rgba(0,0,0,0.25)", border: "1px solid var(--nv-border)", borderRadius: 6, cursor: "pointer", color: isMe ? "rgba(255,80,80,0.6)" : "rgba(255,200,80,0.7)", fontSize: 11, padding: "2px 6px", opacity: 0, transition: "opacity 0.12s" }}
                           >{isMe ? "✕" : "🛡"}</button>
                         )}
                       </div>
@@ -751,10 +751,10 @@ export function ChatApp({ user, AC, data, updateData }) {
 
         {/* Input bar — hidden when on the new-DM form */}
         {view !== "new" && (
-          <div style={{ padding: "10px 14px 12px", borderTop: "1px solid rgba(255,255,255,0.08)", flexShrink: 0, display: "flex", gap: 8, alignItems: "flex-end" }}>
+          <div style={{ padding: "10px 14px 12px", borderTop: "1px solid var(--nv-border)", flexShrink: 0, display: "flex", gap: 8, alignItems: "flex-end" }}>
             <div style={{ position: "relative", flex: 1, display: "flex" }}>
               {mention && mention.items.length > 0 && (
-                <div style={{ position: "absolute", bottom: "calc(100% + 6px)", left: 0, minWidth: 180, maxWidth: 280, maxHeight: 200, overflowY: "auto", background: "var(--nv-surface-solid)", border: "1px solid rgba(255,255,255,0.16)", borderRadius: 10, boxShadow: "0 12px 36px rgba(0,0,0,0.5)", zIndex: 60, padding: 4 }}>
+                <div style={{ position: "absolute", bottom: "calc(100% + 6px)", left: 0, minWidth: 180, maxWidth: 280, maxHeight: 200, overflowY: "auto", background: "var(--nv-surface-solid)", border: "1px solid var(--nv-border)", borderRadius: 10, boxShadow: "0 12px 36px rgba(0,0,0,0.5)", zIndex: 60, padding: 4 }}>
                   {mention.items.map((u, i) => (
                     <button key={u} type="button" onMouseDown={e => e.preventDefault()} onClick={() => pickMention(u)}
                       style={{ display: "flex", alignItems: "center", gap: 7, width: "100%", textAlign: "left", padding: "7px 9px", borderRadius: 7, border: "none", cursor: "pointer", background: i === mention.active ? fill(AC) : "transparent", color: i === mention.active ? AC : "var(--nv-text)", fontFamily: FF, fontSize: 12.5 }}>
@@ -870,7 +870,7 @@ function DmRow({ username, preview, active, unread, onClick, AC }) {
         width: 32, height: 32, borderRadius: "50%", flexShrink: 0, position: "relative",
         background: `rgba(${hexRgb(uc)},0.22)`, border: `1.5px solid ${uc}`,
         display: "flex", alignItems: "center", justifyContent: "center",
-        fontFamily: FFB, fontWeight: 700, fontSize: 13, color: "#fff",
+        fontFamily: FFB, fontWeight: 700, fontSize: 13, color:"var(--nv-text-strong)",
       }}>
         {(username || "?")[0].toUpperCase()}
         {unread && <span style={{ position: "absolute", top: -2, right: -2, width: 11, height: 11, borderRadius: "50%", background: "#ff5a5a", border: "2px solid var(--nv-surface-solid)" }}/>}
@@ -892,12 +892,12 @@ function NewDmForm({ newDmInput, setNewDmInput, startNewDm, opening, newDmError,
     <div style={{ flex: 1, padding: "30px 22px", overflow: "auto", minHeight: 0 }}>
       <div style={{ maxWidth: 360, margin: "0 auto", display: "flex", flexDirection: "column", gap: 14 }}>
         <div style={{ fontSize: 48, textAlign: "center", lineHeight: 1, marginBottom: 4 }}>💬</div>
-        <div style={{ fontFamily: FFB, fontWeight: 700, fontSize: 18, color: "#fff", textAlign: "center" }}>Start a new DM</div>
+        <div style={{ fontFamily: FFB, fontWeight: 700, fontSize: 18, color:"var(--nv-text-strong)", textAlign: "center" }}>Start a new DM</div>
         <div style={{ fontSize: 12, color: "var(--nv-text-dim)", textAlign: "center", lineHeight: 1.6 }}>
           Type any Nova OS user's name to begin a direct message. Only the two of you (and moderators) can see what you send.
         </div>
         <div style={{ display: "flex", gap: 7, marginTop: 8 }}>
-          <span style={{ display: "flex", alignItems: "center", padding: "0 12px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, fontFamily: FFM, color: "var(--nv-text-dim)", fontSize: 14 }}>@</span>
+          <span style={{ display: "flex", alignItems: "center", padding: "0 12px", background:"var(--nv-elevated)", border: "1px solid var(--nv-border)", borderRadius: 8, fontFamily: FFM, color: "var(--nv-text-dim)", fontSize: 14 }}>@</span>
           <input
             autoFocus
             value={newDmInput}
@@ -999,7 +999,7 @@ function ServerOwnerPanel({ server, isOwner, myRole, myUid, myUsername, AC, onCl
   return (
     <div style={{
       padding: "14px 18px", borderBottom: "1px solid var(--nv-border)",
-      background: "rgba(255,255,255,0.03)", display: "flex", flexDirection: "column", gap: 10,
+      background:"var(--nv-elevated)", display: "flex", flexDirection: "column", gap: 10,
       maxHeight: "50%", overflowY: "auto", flexShrink: 0,
     }}>
       <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
@@ -1071,7 +1071,7 @@ function ServerOwnerPanel({ server, isOwner, myRole, myUid, myUsername, AC, onCl
             const canKick = isOwner && m.role !== ROLE_OWNER;
             return (
               <div key={m.uid} style={{ display: "flex", alignItems: "center", gap: 9, padding: "6px 9px", background: "var(--nv-elevated)", border: "1px solid var(--nv-border)", borderRadius: 7 }}>
-                <div style={{ width: 26, height: 26, borderRadius: "50%", flexShrink: 0, background: "rgba(255,255,255,0.06)", border: "1px solid var(--nv-border)", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: FFB, fontWeight: 700, fontSize: 11, color: "var(--nv-text)" }}>
+                <div style={{ width: 26, height: 26, borderRadius: "50%", flexShrink: 0, background:"var(--nv-elevated)", border: "1px solid var(--nv-border)", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: FFB, fontWeight: 700, fontSize: 11, color: "var(--nv-text)" }}>
                   {(display || "?")[0].toUpperCase()}
                 </div>
                 {editingNick?.uid === m.uid ? (
@@ -1370,7 +1370,7 @@ function ReactionsRow({ msgId, bag, myUid, user, pickerOpen, onClosePicker, onTo
         );
       })}
       {pickerOpen && (
-        <div style={{ display: "inline-flex", gap: 3, padding: "2px 6px", borderRadius: 14, background: "rgba(0,0,0,0.35)", border: "1px solid rgba(255,255,255,0.12)" }}>
+        <div style={{ display: "inline-flex", gap: 3, padding: "2px 6px", borderRadius: 14, background: "rgba(0,0,0,0.35)", border: "1px solid var(--nv-border)" }}>
           {REACTION_PRESETS.map(emoji => (
             <button
               key={emoji}

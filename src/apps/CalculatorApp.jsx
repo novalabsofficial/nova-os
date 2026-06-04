@@ -46,7 +46,7 @@ export function CalculatorApp({ AC }) {
         width: 180, flexShrink: 0, borderRight: "1px solid var(--nv-border)",
         padding: "16px 10px", overflowY: "auto",
         display: "flex", flexDirection: "column", gap: 2,
-        background: "rgba(255,255,255,0.02)",
+        background:"var(--nv-elevated)",
       }}>
         <div style={{ padding: "2px 10px 12px", fontFamily: FFB, fontWeight: 700, fontSize: 12, letterSpacing: 1.2, color: "var(--nv-text-dim)", textTransform: "uppercase" }}>Calculator</div>
 
@@ -104,7 +104,7 @@ export function CalculatorApp({ AC }) {
           <div style={{
             width: 220, flexShrink: 0,
             borderLeft: "1px solid var(--nv-border)",
-            background: "rgba(255,255,255,0.02)",
+            background:"var(--nv-elevated)",
             display: "flex", flexDirection: "column", minHeight: 0,
           }}>
             <div style={{ padding: "12px 14px 8px", borderBottom: "1px solid var(--nv-border)", display: "flex", alignItems: "center", gap: 8 }}>
@@ -208,8 +208,8 @@ function KeyBtn({ children, onClick, onHold, variant, span, AC, height, fontSize
   const v = variant || "default";
   let s;
   switch (v) {
-    case "op":      s = { background: "rgba(255,255,255,0.10)", border: "1px solid var(--nv-border-strong)", color: "var(--nv-text-strong)" }; break;
-    case "accent":  s = { background: AC, border: "1px solid " + AC, color: "#fff" }; break;
+    case "op":      s = { background:"var(--nv-elevated)", border: "1px solid var(--nv-border-strong)", color: "var(--nv-text-strong)" }; break;
+    case "accent":  s = { background: AC, border: "1px solid " + AC, color:"var(--nv-text-strong)" }; break;
     case "danger":  s = { background: fill(AC), border: "1px solid " + bdr(AC), color: AC }; break;
     case "muted":   s = { background: "transparent", border: "1px solid var(--nv-border)", color: "var(--nv-text-dim)" }; break;
     default:        s = { background: "var(--nv-elevated)", border: "1px solid var(--nv-border)", color: "var(--nv-text-strong)" };

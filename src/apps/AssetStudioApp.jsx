@@ -396,7 +396,7 @@ export function AssetStudioApp({ AC, showToast }) {
   }
 
   const tbtn = (active) => ({ padding: "7px 11px", borderRadius: 8, border: "1px solid " + (active ? bdr(AC) : "rgba(255,255,255,0.14)"), background: active ? fill(AC) : "rgba(255,255,255,0.06)", color: active ? AC : "var(--nv-text)", cursor: "pointer", fontFamily: FFB, fontWeight: 600, fontSize: 12.5, whiteSpace: "nowrap" });
-  const ibtn = { padding: "6px 9px", borderRadius: 7, border: "1px solid rgba(255,255,255,0.14)", background: "rgba(255,255,255,0.06)", color: "var(--nv-text)", cursor: "pointer", fontFamily: FFB, fontSize: 13, lineHeight: 1, minWidth: 30 };
+  const ibtn = { padding: "6px 9px", borderRadius: 7, border: "1px solid var(--nv-border)", background:"var(--nv-elevated)", color: "var(--nv-text)", cursor: "pointer", fontFamily: FFB, fontSize: 13, lineHeight: 1, minWidth: 30 };
   const lblS = { display: "flex", alignItems: "center", gap: 6, fontSize: 11.5, color: "var(--nv-text-dim)", fontFamily: FF };
   const swatch = { width: 28, height: 28, borderRadius: 6, border: "1px solid var(--nv-border)", background: "none", cursor: "pointer", padding: 0 };
   const dlBtn = (disabled) => ({ padding: "8px 16px", borderRadius: 8, border: "1px solid " + bdr(AC), background: fill(AC), color: AC, cursor: disabled ? "default" : "pointer", fontFamily: FFB, fontWeight: 700, fontSize: 13, opacity: disabled ? 0.5 : 1 });
@@ -448,13 +448,13 @@ export function AssetStudioApp({ AC, showToast }) {
           {!cropMode && marquee && <div style={{ position: "absolute", left: marquee.x0 * 100 + "%", top: marquee.y0 * 100 + "%", width: (marquee.x1 - marquee.x0) * 100 + "%", height: (marquee.y1 - marquee.y0) * 100 + "%", border: "1px solid " + AC, background: fill(AC), pointerEvents: "none", zIndex: 98 }} />}
           {cropMode && (cropArea
             ? <div style={{ position: "absolute", left: cropRect.x0 * 100 + "%", top: cropRect.y0 * 100 + "%", width: (cropRect.x1 - cropRect.x0) * 100 + "%", height: (cropRect.y1 - cropRect.y0) * 100 + "%", boxShadow: "0 0 0 9999px rgba(0,0,0,0.55)", border: "1.5px solid #fff", pointerEvents: "none", zIndex: 97 }} />
-            : <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.45)", pointerEvents: "none", zIndex: 97, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontFamily: FFB, fontSize: 13 }}>Drag to select an area</div>)}
+            : <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.45)", pointerEvents: "none", zIndex: 97, display: "flex", alignItems: "center", justifyContent: "center", color:"var(--nv-text-strong)", fontFamily: FFB, fontSize: 13 }}>Drag to select an area</div>)}
         </div>
       </div>
 
       {/* Properties (hidden while snipping) */}
       {cropMode ? null : selLayers.length > 0 ? (
-        <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 10, padding: "10px 12px", borderTop: "1px solid var(--nv-border)", background: "rgba(255,255,255,0.02)" }}>
+        <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 10, padding: "10px 12px", borderTop: "1px solid var(--nv-border)", background:"var(--nv-elevated)" }}>
           <span style={{ fontFamily: FFB, fontWeight: 700, fontSize: 12, color: "var(--nv-text-strong)", textTransform: "capitalize" }}>{single ? single.type : selLayers.length + " selected"}</span>
 
           {allShapes && selLayers.every(l => l.type !== "line") && (

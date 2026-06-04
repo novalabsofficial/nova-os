@@ -211,11 +211,11 @@ export function TasksApp({ data, updateData, showToast, AC, openNovaAi }) {
         width: isMobile ? "100%" : 204, flexShrink: 0, borderRight: isMobile ? "none" : "1px solid var(--nv-border)",
         padding: "16px 10px", overflowY: "auto",
         display: (isMobile && mobilePane !== "rail") ? "none" : "flex", flexDirection: "column", gap: 2,
-        background: "rgba(255,255,255,0.02)",
+        background:"var(--nv-elevated)",
       }}>
         <div style={{ padding: "2px 6px 10px", display: "flex", alignItems: "center" }}>
           <span style={{ fontFamily: FFB, fontWeight: 700, fontSize: 12, letterSpacing: 1.2, color: "var(--nv-text-dim)", textTransform: "uppercase" }}>Tasks</span>
-          {isMobile && <button onClick={() => setMobilePane("main")} style={{ marginLeft: "auto", background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.14)", borderRadius: 7, padding: "5px 12px", color: "var(--nv-text-strong)", cursor: "pointer", fontFamily: FFB, fontWeight: 700, fontSize: 12 }}>Done</button>}
+          {isMobile && <button onClick={() => setMobilePane("main")} style={{ marginLeft: "auto", background:"var(--nv-elevated)", border: "1px solid var(--nv-border)", borderRadius: 7, padding: "5px 12px", color: "var(--nv-text-strong)", cursor: "pointer", fontFamily: FFB, fontWeight: 700, fontSize: 12 }}>Done</button>}
         </div>
 
         <RailButton ac={AC} active={view.kind === "today"}     onClick={() => setView({ kind: "today" })}     icon={<TodayGlyph />}    label="Today"     badge={counts.today || null} />
@@ -271,7 +271,7 @@ export function TasksApp({ data, updateData, showToast, AC, openNovaAi }) {
 
         {/* Header */}
         <div style={{ padding: "16px 22px 12px", borderBottom: "1px solid var(--nv-border)", flexShrink: 0, display: "flex", alignItems: "center", gap: 10 }}>
-          {isMobile && <button onClick={() => setMobilePane("rail")} title="Views & lists" style={{ background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.14)", borderRadius: 8, padding: "6px 11px", color: "var(--nv-text-strong)", cursor: "pointer", fontFamily: FFB, fontWeight: 700, fontSize: 14, lineHeight: 1, flexShrink: 0 }}>☰</button>}
+          {isMobile && <button onClick={() => setMobilePane("rail")} title="Views & lists" style={{ background:"var(--nv-elevated)", border: "1px solid var(--nv-border)", borderRadius: 8, padding: "6px 11px", color: "var(--nv-text-strong)", cursor: "pointer", fontFamily: FFB, fontWeight: 700, fontSize: 14, lineHeight: 1, flexShrink: 0 }}>☰</button>}
           {vt.listColor && <span style={{ width: 12, height: 12, borderRadius: "50%", background: vt.listColor, flexShrink: 0 }}/>}
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontFamily: FFB, fontWeight: 700, fontSize: 19, color: "var(--nv-text-strong)", letterSpacing: 0.2 }}>{vt.title}</div>

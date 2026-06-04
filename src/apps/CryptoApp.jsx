@@ -106,7 +106,7 @@ export function CryptoApp({ AC }) {
           <div style={{ textAlign: "center", padding: "30px 20px", color: "var(--nv-text-dim)" }}>
             <div style={{ fontSize: 36, marginBottom: 10, opacity: 0.5 }}>📉</div>
             <div style={{ fontSize: 14, marginBottom: 12 }}>{err}</div>
-            <button onClick={() => load(vs)} style={{ padding: "8px 16px", background: AC, border: "none", borderRadius: 9, color: "#fff", fontFamily: FFB, fontWeight: 600, fontSize: 13, cursor: "pointer" }}>Retry</button>
+            <button onClick={() => load(vs)} style={{ padding: "8px 16px", background: AC, border: "none", borderRadius: 9, color:"var(--nv-text-strong)", fontFamily: FFB, fontWeight: 600, fontSize: 13, cursor: "pointer" }}>Retry</button>
           </div>
         )}
         {shown.map((c) => {

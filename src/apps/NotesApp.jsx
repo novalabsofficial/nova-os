@@ -205,7 +205,7 @@ export function NotesApp({ data, updateData, showToast, AC, openNovaAi }) {
         width: 196, flexShrink: 0, borderRight: "1px solid var(--nv-border)",
         padding: "16px 10px", overflowY: "auto",
         display: isMobile ? "none" : "flex", flexDirection: "column", gap: 2,
-        background: "rgba(255,255,255,0.02)",
+        background:"var(--nv-elevated)",
       }}>
         <div style={{ padding: "2px 10px 12px", fontFamily: FFB, fontWeight: 700, fontSize: 12, letterSpacing: 1.2, color: "var(--nv-text-dim)", textTransform: "uppercase" }}>Notes</div>
 
@@ -255,7 +255,7 @@ export function NotesApp({ data, updateData, showToast, AC, openNovaAi }) {
       <div style={{
         width: isMobile ? "100%" : 288, flexShrink: 0, borderRight: isMobile ? "none" : "1px solid var(--nv-border)",
         display: (isMobile && mobilePane !== "list") ? "none" : "flex", flexDirection: "column", minHeight: 0,
-        background: "rgba(255,255,255,0.012)",
+        background:"var(--nv-elevated)",
       }}>
         <div style={{ padding: "14px 14px 10px", display: "flex", alignItems: "center", gap: 8, borderBottom: "1px solid var(--nv-border)", flexShrink: 0 }}>
           <div style={{ flex: 1, minWidth: 0 }}>
@@ -312,7 +312,7 @@ export function NotesApp({ data, updateData, showToast, AC, openNovaAi }) {
           <>
             {/* Editor toolbar — folder picker, AI assist, delete */}
             <div style={{ padding: "12px 18px", borderBottom: "1px solid var(--nv-border)", flexShrink: 0, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-              {isMobile && <button onClick={() => { flushSave(); setMobilePane("list"); }} style={{ background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.14)", borderRadius: 8, padding: "5px 10px", color: "var(--nv-text-strong)", cursor: "pointer", fontFamily: FFB, fontWeight: 700, fontSize: 12 }}>← Notes</button>}
+              {isMobile && <button onClick={() => { flushSave(); setMobilePane("list"); }} style={{ background:"var(--nv-elevated)", border: "1px solid var(--nv-border)", borderRadius: 8, padding: "5px 10px", color: "var(--nv-text-strong)", cursor: "pointer", fontFamily: FFB, fontWeight: 700, fontSize: 12 }}>← Notes</button>}
               <div style={{ fontSize: 11, color: "var(--nv-text-dim)", fontFamily: FFM }}>
                 {new Date(selected.ts || 0).toLocaleString()}
                 {saveTimerRef.current && <span style={{ marginLeft: 8, fontStyle: "italic", color: "var(--nv-text-dim)" }}>· saving…</span>}
@@ -360,7 +360,7 @@ export function NotesApp({ data, updateData, showToast, AC, openNovaAi }) {
               <div style={{
                 display: "flex", alignItems: "center", gap: 2, flexWrap: "wrap",
                 padding: "4px 18px", borderBottom: "1px solid var(--nv-border)",
-                background: "rgba(255,255,255,0.02)", flexShrink: 0,
+                background:"var(--nv-elevated)", flexShrink: 0,
               }}>
                 <MdBtn label="H1" title="Heading 1"     onClick={() => applyAction("h1")} />
                 <MdBtn label="H2" title="Heading 2"     onClick={() => applyAction("h2")} />
