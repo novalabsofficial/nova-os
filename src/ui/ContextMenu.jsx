@@ -31,10 +31,10 @@ export function ContextMenu({ x, y, items, onClose, AC }) {
   return (
     <div ref={ref} style={{
       position: "fixed", left: ax, top: ay, width: W, zIndex: 99999,
-      background: "linear-gradient(180deg, rgba(15,17,32,0.96) 0%, rgba(10,12,24,0.96) 100%)",
+      background: "var(--nv-surface-solid)",
       backdropFilter: "blur(32px) saturate(180%)",
       WebkitBackdropFilter: "blur(32px) saturate(180%)",
-      border: "1px solid rgba(255,255,255,0.1)",
+      border: "1px solid var(--nv-border)",
       borderRadius: 11,
       boxShadow: "0 4px 8px rgba(0,0,0,0.3), 0 22px 60px rgba(0,0,0,0.55), 0 1px 0 rgba(255,255,255,0.08) inset",
       padding: "6px 5px",
@@ -43,7 +43,7 @@ export function ContextMenu({ x, y, items, onClose, AC }) {
     }}>
       {items.map((it, i) => {
         if (it.type === "divider") {
-          return <div key={i} style={{height: 1, background: "rgba(255,255,255,0.07)", margin: "5px 8px"}}/>;
+          return <div key={i} style={{height: 1, background: "var(--nv-border)", margin: "5px 8px"}}/>;
         }
         const danger = !!it.danger;
         const disabled = !!it.disabled;
@@ -53,7 +53,7 @@ export function ContextMenu({ x, y, items, onClose, AC }) {
             style={{
               padding: "8px 12px", borderRadius: 7, cursor: disabled ? "default" : "pointer",
               fontSize: 12, fontWeight: 500,
-              color: disabled ? "rgba(255,255,255,0.3)" : danger ? "rgba(255,130,130,0.92)" : "rgba(255,255,255,0.88)",
+              color: disabled ? "var(--nv-text-dim)" : danger ? "var(--nv-danger, rgba(229,72,77,0.95))" : "var(--nv-text-strong)",
               display: "flex", alignItems: "center", gap: 10, opacity: disabled ? 0.5 : 1,
               transition: "background 0.15s, color 0.15s",
               letterSpacing: 0.1,
@@ -65,11 +65,11 @@ export function ContextMenu({ x, y, items, onClose, AC }) {
             }}
             onPointerLeave={e => {
               e.currentTarget.style.background = "transparent";
-              e.currentTarget.style.color = danger ? "rgba(255,130,130,0.92)" : "rgba(255,255,255,0.88)";
+              e.currentTarget.style.color = danger ? "var(--nv-danger, rgba(229,72,77,0.95))" : "var(--nv-text-strong)";
             }}>
             {it.icon && <span style={{width: 18, textAlign: "center", fontSize: 13, opacity: 0.9, flexShrink: 0}}>{it.icon}</span>}
             <span style={{flex: 1}}>{it.label}</span>
-            {it.shortcut && <span style={{fontSize: 10, fontFamily: FFM, color: "rgba(255,255,255,0.3)", letterSpacing: 0.2}}>{it.shortcut}</span>}
+            {it.shortcut && <span style={{fontSize: 10, fontFamily: FFM, color: "var(--nv-text-dim)", letterSpacing: 0.2}}>{it.shortcut}</span>}
           </div>
         );
       })}

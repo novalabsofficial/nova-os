@@ -396,7 +396,7 @@ function Spotlight({ AC, data, apps, storeCatalog, commApps, isPubliclyVisible, 
         width: "min(560px, calc(100vw - 28px))", zIndex: 100051,
         background: "var(--nv-surface-solid)",
         backdropFilter: "blur(40px) saturate(180%)", WebkitBackdropFilter: "blur(40px) saturate(180%)",
-        border: "1px solid rgba(255,255,255,0.1)", borderRadius: 16,
+        border: "1px solid var(--nv-border)", borderRadius: 16,
         boxShadow: "0 30px 90px rgba(0,0,0,0.6), 0 1px 0 rgba(255,255,255,0.08) inset",
         overflow: "hidden", fontFamily: FF,
         animation: "menu-up 0.22s cubic-bezier(0.16,1,0.3,1)",
@@ -411,7 +411,7 @@ function Spotlight({ AC, data, apps, storeCatalog, commApps, isPubliclyVisible, 
             placeholder="Search Nova OS — apps, notes, tasks, folders, settings…"
             style={{ flex: 1, background: "transparent", border: "none", outline: "none", color: "var(--nv-text-strong)", fontFamily: FF, fontSize: 15, letterSpacing: 0.2 }}
           />
-          <button onClick={onClose} style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 6, cursor: "pointer", color: "var(--nv-text-dim)", fontFamily: FFM, fontSize: 10.5, padding: "2px 7px" }}>Esc</button>
+          <button onClick={onClose} style={{ background: "var(--nv-elevated)", border: "1px solid var(--nv-border)", borderRadius: 6, cursor: "pointer", color: "var(--nv-text-dim)", fontFamily: FFM, fontSize: 10.5, padding: "2px 7px" }}>Esc</button>
         </div>
         <div style={{ maxHeight: "min(420px, 60vh)", overflowY: "auto", padding: 6 }}>
           {results.length === 0 && (
@@ -439,7 +439,7 @@ function Spotlight({ AC, data, apps, storeCatalog, commApps, isPubliclyVisible, 
                   <div style={{ fontSize: 11, color: "var(--nv-text-dim)", marginTop: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.subtitle}</div>
                 )}
               </div>
-              <div style={{ fontFamily: FFM, fontSize: 9.5, color: "var(--nv-text-dim)", letterSpacing: 0.6, textTransform: "uppercase", flexShrink: 0, padding: "2px 7px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 4 }}>{r.type}</div>
+              <div style={{ fontFamily: FFM, fontSize: 9.5, color: "var(--nv-text-dim)", letterSpacing: 0.6, textTransform: "uppercase", flexShrink: 0, padding: "2px 7px", background: "var(--nv-elevated)", border: "1px solid var(--nv-border)", borderRadius: 4 }}>{r.type}</div>
             </div>
           ))}
         </div>
@@ -522,8 +522,8 @@ function QuickSettingsPanel({ AC, glass, onToggleGlass, onClose, openSettingsSec
 
   const tile = (active) => ({
     flex: 1, display: "flex", alignItems: "center", gap: 11, padding: "12px 13px", borderRadius: 12,
-    background: active ? fill(AC) : "rgba(255,255,255,0.05)",
-    border: "1px solid " + (active ? bdr(AC) : "rgba(255,255,255,0.08)"),
+    background: active ? fill(AC) : "var(--nv-elevated)",
+    border: "1px solid " + (active ? bdr(AC) : "var(--nv-border)"),
     cursor: "pointer", textAlign: "left", transition: "all 0.15s",
   });
 
@@ -534,37 +534,37 @@ function QuickSettingsPanel({ AC, glass, onToggleGlass, onClose, openSettingsSec
         position: "fixed", bottom: TASKBAR_H + 10, right: 10, width: "min(312px, calc(100vw - 20px))",
         background: "var(--nv-surface-solid)",
         backdropFilter: "blur(40px) saturate(180%)", WebkitBackdropFilter: "blur(40px) saturate(180%)",
-        border: "1px solid rgba(255,255,255,0.1)", borderRadius: 16,
+        border: "1px solid var(--nv-border)", borderRadius: 16,
         boxShadow: "0 8px 16px rgba(0,0,0,0.35), 0 30px 80px rgba(0,0,0,0.55), 0 1px 0 rgba(255,255,255,0.08) inset",
         zIndex: 9998, padding: 14, animation: "menu-up 0.24s cubic-bezier(0.16,1,0.3,1)",
       }}>
         {/* Top tiles: Network + Liquid Glass */}
         <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
           <button onClick={() => { openSettingsSection("network"); onClose(); }} style={tile(net.online)} title="Network settings">
-            <span style={{ color: net.online ? AC : "rgba(255,255,255,0.6)", display: "flex" }}><WifiGlyph size={20} on={net.online} /></span>
+            <span style={{ color: net.online ? AC : "var(--nv-text)", display: "flex" }}><WifiGlyph size={20} on={net.online} /></span>
             <div style={{ minWidth: 0 }}>
-              <div style={{ fontFamily: FFB, fontWeight: 600, fontSize: 12, color: net.online ? AC : "#fff", lineHeight: 1.2 }}>{net.label}</div>
-              <div style={{ fontFamily: FF, fontSize: 10, color: "rgba(255,255,255,0.5)", marginTop: 1 }}>{net.sub}</div>
+              <div style={{ fontFamily: FFB, fontWeight: 600, fontSize: 12, color: net.online ? AC : "var(--nv-text-strong)", lineHeight: 1.2 }}>{net.label}</div>
+              <div style={{ fontFamily: FF, fontSize: 10, color: "var(--nv-text-dim)", marginTop: 1 }}>{net.sub}</div>
             </div>
           </button>
           <button onClick={onToggleGlass} style={{ ...tile(glass), flex: "0 0 auto", width: 58, justifyContent: "center" }} title="Liquid Glass">
-            <span style={{ fontSize: 18, color: glass ? AC : "rgba(255,255,255,0.6)" }}>✨</span>
+            <span style={{ fontSize: 18, color: glass ? AC : "var(--nv-text)" }}>✨</span>
           </button>
         </div>
 
         {/* Volume */}
-        <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 12, marginBottom: 10 }}>
-          <button onClick={() => applySnd(muted ? { enabled: true, volume: snd.volume > 0 ? snd.volume : 0.6 } : { enabled: false })} title={muted ? "Unmute" : "Mute"} style={{ background: "none", border: "none", cursor: "pointer", color: muted ? "rgba(255,255,255,0.4)" : AC, display: "flex", padding: 0, flexShrink: 0 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", background: "var(--nv-elevated)", border: "1px solid var(--nv-border)", borderRadius: 12, marginBottom: 10 }}>
+          <button onClick={() => applySnd(muted ? { enabled: true, volume: snd.volume > 0 ? snd.volume : 0.6 } : { enabled: false })} title={muted ? "Unmute" : "Mute"} style={{ background: "none", border: "none", cursor: "pointer", color: muted ? "var(--nv-text-dim)" : AC, display: "flex", padding: 0, flexShrink: 0 }}>
             <VolumeGlyph size={20} muted={muted} />
           </button>
           <input type="range" min={0} max={1} step={0.05} value={snd.enabled ? snd.volume : 0}
             onChange={e => { const v = +e.target.value; applySnd({ volume: v, enabled: v > 0 }); previewVolume(v); }}
             style={{ flex: 1, accentColor: AC }} />
-          <span style={{ fontFamily: FFM, fontSize: 11, color: "rgba(255,255,255,0.5)", width: 30, textAlign: "right" }}>{Math.round((snd.enabled ? snd.volume : 0) * 100)}%</span>
+          <span style={{ fontFamily: FFM, fontSize: 11, color: "var(--nv-text-dim)", width: 30, textAlign: "right" }}>{Math.round((snd.enabled ? snd.volume : 0) * 100)}%</span>
         </div>
 
         {/* Footer */}
-        <button onClick={() => { openSettingsSection("sound"); onClose(); }} style={{ width: "100%", padding: "9px", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 10, cursor: "pointer", fontFamily: FFB, fontWeight: 600, fontSize: 11.5, color: "rgba(255,255,255,0.7)" }}>All settings</button>
+        <button onClick={() => { openSettingsSection("sound"); onClose(); }} style={{ width: "100%", padding: "9px", background: "var(--nv-elevated)", border: "1px solid var(--nv-border)", borderRadius: 10, cursor: "pointer", fontFamily: FFB, fontWeight: 600, fontSize: 11.5, color: "var(--nv-text)" }}>All settings</button>
       </div>
     </>
   );
@@ -2471,7 +2471,7 @@ export default function NovaOS(){
         background:"var(--nv-surface-solid)",
         backdropFilter:"blur(40px) saturate(180%)",
         WebkitBackdropFilter:"blur(40px) saturate(180%)",
-        border:"1px solid rgba(255,255,255,0.1)",
+        border:"1px solid var(--nv-border)",
         borderRadius:16,
         boxShadow:"0 8px 16px rgba(0,0,0,0.35), 0 30px 80px rgba(0,0,0,0.55), 0 1px 0 rgba(255,255,255,0.08) inset",
         zIndex:9998,display:"flex",flexDirection:"column",
@@ -2480,10 +2480,10 @@ export default function NovaOS(){
       }}>
         {/* Search bar — gains an accent-tinged border on focus via CSS focus-visible */}
         <div style={{padding:"18px 18px 12px",flexShrink:0}}>
-          <div style={{display:"flex",alignItems:"center",gap:10,background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:11,padding:"11px 16px",transition:"border-color 0.2s, background 0.2s"}}>
+          <div style={{display:"flex",alignItems:"center",gap:10,background:"var(--nv-elevated)",border:"1px solid var(--nv-border)",borderRadius:11,padding:"11px 16px",transition:"border-color 0.2s, background 0.2s"}}>
             <span style={{fontSize:14,opacity:0.55}}>🔍</span>
-            <input value={menuSrch} onChange={e=>setMenuSrch(e.target.value)} placeholder="Search apps…" autoFocus style={{flex:1,background:"none",border:"none",outline:"none",color:"rgba(255,255,255,0.95)",fontFamily:FF,fontSize:14}}/>
-            {menuSrch&&<button onClick={()=>setMenuSrch("")} style={{background:"rgba(255,255,255,0.08)",border:"none",color:"rgba(255,255,255,0.5)",cursor:"pointer",fontSize:11,width:20,height:20,borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center"}}>✕</button>}
+            <input value={menuSrch} onChange={e=>setMenuSrch(e.target.value)} placeholder="Search apps…" autoFocus style={{flex:1,background:"none",border:"none",outline:"none",color:"var(--nv-text-strong)",fontFamily:FF,fontSize:14}}/>
+            {menuSrch&&<button onClick={()=>setMenuSrch("")} style={{background:"var(--nv-hover)",border:"none",color:"var(--nv-text-dim)",cursor:"pointer",fontSize:11,width:20,height:20,borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center"}}>✕</button>}
           </div>
         </div>
         <div style={{padding:"0 16px 18px",flex:1,overflowY:"auto",minHeight:0}}>
@@ -2510,31 +2510,31 @@ export default function NovaOS(){
                 style={{display:"flex",flexDirection:"column",alignItems:"center",gap:7,padding:"14px 6px 12px",borderRadius:11,cursor:"pointer",position:"relative"}}>
                 {isRunning&&<div style={{position:"absolute",bottom:5,left:"50%",transform:"translateX(-50%)",width:5,height:5,borderRadius:"50%",background:AC,boxShadow:"0 0 6px "+AC}}/>}
                 <div style={{display:"flex",alignItems:"center",justifyContent:"center",opacity:isHidden?0.5:1}}><AppIconDisplay app={app} size={28} glass={glass}/></div>
-                <span style={{fontFamily:FF,fontWeight:600,fontSize:10.5,color:isHidden?"rgba(255,255,255,0.45)":"rgba(255,255,255,0.85)",textAlign:"center",lineHeight:1.3,letterSpacing:0.1}}>{app.label}</span>
+                <span style={{fontFamily:FF,fontWeight:600,fontSize:10.5,color:isHidden?"var(--nv-text-dim)":"var(--nv-text-strong)",textAlign:"center",lineHeight:1.3,letterSpacing:0.1}}>{app.label}</span>
               </div>
               );
             })}
-            {filteredMenu.length===0&&<div style={{gridColumn:"span 4",color:"rgba(255,255,255,0.25)",fontFamily:FF,fontStyle:"italic",fontSize:12,textAlign:"center",padding:"24px 0"}}>No apps found</div>}
+            {filteredMenu.length===0&&<div style={{gridColumn:"span 4",color:"var(--nv-text-dim)",fontFamily:FF,fontStyle:"italic",fontSize:12,textAlign:"center",padding:"24px 0"}}>No apps found</div>}
           </div>
         </div>
         {/* User card — accent-tinged background for a subtle highlight,
             larger avatar pulled to match the rest of the cluster. */}
-        <div style={{padding:"14px 18px",borderTop:"1px solid rgba(255,255,255,0.07)",display:"flex",alignItems:"center",gap:12,background:"linear-gradient(180deg, transparent, rgba(255,255,255,0.02))",flexShrink:0}}>
+        <div style={{padding:"14px 18px",borderTop:"1px solid var(--nv-border)",display:"flex",alignItems:"center",gap:12,background:"linear-gradient(180deg, transparent, rgba(255,255,255,0.02))",flexShrink:0}}>
           <UserAvatar name={user} img={data?.avatar} ac={AC} size={38}/>
           <div style={{flex:1,minWidth:0}}>
-            <div style={{fontFamily:FFB,fontWeight:600,fontSize:13.5,color:"#fff",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>@{user}</div>
-            <div style={{fontFamily:FFM,fontSize:10,color:"rgba(255,255,255,0.35)",marginTop:1,letterSpacing:0.3}}>Nova OS v{NOVA_VERSION}</div>
+            <div style={{fontFamily:FFB,fontWeight:600,fontSize:13.5,color:"var(--nv-text-strong)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>@{user}</div>
+            <div style={{fontFamily:FFM,fontSize:10,color:"var(--nv-text-dim)",marginTop:1,letterSpacing:0.3}}>Nova OS v{NOVA_VERSION}</div>
           </div>
           {/* v8.3 F2: explicit fullscreen toggle in the start menu so users
               who don't know F11 can always get in/out of fullscreen. Since
               the taskbar auto-hides in fullscreen, the start menu (reachable
               via Cmd/Ctrl+K or the bottom-edge peek) is the discoverable
               exit point. */}
-          <button onClick={()=>{setMenuOpen(false);toggleFullscreen();}} title={isFs?"Exit fullscreen (F11)":"Enter fullscreen (F11)"} style={{width:34,height:34,borderRadius:8,background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.1)",cursor:"pointer",fontSize:13,color:"rgba(255,255,255,0.7)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,transition:"all 0.15s"}}>{isFs?"🗗":"⛶"}</button>
+          <button onClick={()=>{setMenuOpen(false);toggleFullscreen();}} title={isFs?"Exit fullscreen (F11)":"Enter fullscreen (F11)"} style={{width:34,height:34,borderRadius:8,background:"var(--nv-elevated)",border:"1px solid var(--nv-border)",cursor:"pointer",fontSize:13,color:"var(--nv-text)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,transition:"all 0.15s"}}>{isFs?"🗗":"⛶"}</button>
           <button onClick={logout} title="Sign out" style={{padding:"7px 13px",background:"rgba(255,80,80,0.1)",border:"1px solid rgba(255,80,80,0.28)",borderRadius:8,cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:11,color:"rgba(255,140,140,0.95)",transition:"all 0.18s cubic-bezier(0.4,0,0.2,1)"}}>Logout</button>
           {/* v10.7 — Quit the desktop (Tauri) app, for users who don't know about Settings → Close. */}
           {isDesktop()&&(
-            <button onClick={()=>{setMenuOpen(false);playSound("logout");quitApp();}} title="Quit Nova OS" style={{padding:"7px 11px",background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.14)",borderRadius:8,cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:11,color:"rgba(255,255,255,0.85)",transition:"all 0.18s cubic-bezier(0.4,0,0.2,1)",display:"flex",alignItems:"center",gap:5}}>⏻ Quit</button>
+            <button onClick={()=>{setMenuOpen(false);playSound("logout");quitApp();}} title="Quit Nova OS" style={{padding:"7px 11px",background:"var(--nv-elevated)",border:"1px solid var(--nv-border)",borderRadius:8,cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:11,color:"var(--nv-text-strong)",transition:"all 0.18s cubic-bezier(0.4,0,0.2,1)",display:"flex",alignItems:"center",gap:5}}>⏻ Quit</button>
           )}
           {/* v10.5 — Shut Down (powers off the host). Only the Nova Linux Tauri
               kiosk can actually do this, so it's shown only there
@@ -3038,7 +3038,7 @@ export default function NovaOS(){
             const appObj = t.appId ? APPS.find(a=>a.id===t.appId) : null;
             return(
               <div key={t.id} onClick={()=>{dismissNotifToast(t.id); if(t.appId) openApp(t.appId);}}
-                style={{position:"relative",pointerEvents:"auto",cursor:"pointer",width:"min(360px, calc(100vw - 28px))",display:"flex",gap:12,alignItems:"flex-start",padding:"13px 30px 13px 15px",background:"var(--nv-surface-solid)",backdropFilter:"blur(44px) saturate(180%)",WebkitBackdropFilter:"blur(44px) saturate(180%)",border:"1px solid rgba(255,255,255,0.12)",borderRadius:16,boxShadow:"0 8px 18px rgba(0,0,0,0.32), 0 26px 64px rgba(0,0,0,0.5), 0 1px 0 rgba(255,255,255,0.09) inset",animation:"panel-in-right 0.34s cubic-bezier(0.22,1,0.36,1)",overflow:"hidden"}}>
+                style={{position:"relative",pointerEvents:"auto",cursor:"pointer",width:"min(360px, calc(100vw - 28px))",display:"flex",gap:12,alignItems:"flex-start",padding:"13px 30px 13px 15px",background:"var(--nv-surface-solid)",backdropFilter:"blur(44px) saturate(180%)",WebkitBackdropFilter:"blur(44px) saturate(180%)",border:"1px solid var(--nv-border)",borderRadius:16,boxShadow:"0 8px 18px rgba(0,0,0,0.32), 0 26px 64px rgba(0,0,0,0.5), 0 1px 0 rgba(255,255,255,0.09) inset",animation:"panel-in-right 0.34s cubic-bezier(0.22,1,0.36,1)",overflow:"hidden"}}>
                 <div style={{position:"absolute",left:0,top:0,bottom:0,width:3,background:kc,boxShadow:"0 0 12px "+kc+"99"}}/>
                 <div style={{flexShrink:0,width:38,height:38,borderRadius:11,display:"flex",alignItems:"center",justifyContent:"center",background:fill(kc),border:"1px solid "+bdr(kc)}}>
                   {appObj ? <AppIconDisplay app={{id:appObj.id,icon:appObj.icon}} size={24} glass={glass}/> : <span style={{fontSize:18}}>🔔</span>}
@@ -3050,7 +3050,7 @@ export default function NovaOS(){
                   </div>
                   {t.body && <div style={{fontSize:12,color:"var(--nv-text)",opacity:0.82,marginTop:3,lineHeight:1.42,display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical",overflow:"hidden"}}>{t.body}</div>}
                 </div>
-                <button onClick={e=>{e.stopPropagation();dismissNotifToast(t.id);}} title="Dismiss" style={{position:"absolute",top:8,right:8,width:19,height:19,borderRadius:6,background:"rgba(255,255,255,0.07)",border:"none",color:"rgba(255,255,255,0.55)",cursor:"pointer",fontSize:10,lineHeight:1,display:"flex",alignItems:"center",justifyContent:"center",padding:0}}>✕</button>
+                <button onClick={e=>{e.stopPropagation();dismissNotifToast(t.id);}} title="Dismiss" style={{position:"absolute",top:8,right:8,width:19,height:19,borderRadius:6,background:"var(--nv-elevated)",border:"none",color:"var(--nv-text-dim)",cursor:"pointer",fontSize:10,lineHeight:1,display:"flex",alignItems:"center",justifyContent:"center",padding:0}}>✕</button>
               </div>
             );
           })}
@@ -3064,25 +3064,25 @@ export default function NovaOS(){
             background:"var(--nv-surface-solid)",
             backdropFilter:"blur(40px) saturate(180%)",
             WebkitBackdropFilter:"blur(40px) saturate(180%)",
-            border:"1px solid rgba(255,255,255,0.1)",
+            border:"1px solid var(--nv-border)",
             borderRadius:16,
             boxShadow:"0 8px 16px rgba(0,0,0,0.35), 0 30px 80px rgba(0,0,0,0.55), 0 1px 0 rgba(255,255,255,0.08) inset",
             zIndex:9998,display:"flex",flexDirection:"column",
             animation:"panel-in-right 0.3s cubic-bezier(0.22,1,0.36,1)",
             overflow:"hidden",
           }}>
-            <div style={{padding:"16px 18px",borderBottom:"1px solid rgba(255,255,255,0.06)",display:"flex",alignItems:"center",gap:10,flexShrink:0,background:"linear-gradient(180deg, rgba(255,255,255,0.03), transparent)"}}>
+            <div style={{padding:"16px 18px",borderBottom:"1px solid var(--nv-border)",display:"flex",alignItems:"center",gap:10,flexShrink:0,background:"linear-gradient(180deg, rgba(255,255,255,0.03), transparent)"}}>
               <span style={{fontSize:16,filter:"drop-shadow(0 0 8px "+AC+"55)"}}>🔔</span>
-              <div style={{flex:1,fontFamily:FFB,fontWeight:700,fontSize:14,color:"#fff",letterSpacing:0.2}}>Notifications</div>
+              <div style={{flex:1,fontFamily:FFB,fontWeight:700,fontSize:14,color:"var(--nv-text-strong)",letterSpacing:0.2}}>Notifications</div>
               {notifications.length>0 && <button onClick={clearAllNotifications} style={{padding:"5px 11px",background:"rgba(255,80,80,0.08)",border:"1px solid rgba(255,80,80,0.25)",borderRadius:7,cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:10,color:"rgba(255,130,130,0.9)",letterSpacing:0.3,transition:"all 0.15s"}}>Clear all</button>}
-              <button onClick={()=>setNotifsOpen(false)} title="Close" style={{width:26,height:26,borderRadius:7,background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.06)",cursor:"pointer",color:"rgba(255,255,255,0.5)",fontSize:12,display:"flex",alignItems:"center",justifyContent:"center",padding:0,transition:"all 0.15s"}}>✕</button>
+              <button onClick={()=>setNotifsOpen(false)} title="Close" style={{width:26,height:26,borderRadius:7,background:"var(--nv-elevated)",border:"1px solid var(--nv-border)",cursor:"pointer",color:"var(--nv-text-dim)",fontSize:12,display:"flex",alignItems:"center",justifyContent:"center",padding:0,transition:"all 0.15s"}}>✕</button>
             </div>
             <div style={{flex:1,overflowY:"auto",minHeight:0,padding:"10px"}}>
               {notifications.length===0 ? (
-                <div style={{textAlign:"center",padding:"60px 24px",color:"rgba(255,255,255,0.35)",fontFamily:FF}}>
+                <div style={{textAlign:"center",padding:"60px 24px",color:"var(--nv-text-dim)",fontFamily:FF}}>
                   <div style={{fontSize:40,opacity:0.5,marginBottom:14,filter:"drop-shadow(0 0 16px "+AC+"33)"}}>🔕</div>
-                  <div style={{fontFamily:FFB,fontWeight:600,fontSize:13,color:"rgba(255,255,255,0.55)",marginBottom:5}}>All caught up</div>
-                  <div style={{fontSize:11,color:"rgba(255,255,255,0.35)",lineHeight:1.55,maxWidth:240,margin:"0 auto"}}>NWS alerts and other important events will appear here when they happen.</div>
+                  <div style={{fontFamily:FFB,fontWeight:600,fontSize:13,color:"var(--nv-text-dim)",marginBottom:5}}>All caught up</div>
+                  <div style={{fontSize:11,color:"var(--nv-text-dim)",lineHeight:1.55,maxWidth:240,margin:"0 auto"}}>NWS alerts and other important events will appear here when they happen.</div>
                 </div>
               ) : notifications.map(n=>{
                 const kindColor = n.kind==="alert"?"#ff8b8b":n.kind==="warning"?"#ffcc66":n.kind==="success"?"#4cef90":AC;
@@ -3093,9 +3093,9 @@ export default function NovaOS(){
                   <div key={n.id} style={{
                     padding:"12px 14px 12px 14px",
                     marginBottom:6,
-                    background:n.read?"rgba(255,255,255,0.025)":"linear-gradient(135deg, rgba(255,255,255,0.07), rgba(255,255,255,0.04))",
-                    border:"1px solid "+(n.read?"rgba(255,255,255,0.05)":"rgba(255,255,255,0.11)"),
-                    borderLeft:"3px solid "+(n.read?"rgba(255,255,255,0.1)":kindColor),
+                    background:n.read?"var(--nv-elevated)":"linear-gradient(135deg, rgba(255,255,255,0.07), rgba(255,255,255,0.04))",
+                    border:"1px solid "+(n.read?"var(--nv-border)":"var(--nv-border)"),
+                    borderLeft:"3px solid "+(n.read?"var(--nv-border)":kindColor),
                     borderRadius:10,
                     position:"relative",
                     transition:"background 0.18s",
@@ -3103,13 +3103,13 @@ export default function NovaOS(){
                     <div style={{display:"flex",alignItems:"flex-start",gap:10}}>
                       <span style={{color:kindColor,fontSize:14,lineHeight:1.4,flexShrink:0,filter:n.read?"none":"drop-shadow(0 0 6px "+kindColor+"55)"}}>{kindIcon}</span>
                       <div style={{flex:1,minWidth:0}}>
-                        <div style={{fontFamily:FFB,fontWeight:600,fontSize:12.5,color:n.read?"rgba(255,255,255,0.78)":"#fff",lineHeight:1.4,letterSpacing:0.1}}>{n.title}</div>
-                        {n.body && <div style={{fontSize:11,color:"rgba(255,255,255,0.6)",marginTop:4,lineHeight:1.55,wordBreak:"break-word"}}>{n.body}</div>}
-                        <div style={{fontSize:10,fontFamily:FFM,color:"rgba(255,255,255,0.32)",marginTop:6,letterSpacing:0.2}}>{ageStr}</div>
+                        <div style={{fontFamily:FFB,fontWeight:600,fontSize:12.5,color:n.read?"var(--nv-text)":"var(--nv-text-strong)",lineHeight:1.4,letterSpacing:0.1}}>{n.title}</div>
+                        {n.body && <div style={{fontSize:11,color:"var(--nv-text)",marginTop:4,lineHeight:1.55,wordBreak:"break-word"}}>{n.body}</div>}
+                        <div style={{fontSize:10,fontFamily:FFM,color:"var(--nv-text-dim)",marginTop:6,letterSpacing:0.2}}>{ageStr}</div>
                       </div>
-                      <button onClick={()=>dismissNotification(n.id)} title="Dismiss" style={{background:"transparent",border:"none",cursor:"pointer",color:"rgba(255,255,255,0.32)",fontSize:11,padding:"3px 6px",lineHeight:1,flexShrink:0,borderRadius:5,transition:"background 0.15s, color 0.15s"}}
+                      <button onClick={()=>dismissNotification(n.id)} title="Dismiss" style={{background:"transparent",border:"none",cursor:"pointer",color:"var(--nv-text-dim)",fontSize:11,padding:"3px 6px",lineHeight:1,flexShrink:0,borderRadius:5,transition:"background 0.15s, color 0.15s"}}
                         onMouseEnter={e=>{e.currentTarget.style.background="rgba(255,80,80,0.12)";e.currentTarget.style.color="rgba(255,130,130,0.9)";}}
-                        onMouseLeave={e=>{e.currentTarget.style.background="transparent";e.currentTarget.style.color="rgba(255,255,255,0.32)";}}>✕</button>
+                        onMouseLeave={e=>{e.currentTarget.style.background="transparent";e.currentTarget.style.color="var(--nv-text-dim)";}}>✕</button>
                     </div>
                   </div>
                 );
