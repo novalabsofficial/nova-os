@@ -2574,9 +2574,15 @@ export default function NovaOS(){
         //   • Window controls grouped into a subtle pill at the right end of
         //     the title bar — same hit targets, more cohesive look.
         const winRadius = 14;
+        // v11.0 unified chrome — the focused window sits crisp + lifted; the
+        // rest recede with a softer shadow, dimmer border + muted title bar so
+        // it's always obvious which window is active (real-OS depth).
+        const isFocused = win.id===focusedWinId;
         const winShadow = isDrg
           ? "0 14px 28px rgba(0,0,0,0.45), 0 40px 100px rgba(0,0,0,0.7), 0 1px 0 rgba(255,255,255,0.1) inset"
-          : "0 4px 8px rgba(0,0,0,0.25), 0 18px 60px rgba(0,0,0,0.5), 0 1px 0 rgba(255,255,255,0.08) inset";
+          : isFocused
+          ? "0 4px 8px rgba(0,0,0,0.25), 0 18px 60px rgba(0,0,0,0.5), 0 1px 0 rgba(255,255,255,0.08) inset"
+          : "0 2px 6px rgba(0,0,0,0.16), 0 10px 32px rgba(0,0,0,0.3), 0 1px 0 rgba(255,255,255,0.05) inset";
         // v10.0: maximized windows are position:absolute (not fixed) so they
         // stay confined to their virtual-desktop panel — a fixed element would
         // anchor to the transformed track and span every desktop at once.
@@ -2607,26 +2613,26 @@ export default function NovaOS(){
                       : "none";
         const fxBusy = fx==="closing"||fx==="minimizing";
         return(
-          <div key={win.id} data-win="1" data-drop={win.app==="profile"?"avatar":"none"} onClick={()=>focusWin(win.id)} style={{...winStyle,...minimizedStyle,pointerEvents:fxBusy?"none":"auto",transformOrigin:fxOrigin,background:"var(--nv-surface-solid)",border:"1px solid rgba(255,255,255,0.09)",boxShadow:winShadow,display:isMin?"none":"flex",flexDirection:"column",animation:winAnim,backdropFilter:"blur("+winBlur+"px) saturate(160%)",WebkitBackdropFilter:"blur("+winBlur+"px) saturate(160%)",transition:isDrg?"box-shadow 0.18s cubic-bezier(0.4,0,0.2,1)":"box-shadow 0.22s cubic-bezier(0.4,0,0.2,1), left 0.28s cubic-bezier(0.4,0,0.2,1), top 0.28s cubic-bezier(0.4,0,0.2,1), width 0.28s cubic-bezier(0.4,0,0.2,1), height 0.28s cubic-bezier(0.4,0,0.2,1)",overflow:"hidden"}}>
+          <div key={win.id} data-win="1" data-drop={win.app==="profile"?"avatar":"none"} onClick={()=>focusWin(win.id)} style={{...winStyle,...minimizedStyle,pointerEvents:fxBusy?"none":"auto",transformOrigin:fxOrigin,background:"var(--nv-surface-solid)",border:"1px solid "+(isFocused?"rgba(255,255,255,0.14)":"rgba(255,255,255,0.06)"),boxShadow:winShadow,display:isMin?"none":"flex",flexDirection:"column",animation:winAnim,backdropFilter:"blur("+winBlur+"px) saturate(160%)",WebkitBackdropFilter:"blur("+winBlur+"px) saturate(160%)",transition:isDrg?"box-shadow 0.18s cubic-bezier(0.4,0,0.2,1)":"box-shadow 0.22s cubic-bezier(0.4,0,0.2,1), left 0.28s cubic-bezier(0.4,0,0.2,1), top 0.28s cubic-bezier(0.4,0,0.2,1), width 0.28s cubic-bezier(0.4,0,0.2,1), height 0.28s cubic-bezier(0.4,0,0.2,1)",overflow:"hidden"}}>
             {!isMax&&<ResizeHandles winId={win.id} onStartResize={startResize} touchy={touchy}/>}
             {/* v8.3 F1: title bar is now draggable even when maximized —
                 dragging restores the window and tears it off (Windows-style),
                 so the cursor is always grab/grabbing rather than default. */}
-            <div onPointerDown={e=>startDrag(e,win.id)} style={{height:40,display:"flex",alignItems:"center",padding:"0 6px 0 14px",gap:10,background:"linear-gradient(180deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.02) 100%)",borderBottom:"1px solid rgba(255,255,255,0.06)",borderRadius:isMax?"0":winRadius+"px "+winRadius+"px 0 0",cursor:isDrg?"grabbing":"grab",userSelect:"none",flexShrink:0,touchAction:"none"}}>
-              <div style={{display:"flex",alignItems:"center",justifyContent:"center"}}><AppIconDisplay app={{id:win.app,icon:app?.icon||"📦"}} size={18} glass={glass}/></div>
-              <span style={{flex:1,fontFamily:FFB,fontWeight:600,fontSize:13,color:"rgba(255,255,255,0.92)",letterSpacing:0.2}}>{app?.label}</span>
+            <div onPointerDown={e=>startDrag(e,win.id)} style={{height:40,display:"flex",alignItems:"center",padding:"0 6px 0 14px",gap:10,background:isFocused?"linear-gradient(180deg, rgba(255,255,255,0.07) 0%, rgba(255,255,255,0.02) 100%)":"linear-gradient(180deg, rgba(255,255,255,0.025) 0%, rgba(255,255,255,0.008) 100%)",borderBottom:"1px solid rgba(255,255,255,0.06)",borderRadius:isMax?"0":winRadius+"px "+winRadius+"px 0 0",cursor:isDrg?"grabbing":"grab",userSelect:"none",flexShrink:0,touchAction:"none",transition:"background 0.18s"}}>
+              <div style={{display:"flex",alignItems:"center",justifyContent:"center",opacity:isFocused?1:0.55,transition:"opacity 0.18s"}}><AppIconDisplay app={{id:win.app,icon:app?.icon||"📦"}} size={18} glass={glass}/></div>
+              <span style={{flex:1,fontFamily:FFB,fontWeight:600,fontSize:13,color:isFocused?"rgba(255,255,255,0.92)":"rgba(255,255,255,0.5)",letterSpacing:0.2,transition:"color 0.18s"}}>{app?.label}</span>
               {/* v8.0 round 3 — proper SVG window controls. Unicode glyphs
                   rendered inconsistently across platforms and weren't pixel-
                   aligned within their hit boxes. Now stroke-based icons that
                   inherit the button color via currentColor. */}
               <div style={{display:"flex",alignItems:"center",gap:2,padding:2,borderRadius:9}}>
-                <button className="wn" onPointerDown={e=>e.stopPropagation()} onClick={e=>{e.stopPropagation();minimizeWin(win.id);}} title="Minimize" style={{width:28,height:28,borderRadius:7,background:"transparent",border:"1px solid transparent",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",color:"rgba(255,255,255,0.62)",flexShrink:0,padding:0}}>
+                <button className="wn" onPointerDown={e=>e.stopPropagation()} onClick={e=>{e.stopPropagation();minimizeWin(win.id);}} title="Minimize" style={{width:28,height:28,borderRadius:7,background:"transparent",border:"1px solid transparent",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",color:isFocused?"rgba(255,255,255,0.62)":"rgba(255,255,255,0.36)",flexShrink:0,padding:0}}>
                   <WindowControlIcon type="minimize" size={11}/>
                 </button>
-                <button className="wm" onPointerDown={e=>e.stopPropagation()} onClick={e=>{e.stopPropagation();maximizeWin(win.id);}} title={isMax?"Restore":"Maximize"} style={{width:28,height:28,borderRadius:7,background:"transparent",border:"1px solid transparent",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",color:"rgba(255,255,255,0.62)",flexShrink:0,padding:0}}>
+                <button className="wm" onPointerDown={e=>e.stopPropagation()} onClick={e=>{e.stopPropagation();maximizeWin(win.id);}} title={isMax?"Restore":"Maximize"} style={{width:28,height:28,borderRadius:7,background:"transparent",border:"1px solid transparent",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",color:isFocused?"rgba(255,255,255,0.62)":"rgba(255,255,255,0.36)",flexShrink:0,padding:0}}>
                   <WindowControlIcon type={isMax?"restore":"maximize"} size={11}/>
                 </button>
-                <button className="wx" onPointerDown={e=>e.stopPropagation()} onClick={e=>{e.stopPropagation();closeWin(win.id);}} title="Close" style={{width:28,height:28,borderRadius:7,background:"transparent",border:"1px solid transparent",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",color:"rgba(255,255,255,0.62)",flexShrink:0,padding:0}}>
+                <button className="wx" onPointerDown={e=>e.stopPropagation()} onClick={e=>{e.stopPropagation();closeWin(win.id);}} title="Close" style={{width:28,height:28,borderRadius:7,background:"transparent",border:"1px solid transparent",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",color:isFocused?"rgba(255,255,255,0.62)":"rgba(255,255,255,0.36)",flexShrink:0,padding:0}}>
                   <WindowControlIcon type="close" size={11}/>
                 </button>
               </div>
