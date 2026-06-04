@@ -889,10 +889,10 @@ export default function NovaOS(){
     return onFullscreenChange(setIsFs);
   },[]);
 
-  // v9.0 — light mode was scrapped (didn't suit Nova OS). Force dark always so
-  // any previously-saved settings.theme:"light" can't leave the OS in light
-  // tokens. The dark :root tokens in styles.js are the only palette now.
-  useEffect(()=>{ document.documentElement.setAttribute("data-theme","dark"); },[]);
+  // v11.0 — light mode (rebuilt). Applies the saved theme (default dark) by
+  // flipping the --nv-* tokens via html[data-theme]; set in Settings → Display.
+  const theme = (data?.settings?.theme === "light") ? "light" : "dark";
+  useEffect(()=>{ document.documentElement.setAttribute("data-theme", theme); },[theme]);
 
   // v9.0 — Liquid Glass on/off. Sets html[data-glass] so the sheerer surface
   // tokens (styles.js) kick in for windows, taskbar, menus and widgets.

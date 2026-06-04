@@ -236,6 +236,10 @@ export function SettingsApp({ user, data, updateSettings, showToast, AC, onCusto
           <div style={PANE_TITLE}>Display</div>
           <div style={PANE_SUB}>Screen behavior, clock format, text size and how Nova sizes for your device.</div>
 
+          <div style={SEC}>Appearance</div>
+          <Toggle label="🌗 Light mode" value={settings.theme === "light"} onChange={v => { updateSettings({ theme: v ? "light" : "dark" }); showToast(v ? "Light mode on ☀️" : "Dark mode on 🌙"); }} ac={AC} />
+          <div style={{ fontSize: 10, color: "var(--nv-text-dim)", marginBottom: 10, fontStyle: "italic", marginTop: -4 }}>New in 11.0 — a few apps are still being polished for light mode.</div>
+
           <div style={SEC}>Screen</div>
           <Toggle label="Fullscreen Mode" value={fs} onChange={() => { toggleFullscreen(); }} ac={AC} />
           <div style={{ fontSize: 10, color: "var(--nv-text-dim)", marginBottom: 10, fontStyle: "italic", marginTop: -4 }}>Tip: press <strong style={{ color: "var(--nv-text)" }}>F11</strong> any time to toggle.</div>

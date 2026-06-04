@@ -150,8 +150,29 @@ export const CSS = `
     --nv-scroll-hover:rgba(255,255,255,0.24);
     --nv-glass-blur:28px;
   }
-  /* (v9.0: light mode was scrapped — Nova OS is dark-only. The tokens above
-     stay because surfaces reference them; only the light overrides are gone.) */
+  /* ── v11.0 Light mode. Flips the --nv-* tokens; every surface that uses them
+     reskins automatically. (Apps still on hardcoded colors get migrated to
+     tokens in waves.) Toggle in Settings → Display. */
+  html[data-theme="light"]{
+    color-scheme:light;
+    --nv-body-bg:#e6e8f0;
+    --nv-surface:rgba(255,255,255,0.7);
+    --nv-surface-solid:rgba(249,250,253,0.94);
+    --nv-elevated:rgba(15,23,42,0.045);
+    --nv-border:rgba(15,23,42,0.12);
+    --nv-border-strong:rgba(15,23,42,0.22);
+    --nv-text-strong:rgba(17,20,28,0.96);
+    --nv-text:rgba(28,32,44,0.72);
+    --nv-text-dim:rgba(40,46,60,0.5);
+    --nv-hover:rgba(15,23,42,0.06);
+    --nv-input-bg:rgba(15,23,42,0.05);
+    --nv-scroll:rgba(15,23,42,0.2);
+    --nv-scroll-hover:rgba(15,23,42,0.32);
+  }
+  html[data-theme="light"][data-glass="on"]{
+    --nv-surface:rgba(255,255,255,0.5);
+    --nv-surface-solid:rgba(249,250,253,0.62);
+  }
 
   /* ── v9.0 Liquid Glass. When enabled (html[data-glass="on"]), surfaces get
      noticeably sheerer + a heavier blur so the wallpaper frosts through —
