@@ -55,7 +55,7 @@ export const INP = {
   fontFamily: FF,
   fontSize: 14,
   outline: "none",
-  transition: "border-color 0.18s cubic-bezier(0.4,0,0.2,1), background 0.18s cubic-bezier(0.4,0,0.2,1)",
+  transition: "border-color 0.18s var(--nv-ease), background 0.18s var(--nv-ease)",
 };
 
 // "Section header" style — small all-caps label between sections of an app.
@@ -99,7 +99,7 @@ export const TYPE = {
 // These mirror the CSS curves (--nv-ease / --nv-spring) so JS- and CSS-driven
 // transitions feel identical. tx(...props) builds a transition string.
 export const EASE = {
-  standard: "cubic-bezier(0.4,0,0.2,1)",      // Material standard — most UI transitions
+  standard: "var(--nv-ease)",      // the Nova ease-out — most UI transitions
   out:      "cubic-bezier(0.22,1,0.36,1)",    // ease-out-quint — enters / slides (= --nv-ease)
   spring:   "cubic-bezier(0.34,1.56,0.64,1)", // slight overshoot — playful pops (= --nv-spring)
 };
@@ -252,42 +252,42 @@ export const CSS = `
   @keyframes ring-in{from{box-shadow:0 0 0 0 rgba(99,102,241,0);}to{box-shadow:0 0 0 3px rgba(99,102,241,0.35);}}
 
   /* ── Interactive class hover states ────────────────────────────────────
-     Standardized on cubic-bezier(0.4,0,0.2,1) (Material standard).
+     Standardized on var(--nv-ease) (Material standard).
      v8.0 increased the hover background opacities so hover states are
      clearly readable on bright wallpapers, where the old v7.x values
      sometimes disappeared into the backdrop. */
 
   /* Desktop icon — soft selection ring on hover */
-  .di{transition:background 0.2s cubic-bezier(0.4,0,0.2,1),transform 0.2s cubic-bezier(0.4,0,0.2,1),border-color 0.2s cubic-bezier(0.4,0,0.2,1);}
+  .di{transition:background 0.2s var(--nv-ease),transform 0.2s var(--nv-ease),border-color 0.2s var(--nv-ease);}
   .di:hover{background:rgba(255,255,255,0.12)!important;border-color:rgba(255,255,255,0.14)!important;}
   /* v11.0 light mode — desktop sits on a light wallpaper, so the icon hover is a faint DARK wash + hairline (not white-on-white) */
   html[data-theme="light"] .di:hover{background:rgba(20,28,48,0.08)!important;border-color:rgba(20,28,48,0.13)!important;}
 
   /* Taskbar window chip — lifts slightly on hover */
-  .tb{transition:all 0.2s cubic-bezier(0.4,0,0.2,1);}
+  .tb{transition:all 0.2s var(--nv-ease);}
   .tb:hover{background:rgba(255,255,255,0.14)!important;border-color:rgba(255,255,255,0.2)!important;transform:translateY(-1px);}
 
   /* Window controls — close turns red, minimize/maximize gain subtle hovers */
-  .wx{transition:background 0.18s cubic-bezier(0.4,0,0.2,1),color 0.18s cubic-bezier(0.4,0,0.2,1);}
+  .wx{transition:background 0.18s var(--nv-ease),color 0.18s var(--nv-ease);}
   .wx:hover{background:#e5484d!important;color:#fff!important;border-color:#e5484d!important;}
-  .wm,.wn{transition:background 0.18s cubic-bezier(0.4,0,0.2,1),color 0.18s cubic-bezier(0.4,0,0.2,1);}
+  .wm,.wn{transition:background 0.18s var(--nv-ease),color 0.18s var(--nv-ease);}
   .wm:hover,.wn:hover{background:rgba(255,255,255,0.14)!important;color:rgba(255,255,255,0.95)!important;}
 
   /* Start menu app tile */
-  .ma{transition:background 0.18s cubic-bezier(0.4,0,0.2,1),transform 0.18s cubic-bezier(0.4,0,0.2,1);}
+  .ma{transition:background 0.18s var(--nv-ease),transform 0.18s var(--nv-ease);}
   .ma:hover{background:rgba(255,255,255,0.1)!important;transform:translateY(-1px);}
 
-  .ls{transition:opacity 0.18s cubic-bezier(0.4,0,0.2,1);}.ls:hover:not(:disabled){opacity:0.82!important;}
-  .lt{transition:color 0.18s cubic-bezier(0.4,0,0.2,1);}.lt:hover{color:rgba(160,210,255,0.9)!important;}
+  .ls{transition:opacity 0.18s var(--nv-ease);}.ls:hover:not(:disabled){opacity:0.82!important;}
+  .lt{transition:color 0.18s var(--nv-ease);}.lt:hover{color:rgba(160,210,255,0.9)!important;}
 
   /* System buttons (taskbar start, bell, settings cog, user chip) */
-  .sb{transition:all 0.2s cubic-bezier(0.4,0,0.2,1);}
+  .sb{transition:all 0.2s var(--nv-ease);}
   .sb:hover{background:rgba(255,255,255,0.14)!important;border-color:rgba(255,255,255,0.18)!important;}
 
-  .dl{transition:color 0.18s cubic-bezier(0.4,0,0.2,1);}.dl:hover{color:rgba(255,90,90,0.95)!important;}
+  .dl{transition:color 0.18s var(--nv-ease);}.dl:hover{color:rgba(255,90,90,0.95)!important;}
   .ps{transition:transform 0.22s cubic-bezier(0.34,1.56,0.64,1);}.ps:hover{transform:scale(1.22);z-index:2;}
-  .fr{transition:background 0.18s cubic-bezier(0.4,0,0.2,1);}.fr:hover{background:rgba(255,255,255,0.08)!important;}
-  .sr{transition:background 0.18s cubic-bezier(0.4,0,0.2,1);}.sr:hover{background:rgba(255,255,255,0.07)!important;}
+  .fr{transition:background 0.18s var(--nv-ease);}.fr:hover{background:rgba(255,255,255,0.08)!important;}
+  .sr{transition:background 0.18s var(--nv-ease);}.sr:hover{background:rgba(255,255,255,0.07)!important;}
   /* v9.2 — Discord-style chat rows. Whole row highlights on hover; the
      delete/mod button (.rowact) and the per-message timestamp shown in the
      avatar gutter for grouped messages (.ts-hover) reveal on hover. */
@@ -295,11 +295,11 @@ export const CSS = `
   .msgrow:hover{background:rgba(255,255,255,0.035);}
   .msgrow:hover .rowact{opacity:1!important;}
   .msgrow:hover .ts-hover{color:var(--nv-text-dim)!important;}
-  .bp{transition:background 0.18s cubic-bezier(0.4,0,0.2,1);}.bp:hover{background:rgba(255,255,255,0.12)!important;}
+  .bp{transition:background 0.18s var(--nv-ease);}.bp:hover{background:rgba(255,255,255,0.12)!important;}
   .ad{transition:transform 0.22s cubic-bezier(0.34,1.56,0.64,1);}.ad:hover{transform:scale(1.16);}
-  .ws{transition:border-color 0.2s cubic-bezier(0.4,0,0.2,1),transform 0.2s cubic-bezier(0.4,0,0.2,1);}.ws:hover{border-color:rgba(255,255,255,0.55)!important;transform:scale(1.02);}
-  .sc{transition:background 0.18s cubic-bezier(0.4,0,0.2,1);}.sc:hover{background:rgba(255,255,255,0.07)!important;}
-  .wgt{transition:border-color 0.22s cubic-bezier(0.4,0,0.2,1),box-shadow 0.22s cubic-bezier(0.4,0,0.2,1);}.wgt:hover{border-color:rgba(255,255,255,0.24)!important;}
+  .ws{transition:border-color 0.2s var(--nv-ease),transform 0.2s var(--nv-ease);}.ws:hover{border-color:rgba(255,255,255,0.55)!important;transform:scale(1.02);}
+  .sc{transition:background 0.18s var(--nv-ease);}.sc:hover{background:rgba(255,255,255,0.07)!important;}
+  .wgt{transition:border-color 0.22s var(--nv-ease),box-shadow 0.22s var(--nv-ease);}.wgt:hover{border-color:rgba(255,255,255,0.24)!important;}
 
   /* ── v10.0 Supernova — tactile micro-interactions ──────────────────────
      Press feedback (scale-down) + gentle hover lifts using the same smooth
@@ -312,9 +312,9 @@ export const CSS = `
   .ma:active{transform:translateY(-1px) scale(0.96)!important;}
   .di:hover{transform:translateY(-2px)!important;}
   .di:active{transform:scale(0.95)!important;}
-  .bp{transition:background 0.18s cubic-bezier(0.4,0,0.2,1),transform 0.2s var(--nv-ease);}
+  .bp{transition:background 0.18s var(--nv-ease),transform 0.2s var(--nv-ease);}
   /* window controls gain a satisfying press */
-  .wx,.wm,.wn{transition:background 0.18s cubic-bezier(0.4,0,0.2,1),color 0.18s cubic-bezier(0.4,0,0.2,1),transform 0.16s var(--nv-ease);}
+  .wx,.wm,.wn{transition:background 0.18s var(--nv-ease),color 0.18s var(--nv-ease),transform 0.16s var(--nv-ease);}
   .wx:active,.wm:active,.wn:active{transform:scale(0.86);}
   /* sidebar/list rows ease their background instead of snapping */
   .sr,.fr,.sc{transition:background 0.16s var(--nv-ease)!important;}
@@ -354,7 +354,7 @@ export const CSS = `
 
   /* v11.0 design-system primitive: <Button>/<IconButton> share this class for a
      consistent hover-brighten + press-shrink across the whole OS. */
-  .nv-btn{transition:background 0.18s cubic-bezier(0.4,0,0.2,1),border-color 0.18s cubic-bezier(0.4,0,0.2,1),transform 0.16s var(--nv-ease),opacity 0.18s,filter 0.18s;}
+  .nv-btn{transition:background 0.18s var(--nv-ease),border-color 0.18s var(--nv-ease),transform 0.16s var(--nv-ease),opacity 0.18s,filter 0.18s;}
   .nv-btn:hover:not(:disabled){filter:brightness(1.08);}
   .nv-btn:active:not(:disabled){transform:scale(0.96);}
   .nv-btn:disabled{opacity:0.45;cursor:default!important;}

@@ -224,7 +224,7 @@ function TaskbarWeather({ data, onClick }) {
     height: 42, display: "flex", alignItems: "center", gap: 7, padding: "0 13px",
     borderRadius: 12, background: "rgba(255,255,255,0.04)",
     border: "1px solid rgba(255,255,255,0.07)", cursor: "pointer",
-    fontFamily: FF, flexShrink: 0, transition: "all 0.18s cubic-bezier(0.4,0,0.2,1)",
+    fontFamily: FF, flexShrink: 0, transition: "all 0.18s var(--nv-ease)",
   };
 
   if (status === "ok" && wx) {
@@ -2424,7 +2424,7 @@ export default function NovaOS(){
             background:isDrg?"rgba(20,22,40,0.5)":isSel?"rgba("+hexRgb(AC)+",0.22)":(lightT?"rgba(20,28,48,0.05)":"rgba(0,0,0,0.08)"),
             border:"1px solid "+(isDrg?"rgba(255,255,255,0.16)":isSel?"rgba("+hexRgb(AC)+",0.6)":"transparent"),
             backdropFilter:(isDrg||isSel)?"blur(8px)":"none",
-            transition:isDrg?"none":"background 0.22s cubic-bezier(0.4,0,0.2,1), border-color 0.22s cubic-bezier(0.4,0,0.2,1), left 0.28s cubic-bezier(0.4,0,0.2,1), top 0.28s cubic-bezier(0.4,0,0.2,1), transform 0.2s cubic-bezier(0.22,1,0.36,1)",
+            transition:isDrg?"none":"background 0.22s var(--nv-ease), border-color 0.22s var(--nv-ease), left 0.28s var(--nv-ease), top 0.28s var(--nv-ease), transform 0.2s cubic-bezier(0.22,1,0.36,1)",
             boxShadow:isDrg?"0 10px 30px rgba(0,0,0,0.5), 0 1px 0 rgba(255,255,255,0.08) inset":"none",
             // v10.0 — one-shot staggered reveal on login.
             ...(iconsRevealed?{}:{animation:"icon-pop 0.44s cubic-bezier(0.16,1,0.3,1) both",animationDelay:(Math.min(idx,16)*0.03)+"s"}),
@@ -2545,17 +2545,17 @@ export default function NovaOS(){
               via Cmd/Ctrl+K or the bottom-edge peek) is the discoverable
               exit point. */}
           <button onClick={()=>{setMenuOpen(false);toggleFullscreen();}} title={isFs?"Exit fullscreen (F11)":"Enter fullscreen (F11)"} style={{width:34,height:34,borderRadius:8,background:"var(--nv-elevated)",border:"1px solid var(--nv-border)",cursor:"pointer",fontSize:13,color:"var(--nv-text)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,transition:"all 0.15s"}}>{isFs?"🗗":"⛶"}</button>
-          <button onClick={logout} title="Sign out" style={{padding:"7px 13px",background:"rgba(255,80,80,0.1)",border:"1px solid rgba(255,80,80,0.28)",borderRadius:8,cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:11,color:"rgba(255,140,140,0.95)",transition:"all 0.18s cubic-bezier(0.4,0,0.2,1)"}}>Logout</button>
+          <button onClick={logout} title="Sign out" style={{padding:"7px 13px",background:"rgba(255,80,80,0.1)",border:"1px solid rgba(255,80,80,0.28)",borderRadius:8,cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:11,color:"rgba(255,140,140,0.95)",transition:"all 0.18s var(--nv-ease)"}}>Logout</button>
           {/* v10.7 — Quit the desktop (Tauri) app, for users who don't know about Settings → Close. */}
           {isDesktop()&&(
-            <button onClick={()=>{setMenuOpen(false);playSound("logout");quitApp();}} title="Quit Nova OS" style={{padding:"7px 11px",background:"var(--nv-elevated)",border:"1px solid var(--nv-border)",borderRadius:8,cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:11,color:"var(--nv-text-strong)",transition:"all 0.18s cubic-bezier(0.4,0,0.2,1)",display:"flex",alignItems:"center",gap:5}}>⏻ Quit</button>
+            <button onClick={()=>{setMenuOpen(false);playSound("logout");quitApp();}} title="Quit Nova OS" style={{padding:"7px 11px",background:"var(--nv-elevated)",border:"1px solid var(--nv-border)",borderRadius:8,cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:11,color:"var(--nv-text-strong)",transition:"all 0.18s var(--nv-ease)",display:"flex",alignItems:"center",gap:5}}>⏻ Quit</button>
           )}
           {/* v10.5 — Shut Down (powers off the host). Only the Nova Linux Tauri
               kiosk can actually do this, so it's shown only there
               (Tauri + lite/kiosk mode); hidden on web, PWA, Android, and the
               normal windowed desktop build. */}
           {isDesktop()&&isLiteMode()&&(
-            <button onClick={()=>{playSound("logout");powerOff();}} title="Shut down this machine" style={{padding:"7px 11px",background:"rgba(255,170,60,0.1)",border:"1px solid rgba(255,170,60,0.3)",borderRadius:8,cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:11,color:"rgba(255,196,120,0.96)",transition:"all 0.18s cubic-bezier(0.4,0,0.2,1)",display:"flex",alignItems:"center",gap:5}}>⏻ Shut Down</button>
+            <button onClick={()=>{playSound("logout");powerOff();}} title="Shut down this machine" style={{padding:"7px 11px",background:"rgba(255,170,60,0.1)",border:"1px solid rgba(255,170,60,0.3)",borderRadius:8,cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:11,color:"rgba(255,196,120,0.96)",transition:"all 0.18s var(--nv-ease)",display:"flex",alignItems:"center",gap:5}}>⏻ Shut Down</button>
           )}
         </div>
       </div>)}
@@ -2634,7 +2634,7 @@ export default function NovaOS(){
                       : "none";
         const fxBusy = fx==="closing"||fx==="minimizing";
         return(
-          <div key={win.id} data-win="1" data-drop={win.app==="profile"?"avatar":"none"} onClick={()=>focusWin(win.id)} style={{...winStyle,...minimizedStyle,pointerEvents:fxBusy?"none":"auto",transformOrigin:fxOrigin,background:"var(--nv-surface-solid)",border:"1px solid "+(isFocused?"var(--nv-border-strong)":"var(--nv-border)"),boxShadow:winShadow,display:isMin?"none":"flex",flexDirection:"column",animation:winAnim,backdropFilter:"blur("+winBlur+"px) saturate(160%)",WebkitBackdropFilter:"blur("+winBlur+"px) saturate(160%)",transition:isDrg?"box-shadow 0.18s cubic-bezier(0.4,0,0.2,1)":"box-shadow 0.22s cubic-bezier(0.4,0,0.2,1), left 0.28s cubic-bezier(0.4,0,0.2,1), top 0.28s cubic-bezier(0.4,0,0.2,1), width 0.28s cubic-bezier(0.4,0,0.2,1), height 0.28s cubic-bezier(0.4,0,0.2,1)",overflow:"hidden"}}>
+          <div key={win.id} data-win="1" data-drop={win.app==="profile"?"avatar":"none"} onClick={()=>focusWin(win.id)} style={{...winStyle,...minimizedStyle,pointerEvents:fxBusy?"none":"auto",transformOrigin:fxOrigin,background:"var(--nv-surface-solid)",border:"1px solid "+(isFocused?"var(--nv-border-strong)":"var(--nv-border)"),boxShadow:winShadow,display:isMin?"none":"flex",flexDirection:"column",animation:winAnim,backdropFilter:"blur("+winBlur+"px) saturate(160%)",WebkitBackdropFilter:"blur("+winBlur+"px) saturate(160%)",transition:isDrg?"box-shadow 0.18s var(--nv-ease)":"box-shadow 0.22s var(--nv-ease), left 0.28s var(--nv-ease), top 0.28s var(--nv-ease), width 0.28s var(--nv-ease), height 0.28s var(--nv-ease)",overflow:"hidden"}}>
             {!isMax&&<ResizeHandles winId={win.id} onStartResize={startResize} touchy={touchy}/>}
             {/* v8.3 F1: title bar is now draggable even when maximized —
                 dragging restores the window and tears it off (Windows-style),
@@ -2736,7 +2736,7 @@ export default function NovaOS(){
           border:"1px solid "+(menuOpen?bdr(AC):"var(--nv-border)"),
           boxShadow:menuOpen?"0 0 16px "+fill(AC)+", 0 2px 8px rgba(0,0,0,0.3) inset":"none",
           cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,
-          transition:"all 0.2s cubic-bezier(0.4,0,0.2,1)",
+          transition:"all 0.2s var(--nv-ease)",
           padding:0,
         }}>
           <NovaLogo size={30}/>
@@ -2748,7 +2748,7 @@ export default function NovaOS(){
             height:42,display:"flex",alignItems:"center",gap:8,padding:"0 14px",borderRadius:12,
             background:"var(--nv-elevated)",border:"1px solid var(--nv-border)",
             cursor:"pointer",fontFamily:FF,fontSize:12.5,color:"var(--nv-text-dim)",
-            transition:"all 0.18s cubic-bezier(0.4,0,0.2,1)",flexShrink:0,
+            transition:"all 0.18s var(--nv-ease)",flexShrink:0,
           }}>
             <span style={{fontSize:14,lineHeight:1}}>🔍</span>
             <span>Search</span>
@@ -2761,7 +2761,7 @@ export default function NovaOS(){
           background:commandOpen?fill(AC):"var(--nv-elevated)",
           border:"1px solid "+(commandOpen?bdr(AC):"var(--nv-border)"),
           cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:12.5,color:commandOpen?AC:"var(--nv-text-dim)",
-          transition:"all 0.18s cubic-bezier(0.4,0,0.2,1)",flexShrink:0,
+          transition:"all 0.18s var(--nv-ease)",flexShrink:0,
         }}>
           <span style={{fontSize:14,lineHeight:1,filter:commandOpen?"drop-shadow(0 0 8px rgba("+hexRgb(AC)+",0.5))":"none"}}>✨</span>
           {deviceMode!=="mobile" && <span>Ask Nova</span>}
@@ -2773,7 +2773,7 @@ export default function NovaOS(){
           background:taskViewOpen?fill(AC):"var(--nv-elevated)",
           border:"1px solid "+(taskViewOpen?bdr(AC):"var(--nv-border)"),
           cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:12.5,color:taskViewOpen?AC:"var(--nv-text-dim)",
-          transition:"all 0.18s cubic-bezier(0.4,0,0.2,1)",flexShrink:0,
+          transition:"all 0.18s var(--nv-ease)",flexShrink:0,
         }}>
           {/* stacked-windows glyph */}
           <svg width="15" height="15" viewBox="0 0 16 16" fill="none" style={{flexShrink:0}}>
@@ -2896,7 +2896,7 @@ export default function NovaOS(){
                     border:"1px solid var(--nv-border)",
                     borderRadius:12,cursor:isDragging?"grabbing":"pointer",
                     display:"flex",alignItems:"center",justifyContent:"center",
-                    transition:"all 0.18s cubic-bezier(0.4,0,0.2,1)",
+                    transition:"all 0.18s var(--nv-ease)",
                     flexShrink:0,position:"relative",
                     ...dragStyle,
                   }}>
@@ -2924,7 +2924,7 @@ export default function NovaOS(){
                   fontFamily:FF,fontSize:13,fontWeight:600,
                   color:allMin?"var(--nv-text-dim)":"var(--nv-text-strong)",
                   whiteSpace:"nowrap",
-                  transition:"all 0.22s cubic-bezier(0.4,0,0.2,1)",
+                  transition:"all 0.22s var(--nv-ease)",
                   display:"flex",alignItems:"center",gap:7,position:"relative",
                   flexShrink:0,
                   ...dragStyle,
@@ -2938,7 +2938,7 @@ export default function NovaOS(){
                   )}
                 </div>
                 {deviceMode!=="mobile"&&<span>{app.label}</span>}
-                {hasRunning&&!allMin&&<div style={{position:"absolute",bottom:-1,left:"50%",transform:"translateX(-50%)",width:isTop?28:10,height:3,borderRadius:3,background:AC,boxShadow:isTop?"0 0 10px "+AC+", 0 0 4px "+AC:"none",transition:"width 0.25s cubic-bezier(0.4,0,0.2,1), box-shadow 0.25s cubic-bezier(0.4,0,0.2,1)"}}/>}
+                {hasRunning&&!allMin&&<div style={{position:"absolute",bottom:-1,left:"50%",transform:"translateX(-50%)",width:isTop?28:10,height:3,borderRadius:3,background:AC,boxShadow:isTop?"0 0 10px "+AC+", 0 0 4px "+AC:"none",transition:"width 0.25s var(--nv-ease), box-shadow 0.25s var(--nv-ease)"}}/>}
               </button>
             );
           });
@@ -2953,7 +2953,7 @@ export default function NovaOS(){
             padding:"0 14px 0 8px",borderRadius:12,
             background:"var(--nv-elevated)",border:"1px solid var(--nv-border)",
             cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:12.5,color:AC,
-            transition:"all 0.18s cubic-bezier(0.4,0,0.2,1)",
+            transition:"all 0.18s var(--nv-ease)",
           }}>
             <UserAvatar name={user} img={data?.avatar} ac={AC} size={24} ring={false}/>
             @{user}
@@ -2980,7 +2980,7 @@ export default function NovaOS(){
                 border:qsOpen?"1px solid "+bdr(AC):"1px solid transparent",
                 cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",
                 color:qsOpen?AC:(muted?"var(--nv-text-dim)":"var(--nv-text)"),
-                transition:"all 0.18s cubic-bezier(0.4,0,0.2,1)",
+                transition:"all 0.18s var(--nv-ease)",
               }}><VolumeGlyph size={17} muted={muted}/></button>
             );
           })()}
@@ -2991,7 +2991,7 @@ export default function NovaOS(){
             border:qsOpen?"1px solid "+bdr(AC):"1px solid transparent",
             cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",
             color:qsOpen?AC:"var(--nv-text)",
-            transition:"all 0.18s cubic-bezier(0.4,0,0.2,1)",
+            transition:"all 0.18s var(--nv-ease)",
           }}><WifiGlyph size={17}/></button>
           {/* Notification bell — badge shows unread count, click toggles the panel.
               v9.0: monochrome glass glyph (inherits color via currentColor). */}
@@ -3001,7 +3001,7 @@ export default function NovaOS(){
             border:notifsOpen?"1px solid "+bdr(AC):"1px solid transparent",
             cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",
             color:notifsOpen?AC:"var(--nv-text)",
-            transition:"all 0.18s cubic-bezier(0.4,0,0.2,1)",
+            transition:"all 0.18s var(--nv-ease)",
           }}>
             <BellGlyph size={17}/>
             {unreadCount>0 && <span style={{position:"absolute",top:3,right:3,minWidth:14,height:14,padding:"0 3px",borderRadius:7,background:"#ff5555",color:"#fff",fontFamily:FFB,fontWeight:700,fontSize:9,display:"flex",alignItems:"center",justifyContent:"center",lineHeight:1,boxShadow:"0 0 8px rgba(255,85,85,0.5)"}}>{unreadCount>9?"9+":unreadCount}</span>}
@@ -3011,7 +3011,7 @@ export default function NovaOS(){
             background:"transparent",border:"1px solid transparent",
             cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",
             color:"var(--nv-text)",
-            transition:"all 0.18s cubic-bezier(0.4,0,0.2,1)",
+            transition:"all 0.18s var(--nv-ease)",
           }}><GearGlyph size={17}/></button>
         </div>
         <div style={{

@@ -48,7 +48,7 @@ export function WidgetShell({ id, state, onDragStart, onResizeStart, onClose, ch
         <span style={{fontFamily:FFB,fontWeight:600,fontSize:9.5,letterSpacing:1.4,color:"var(--nv-text-dim)",textTransform:"uppercase",flex:1}}>{cfg?.label || id}</span>
         <button onClick={e => { e.stopPropagation(); onClose(); }}
           title="Hide widget"
-          style={{width:18,height:18,borderRadius:5,background:"transparent",border:"none",cursor:"pointer",color:"var(--nv-text-dim)",fontSize:10,display:"flex",alignItems:"center",justifyContent:"center",padding:0,transition:"all 0.15s cubic-bezier(0.4,0,0.2,1)"}}
+          style={{width:18,height:18,borderRadius:5,background:"transparent",border:"none",cursor:"pointer",color:"var(--nv-text-dim)",fontSize:10,display:"flex",alignItems:"center",justifyContent:"center",padding:0,transition:"all 0.15s var(--nv-ease)"}}
           onMouseEnter={e=>{e.currentTarget.style.background="rgba(255,80,80,0.15)";e.currentTarget.style.color="rgba(255,130,130,0.9)";}}
           onMouseLeave={e=>{e.currentTarget.style.background="transparent";e.currentTarget.style.color="rgba(255,255,255,0.35)";}}>✕</button>
       </div>
@@ -343,7 +343,7 @@ export function SysInfoWidgetContent({ state }) {
   // typographic vibe.
   const Bar = ({pct, col = "#4f9eff"}) => (
     <div style={{flex:1,height:6,background:"var(--nv-elevated)",borderRadius:4,overflow:"hidden",boxShadow:"0 1px 2px rgba(0,0,0,0.2) inset"}}>
-      <div style={{width:pct+"%",height:"100%",background:"linear-gradient(90deg,"+col+"88,"+col+")",borderRadius:4,transition:"width 1s cubic-bezier(0.4,0,0.2,1)",boxShadow:"0 0 6px "+col+"55"}}/>
+      <div style={{width:pct+"%",height:"100%",background:"linear-gradient(90deg,"+col+"88,"+col+")",borderRadius:4,transition:"width 1s var(--nv-ease)",boxShadow:"0 0 6px "+col+"55"}}/>
     </div>
   );
   const h = state.h - 28;
