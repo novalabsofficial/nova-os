@@ -627,7 +627,7 @@ export function AssetStudioApp({ AC, showToast }) {
       )}
 
       {/* Canvas */}
-      <div style={{ flex: 1, minHeight: 0, display: "flex", alignItems: "center", justifyContent: "center", overflow: "auto", padding: 16, background: "#0a0c14" }} onPointerDown={() => setShapeMenu(false)}>
+      <div style={{ flex: 1, minHeight: 0, display: "flex", alignItems: "center", justifyContent: "center", overflow: "auto", padding: 16, background: "#0a0c14" }} onPointerDown={e => { setShapeMenu(false); if (e.target === e.currentTarget && !cropMode) setSelIds([]); }}>
         <div ref={canvasRef} onPointerDown={cropMode ? startCrop : startMarquee}
           style={{ position: "relative", aspectRatio: preset.w + " / " + preset.h, width: "min(100%, " + (ar * 64).toFixed(0) + "vh)", maxWidth: "100%", background: transparent ? CHECKER : bgColor, borderRadius: 4, boxShadow: "0 16px 50px rgba(0,0,0,0.55)", overflow: "hidden", flexShrink: 0, touchAction: "none" }}>
           {layers.map(layerEl)}
