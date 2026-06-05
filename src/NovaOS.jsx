@@ -1993,7 +1993,16 @@ export default function NovaOS(){
   // existing users see no change to their workspace.
   const hiddenFromDesktop=data?.hiddenFromDesktop||[];
   const hiddenSet=new Set(hiddenFromDesktop);
-  const allDesktopIcons=allApps.filter(a=>!hiddenSet.has(a.id));
+  // v11.0 Phase B — whitelist desktop model. `desktopApps` is the ordered set of
+  // apps shown on the desktop (Windows-style: nothing unless added). Pre-11.0
+  // accounts have no `desktopApps` yet, so we derive the SAME set the old
+  // blacklist produced (all apps minus hidden) until they're migrated on first
+  // add/remove or via the setup wizard — so existing desktops are unchanged.
+  const desktopApps = Array.isArray(data?.desktopApps)
+    ? data.desktopApps
+    : allApps.filter(a=>!hiddenSet.has(a.id)).map(a=>a.id);
+  const desktopSet = new Set(desktopApps);
+  const allDesktopIcons = allApps.filter(a=>desktopSet.has(a.id));
   // v10.0 — for the native-webview browser: it's "active" (so its webview may
   // show) only when it's the focused top window on the current desktop and no
   // OS overlay is covering it. Any overlay forces the webview to hide so it
@@ -2039,16 +2048,20 @@ export default function NovaOS(){
     window.addEventListener("pointerup",up);
   }
 
+  // v11.0 Phase B — add/remove operate on the `desktopApps` whitelist. The first
+  // call on a pre-11.0 account persists the current visible set, migrating it off
+  // the old blacklist without changing what's shown.
+  const effectiveDesktopApps=(p)=>Array.isArray(p.desktopApps)
+    ? p.desktopApps
+    : allApps.filter(a=>!new Set(p.hiddenFromDesktop||[]).has(a.id)).map(a=>a.id);
   function hideAppFromDesktop(appId){
-    if(hiddenSet.has(appId))return;
-    const next=[...hiddenFromDesktop,appId];
-    updateData(p=>({...p,hiddenFromDesktop:next}));
+    if(!desktopSet.has(appId))return;
+    updateData(p=>({...p,desktopApps:effectiveDesktopApps(p).filter(id=>id!==appId)}));
     showToast("Removed from desktop");
   }
   function addAppToDesktop(appId){
-    if(!hiddenSet.has(appId))return;
-    const next=hiddenFromDesktop.filter(id=>id!==appId);
-    updateData(p=>({...p,hiddenFromDesktop:next}));
+    if(desktopSet.has(appId))return;
+    updateData(p=>{const cur=effectiveDesktopApps(p);return cur.includes(appId)?p:{...p,desktopApps:[...cur,appId]};});
     showToast("Added to desktop");
   }
   // v8.0 — Taskbar pinning. Users can pin apps to the taskbar so they
@@ -2509,7 +2522,7 @@ export default function NovaOS(){
           <div style={SEC}>{menuSrch?`Results for "${menuSrch}"`:"All Apps"}</div>
           <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:6}}>
             {filteredMenu.map(app=>{
-              const isHidden=hiddenSet.has(app.id);
+              const isHidden=!desktopSet.has(app.id);
               const isRunning=wins.some(w=>w.app===app.id);
               return(
               <div key={app.id} className="ma"
@@ -2832,7 +2845,7 @@ export default function NovaOS(){
             const topWin=hasRunning?[...slot.running].sort((a,b)=>(b.z||0)-(a.z||0))[0]:null;
             const allMin=hasRunning&&slot.running.every(w=>w.state==="minimized");
             const isTop=hasRunning&&topWin.z===topZ&&!allMin;
-            const isHidden=hiddenSet.has(slot.appId);
+            const isHidden=!desktopSet.has(slot.appId);
 
             // Click: launch if not running, focus/minimize topmost if running.
             const handleClick=()=>{
