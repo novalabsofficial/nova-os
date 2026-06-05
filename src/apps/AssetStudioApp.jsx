@@ -34,6 +34,7 @@ const SHAPES = [
   { type: "rect", glyph: "▭", label: "Rectangle" },
   { type: "roundrect", glyph: "▢", label: "Rounded rectangle" },
   { type: "ellipse", glyph: "◯", label: "Ellipse" },
+  { type: "semicircle", glyph: "◓", label: "Semicircle" },
   { type: "triangle", glyph: "△", label: "Triangle" },
   { type: "diamond", glyph: "◇", label: "Diamond" },
   { type: "pentagon", glyph: "⬠", label: "Pentagon" },
@@ -545,6 +546,7 @@ export function AssetStudioApp({ AC, showToast }) {
         if (l.type === "rect") ctx.rect(-dw / 2, -dh / 2, dw, dh);
         else if (l.type === "roundrect") roundRectPath(ctx, -dw / 2, -dh / 2, dw, dh, Math.min(dw, dh) * 0.16);
         else if (l.type === "ellipse") ctx.ellipse(0, 0, Math.abs(dw / 2), Math.abs(dh / 2), 0, 0, Math.PI * 2);
+        else if (l.type === "semicircle") { ctx.ellipse(0, dh / 2, Math.abs(dw / 2), Math.abs(dh), 0, Math.PI, 2 * Math.PI); ctx.closePath(); }
         else if (POLY[l.type]) { POLY[l.type].forEach(([px, py], i) => { const X = (px - 0.5) * dw, Y = (py - 0.5) * dh; if (i) ctx.lineTo(X, Y); else ctx.moveTo(X, Y); }); ctx.closePath(); }
         if (l.fill) { ctx.fillStyle = l.fill; ctx.fill(); }
         if (l.strokeW > 0) { ctx.strokeStyle = l.stroke; ctx.lineWidth = l.strokeW; ctx.lineJoin = "round"; ctx.stroke(); }
@@ -554,6 +556,7 @@ export function AssetStudioApp({ AC, showToast }) {
           if (l.type === "rect") ctx.rect(-dw / 2, -dh / 2, dw, dh);
           else if (l.type === "roundrect") roundRectPath(ctx, -dw / 2, -dh / 2, dw, dh, Math.min(dw, dh) * 0.16);
           else if (l.type === "ellipse") ctx.ellipse(0, 0, Math.abs(dw / 2), Math.abs(dh / 2), 0, 0, Math.PI * 2);
+          else if (l.type === "semicircle") { ctx.ellipse(0, dh / 2, Math.abs(dw / 2), Math.abs(dh), 0, Math.PI, 2 * Math.PI); ctx.closePath(); }
           else if (POLY[l.type]) { POLY[l.type].forEach(([px, py], i) => { const X = (px - 0.5) * dw, Y = (py - 0.5) * dh; if (i) ctx.lineTo(X, Y); else ctx.moveTo(X, Y); }); ctx.closePath(); }
           ctx.clip(); ctx.globalCompositeOperation = "screen";
           const sg = ctx.createLinearGradient(0, -dh / 2, 0, dh / 2);
@@ -648,6 +651,7 @@ export function AssetStudioApp({ AC, showToast }) {
     if (l.type === "rect") return <div style={{ width: "100%", height: "100%", background: l.fill || "transparent", border: border, boxSizing: "border-box", transform: flip }} />;
     if (l.type === "roundrect") return <div style={{ width: "100%", height: "100%", background: l.fill || "transparent", border: border, borderRadius: "16%", boxSizing: "border-box", transform: flip }} />;
     if (l.type === "ellipse") return <div style={{ width: "100%", height: "100%", background: l.fill || "transparent", border: border, borderRadius: "50%", boxSizing: "border-box", transform: flip }} />;
+    if (l.type === "semicircle") return <div style={{ width: "100%", height: "100%", background: l.fill || "transparent", border: border, borderRadius: "50% 50% 0 0 / 100% 100% 0 0", boxSizing: "border-box", transform: flip }} />;
     if (l.type === "line") return <div style={{ position: "absolute", top: "50%", left: 0, width: "100%", height: Math.max(2, l.strokeW || 4), background: l.stroke || "#fff", transform: "translateY(-50%)", borderRadius: 999 }} />;
     if (l.type === "curve") {
       const cxn = (0.5 + (l.curveSkew ?? 0) * 0.5) * 100, cyn = (0.5 - (l.curve ?? 0.6) * 0.5) * 100;
