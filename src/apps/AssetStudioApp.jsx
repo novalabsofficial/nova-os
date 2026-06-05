@@ -94,6 +94,7 @@ export function AssetStudioApp({ AC, showToast }) {
   const [cropRect, setCropRect] = useState(null);
   const [busy, setBusy] = useState(false);
   const rootRef = useRef(null);
+  const [dragActive, setDragActive] = useState(false);   // v11.0 — drag-drop image files onto the canvas
   const canvasRef = useRef(null);
   const fileRef = useRef(null);
   const layersRef = useRef(layers);
@@ -150,6 +151,12 @@ export function AssetStudioApp({ AC, showToast }) {
     function onKey(e) {
       if (!hot.current) return;
       if (e.key === "Escape") { if (cropRef.current) { setCropMode(false); setCropRect(null); } else setSelIds([]); return; }
+      if ((e.metaKey || e.ctrlKey) && (e.key === "c" || e.key === "C")) {
+        const a = document.activeElement, t = a && a.tagName;
+        if (t === "INPUT" || t === "TEXTAREA" || t === "SELECT" || (a && a.isContentEditable)) return;   // let real text copy through
+        if (window.getSelection && String(window.getSelection())) return;
+        e.preventDefault(); copyImage(); return;
+      }
       if (e.key !== "Backspace" && e.key !== "Delete") return;
       const el = document.activeElement, tag = el && el.tagName;
       if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || (el && el.isContentEditable)) return;
@@ -349,6 +356,32 @@ export function AssetStudioApp({ AC, showToast }) {
       saveBlob(c, "nova-asset-" + W + "x" + H + ".png", "Downloaded PNG ✓");
     } catch { showToast?.("Export failed — see console"); setBusy(false); }
   }
+  // v11.0 — copy the composited image to the clipboard (Ctrl/Cmd+C or the Copy
+  // button) so it can be pasted into another app. Falls back to a hint if the
+  // browser blocks image-clipboard writes.
+  async function copyImage() {
+    if (typeof ClipboardItem === "undefined" || !navigator.clipboard?.write) { showToast?.("Copy unsupported here — use Download"); return; }
+    setBusy(true);
+    try {
+      const W = preset.w, H = preset.h;
+      const c = document.createElement("canvas"); c.width = W; c.height = H;
+      const ctx = c.getContext("2d");
+      if (!transparent) { ctx.fillStyle = bgColor; ctx.fillRect(0, 0, W, H); }
+      await renderLayers(ctx, W, H);
+      const blob = await new Promise(res => c.toBlob(res, "image/png"));
+      if (!blob) { showToast?.("Copy failed"); setBusy(false); return; }
+      await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
+      showToast?.("Copied to clipboard ✓"); setBusy(false);
+    } catch { showToast?.("Copy failed — clipboard blocked"); setBusy(false); }
+  }
+  // v11.0 — drag image files from the OS / another app onto the canvas to add them.
+  function onDropFiles(e) {
+    e.preventDefault(); setDragActive(false);
+    const files = [...(e.dataTransfer?.files || [])].filter(f => f.type?.startsWith("image/"));
+    if (!files.length) return;
+    files.forEach(f => { const r = new FileReader(); r.onload = () => addImageFromSrc(r.result); r.readAsDataURL(f); });
+    showToast?.(files.length > 1 ? files.length + " images added" : "Image added");
+  }
   async function downloadRegion() {
     if (!cropRect) return;
     setBusy(true);
@@ -403,7 +436,16 @@ export function AssetStudioApp({ AC, showToast }) {
   const cropArea = cropRect && (cropRect.x1 - cropRect.x0) > 0.01 && (cropRect.y1 - cropRect.y0) > 0.01;
 
   return (
-    <div ref={rootRef} style={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0, fontFamily: FF, background: "var(--nv-surface-solid)" }}>
+    <div ref={rootRef}
+      onDragOver={e=>{ if([...(e.dataTransfer?.items||[])].some(it=>it.kind==="file")){ e.preventDefault(); if(!dragActive) setDragActive(true); } }}
+      onDragLeave={e=>{ if(e.target===e.currentTarget) setDragActive(false); }}
+      onDrop={onDropFiles}
+      style={{ position:"relative", display: "flex", flexDirection: "column", height: "100%", minHeight: 0, fontFamily: FF, background: "var(--nv-surface-solid)" }}>
+      {dragActive && (
+        <div style={{position:"absolute",inset:8,zIndex:60,pointerEvents:"none",display:"flex",alignItems:"center",justifyContent:"center",background:fill(AC),border:"2.5px dashed "+AC,borderRadius:14}}>
+          <div style={{fontFamily:FFB,fontWeight:700,fontSize:18,color:AC,background:"var(--nv-surface-solid)",padding:"10px 20px",borderRadius:10,boxShadow:"var(--nv-popover-shadow)"}}>Drop image to add</div>
+        </div>
+      )}
       {/* Toolbar — or the Snip bar while cropping */}
       {cropMode ? (
         <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8, padding: "10px 12px", borderBottom: "1px solid var(--nv-border)" }}>
@@ -433,6 +475,7 @@ export function AssetStudioApp({ AC, showToast }) {
           {!transparent && <input type="color" value={bgColor} onChange={e => setBgColor(e.target.value)} title="Background color" style={swatch} />}
           <div style={{ flex: 1 }} />
           <button style={tbtn(false)} onClick={() => { setCropMode(true); setCropRect(null); setSelIds([]); }}>✂ Snip</button>
+          <button onClick={copyImage} disabled={busy} style={tbtn(false)} title="Copy image to clipboard (Ctrl/Cmd+C)">⧉ Copy</button>
           <button onClick={download} disabled={busy} style={dlBtn(busy)}>⬇ Download PNG</button>
           <input ref={fileRef} type="file" accept="image/*" onChange={onFile} style={{ display: "none" }} />
         </div>
