@@ -91,7 +91,7 @@ export const TYPE = {
   heading: { fontFamily: FFB, fontWeight: 600, fontSize: 15, lineHeight: 1.3 },
   body:    { fontFamily: FF,  fontWeight: 400, fontSize: 14, lineHeight: 1.5 },
   small:   { fontFamily: FF,  fontWeight: 400, fontSize: 12, lineHeight: 1.45 },
-  label:   { fontFamily: FFB, fontWeight: 600, fontSize: 11, letterSpacing: 1.2, textTransform: "uppercase" },
+  label:   { fontFamily: FFB, fontWeight: 600, fontSize: 11, letterSpacing: 1.8, textTransform: "uppercase" },  // matches the SEC section-label used across all apps
   mono:    { fontFamily: FFM, fontWeight: 500, fontSize: 12.5, lineHeight: 1.4 },
 };
 
