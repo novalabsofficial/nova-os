@@ -36,7 +36,7 @@ export function ContextMenu({ x, y, items, onClose, AC }) {
       WebkitBackdropFilter: "blur(32px) saturate(180%)",
       border: "1px solid var(--nv-border)",
       borderRadius: 11,
-      boxShadow: "0 4px 8px rgba(0,0,0,0.3), 0 22px 60px rgba(0,0,0,0.55), 0 1px 0 rgba(255,255,255,0.08) inset",
+      boxShadow: "var(--nv-popover-shadow)",
       padding: "6px 5px",
       animation: "menu-up 0.2s cubic-bezier(0.16,1,0.3,1)",
       fontFamily: FF,

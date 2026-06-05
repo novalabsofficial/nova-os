@@ -150,6 +150,7 @@ export const CSS = `
     --nv-scroll-hover:rgba(255,255,255,0.24);
     --nv-glass-blur:28px;
     --nv-card-shadow:0 2px 4px rgba(0,0,0,0.22), 0 10px 30px rgba(0,0,0,0.45), 0 1px 0 rgba(255,255,255,0.08) inset;
+    --nv-popover-shadow:0 8px 16px rgba(0,0,0,0.35), 0 30px 80px rgba(0,0,0,0.55), 0 1px 0 rgba(255,255,255,0.08) inset;
   }
   /* ── v11.0 Light mode. Flips the --nv-* tokens; every surface that uses them
      reskins automatically. (Apps still on hardcoded colors get migrated to
@@ -175,6 +176,7 @@ export const CSS = `
     /* soft, light drop-shadow so cards (widgets, windows) float gently instead
        of casting the heavy dark shadow from dark mode — keeps the light theme airy */
     --nv-card-shadow:0 2px 6px rgba(30,41,59,0.07), 0 12px 30px rgba(30,41,59,0.12), 0 1px 0 rgba(255,255,255,0.6) inset;
+    --nv-popover-shadow:0 6px 16px rgba(30,41,59,0.10), 0 28px 70px rgba(30,41,59,0.18), 0 1px 0 rgba(255,255,255,0.7) inset;
   }
   /* v11.0 — with glass on, keep every light surface the SAME clean shade so the
      taskbar + widgets + windows read as one consistent material (was 0.66 vs 0.8,

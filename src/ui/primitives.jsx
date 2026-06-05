@@ -83,7 +83,7 @@ export function Dialog({ open, onClose, title, icon, accent = DEFAULT_AC, footer
       <div onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" style={{
         width: "100%", maxWidth: width, maxHeight: "86%", overflowY: "auto",
         background: "var(--nv-surface-solid)", border: "1px solid var(--nv-border)", borderRadius: RADIUS.xl,
-        boxShadow: SHADOW_DEEP, fontFamily: FF, animation: "pop-in " + DUR.base + "ms " + EASE.out,
+        boxShadow: "var(--nv-popover-shadow)", fontFamily: FF, animation: "pop-in " + DUR.base + "ms " + EASE.out,
       }}>
         {title != null && (
           <div style={{ display: "flex", alignItems: "center", gap: SPACE[2], padding: "16px 18px", borderBottom: "1px solid var(--nv-border)" }}>

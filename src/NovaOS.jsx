@@ -397,7 +397,7 @@ function Spotlight({ AC, data, apps, storeCatalog, commApps, isPubliclyVisible, 
         background: "var(--nv-surface-solid)",
         backdropFilter: "blur(40px) saturate(180%)", WebkitBackdropFilter: "blur(40px) saturate(180%)",
         border: "1px solid var(--nv-border)", borderRadius: 16,
-        boxShadow: "0 30px 90px rgba(0,0,0,0.6), 0 1px 0 rgba(255,255,255,0.08) inset",
+        boxShadow: "var(--nv-popover-shadow)",
         overflow: "hidden", fontFamily: FF,
         animation: "menu-up 0.22s cubic-bezier(0.16,1,0.3,1)",
       }}>
@@ -2487,7 +2487,7 @@ export default function NovaOS(){
         WebkitBackdropFilter:"blur(40px) saturate(180%)",
         border:"1px solid var(--nv-border)",
         borderRadius:16,
-        boxShadow:"0 8px 16px rgba(0,0,0,0.35), 0 30px 80px rgba(0,0,0,0.55), 0 1px 0 rgba(255,255,255,0.08) inset",
+        boxShadow:"var(--nv-popover-shadow)",
         zIndex:9998,display:"flex",flexDirection:"column",
         animation:"menu-up 0.26s cubic-bezier(0.16,1,0.3,1)",
         overflow:"hidden",
@@ -3052,7 +3052,7 @@ export default function NovaOS(){
             const appObj = t.appId ? APPS.find(a=>a.id===t.appId) : null;
             return(
               <div key={t.id} onClick={()=>{dismissNotifToast(t.id); if(t.appId) openApp(t.appId);}}
-                style={{position:"relative",pointerEvents:"auto",cursor:"pointer",width:"min(360px, calc(100vw - 28px))",display:"flex",gap:12,alignItems:"flex-start",padding:"13px 30px 13px 15px",background:"var(--nv-surface-solid)",backdropFilter:"blur(44px) saturate(180%)",WebkitBackdropFilter:"blur(44px) saturate(180%)",border:"1px solid var(--nv-border)",borderRadius:16,boxShadow:"0 8px 18px rgba(0,0,0,0.32), 0 26px 64px rgba(0,0,0,0.5), 0 1px 0 rgba(255,255,255,0.09) inset",animation:"panel-in-right 0.34s cubic-bezier(0.22,1,0.36,1)",overflow:"hidden"}}>
+                style={{position:"relative",pointerEvents:"auto",cursor:"pointer",width:"min(360px, calc(100vw - 28px))",display:"flex",gap:12,alignItems:"flex-start",padding:"13px 30px 13px 15px",background:"var(--nv-surface-solid)",backdropFilter:"blur(44px) saturate(180%)",WebkitBackdropFilter:"blur(44px) saturate(180%)",border:"1px solid var(--nv-border)",borderRadius:16,boxShadow:"var(--nv-popover-shadow)",animation:"panel-in-right 0.34s cubic-bezier(0.22,1,0.36,1)",overflow:"hidden"}}>
                 <div style={{position:"absolute",left:0,top:0,bottom:0,width:3,background:kc,boxShadow:"0 0 12px "+kc+"99"}}/>
                 <div style={{flexShrink:0,width:38,height:38,borderRadius:11,display:"flex",alignItems:"center",justifyContent:"center",background:fill(kc),border:"1px solid "+bdr(kc)}}>
                   {appObj ? <AppIconDisplay app={{id:appObj.id,icon:appObj.icon}} size={24} glass={glass}/> : <span style={{fontSize:18}}>🔔</span>}
@@ -3080,7 +3080,7 @@ export default function NovaOS(){
             WebkitBackdropFilter:"blur(40px) saturate(180%)",
             border:"1px solid var(--nv-border)",
             borderRadius:16,
-            boxShadow:"0 8px 16px rgba(0,0,0,0.35), 0 30px 80px rgba(0,0,0,0.55), 0 1px 0 rgba(255,255,255,0.08) inset",
+            boxShadow:"var(--nv-popover-shadow)",
             zIndex:9998,display:"flex",flexDirection:"column",
             animation:"panel-in-right 0.3s cubic-bezier(0.22,1,0.36,1)",
             overflow:"hidden",

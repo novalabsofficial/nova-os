@@ -44,6 +44,12 @@ solid. This combined release **absorbs everything that was tentatively scoped as
    filler between the big steps — no dependencies.
 ```
 
+> **Status (2026-06, `nova-11`):** Steps **1–6 done** — design tokens + primitives,
+> unified dialogs, all-SVG icon set, unified window chrome, app→token migration, and
+> **light mode** (incl. the **Bloom** light/dark wallpaper pair with per-theme
+> auto-switch + custom-safe slots). **Next: step 7 — full visual-redesign polish**
+> (caps Phase A), then Phase B · Desktop power.
+
 ## A · Design foundation — the bedrock everything else sits on
 - **Design system / tokens.** One shared scale for spacing, corner radius,
   shadows, typography and accent usage (extends the existing `--nv-*` vars in
