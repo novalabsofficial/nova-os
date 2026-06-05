@@ -795,7 +795,7 @@ export function AssetStudioApp({ AC, showToast }) {
           )}
 
           <span style={lblS}>Opacity <input type="range" min="10" max="100" value={ref0.opacity ?? 100} onChange={e => patchSel({ opacity: +e.target.value })} style={{ width: 72 }} /></span>
-          <span style={lblS}>Rotate <input type="range" min="0" max="360" value={ref0.rotation || 0} onChange={e => patchSel({ rotation: +e.target.value })} style={{ width: 72 }} /></span>
+          <span style={lblS}>Rotate <input type="range" min="0" max="360" step="10" value={ref0.rotation || 0} onChange={e => patchSel({ rotation: +e.target.value })} style={{ width: 80 }} title="Snaps every 10° (hits 90°, 180°, 270°)" /><span style={{ minWidth: 30, fontVariantNumeric: "tabular-nums", color: "var(--nv-text)" }}>{Math.round(ref0.rotation || 0)}°</span></span>
           <span style={lblS} title="Material — shadow, gloss, metallic, glass or neon">Material
             <select value={ref0.material || "flat"} onChange={e => patchSel({ material: e.target.value })} style={matSel}>
               {MATERIALS.map(m => <option key={m.id} value={m.id}>{m.label}</option>)}
