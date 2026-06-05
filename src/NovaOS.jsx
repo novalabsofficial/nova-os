@@ -2460,16 +2460,14 @@ export default function NovaOS(){
             display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:6,
             padding:"6px 4px",
             borderRadius:13,
-            // v8.0: lighter resting background, accent-tinged shadow during
-            // drag for a more lifted feel. The .di hover class adds a brighter
-            // background + soft outline ring (see styles.js).
-            // v11.0 — desktop icon tiles share the widgets'/taskbar's frosted glass
-            // surface so all three read as one material (was a near-invisible faint
-            // black/light box that didn't match the chrome).
-            background:isDrg?"rgba(20,22,40,0.5)":isSel?"rgba("+hexRgb(AC)+",0.22)":"var(--nv-surface)",
-            border:"1px solid "+(isDrg?"rgba(255,255,255,0.16)":isSel?"rgba("+hexRgb(AC)+",0.6)":"var(--nv-border)"),
-            backdropFilter:"blur(var(--nv-glass-blur)) saturate(160%)",
-            WebkitBackdropFilter:"blur(var(--nv-glass-blur)) saturate(160%)",
+            // v11.0 — real-desktop look: icons FLOAT on the wallpaper with no
+            // resting box (a box read like an app-drawer grid, not a desktop — cf.
+            // Windows/macOS). A subtle highlight appears only on hover (.di) /
+            // selection / drag for interaction feedback.
+            background:isDrg?"rgba(20,22,40,0.5)":isSel?"rgba("+hexRgb(AC)+",0.22)":"transparent",
+            border:"1px solid "+(isDrg?"rgba(255,255,255,0.16)":isSel?"rgba("+hexRgb(AC)+",0.6)":"transparent"),
+            backdropFilter:(isDrg||isSel)?"blur(8px)":"none",
+            WebkitBackdropFilter:(isDrg||isSel)?"blur(8px)":"none",
             transition:isDrg?"none":"background 0.22s var(--nv-ease), border-color 0.22s var(--nv-ease), left 0.28s var(--nv-ease), top 0.28s var(--nv-ease), transform 0.2s cubic-bezier(0.22,1,0.36,1)",
             boxShadow:isDrg?"0 10px 30px rgba(0,0,0,0.5), 0 1px 0 rgba(255,255,255,0.08) inset":"none",
             // v10.0 — one-shot staggered reveal on login.
@@ -2505,7 +2503,7 @@ export default function NovaOS(){
               {icon:"📋", label:"Copy app name", onClick:()=>{try{navigator.clipboard?.writeText(app.label);showToast("Copied");}catch{}}},
             ])}>
             <div style={{position:"relative",pointerEvents:"none",display:"flex",alignItems:"center",justifyContent:"center",filter:"drop-shadow(0 3px 8px rgba(0,0,0,0.55))"}}>
-              <AppIconDisplay app={app} size={32} glass={glass}/>
+              <AppIconDisplay app={app} size={44} glass={glass}/>
               {/* v8.1: notification badge — small numeric circle in the
                   upper-right of the icon when the app has unread items. */}
               {appBadgeCounts[app.id]>0 && (
