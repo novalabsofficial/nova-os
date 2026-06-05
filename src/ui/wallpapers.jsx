@@ -8,6 +8,17 @@ import { useState, useEffect } from "react";
 import { WALLPAPERS } from "./constants.js";
 import { isLiteMode } from "../lib/lite.js";
 
+// v11.0 — optional bundled high-quality default LIGHT wallpaper. Drop ONE image
+// (png/jpg/jpeg/webp/avif) into src/assets/wallpapers/ and it becomes the
+// "Bloom" light wallpaper at full original resolution — no recompression,
+// unlike the in-app uploader. Empty folder → the built-in SVG fallback is used.
+// Vite discovers the file at build time; restart the dev server after adding it.
+const _wpImgs = import.meta.glob("../assets/wallpapers/*.{png,jpg,jpeg,webp,avif}", { eager: true });
+export const CUSTOM_LIGHT_WP = (() => {
+  const first = Object.values(_wpImgs)[0];
+  return first ? (first.default || first) : null;
+})();
+
 function NovaBg() {
   return (
     <svg style={{position:"absolute",inset:0,width:"100%",height:"100%"}} viewBox="0 0 1440 900" preserveAspectRatio="xMidYMid slice">
@@ -694,6 +705,11 @@ function NebulaBg() {
 // toward the edges so it never reads flat or blinding. The bloom sits
 // center-right, leaving the top-left calm for dark icon labels.
 function BloomBg() {
+  // If a high-quality image was dropped into src/assets/wallpapers/, use it at
+  // full resolution. Otherwise render the built-in SVG bloom as a fallback.
+  if (CUSTOM_LIGHT_WP) {
+    return <div style={{position:"absolute",inset:0,background:'url("'+CUSTOM_LIGHT_WP+'") center/cover no-repeat'}}/>;
+  }
   const CX = 760, CY = 420;
   return (
     <svg style={{position:"absolute",inset:0,width:"100%",height:"100%"}} viewBox="0 0 1440 900" preserveAspectRatio="xMidYMid slice">
