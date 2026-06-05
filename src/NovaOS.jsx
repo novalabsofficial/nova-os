@@ -867,8 +867,35 @@ export default function NovaOS(){
       }
       return null;
     }
-    function onMove(e){const nx=Math.max(0,Math.min(e.clientX-iconDrag.ox,window.innerWidth-ICON_W));const ny=Math.max(0,Math.min(e.clientY-iconDrag.oy,window.innerHeight-TASKBAR_H-ICON_H));setIconPos(prev=>({...prev,[iconDrag.id]:{x:nx,y:ny}}));const t=findTarget(nx,ny);setMergeTarget(t?t.id:null);}
+    function onMove(e){
+      const nx=Math.max(0,Math.min(e.clientX-iconDrag.ox,window.innerWidth-ICON_W));
+      const ny=Math.max(0,Math.min(e.clientY-iconDrag.oy,window.innerHeight-TASKBAR_H-ICON_H));
+      const group=iconDrag.group||[iconDrag.id];
+      if(group.length>1){   // move the whole selection rigidly; no folder-merge
+        const start=iconDrag.groupStart||{};const base=start[iconDrag.id]||{x:nx,y:ny};
+        const dx=nx-base.x,dy=ny-base.y;
+        setIconPos(prev=>{const n={...prev};group.forEach(gid=>{const s=start[gid];if(!s)return;n[gid]={x:Math.max(0,Math.min(s.x+dx,window.innerWidth-ICON_W)),y:Math.max(0,Math.min(s.y+dy,window.innerHeight-TASKBAR_H-ICON_H))};});return n;});
+        setMergeTarget(null);
+      }else{
+        setIconPos(prev=>({...prev,[iconDrag.id]:{x:nx,y:ny}}));
+        const t=findTarget(nx,ny);setMergeTarget(t?t.id:null);
+      }
+    }
     function onUp(){
+      const group=iconDrag.group||[iconDrag.id];
+      if(group.length>1){   // group move — snap each selected icon to a free grid cell
+        setMergeTarget(null);
+        let fp={...iconPosRef.current};
+        for(const gid of group){
+          const raw=fp[gid];if(!raw)continue;
+          const allPos=layoutIcons(iconDrag.allIcons||[],fp);
+          const snapped=snapToFreeGrid(gid,raw.x,raw.y,allPos);
+          if(snapped)fp={...fp,[gid]:snapped};
+        }
+        setIconPos(fp);db.set("user:"+iconDrag.user+":iconpos",fp).catch(()=>{});
+        justDraggedRef.current=true;setTimeout(()=>{justDraggedRef.current=false;},60);
+        setIconDrag(null);return;
+      }
       const drop=iconPosRef.current[iconDrag.id];
       const target=drop?findTarget(drop.x,drop.y):null;
       setMergeTarget(null);
@@ -1881,7 +1908,19 @@ export default function NovaOS(){
     document.addEventListener("keydown", onKey);
     return ()=>document.removeEventListener("keydown", onKey);
   },[]);
-  function onIconMouseDown(e,appId,allIcons){if(e.button!==0)return;e.stopPropagation();e.preventDefault();const positions=layoutIcons(allIcons,iconPos);const pos=positions[appId]||{x:0,y:0};setIconDrag({id:appId,ox:e.clientX-pos.x,oy:e.clientY-pos.y,user,allIcons:[...allIcons],layout:positions});}
+  function onIconMouseDown(e,appId,allIcons){
+    if(e.button!==0)return;e.stopPropagation();e.preventDefault();
+    // Ctrl/Cmd-click toggles this icon's membership in the multi-selection (no drag).
+    if(e.metaKey||e.ctrlKey){setSelectedIcons(prev=>{const n=new Set(prev);n.has(appId)?n.delete(appId):n.add(appId);return n;});return;}
+    const positions=layoutIcons(allIcons,iconPos);const pos=positions[appId]||{x:0,y:0};
+    // v11.0 Phase B — grabbing one of several selected icons drags the whole group;
+    // otherwise it's a single-icon drag (and we clear any stale marquee highlight).
+    const groupSel=selectedIcons.has(appId)&&selectedIcons.size>1;
+    const group=groupSel?allIcons.filter(en=>selectedIcons.has(en.id)).map(en=>en.id):[appId];
+    if(!groupSel&&selectedIcons.size)setSelectedIcons(new Set());
+    const groupStart={};group.forEach(gid=>{groupStart[gid]=positions[gid]||{x:0,y:0};});
+    setIconDrag({id:appId,ox:e.clientX-pos.x,oy:e.clientY-pos.y,user,allIcons:[...allIcons],layout:positions,group,groupStart});
+  }
   function onWidgetDragStart(e,id){if(e.button!==0)return;e.stopPropagation();e.preventDefault();const s=widgetState[id]||DEFAULT_WIDGET_STATE[id];setWidgetDrag({id,ox:e.clientX-s.x,oy:e.clientY-s.y});}
   function onWidgetResizeStart(e,id,edge){if(e.button!==0)return;e.stopPropagation();e.preventDefault();const s=widgetState[id]||DEFAULT_WIDGET_STATE[id];setWidgetResize({id,edge,sx:e.clientX,sy:e.clientY,x0:s.x,y0:s.y,w0:s.w,h0:s.h});}
   function closeWidget(id){updateSettings({widgets:{...widgets,[id]:false}});}
@@ -2499,6 +2538,7 @@ export default function NovaOS(){
                 return desktopEntries.map((entry, idx) => {
         const pos = positions[entry.id] || { x: 0, y: 0 };
         const isDrg=iconDrag?.id===entry.id;
+        const inGroupDrag=!!(iconDrag&&iconDrag.group&&iconDrag.group.length>1&&iconDrag.group.includes(entry.id));
         const isSel=selectedIcons.has(entry.id);
         const isMergeTarget=mergeTarget===entry.id&&iconDrag&&iconDrag.id!==entry.id;   // v11.0 drag-to-merge drop target
         // Shared container (both app icons and folders): icons FLOAT on the
@@ -2506,14 +2546,14 @@ export default function NovaOS(){
         // subtle highlight only on hover (.di) / selection / drag.
         const wrap={
           position:"absolute",left:pos.x,top:pos.y,width:ICON_W,height:ICON_H,
-          zIndex:isDrg?500:2,cursor:isDrg?"grabbing":"grab",userSelect:"none",
+          zIndex:(isDrg||inGroupDrag)?500:2,cursor:(isDrg||inGroupDrag)?"grabbing":"grab",userSelect:"none",
           display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:6,
           padding:"6px 4px",borderRadius:13,
           background:isDrg?"rgba(20,22,40,0.5)":isSel?"rgba("+hexRgb(AC)+",0.22)":"transparent",
           border:"1px solid "+(isDrg?"rgba(255,255,255,0.16)":isSel?"rgba("+hexRgb(AC)+",0.6)":"transparent"),
           backdropFilter:(isDrg||isSel)?"blur(8px)":"none",
           WebkitBackdropFilter:(isDrg||isSel)?"blur(8px)":"none",
-          transition:isDrg?"none":"background 0.22s var(--nv-ease), border-color 0.22s var(--nv-ease), left 0.28s var(--nv-ease), top 0.28s var(--nv-ease), transform 0.2s cubic-bezier(0.22,1,0.36,1)",
+          transition:(isDrg||inGroupDrag)?"none":"background 0.22s var(--nv-ease), border-color 0.22s var(--nv-ease), left 0.28s var(--nv-ease), top 0.28s var(--nv-ease), transform 0.2s cubic-bezier(0.22,1,0.36,1)",
           boxShadow:isDrg?"0 10px 30px rgba(0,0,0,0.5), 0 1px 0 rgba(255,255,255,0.08) inset":"none",
           ...(iconsRevealed?{}:{animation:"icon-pop 0.44s cubic-bezier(0.16,1,0.3,1) both",animationDelay:(Math.min(idx,16)*0.03)+"s"}),
           // v11.0 drag-to-merge — highlight + pop the tile being hovered as a folder target
