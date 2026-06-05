@@ -4,7 +4,7 @@
 // blur to avoid a write per keystroke; position/color/delete persist on the
 // action. Desktop shell only.
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { FF } from "./styles.js";
 
 const NOTE_COLORS = [
@@ -23,7 +23,6 @@ function StickyNote({ note, onUpdate, onRemove }) {
   const [text, setText] = useState(note.text || "");
   const [dragging, setDragging] = useState(false);
   const [picking, setPicking] = useState(false);
-  const drag = useRef(null);
 
   // Reflect external position changes (e.g. after restore); only re-seed the
   // text from props when this is a different note, so typing isn't clobbered.
@@ -33,18 +32,20 @@ function StickyNote({ note, onUpdate, onRemove }) {
   function onBarDown(e) {
     if (e.button !== 0) return;
     e.stopPropagation();
-    drag.current = { ox: e.clientX - pos.x, oy: e.clientY - pos.y };
+    const ox = e.clientX - pos.x, oy = e.clientY - pos.y;
+    let last = { x: pos.x, y: pos.y };
     setDragging(true);
     const move = (ev) => {
-      const nx = Math.max(0, Math.min(ev.clientX - drag.current.ox, window.innerWidth - 56));
-      const ny = Math.max(0, Math.min(ev.clientY - drag.current.oy, window.innerHeight - 44));
-      setPos({ x: nx, y: ny });
+      last = {
+        x: Math.max(0, Math.min(ev.clientX - ox, window.innerWidth - 56)),
+        y: Math.max(0, Math.min(ev.clientY - oy, window.innerHeight - 44)),
+      };
+      setPos(last);
     };
     const up = () => {
       window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", up);
       setDragging(false);
-      setPos(p => { onUpdate(note.id, { x: p.x, y: p.y }); return p; });
-      drag.current = null;
+      onUpdate(note.id, { x: last.x, y: last.y });   // persist after drag — never call setState inside a setState updater
     };
     window.addEventListener("pointermove", move); window.addEventListener("pointerup", up);
   }
