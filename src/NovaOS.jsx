@@ -807,7 +807,7 @@ export default function NovaOS(){
     return ()=>clearTimeout(t);
   },[wins, user, data?.settings?.restoreOnSignin]);
   // Outside-click closes menu. pointerdown covers both mouse and touch in one go.
-  useEffect(()=>{if(!menuOpen)return;function h(e){if(menuRef.current&&!menuRef.current.contains(e.target))setMenuOpen(false);}setTimeout(()=>document.addEventListener("pointerdown",h),0);return()=>document.removeEventListener("pointerdown",h);},[menuOpen]);
+  useEffect(()=>{if(!menuOpen)return;function h(e){if(e.target&&e.target.closest&&e.target.closest("[data-start-btn]"))return;/* let the Start button's own onClick toggle it closed */if(menuRef.current&&!menuRef.current.contains(e.target))setMenuOpen(false);}setTimeout(()=>document.addEventListener("pointerdown",h),0);return()=>document.removeEventListener("pointerdown",h);},[menuOpen]);
 
   // All drag/resize tracking uses Pointer Events (pointermove/pointerup/pointercancel).
   // Pointer Events fire for mouse, touch, AND pen with a unified API — this is what
@@ -2730,7 +2730,7 @@ export default function NovaOS(){
         <div style={{display:"flex",alignItems:"center",gap:8,zIndex:2,flexShrink:0}}>
         {/* v7.7: Start menu button — shows the Nova OS brand mark. The button
             lights up with the accent color when the menu is open. */}
-        <button className="sb" onClick={()=>{setMenuOpen(o=>!o);setMenuSrch("");}} title="Nova OS" style={{
+        <button className="sb" data-start-btn onClick={()=>{setMenuOpen(o=>!o);setMenuSrch("");}} title="Nova OS" style={{
           width:46,height:46,borderRadius:13,
           background:menuOpen?fill(AC):"var(--nv-hover)",
           border:"1px solid "+(menuOpen?bdr(AC):"var(--nv-border)"),
