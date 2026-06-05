@@ -2731,7 +2731,7 @@ export default function NovaOS(){
         {/* v7.7: Start menu button — shows the Nova OS brand mark. The button
             lights up with the accent color when the menu is open. */}
         <button className="sb" data-start-btn onClick={()=>{setMenuOpen(o=>!o);setMenuSrch("");}} title="Nova OS" style={{
-          width:46,height:46,borderRadius:13,
+          width:46,height:46,borderRadius:12,
           background:menuOpen?fill(AC):"var(--nv-hover)",
           border:"1px solid "+(menuOpen?bdr(AC):"var(--nv-border)"),
           boxShadow:menuOpen?"0 0 16px "+fill(AC)+", 0 2px 8px rgba(0,0,0,0.3) inset":"none",
@@ -2961,7 +2961,7 @@ export default function NovaOS(){
         }
         <div style={{
           height:44,display:"flex",alignItems:"center",gap:3,padding:"0 4px",
-          background:"var(--nv-elevated)",border:"1px solid var(--nv-border)",borderRadius:13,
+          background:"var(--nv-elevated)",border:"1px solid var(--nv-border)",borderRadius:12,
         }}>
           {/* v9.3 (#22) — Dedicated volume button so the slider is one click
               away without opening Settings. Same flyout as the network
