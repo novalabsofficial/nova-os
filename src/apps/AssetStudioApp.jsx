@@ -81,6 +81,26 @@ function roundRectPath(ctx, x, y, w, h, r) {
   ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
 }
 
+// v11.0 — recolor an uploaded image. Builds a solid-color silhouette that keeps
+// the image's own alpha mask, then blends it over the original by `amt` (0–1):
+// amt = 1 fully replaces the color (perfect for tinting a white icon to any
+// color), lower values keep the original shading/detail. Full resolution → a
+// crisp PNG data URL used by both the on-screen preview and the export.
+function tintImage(img, color, amt) {
+  const W = img.naturalWidth || img.width, H = img.naturalHeight || img.height;
+  const sil = document.createElement("canvas"); sil.width = W; sil.height = H;
+  const sx = sil.getContext("2d");
+  sx.drawImage(img, 0, 0, W, H);
+  sx.globalCompositeOperation = "source-in";          // paint solid color only where the image is opaque
+  sx.fillStyle = color; sx.fillRect(0, 0, W, H);
+  const out = document.createElement("canvas"); out.width = W; out.height = H;
+  const ox = out.getContext("2d");
+  ox.drawImage(img, 0, 0, W, H);                       // original underneath
+  ox.globalAlpha = Math.min(1, Math.max(0, amt));      // blend the silhouette on top
+  ox.drawImage(sil, 0, 0);
+  return out.toDataURL("image/png");
+}
+
 export function AssetStudioApp({ AC, showToast }) {
   const [preset, setPreset] = useState(PRESETS[0]);
   const [transparent, setTransparent] = useState(true);
@@ -103,6 +123,7 @@ export function AssetStudioApp({ AC, showToast }) {
   const hot = useRef(false);            // is the user interacting with this app?
   const ptrs = useRef(new Map());       // active pointerId -> {x,y} for move/pinch
   const gesture = useRef(null);         // current move/pinch descriptor
+  const imgSrcCache = useRef(new Map()); // src -> decoded Image, so recolor doesn't re-decode each slider tick
   useEffect(() => { layersRef.current = layers; }, [layers]);
   useEffect(() => { selRef.current = selIds; }, [selIds]);
   useEffect(() => { cropRef.current = cropMode; }, [cropMode]);
@@ -114,6 +135,8 @@ export function AssetStudioApp({ AC, showToast }) {
   const allShapes = selLayers.length > 0 && selLayers.every(l => l.type !== "image");
   const anyImage = selLayers.some(l => l.type === "image");
   const ref0 = single || selLayers[0];
+  const imgSel = selLayers.filter(l => l.type === "image");
+  const imgRef = imgSel[0];
 
   const patch = (id, p) => setLayers(ls => ls.map(l => l.id === id ? { ...l, ...p } : l));
   const patchSel = (p) => setLayers(ls => ls.map(l => selIds.includes(l.id) ? { ...l, ...p } : l));
@@ -314,6 +337,24 @@ export function AssetStudioApp({ AC, showToast }) {
   const toBack = () => setLayers(ls => [...ls.filter(l => selIds.includes(l.id)), ...ls.filter(l => !selIds.includes(l.id))]);
   function dup() { if (!selLayers.length) return; const copies = selLayers.map(l => ({ ...l, id: nid(), x: Math.min(l.x + 0.04, 0.9), y: Math.min(l.y + 0.04, 0.9) })); setLayers(ls => [...ls, ...copies]); setSelIds(copies.map(c => c.id)); }
 
+  async function getImg(src) {
+    const c = imgSrcCache.current;
+    if (c.has(src)) return c.get(src);
+    const img = await loadImage(src).catch(() => null);
+    if (img) c.set(src, img);
+    return img;
+  }
+  // Recolor every selected image layer (color=null clears it). Re-tints from the
+  // original src each time so strength is always relative to the source image.
+  async function recolorSelected(color, amt = 1) {
+    const imgs = layersRef.current.filter(l => selRef.current.includes(l.id) && l.type === "image");
+    if (!imgs.length) return;
+    if (!color) { setLayers(ls => ls.map(l => imgs.some(i => i.id === l.id) ? { ...l, tint: null, tintAmt: undefined, tintedSrc: null } : l)); return; }
+    const made = {};
+    for (const l of imgs) { const img = await getImg(l.src); if (img) made[l.id] = tintImage(img, color, amt); }
+    setLayers(ls => ls.map(l => made[l.id] ? { ...l, tint: color, tintAmt: amt, tintedSrc: made[l.id] } : l));
+  }
+
   // Draw every layer into ctx using CW×CH as the coordinate space.
   async function renderLayers(ctx, CW, CH) {
     for (const l of layersRef.current) {
@@ -323,7 +364,7 @@ export function AssetStudioApp({ AC, showToast }) {
       ctx.translate(cx, cy);
       ctx.rotate((l.rotation || 0) * Math.PI / 180);
       ctx.scale(l.flipH ? -1 : 1, l.flipV ? -1 : 1);
-      if (l.type === "image") { const img = await loadImage(l.src).catch(() => null); if (img) ctx.drawImage(img, -dw / 2, -dh / 2, dw, dh); }
+      if (l.type === "image") { const img = await loadImage(l.tintedSrc || l.src).catch(() => null); if (img) ctx.drawImage(img, -dw / 2, -dh / 2, dw, dh); }
       else if (l.type === "line") { ctx.strokeStyle = l.stroke || "#fff"; ctx.lineWidth = Math.max(1, l.strokeW || 4); ctx.lineCap = "round"; ctx.beginPath(); ctx.moveTo(-dw / 2, 0); ctx.lineTo(dw / 2, 0); ctx.stroke(); }
       else {
         ctx.beginPath();
@@ -415,7 +456,7 @@ export function AssetStudioApp({ AC, showToast }) {
     const flip = "scaleX(" + (l.flipH ? -1 : 1) + ") scaleY(" + (l.flipV ? -1 : 1) + ")";
     const box = { position: "absolute", left: l.x * 100 + "%", top: l.y * 100 + "%", width: l.w * 100 + "%", height: l.h * 100 + "%", transform: "rotate(" + (l.rotation || 0) + "deg)", opacity: (l.opacity ?? 100) / 100, cursor: "move", outline: isSel(l.id) ? "2px solid " + AC : "none", outlineOffset: 1, pointerEvents: cropMode ? "none" : "auto", touchAction: "none" };
     const inner = l.type === "image"
-      ? <img src={l.src} alt="" draggable={false} style={{ width: "100%", height: "100%", objectFit: "contain", pointerEvents: "none", display: "block", transform: flip }} />
+      ? <img src={l.tintedSrc || l.src} alt="" draggable={false} style={{ width: "100%", height: "100%", objectFit: "contain", pointerEvents: "none", display: "block", transform: flip }} />
       : shapeInner(l, flip);
     const showHandles = single && single.id === l.id && !cropMode;
     return (
@@ -508,6 +549,14 @@ export function AssetStudioApp({ AC, showToast }) {
           )}
           {allShapes && (
             <span style={lblS}>{selLayers.every(l => l.type === "line") ? "Thickness" : "Border"} <input type="range" min="0" max="40" value={ref0.strokeW || 0} onChange={e => patchSel({ strokeW: +e.target.value })} style={{ width: 72 }} /></span>
+          )}
+
+          {imgSel.length > 0 && (
+            <span style={lblS} title="Recolor the image — full strength replaces its color, lower keeps the shading">Recolor
+              <input type="color" value={imgRef.tint || "#ffffff"} onChange={e => recolorSelected(e.target.value, imgRef.tintAmt ?? 1)} style={swatch} />
+              {imgRef.tint && <input type="range" min="15" max="100" value={Math.round((imgRef.tintAmt ?? 1) * 100)} onChange={e => recolorSelected(imgRef.tint, +e.target.value / 100)} style={{ width: 64 }} title="Strength" />}
+              {imgRef.tint && <button onClick={() => recolorSelected(null)} title="Remove recolor" style={{ ...ibtn, fontSize: 11, padding: "4px 7px" }}>reset</button>}
+            </span>
           )}
 
           <span style={lblS}>Opacity <input type="range" min="10" max="100" value={ref0.opacity ?? 100} onChange={e => patchSel({ opacity: +e.target.value })} style={{ width: 72 }} /></span>
