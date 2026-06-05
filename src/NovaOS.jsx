@@ -55,6 +55,7 @@ import { ResizeHandles } from "./ui/ResizeHandles.jsx";
 import { ContextMenu } from "./ui/ContextMenu.jsx";
 import { AiAssist } from "./ui/AiAssist.jsx";
 import { StickyNotes } from "./ui/StickyNotes.jsx";
+import { WorkspacesPanel } from "./ui/Workspaces.jsx";
 // Widgets
 import {
   WidgetShell,
@@ -609,6 +610,7 @@ export default function NovaOS(){
   const [data,       setData]       = useState(null);
   const [customWp,   setCustomWp]   = useState(null);
   const [wins,       setWins]       = useState([]);
+  const [workspacesOpen, setWorkspacesOpen] = useState(false);   // v11.0 Phase B — snap-workspaces panel
   // v10.0 — transient per-window animation flags: id → "entering" | "closing"
   // | "minimizing" | "restoring". Drives the open/close/minimize/restore
   // motion; cleared once the animation finishes (see markFx).
@@ -1452,6 +1454,28 @@ export default function NovaOS(){
   const addStickyNote=useCallback((x,y)=>{const id="note-"+Date.now()+"-"+Math.floor(Math.random()*1000);const W=212;const nx=Math.max(8,Math.min((x||140)-30,window.innerWidth-W-8));const ny=Math.max(8,Math.min((y||140)-12,window.innerHeight-200));updateData(d=>({...d,stickyNotes:[...(d.stickyNotes||[]),{id,text:"",color:"yellow",x:nx,y:ny}]}));showToast("Sticky note added");},[updateData,showToast]);
   const updateStickyNote=useCallback((id,patch)=>{updateData(d=>({...d,stickyNotes:(d.stickyNotes||[]).map(n=>n.id===id?{...n,...patch}:n)}));},[updateData]);
   const removeStickyNote=useCallback((id)=>{updateData(d=>({...d,stickyNotes:(d.stickyNotes||[]).filter(n=>n.id!==id)}));},[updateData]);
+  // v11.0 Phase B — Snap Workspaces. Save the current window arrangement as a
+  // named layout (settings.workspaces, so it backs up too) and snap back later.
+  const saveWorkspace=useCallback((name)=>{
+    const snap=(winsRef.current||[]).map(w=>({...w}));
+    if(!snap.length){showToast("No open windows to save");return;}
+    updateData(d=>{const list=d?.settings?.workspaces||[];const ws={id:"ws-"+Date.now()+"-"+Math.floor(Math.random()*1000),name:(name&&name.trim())||("Layout "+(list.length+1)),wins:snap,savedAt:Date.now()};return {...d,settings:{...(d.settings||{}),workspaces:[...list,ws].slice(-12)}};});
+    showToast("Layout saved ✓");
+  },[updateData,showToast]);
+  const restoreWorkspace=useCallback((id)=>{
+    const ws=(data?.settings?.workspaces||[]).find(w=>w.id===id);
+    if(!ws||!Array.isArray(ws.wins))return;
+    const validIds=new Set(APPS.map(a=>a.id));
+    const valid=ws.wins.filter(w=>validIds.has(w.app)).map(w=>({...w}));
+    setWins(valid);
+    setMaxZ(valid.reduce((m,w)=>Math.max(m,w.z||100),100)+1);
+    setDeskCount(Math.max(1,Math.min(MAX_DESKTOPS,valid.reduce((m,w)=>Math.max(m,w.desk||0),0)+1)));
+    setCurDesk(0);
+    setTimeout(()=>setWins(ws2=>ws2.map(w=>({...w}))),160);   // settle restored window subtrees (mirrors login restore)
+    setWorkspacesOpen(false);
+    showToast("Restored “"+ws.name+"”");
+  },[data,showToast]);
+  const deleteWorkspace=useCallback((id)=>{updateData(d=>({...d,settings:{...(d.settings||{}),workspaces:(d.settings?.workspaces||[]).filter(w=>w.id!==id)}}));},[updateData]);
 
   // v10.0 Supernova — AI command-bar executor. Maps a planned {tool, args}
   // step to a real OS action and returns a short result string (or null for
@@ -2306,6 +2330,7 @@ export default function NovaOS(){
         const mx=e.clientX, my=e.clientY;
         openContextMenu(e, [
           {icon:"📝", label:"New sticky note", onClick:()=>addStickyNote(mx,my)},
+          {icon:"🗔", label:"Window layouts…", onClick:()=>setWorkspacesOpen(true)},
           {icon:"⚙", label:"Open Settings", onClick:()=>openApp("settings")},
           {icon:"🎨", label:"Change wallpaper", onClick:()=>{openApp("settings");}},
           {type:"divider"},
@@ -3325,6 +3350,13 @@ export default function NovaOS(){
         );
       })()}
       {ctxMenu && <ContextMenu x={ctxMenu.x} y={ctxMenu.y} items={ctxMenu.items} onClose={closeContextMenu} AC={AC}/>}
+      {workspacesOpen && (
+        <WorkspacesPanel
+          workspaces={data?.settings?.workspaces||[]}
+          winCount={wins.length}
+          onSave={saveWorkspace} onRestore={restoreWorkspace} onDelete={deleteWorkspace}
+          onClose={()=>setWorkspacesOpen(false)} AC={AC}/>
+      )}
       {/* v11.0 Phase B — first-run setup wizard, shown once for brand-new accounts
           (setupComplete strictly false; existing accounts have it undefined). */}
       {data && data.setupComplete===false && (
