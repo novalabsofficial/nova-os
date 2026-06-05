@@ -24,6 +24,7 @@ function SGlyph({ id, size = 18 }) {
     case "widgets":    return (<svg {...p}><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/></svg>);
     case "keyboard":   return (<svg {...p}><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M7 14h10"/></svg>);
     case "account":    return (<svg {...p}><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>);
+    case "backup":     return (<svg {...p}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>);
     case "about":      return (<svg {...p}><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>);
     default: return null;
   }
@@ -53,6 +54,7 @@ const SECTIONS = [
   { id: "widgets",    label: "Widgets" },
   { id: "keyboard",   label: "Keyboard" },
   { id: "account",    label: "Account" },
+  { id: "backup",     label: "Backup" },
   { id: "about",      label: "About" },
 ];
 
@@ -67,6 +69,11 @@ export function SettingsApp({ user, data, updateSettings, showToast, AC, onCusto
   const [lite, setLite] = useState(() => getLitePref());   // v10.7 lite-mode toggle
   const [section, setSection] = useState(initialSection || "appearance");
   useEffect(() => { if (initialSection) setSection(initialSection); }, [initialSection]);
+
+  // v11.0 Phase B — profile backup/restore. `pendingImport` holds a parsed,
+  // validated backup awaiting the user's confirmation before it overwrites.
+  const [pendingImport, setPendingImport] = useState(null);
+  const importFileRef = useRef(null);
 
   // v7.8: live fullscreen state. Subscribes to fullscreenchange events so the
   // toggle stays in sync even when the user exits via Esc or F11.
@@ -400,6 +407,60 @@ export function SettingsApp({ user, data, updateSettings, showToast, AC, onCusto
           {isDesktop() && (
             <button onClick={() => quitApp()} style={{ width: "100%", marginTop: 8, padding: "10px", background:"var(--nv-elevated)", border: "1px solid var(--nv-border)", borderRadius: 8, cursor: "pointer", fontFamily: FFB, fontWeight: 600, fontSize: 12, color: "var(--nv-text)" }}>Close Nova OS</button>
           )}
+        </>)}
+
+        {section === "backup" && (<>
+          <div style={PANE_TITLE}>Backup &amp; Restore</div>
+          <div style={PANE_SUB}>Save your whole Nova profile — appearance, desktop layout, pinned apps, notes, tasks and more — to a file you can re-import later or on another device.</div>
+
+          <button onClick={async () => {
+            try {
+              const [iconpos, savedWindows, wpimg] = await Promise.all([
+                db.get("user:" + user + ":iconpos"),
+                db.get("user:" + user + ":savedWindows"),
+                db.get("user:" + user + ":wpimg"),
+              ]);
+              const payload = { nova: "profile", version: NOVA_VERSION, exportedAt: new Date().toISOString(), user, data, iconpos: iconpos || null, savedWindows: savedWindows || null, wpimg: wpimg || null };
+              const a = document.createElement("a");
+              a.href = URL.createObjectURL(new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" }));
+              a.download = "nova-profile-" + user + ".json"; a.click();
+              setTimeout(() => URL.revokeObjectURL(a.href), 3000);
+              showToast?.("Profile exported ✓");
+            } catch { showToast?.("Export failed"); }
+          }} style={{ width: "100%", padding: "11px", background: fill(AC), border: "1px solid " + bdr(AC), borderRadius: 9, cursor: "pointer", fontFamily: FFB, fontWeight: 700, fontSize: 13, color: AC, marginBottom: 8 }}>⬇  Export my profile</button>
+
+          <input ref={importFileRef} type="file" accept="application/json,.json" style={{ display: "none" }} onChange={async e => {
+            const f = e.target.files?.[0]; e.target.value = ""; if (!f) return;
+            let parsed; try { parsed = JSON.parse(await f.text()); } catch { showToast?.("That file isn't valid JSON"); return; }
+            if (!parsed || parsed.nova !== "profile" || !parsed.data) { showToast?.("That isn't a Nova profile backup"); return; }
+            setPendingImport({ payload: parsed, name: f.name });
+          }} />
+          <button onClick={() => importFileRef.current?.click()} style={{ width: "100%", padding: "11px", background: "var(--nv-elevated)", border: "1px solid var(--nv-border)", borderRadius: 9, cursor: "pointer", fontFamily: FFB, fontWeight: 600, fontSize: 13, color: "var(--nv-text)" }}>⬆  Import a backup…</button>
+
+          {pendingImport && (
+            <div style={{ marginTop: 12, padding: "14px", background: "rgba(255,170,40,0.08)", border: "1px solid rgba(255,170,40,0.35)", borderRadius: 10 }}>
+              <div style={{ fontFamily: FFB, fontWeight: 700, fontSize: 13, color: "var(--nv-text-strong)", marginBottom: 4 }}>Restore from “{pendingImport.name}”?</div>
+              <div style={{ fontSize: 12, color: "var(--nv-text-dim)", lineHeight: 1.5, marginBottom: 10 }}>This replaces your current appearance, desktop layout and app data{pendingImport.payload.exportedAt ? " with the backup from " + new Date(pendingImport.payload.exportedAt).toLocaleString() : ""}. Nova will reload.</div>
+              <div style={{ display: "flex", gap: 8 }}>
+                <button onClick={() => setPendingImport(null)} style={{ flex: 1, padding: "9px", background: "var(--nv-elevated)", border: "1px solid var(--nv-border)", borderRadius: 8, cursor: "pointer", fontFamily: FFB, fontWeight: 600, fontSize: 12, color: "var(--nv-text)" }}>Cancel</button>
+                <button onClick={async () => {
+                  const p = pendingImport.payload;
+                  try {
+                    await db.set("user:" + user + ":data", p.data);
+                    if (p.iconpos) await db.set("user:" + user + ":iconpos", p.iconpos);
+                    if (p.savedWindows) await db.set("user:" + user + ":savedWindows", p.savedWindows);
+                    if (p.wpimg) await db.set("user:" + user + ":wpimg", p.wpimg);
+                    showToast?.("Profile restored — reloading…");
+                    setTimeout(() => window.location.reload(), 900);
+                  } catch { showToast?.("Restore failed"); setPendingImport(null); }
+                }} style={{ flex: 1, padding: "9px", background: fill(AC), border: "1px solid " + bdr(AC), borderRadius: 8, cursor: "pointer", fontFamily: FFB, fontWeight: 700, fontSize: 12, color: AC }}>Replace &amp; reload</button>
+              </div>
+            </div>
+          )}
+
+          <div style={{ marginTop: 16, padding: "11px 13px", background: "var(--nv-elevated)", border: "1px solid var(--nv-border)", borderRadius: 9, fontSize: 11.5, lineHeight: 1.6, color: "var(--nv-text-dim)" }}>
+            The backup is a plain JSON file. Your account login, chat servers and direct messages live online and aren't part of it.
+          </div>
         </>)}
 
         {section === "about" && (<>
