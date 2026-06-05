@@ -2454,12 +2454,12 @@ export default function NovaOS(){
         function launch(){if(app.storeApp){if(app.storeApp.newTab)openExternalUrl(app.storeApp.url);else openApp("browser");}else openApp(app.id);}
         return(
           <div key={app.id} style={{
-            position:"absolute",left:pos.x,top:pos.y,width:ICON_W,
+            position:"absolute",left:pos.x,top:pos.y,width:ICON_W,height:ICON_H,
             zIndex:isDrg?500:2,
             cursor:isDrg?"grabbing":"grab",userSelect:"none",
-            display:"flex",flexDirection:"column",alignItems:"center",gap:6,
-            padding:"10px 4px 8px",
-            borderRadius:11,
+            display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:6,
+            padding:"6px 4px",
+            borderRadius:13,
             // v8.0: lighter resting background, accent-tinged shadow during
             // drag for a more lifted feel. The .di hover class adds a brighter
             // background + soft outline ring (see styles.js).

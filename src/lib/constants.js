@@ -9,8 +9,11 @@ export const TASKBAR_H  = 66;
 export const MIN_W      = 280;
 export const MIN_H      = 200;
 export const ICON_W     = 76;
-export const ICON_H     = 92;
-export const ICON_GAP   = 4;
+// v11.0 — tiles are now a fixed height = ICON_H, so the row gap equals the column
+// gap (ICON_GAP) instead of leaving a big void below each short tile. 78 keeps a
+// near-square tile that still fits a two-line label; 6px gap reads balanced.
+export const ICON_H     = 78;
+export const ICON_GAP   = 6;
 export const ICON_PAD_X = 10;
 export const ICON_PAD_Y = 14;
 export const WIDGET_SNAP = 20;
