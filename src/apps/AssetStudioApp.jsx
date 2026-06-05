@@ -201,14 +201,16 @@ export function AssetStudioApp({ AC, showToast }) {
   useEffect(() => { layersRef.current = layers; }, [layers]);
   useEffect(() => { selRef.current = selIds; }, [selIds]);
   useEffect(() => { cropRef.current = cropMode; }, [cropMode]);
+
+  const ar = preset.w / preset.h;
+  // Track the on-screen canvas size so text scales WYSIWYG (declared after `ar`,
+  // which it depends on, to avoid a temporal-dead-zone error).
   useEffect(() => {
     const el = canvasRef.current; if (!el || typeof ResizeObserver === "undefined") return;
     const read = () => { const r = el.getBoundingClientRect(); setCanvasPx({ w: r.width, h: r.height }); };
     read(); const ro = new ResizeObserver(read); ro.observe(el);
     return () => ro.disconnect();
   }, [ar]);
-
-  const ar = preset.w / preset.h;
   const isSel = (id) => selIds.includes(id);
   const selLayers = layers.filter(l => selIds.includes(l.id));
   const single = selLayers.length === 1 ? selLayers[0] : null;
