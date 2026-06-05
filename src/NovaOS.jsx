@@ -669,6 +669,7 @@ export default function NovaOS(){
   const [viewport,   setViewport]   = useState(() => ({ w: typeof window !== "undefined" ? window.innerWidth : 1280, h: typeof window !== "undefined" ? window.innerHeight : 800 }));
   const [iconDrag,   setIconDrag]   = useState(null);
   const [openDesktopFolder, setOpenDesktopFolder] = useState(null);   // v11.0 — fid of the open desktop folder popover (or null)
+  const [mergeTarget, setMergeTarget] = useState(null);   // v11.0 — entry id highlighted as a folder-merge drop target mid-drag
   // v9.7 B1 — Windows-style drag-select. `marquee` is the live selection
   // rectangle (desktop-local px) while dragging on empty desktop;
   // `selectedIcons` is the set of icon ids currently highlighted.
@@ -852,8 +853,35 @@ export default function NovaOS(){
   // Icon drag — free move, snap-to-free-grid on release
   useEffect(()=>{
     if(!iconDrag)return;
-    function onMove(e){const nx=Math.max(0,Math.min(e.clientX-iconDrag.ox,window.innerWidth-ICON_W));const ny=Math.max(0,Math.min(e.clientY-iconDrag.oy,window.innerHeight-TASKBAR_H-ICON_H));setIconPos(prev=>({...prev,[iconDrag.id]:{x:nx,y:ny}}));}
-    function onUp(){const allPos=layoutIcons(iconDrag.allIcons||[],iconPosRef.current);const raw=iconPosRef.current[iconDrag.id]||allPos[iconDrag.id];const snapped=raw?snapToFreeGrid(iconDrag.id,raw.x,raw.y,allPos):null;const fp=snapped?{...iconPosRef.current,[iconDrag.id]:snapped}:iconPosRef.current;setIconPos(fp);db.set("user:"+iconDrag.user+":iconpos",fp).catch(()=>{});setIconDrag(null);}
+    // v11.0 — hit-test the dragged icon's center against the OTHER entries'
+    // (drag-start) layout to find a folder-merge target. Only apps merge; folders
+    // just reposition (no nesting).
+    const draggingApp = !String(iconDrag.id).startsWith("folder:");
+    function findTarget(x,y){
+      if(!draggingApp) return null;
+      const cx=x+ICON_W/2, cy=y+ICON_H/2;
+      for(const en of (iconDrag.allIcons||[])){
+        if(en.id===iconDrag.id) continue;
+        const p=iconDrag.layout?.[en.id]; if(!p) continue;
+        if(cx>=p.x&&cx<=p.x+ICON_W&&cy>=p.y&&cy<=p.y+ICON_H) return en;
+      }
+      return null;
+    }
+    function onMove(e){const nx=Math.max(0,Math.min(e.clientX-iconDrag.ox,window.innerWidth-ICON_W));const ny=Math.max(0,Math.min(e.clientY-iconDrag.oy,window.innerHeight-TASKBAR_H-ICON_H));setIconPos(prev=>({...prev,[iconDrag.id]:{x:nx,y:ny}}));const t=findTarget(nx,ny);setMergeTarget(t?t.id:null);}
+    function onUp(){
+      const drop=iconPosRef.current[iconDrag.id];
+      const target=drop?findTarget(drop.x,drop.y):null;
+      setMergeTarget(null);
+      if(target){
+        // app → existing folder = add; app → app = new folder with both
+        if(target.folder) addToDesktopFolder(target.fid,iconDrag.id);
+        else if(target.app) createDesktopFolder([target.app.id,iconDrag.id]);
+        setIconPos(prev=>{const n={...prev};delete n[iconDrag.id];db.set("user:"+iconDrag.user+":iconpos",n).catch(()=>{});return n;});
+        justDraggedRef.current=true;setTimeout(()=>{justDraggedRef.current=false;},60);
+        setIconDrag(null);return;
+      }
+      const allPos=layoutIcons(iconDrag.allIcons||[],iconPosRef.current);const raw=iconPosRef.current[iconDrag.id]||allPos[iconDrag.id];const snapped=raw?snapToFreeGrid(iconDrag.id,raw.x,raw.y,allPos):null;const fp=snapped?{...iconPosRef.current,[iconDrag.id]:snapped}:iconPosRef.current;setIconPos(fp);db.set("user:"+iconDrag.user+":iconpos",fp).catch(()=>{});setIconDrag(null);
+    }
     window.addEventListener("pointermove",onMove);window.addEventListener("pointerup",onUp);window.addEventListener("pointercancel",onUp);return()=>{window.removeEventListener("pointermove",onMove);window.removeEventListener("pointerup",onUp);window.removeEventListener("pointercancel",onUp);};
   },[iconDrag]);
 
@@ -1853,7 +1881,7 @@ export default function NovaOS(){
     document.addEventListener("keydown", onKey);
     return ()=>document.removeEventListener("keydown", onKey);
   },[]);
-  function onIconMouseDown(e,appId,allIcons){if(e.button!==0)return;e.stopPropagation();e.preventDefault();const positions=layoutIcons(allIcons,iconPos);const pos=positions[appId]||{x:0,y:0};setIconDrag({id:appId,ox:e.clientX-pos.x,oy:e.clientY-pos.y,user,allIcons:[...allIcons]});}
+  function onIconMouseDown(e,appId,allIcons){if(e.button!==0)return;e.stopPropagation();e.preventDefault();const positions=layoutIcons(allIcons,iconPos);const pos=positions[appId]||{x:0,y:0};setIconDrag({id:appId,ox:e.clientX-pos.x,oy:e.clientY-pos.y,user,allIcons:[...allIcons],layout:positions});}
   function onWidgetDragStart(e,id){if(e.button!==0)return;e.stopPropagation();e.preventDefault();const s=widgetState[id]||DEFAULT_WIDGET_STATE[id];setWidgetDrag({id,ox:e.clientX-s.x,oy:e.clientY-s.y});}
   function onWidgetResizeStart(e,id,edge){if(e.button!==0)return;e.stopPropagation();e.preventDefault();const s=widgetState[id]||DEFAULT_WIDGET_STATE[id];setWidgetResize({id,edge,sx:e.clientX,sy:e.clientY,x0:s.x,y0:s.y,w0:s.w,h0:s.h});}
   function closeWidget(id){updateSettings({widgets:{...widgets,[id]:false}});}
@@ -2472,6 +2500,7 @@ export default function NovaOS(){
         const pos = positions[entry.id] || { x: 0, y: 0 };
         const isDrg=iconDrag?.id===entry.id;
         const isSel=selectedIcons.has(entry.id);
+        const isMergeTarget=mergeTarget===entry.id&&iconDrag&&iconDrag.id!==entry.id;   // v11.0 drag-to-merge drop target
         // Shared container (both app icons and folders): icons FLOAT on the
         // wallpaper (no resting box — that read like an app-drawer grid) with a
         // subtle highlight only on hover (.di) / selection / drag.
@@ -2487,6 +2516,8 @@ export default function NovaOS(){
           transition:isDrg?"none":"background 0.22s var(--nv-ease), border-color 0.22s var(--nv-ease), left 0.28s var(--nv-ease), top 0.28s var(--nv-ease), transform 0.2s cubic-bezier(0.22,1,0.36,1)",
           boxShadow:isDrg?"0 10px 30px rgba(0,0,0,0.5), 0 1px 0 rgba(255,255,255,0.08) inset":"none",
           ...(iconsRevealed?{}:{animation:"icon-pop 0.44s cubic-bezier(0.16,1,0.3,1) both",animationDelay:(Math.min(idx,16)*0.03)+"s"}),
+          // v11.0 drag-to-merge — highlight + pop the tile being hovered as a folder target
+          ...(isMergeTarget?{background:"rgba("+hexRgb(AC)+",0.32)",border:"2px solid "+AC,transform:"scale(1.12)",backdropFilter:"blur(8px)",WebkitBackdropFilter:"blur(8px)"}:{}),
         };
         const labelStyle={fontFamily:FFB,fontWeight:600,fontSize:10.5,color:lightT?"var(--nv-text-strong)":"#fff",textAlign:"center",lineHeight:1.25,textShadow:lightT?"0 1px 3px rgba(255,255,255,0.95), 0 0 10px rgba(255,255,255,0.7)":"0 1px 3px rgba(0,0,0,0.9), 0 0 8px rgba(0,0,0,0.5)",pointerEvents:"none",letterSpacing:0.15,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",maxWidth:"100%"};
 
