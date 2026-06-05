@@ -2463,9 +2463,13 @@ export default function NovaOS(){
             // v8.0: lighter resting background, accent-tinged shadow during
             // drag for a more lifted feel. The .di hover class adds a brighter
             // background + soft outline ring (see styles.js).
-            background:isDrg?"rgba(20,22,40,0.5)":isSel?"rgba("+hexRgb(AC)+",0.22)":(lightT?"rgba(20,28,48,0.05)":"rgba(0,0,0,0.08)"),
-            border:"1px solid "+(isDrg?"rgba(255,255,255,0.16)":isSel?"rgba("+hexRgb(AC)+",0.6)":"transparent"),
-            backdropFilter:(isDrg||isSel)?"blur(8px)":"none",
+            // v11.0 — desktop icon tiles share the widgets'/taskbar's frosted glass
+            // surface so all three read as one material (was a near-invisible faint
+            // black/light box that didn't match the chrome).
+            background:isDrg?"rgba(20,22,40,0.5)":isSel?"rgba("+hexRgb(AC)+",0.22)":"var(--nv-surface)",
+            border:"1px solid "+(isDrg?"rgba(255,255,255,0.16)":isSel?"rgba("+hexRgb(AC)+",0.6)":"var(--nv-border)"),
+            backdropFilter:"blur(var(--nv-glass-blur)) saturate(160%)",
+            WebkitBackdropFilter:"blur(var(--nv-glass-blur)) saturate(160%)",
             transition:isDrg?"none":"background 0.22s var(--nv-ease), border-color 0.22s var(--nv-ease), left 0.28s var(--nv-ease), top 0.28s var(--nv-ease), transform 0.2s cubic-bezier(0.22,1,0.36,1)",
             boxShadow:isDrg?"0 10px 30px rgba(0,0,0,0.5), 0 1px 0 rgba(255,255,255,0.08) inset":"none",
             // v10.0 — one-shot staggered reveal on login.
