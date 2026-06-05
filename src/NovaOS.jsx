@@ -668,6 +668,7 @@ export default function NovaOS(){
   // and the desktop icon grid recomputes (fixes #21).
   const [viewport,   setViewport]   = useState(() => ({ w: typeof window !== "undefined" ? window.innerWidth : 1280, h: typeof window !== "undefined" ? window.innerHeight : 800 }));
   const [iconDrag,   setIconDrag]   = useState(null);
+  const [openDesktopFolder, setOpenDesktopFolder] = useState(null);   // v11.0 — fid of the open desktop folder popover (or null)
   // v9.7 B1 — Windows-style drag-select. `marquee` is the live selection
   // rectangle (desktop-local px) while dragging on empty desktop;
   // `selectedIcons` is the set of icon ids currently highlighted.
@@ -2027,7 +2028,26 @@ export default function NovaOS(){
     ? data.desktopApps
     : allApps.filter(a=>!hiddenSet.has(a.id)).map(a=>a.id);
   const desktopSet = new Set(desktopApps);
-  const allDesktopIcons = allApps.filter(a=>desktopSet.has(a.id));
+  // v11.0 Phase B — desktop app folders. `settings.desktopFolders` maps a folder
+  // id -> { name, apps:[appId,...] }. The desktop grid renders un-foldered
+  // whitelisted apps PLUS one tile per folder. Each grid item is an "entry" with
+  // a stable `.id` for the positioning grid: an app id, or "folder:"+fid.
+  const desktopFolders = data?.settings?.desktopFolders || {};
+  const inFolder = new Set();
+  Object.values(desktopFolders).forEach(f => (f?.apps||[]).forEach(id => inFolder.add(id)));
+  const appById = (id) => allApps.find(a => a.id === id);
+  const folderEntries = Object.keys(desktopFolders)
+    .filter(fid => (desktopFolders[fid]?.apps||[]).some(id => appById(id)))
+    .map(fid => ({ id:"folder:"+fid, fid, folder:desktopFolders[fid] }));
+  const appEntries = allApps.filter(a => desktopSet.has(a.id) && !inFolder.has(a.id)).map(a => ({ id:a.id, app:a }));
+  const desktopEntries = [...appEntries, ...folderEntries];
+  // Folder ops — persist to settings.desktopFolders. createDesktopFolder returns
+  // the new id; removeFromDesktopFolder auto-dissolves a folder when it empties.
+  const newFolderId = () => "df"+Date.now().toString(36)+Math.floor(Math.random()*1e4).toString(36);
+  function createDesktopFolder(appIds){ const fid=newFolderId(); updateData(p=>({...p,settings:{...(p.settings||{}),desktopFolders:{...(p.settings?.desktopFolders||{}),[fid]:{name:"Folder",apps:appIds}}}})); return fid; }
+  function addToDesktopFolder(fid,appId){ updateData(p=>{const fs=p.settings?.desktopFolders||{};const f=fs[fid];if(!f||(f.apps||[]).includes(appId))return p;return {...p,settings:{...(p.settings||{}),desktopFolders:{...fs,[fid]:{...f,apps:[...(f.apps||[]),appId]}}}};}); }
+  function removeFromDesktopFolder(fid,appId){ updateData(p=>{const fs={...(p.settings?.desktopFolders||{})};const f=fs[fid];if(!f)return p;const apps=(f.apps||[]).filter(id=>id!==appId);if(apps.length===0)delete fs[fid];else fs[fid]={...f,apps};return {...p,settings:{...(p.settings||{}),desktopFolders:fs}};}); }
+  function renameDesktopFolder(fid,name){ updateData(p=>{const fs=p.settings?.desktopFolders||{};const f=fs[fid];if(!f)return p;return {...p,settings:{...(p.settings||{}),desktopFolders:{...fs,[fid]:{...f,name:(name||"Folder").slice(0,40)}}}};}); }
   // v10.0 — for the native-webview browser: it's "active" (so its webview may
   // show) only when it's the focused top window on the current desktop and no
   // OS overlay is covering it. Any overlay forces the webview to hide so it
@@ -2045,7 +2065,7 @@ export default function NovaOS(){
     if(e.button!==0)return;
     const surface=e.currentTarget;
     const rect=surface.getBoundingClientRect();
-    const positions=layoutIcons(allDesktopIcons,iconPosRef.current);
+    const positions=layoutIcons(desktopEntries,iconPosRef.current);
     const x0=e.clientX-rect.left, y0=e.clientY-rect.top;
     let moved=false;
     setSelectedIcons(new Set());      // clear on press; re-fill as we drag
@@ -2056,11 +2076,11 @@ export default function NovaOS(){
       const box={x:Math.min(x0,x1),y:Math.min(y0,y1),w:Math.abs(x1-x0),h:Math.abs(y1-y0)};
       setMarquee(box);
       const hit=new Set();
-      allDesktopIcons.forEach(app=>{
-        const p=positions[app.id]; if(!p)return;
+      desktopEntries.forEach(it=>{
+        const p=positions[it.id]; if(!p)return;
         // icon hit-rect ≈ ICON_W × ICON_H at its grid position
         const ix=p.x, iy=p.y, iw=ICON_W, ih=ICON_H;
-        if(box.x<ix+iw && box.x+box.w>ix && box.y<iy+ih && box.y+box.h>iy) hit.add(app.id);
+        if(box.x<ix+iw && box.x+box.w>ix && box.y<iy+ih && box.y+box.h>iy) hit.add(it.id);
       });
       setSelectedIcons(hit);
     }
@@ -2445,53 +2465,69 @@ export default function NovaOS(){
           when the window resizes. `viewport.w/h` are referenced inside the
           IIFE so the React renderer treats this expression as depending on
           the viewport state and recomputes on resize. */}
-      {(() => { const positions = layoutIcons(allDesktopIcons, iconPos);
+      {(() => { const positions = layoutIcons(desktopEntries, iconPos);
                 void viewport.w; void viewport.h;
-                return allDesktopIcons.map((app, idx) => {
-        const pos = positions[app.id] || { x: 0, y: 0 };
-        const isDrg=iconDrag?.id===app.id;
-        const isSel=selectedIcons.has(app.id);   // v9.7 B1 drag-select highlight
-        const lightT=theme==="light";   // v11.0 light mode — desktop icon tiles flip to light frosted chips with dark labels
+                const lightT=theme==="light";
+                return desktopEntries.map((entry, idx) => {
+        const pos = positions[entry.id] || { x: 0, y: 0 };
+        const isDrg=iconDrag?.id===entry.id;
+        const isSel=selectedIcons.has(entry.id);
+        // Shared container (both app icons and folders): icons FLOAT on the
+        // wallpaper (no resting box — that read like an app-drawer grid) with a
+        // subtle highlight only on hover (.di) / selection / drag.
+        const wrap={
+          position:"absolute",left:pos.x,top:pos.y,width:ICON_W,height:ICON_H,
+          zIndex:isDrg?500:2,cursor:isDrg?"grabbing":"grab",userSelect:"none",
+          display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:6,
+          padding:"6px 4px",borderRadius:13,
+          background:isDrg?"rgba(20,22,40,0.5)":isSel?"rgba("+hexRgb(AC)+",0.22)":"transparent",
+          border:"1px solid "+(isDrg?"rgba(255,255,255,0.16)":isSel?"rgba("+hexRgb(AC)+",0.6)":"transparent"),
+          backdropFilter:(isDrg||isSel)?"blur(8px)":"none",
+          WebkitBackdropFilter:(isDrg||isSel)?"blur(8px)":"none",
+          transition:isDrg?"none":"background 0.22s var(--nv-ease), border-color 0.22s var(--nv-ease), left 0.28s var(--nv-ease), top 0.28s var(--nv-ease), transform 0.2s cubic-bezier(0.22,1,0.36,1)",
+          boxShadow:isDrg?"0 10px 30px rgba(0,0,0,0.5), 0 1px 0 rgba(255,255,255,0.08) inset":"none",
+          ...(iconsRevealed?{}:{animation:"icon-pop 0.44s cubic-bezier(0.16,1,0.3,1) both",animationDelay:(Math.min(idx,16)*0.03)+"s"}),
+        };
+        const labelStyle={fontFamily:FFB,fontWeight:600,fontSize:10.5,color:lightT?"var(--nv-text-strong)":"#fff",textAlign:"center",lineHeight:1.25,textShadow:lightT?"0 1px 3px rgba(255,255,255,0.95), 0 0 10px rgba(255,255,255,0.7)":"0 1px 3px rgba(0,0,0,0.9), 0 0 8px rgba(0,0,0,0.5)",pointerEvents:"none",letterSpacing:0.15,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",maxWidth:"100%"};
+
+        // ── FOLDER ENTRY ──
+        if(entry.folder){
+          const fapps=(entry.folder.apps||[]).map(appById).filter(Boolean);
+          return(
+            <div key={entry.id} style={wrap} className={isDrg?"":"di"} title={entry.folder.name||"Folder"}
+              onPointerDown={e=>onIconMouseDown(e,entry.id,desktopEntries)}
+              onDoubleClick={()=>setOpenDesktopFolder(entry.fid)}
+              onContextMenu={e=>openContextMenu(e,[
+                {icon:"▶",label:"Open folder",onClick:()=>setOpenDesktopFolder(entry.fid)},
+                {type:"divider"},
+                {icon:"✕",label:"Unfold (delete folder)",danger:true,onClick:()=>updateData(p=>{const fs={...(p.settings?.desktopFolders||{})};delete fs[entry.fid];return {...p,settings:{...(p.settings||{}),desktopFolders:fs}};})},
+              ])}>
+              <div style={{position:"relative",pointerEvents:"none",width:40,height:40,borderRadius:11,background:"var(--nv-surface)",border:"1px solid var(--nv-border)",backdropFilter:"blur(10px)",WebkitBackdropFilter:"blur(10px)",display:"grid",gridTemplateColumns:"1fr 1fr",gridTemplateRows:"1fr 1fr",gap:2,padding:4,boxSizing:"border-box",boxShadow:"0 3px 8px rgba(0,0,0,0.4)"}}>
+                {fapps.slice(0,4).map(a=>(<div key={a.id} style={{display:"flex",alignItems:"center",justifyContent:"center",overflow:"hidden"}}><AppIconDisplay app={{id:a.id,icon:a.icon}} size={14} glass={glass}/></div>))}
+              </div>
+              <span style={labelStyle}>{entry.folder.name||"Folder"}</span>
+            </div>
+          );
+        }
+
+        // ── APP ENTRY ──
+        const app=entry.app;
         function launch(){if(app.storeApp){if(app.storeApp.newTab)openExternalUrl(app.storeApp.url);else openApp("browser");}else openApp(app.id);}
         return(
-          <div key={app.id} style={{
-            position:"absolute",left:pos.x,top:pos.y,width:ICON_W,height:ICON_H,
-            zIndex:isDrg?500:2,
-            cursor:isDrg?"grabbing":"grab",userSelect:"none",
-            display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:6,
-            padding:"6px 4px",
-            borderRadius:13,
-            // v11.0 — real-desktop look: icons FLOAT on the wallpaper with no
-            // resting box (a box read like an app-drawer grid, not a desktop — cf.
-            // Windows/macOS). A subtle highlight appears only on hover (.di) /
-            // selection / drag for interaction feedback.
-            background:isDrg?"rgba(20,22,40,0.5)":isSel?"rgba("+hexRgb(AC)+",0.22)":"transparent",
-            border:"1px solid "+(isDrg?"rgba(255,255,255,0.16)":isSel?"rgba("+hexRgb(AC)+",0.6)":"transparent"),
-            backdropFilter:(isDrg||isSel)?"blur(8px)":"none",
-            WebkitBackdropFilter:(isDrg||isSel)?"blur(8px)":"none",
-            transition:isDrg?"none":"background 0.22s var(--nv-ease), border-color 0.22s var(--nv-ease), left 0.28s var(--nv-ease), top 0.28s var(--nv-ease), transform 0.2s cubic-bezier(0.22,1,0.36,1)",
-            boxShadow:isDrg?"0 10px 30px rgba(0,0,0,0.5), 0 1px 0 rgba(255,255,255,0.08) inset":"none",
-            // v10.0 — one-shot staggered reveal on login.
-            ...(iconsRevealed?{}:{animation:"icon-pop 0.44s cubic-bezier(0.16,1,0.3,1) both",animationDelay:(Math.min(idx,16)*0.03)+"s"}),
-          }}
+          <div key={app.id} style={wrap}
             className={isDrg?"":"di"} title={app.desc}
-            onPointerDown={e=>onIconMouseDown(e,app.id,allDesktopIcons)}
+            onPointerDown={e=>onIconMouseDown(e,app.id,desktopEntries)}
             onDoubleClick={launch}
             onContextMenu={e=>openContextMenu(e, [
               {icon:"▶", label:"Open", onClick:launch},
-              // v8.0: pin/unpin to taskbar. Pinned apps appear as compact
-              // icon-only chips on the taskbar even when not running.
               ...(app.storeApp ? [] : [pinnedSet.has(app.id)
                 ? {icon:"📌", label:"Unpin from taskbar", onClick:()=>unpinAppFromTaskbar(app.id)}
                 : {icon:"📌", label:"Pin to taskbar", onClick:()=>pinAppToTaskbar(app.id)}
               ]),
-              // v7.7: "Remove from desktop" hides the app from the desktop
-              // without uninstalling it. It still shows in the start menu /
-              // taskbar; users can add it back via right-click there.
+              // v11.0 Phase B — folders: move into an existing folder, or start a new one
+              ...folderEntries.map(fe=>({icon:"📁", label:"Move to: "+(fe.folder.name||"Folder"), onClick:()=>addToDesktopFolder(fe.fid,app.id)})),
+              {icon:"📁", label:"New folder", onClick:()=>{const fid=createDesktopFolder([app.id]);setOpenDesktopFolder(fid);}},
               {icon:"–", label:"Remove from desktop", danger:true, onClick:()=>hideAppFromDesktop(app.id)},
-              // For store-installed apps, also offer full uninstall as a
-              // separate action — this removes them from `installedApps`
-              // entirely (so they vanish from the start menu too).
               ...(app.storeApp ? [{
                 icon:"🗑", label:"Uninstall app", danger:true,
                 onClick:()=>{
@@ -2505,15 +2541,13 @@ export default function NovaOS(){
             ])}>
             <div style={{position:"relative",pointerEvents:"none",display:"flex",alignItems:"center",justifyContent:"center",filter:"drop-shadow(0 3px 8px rgba(0,0,0,0.55))"}}>
               <AppIconDisplay app={app} size={40} glass={glass}/>
-              {/* v8.1: notification badge — small numeric circle in the
-                  upper-right of the icon when the app has unread items. */}
               {appBadgeCounts[app.id]>0 && (
                 <div style={{position:"absolute",top:-4,right:-4,minWidth:16,height:16,padding:"0 4px",borderRadius:8,background:"#ff4d4f",color:"#fff",fontFamily:FFB,fontWeight:700,fontSize:10,display:"flex",alignItems:"center",justifyContent:"center",lineHeight:1,boxShadow:"0 0 8px rgba(255,77,79,0.55), 0 1px 2px rgba(0,0,0,0.6)",border:"1.5px solid rgba(10,12,24,0.85)"}}>
                   {appBadgeCounts[app.id]>9?"9+":appBadgeCounts[app.id]}
                 </div>
               )}
             </div>
-            <span style={{fontFamily:FFB,fontWeight:600,fontSize:10.5,color:lightT?"var(--nv-text-strong)":"#fff",textAlign:"center",lineHeight:1.25,textShadow:lightT?"0 1px 3px rgba(255,255,255,0.95), 0 0 10px rgba(255,255,255,0.7)":"0 1px 3px rgba(0,0,0,0.9), 0 0 8px rgba(0,0,0,0.5)",pointerEvents:"none",letterSpacing:0.15}}>{app.label}</span>
+            <span style={labelStyle}>{app.label}</span>
           </div>
         );
       }); })()}
@@ -3177,6 +3211,37 @@ export default function NovaOS(){
           </div>
         </>
       )}
+      {/* v11.0 Phase B — open desktop folder popover: rename inline, click an app
+          to launch, right-click an app to remove it from the folder. */}
+      {openDesktopFolder && desktopFolders[openDesktopFolder] && (()=>{
+        const f = desktopFolders[openDesktopFolder];
+        const fapps = (f.apps||[]).map(appById).filter(Boolean);
+        return (
+          <>
+            <div onClick={()=>setOpenDesktopFolder(null)} style={{position:"fixed",inset:0,zIndex:9996,background:"rgba(0,0,0,0.3)",backdropFilter:"blur(4px)",WebkitBackdropFilter:"blur(4px)"}}/>
+            <div style={{position:"fixed",left:"50%",top:"50%",transform:"translate(-50%,-50%)",zIndex:9997,width:"min(440px,92vw)",maxHeight:"70vh",overflowY:"auto",background:"var(--nv-surface-solid)",border:"1px solid var(--nv-border)",borderRadius:18,boxShadow:"var(--nv-popover-shadow)",padding:18,animation:"pop-in 0.24s var(--nv-ease)"}}>
+              <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14}}>
+                <input value={f.name||"Folder"} onChange={e=>renameDesktopFolder(openDesktopFolder,e.target.value)} spellCheck={false} style={{flex:1,minWidth:0,background:"transparent",border:"none",outline:"none",fontFamily:FFB,fontWeight:700,fontSize:16,color:"var(--nv-text-strong)"}}/>
+                <button onClick={()=>setOpenDesktopFolder(null)} title="Close" style={{width:28,height:28,borderRadius:8,background:"var(--nv-elevated)",border:"1px solid var(--nv-border)",color:"var(--nv-text)",cursor:"pointer",fontSize:12,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,padding:0}}>✕</button>
+              </div>
+              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(82px,1fr))",gap:6}}>
+                {fapps.map(a=>(
+                  <div key={a.id} className="ma" style={{display:"flex",flexDirection:"column",alignItems:"center",gap:7,padding:"13px 6px",borderRadius:12,cursor:"pointer"}}
+                    onClick={()=>{setOpenDesktopFolder(null);openApp(a.id);}}
+                    onContextMenu={e=>{e.preventDefault();openContextMenu(e,[
+                      {icon:"▶",label:"Open",onClick:()=>{setOpenDesktopFolder(null);openApp(a.id);}},
+                      {icon:"–",label:"Remove from folder",danger:true,onClick:()=>removeFromDesktopFolder(openDesktopFolder,a.id)},
+                    ]);}}>
+                    <AppIconDisplay app={{id:a.id,icon:a.icon}} size={40} glass={glass}/>
+                    <span style={{fontSize:10.5,fontFamily:FFB,fontWeight:600,color:"var(--nv-text)",textAlign:"center",lineHeight:1.2,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",maxWidth:"100%"}}>{a.label}</span>
+                  </div>
+                ))}
+              </div>
+              <div style={{marginTop:12,fontSize:11,color:"var(--nv-text-dim)",fontStyle:"italic"}}>Click an app to open it · right-click to remove it from the folder · empty the folder to dissolve it</div>
+            </div>
+          </>
+        );
+      })()}
       {ctxMenu && <ContextMenu x={ctxMenu.x} y={ctxMenu.y} items={ctxMenu.items} onClose={closeContextMenu} AC={AC}/>}
       {/* v11.0 Phase B — first-run setup wizard, shown once for brand-new accounts
           (setupComplete strictly false; existing accounts have it undefined). */}
