@@ -403,31 +403,26 @@ function shade(hex, amt) {
   return "rgb(" + m(r) + "," + m(g) + "," + m(b) + ")";
 }
 
-// v11.0 — app-icon tile. Flat solid fills read as "web project"; real-OS icons
-// have quiet material depth. Each tile now gets a top-lit diagonal gradient
-// (lighter top-left → base → slightly darker bottom), a soft top sheen, and a
-// crisp hairline edge — dimensional but still minimal, no heavy gloss/bevel.
+// v11.0 — app-icon tile. Dead-flat fills read as "web project," but a sheen/
+// bevel reads as dated gloss. The middle ground (Windows 11 / macOS): keep the
+// flat minimal glyph style, add only a WHISPER of top-to-bottom gradient (a few
+// % lighter at top, a few % darker at bottom) so the tile has quiet dimension,
+// plus a crisp hairline edge. No sheen, no bevel.
 export function NovaAppIcon({ id, size = 26 }) {
   const spec = SPECS[id];
   if (!spec) return null;
-  const g = "nai-" + id;   // gradient ids (identical per app id, safe to share across instances)
+  const g = "nai-" + id;   // gradient id (identical per app id, safe to share across instances)
   return (
     <svg width={size} height={size} viewBox="0 0 48 48" style={{ display: "block" }}>
       <defs>
-        <linearGradient id={g} x1="0" y1="0" x2="0.18" y2="1">
-          <stop offset="0%"   stopColor={shade(spec.color, 0.20)} />
-          <stop offset="55%"  stopColor={spec.color} />
-          <stop offset="100%" stopColor={shade(spec.color, -0.16)} />
-        </linearGradient>
-        <linearGradient id={g + "s"} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%"  stopColor="#fff" stopOpacity="0.22" />
-          <stop offset="46%" stopColor="#fff" stopOpacity="0" />
+        <linearGradient id={g} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%"   stopColor={shade(spec.color, 0.07)} />
+          <stop offset="100%" stopColor={shade(spec.color, -0.10)} />
         </linearGradient>
       </defs>
       <rect x="2" y="2" width="44" height="44" rx="11" fill={"url(#" + g + ")"} />
-      <rect x="2" y="2" width="44" height="44" rx="11" fill={"url(#" + g + "s)"} />
       <g transform="translate(24 24) scale(1.2) translate(-24 -24)">{spec.glyph}</g>
-      <rect x="2.5" y="2.5" width="43" height="43" rx="10.6" fill="none" stroke="#000" strokeOpacity="0.09" strokeWidth="1" />
+      <rect x="2.5" y="2.5" width="43" height="43" rx="10.6" fill="none" stroke="#000" strokeOpacity="0.10" strokeWidth="1" />
     </svg>
   );
 }

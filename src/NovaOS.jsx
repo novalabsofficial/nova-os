@@ -160,6 +160,25 @@ function BellGlyph({ size = 16 }) {
     </svg>
   );
 }
+// v11.0 — SVG glyphs replacing hardcoded 🔍/✨ emojis (emojis render per-platform
+// and read as "web", not OS). Both inherit `currentColor`.
+function SearchGlyph({ size = 16 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" style={{display:"block"}}>
+      <circle cx="10.5" cy="10.5" r="6.5"/>
+      <path d="M21 21l-5.1-5.1"/>
+    </svg>
+  );
+}
+function SparkGlyph({ size = 16 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" style={{display:"block"}}>
+      <path d="M12 2.5c.45 4.2 2.3 6.05 6.5 6.5-4.2.45-6.05 2.3-6.5 6.5-.45-4.2-2.3-6.05-6.5-6.5 4.2-.45 6.05-2.3 6.5-6.5z"/>
+      <path d="M18.5 14c.22 1.9 1.1 2.78 3 3-1.9.22-2.78 1.1-3 3-.22-1.9-1.1-2.78-3-3 1.9-.22 2.78-1.1 3-3z"/>
+    </svg>
+  );
+}
 function GearGlyph({ size = 16 }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -403,7 +422,7 @@ function Spotlight({ AC, data, apps, storeCatalog, commApps, isPubliclyVisible, 
         animation: "menu-up 0.22s cubic-bezier(0.16,1,0.3,1)",
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: 11, padding: "16px 18px", borderBottom: "1px solid var(--nv-border)" }}>
-          <span style={{ fontSize: 18 }}>🔍</span>
+          <span style={{ color: "var(--nv-text-dim)", display: "flex" }}><SearchGlyph size={17}/></span>
           <input
             ref={inputRef}
             value={q}
@@ -549,7 +568,7 @@ function QuickSettingsPanel({ AC, glass, onToggleGlass, onClose, openSettingsSec
             </div>
           </button>
           <button onClick={onToggleGlass} style={{ ...tile(glass), flex: "0 0 auto", width: 58, justifyContent: "center" }} title="Liquid Glass">
-            <span style={{ fontSize: 18, color: glass ? AC : "var(--nv-text)" }}>✨</span>
+            <span style={{ color: glass ? AC : "var(--nv-text)", display: "flex" }}><SparkGlyph size={17}/></span>
           </button>
         </div>
 
@@ -2518,7 +2537,7 @@ export default function NovaOS(){
         {/* Search bar — gains an accent-tinged border on focus via CSS focus-visible */}
         <div style={{padding:"18px 18px 12px",flexShrink:0}}>
           <div style={{display:"flex",alignItems:"center",gap:10,background:"var(--nv-elevated)",border:"1px solid var(--nv-border)",borderRadius:11,padding:"11px 16px",transition:"border-color 0.2s, background 0.2s"}}>
-            <span style={{fontSize:14,opacity:0.55}}>🔍</span>
+            <span style={{color:"var(--nv-text-dim)",display:"flex",opacity:0.9}}><SearchGlyph size={14}/></span>
             <input value={menuSrch} onChange={e=>setMenuSrch(e.target.value)} placeholder="Search apps…" autoFocus style={{flex:1,background:"none",border:"none",outline:"none",color:"var(--nv-text-strong)",fontFamily:FF,fontSize:14}}/>
             {menuSrch&&<button onClick={()=>setMenuSrch("")} style={{background:"var(--nv-hover)",border:"none",color:"var(--nv-text-dim)",cursor:"pointer",fontSize:11,width:20,height:20,borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center"}}>✕</button>}
           </div>
@@ -2773,7 +2792,7 @@ export default function NovaOS(){
             cursor:"pointer",fontFamily:FF,fontSize:12.5,color:"var(--nv-text-dim)",
             transition:"all 0.18s var(--nv-ease)",flexShrink:0,
           }}>
-            <span style={{fontSize:14,lineHeight:1}}>🔍</span>
+            <span style={{display:"flex"}}><SearchGlyph size={15}/></span>
             <span>Search</span>
           </button>
         )}
@@ -2786,7 +2805,7 @@ export default function NovaOS(){
           cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:12.5,color:commandOpen?AC:"var(--nv-text-dim)",
           transition:"all 0.18s var(--nv-ease)",flexShrink:0,
         }}>
-          <span style={{fontSize:14,lineHeight:1,filter:commandOpen?"drop-shadow(0 0 8px rgba("+hexRgb(AC)+",0.5))":"none"}}>✨</span>
+          <span style={{display:"flex",filter:commandOpen?"drop-shadow(0 0 8px rgba("+hexRgb(AC)+",0.5))":"none"}}><SparkGlyph size={15}/></span>
           {deviceMode!=="mobile" && <span>Ask Nova</span>}
         </button>
         {/* v10.0 Supernova — Task View launcher (virtual desktops). Shows the
@@ -3056,7 +3075,7 @@ export default function NovaOS(){
         <QuickSettingsPanel
           AC={AC}
           glass={glass}
-          onToggleGlass={()=>{const v=!glass;updateSettings({glass:v});showToast(v?"Liquid Glass on ✨":"Liquid Glass off");}}
+          onToggleGlass={()=>{const v=!glass;updateSettings({glass:v});showToast(v?"Liquid Glass on":"Liquid Glass off");}}
           onClose={()=>setQsOpen(false)}
           openSettingsSection={(id)=>{setSettingsSection(id);openApp("settings");}}
         />
