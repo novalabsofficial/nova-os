@@ -50,9 +50,13 @@ solid. This combined release **absorbs everything that was tentatively scoped as
 > custom-safe slots), and the **step-7 polish pass** — elevation cohesion
 > (`--nv-popover-shadow`), motion cohesion (one `var(--nv-ease)`), spacing/type audits
 > (foundation already consistent; aligned the few outliers), and accent-aware focus
-> rings (`--nv-accent`). **Next: Phase B · Desktop power** (first-run wizard +
-> whitelist pinning, app folders, snap workspaces, multi-select, sticky notes,
-> backup/export).
+> rings (`--nv-accent`). **Phase B · Desktop power COMPLETE** — first-run wizard +
+> whitelist pinning, app folders (menu + drag-to-merge), multi-select icon move
+> (marquee/Ctrl-click + group drag), backup/export profile (Settings → Backup,
+> JSON export/import w/ confirm + reload), desktop sticky notes (`data.stickyNotes`,
+> 6 colors, drag/edit/delete), and snap workspaces (`settings.workspaces` —
+> save/restore named window layouts via desktop right-click → Window layouts).
+> **Next: Phase C · Flagship apps** (video editor, code editor, …).
 
 ## A · Design foundation — the bedrock everything else sits on
 - **Design system / tokens.** One shared scale for spacing, corner radius,
