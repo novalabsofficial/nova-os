@@ -18,6 +18,13 @@ export const CUSTOM_LIGHT_WP = (() => {
   const first = Object.values(_wpImgs)[0];
   return first ? (first.default || first) : null;
 })();
+// Same idea for the DARK default ("Bloom Dark") — drop an image into
+// src/assets/wallpapers-dark/. Empty folder → Bloom Dark falls back to Mesh.
+const _wpImgsDark = import.meta.glob("../assets/wallpapers-dark/*.{png,jpg,jpeg,webp,avif}", { eager: true });
+export const CUSTOM_DARK_WP = (() => {
+  const first = Object.values(_wpImgsDark)[0];
+  return first ? (first.default || first) : null;
+})();
 
 function NovaBg() {
   return (
@@ -764,6 +771,16 @@ function BloomBg() {
   );
 }
 
+// v11.0 — Bloom Dark: the signature DARK wallpaper, paired with light Bloom.
+// Renders the bundled dark image if one was dropped into wallpapers-dark/;
+// otherwise falls back to Mesh so dark mode never breaks before the art exists.
+function BloomDarkBg() {
+  if (CUSTOM_DARK_WP) {
+    return <div style={{position:"absolute",inset:0,background:'url("'+CUSTOM_DARK_WP+'") center/cover no-repeat'}}/>;
+  }
+  return <MeshBg/>;
+}
+
 /**
  * Resolve the concrete background element for a wallpaper id.
  * "custom" requires a customUrl (the user-uploaded base64 image).
@@ -775,6 +792,7 @@ function renderBg(id, customUrl) {
   }
   if (!id || id === "mesh")  return <MeshBg/>;
   if (id === "bloom" || id === "lumina") return <BloomBg/>;   // "lumina" = pre-release alias
+  if (id === "bloomdark")    return <BloomDarkBg/>;
   if (id === "supernova")    return <SupernovaBg/>;
   if (id === "nebula")       return <NebulaBg/>;
   if (id === "aurora")       return <AuroraBg/>;

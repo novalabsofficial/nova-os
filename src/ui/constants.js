@@ -305,6 +305,8 @@ export const WALLPAPERS = {
   // sibling to Mesh). Auto-selected whenever Light mode is on; layered pastel
   // Nova petals + luminous core over a graduated cool-white canvas.
   bloom:    {name:"Bloom",     semitones: 3,  preview:"radial-gradient(circle at 53% 46%,#ffffff 0%,#cbbdfb 13%,#a5b4fc 27%,#f0abce 42%,transparent 62%),linear-gradient(135deg,#f5f7fc,#cfd6e6)"},
+  // v11.0 — Bloom Dark: signature DARK wallpaper, auto-paired with light Bloom.
+  bloomdark:{name:"Bloom Dark", semitones: 0,  preview:"radial-gradient(circle at 60% 60%,#c4b5fd 0%,#8b5cf6 18%,#6d28d9 34%,#3730a3 52%,#1e1b4b 72%,#0a0a18 100%)"},
   // v10.0 — Supernova Edition signature wallpapers (SVG-backed; see
   // wallpapers.jsx). Supernova: a radiant exploding-star burst. Nebula: a
   // calm, spacious deep-space cloud companion. Both clean + professional.

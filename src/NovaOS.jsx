@@ -712,7 +712,7 @@ export default function NovaOS(){
   // existing one. Either is still fully changeable in Settings.
   const wpId    =(settings.theme==="light")
     ? (settings.wallpaperLight || "bloom")
-    : (settings.wallpaper || data?.wallpaper || "mesh");
+    : (settings.wallpaper || data?.wallpaper || "bloomdark");
   const widgets =settings.widgets   ||{};
   // Resolved device mode: user's saved preference overrides detection. "auto"
   // (or any unset/invalid value) defers to the viewport+touch heuristic.
