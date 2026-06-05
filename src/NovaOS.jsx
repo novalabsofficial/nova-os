@@ -707,12 +707,20 @@ export default function NovaOS(){
   const winBlur =settings.winBlur   ??18;
   const largeFnt=settings.largeFont ||false;
   const glass    =!!settings.glass;            // v9.0 Liquid Glass surfaces
-  // v11.0 — wallpaper is remembered per-theme: Light mode auto-uses its own
-  // slot (defaulting to the new Lumina light wallpaper), Dark mode keeps the
-  // existing one. Either is still fully changeable in Settings.
-  const wpId    =(settings.theme==="light")
-    ? (settings.wallpaperLight || "bloom")
-    : (settings.wallpaper || data?.wallpaper || "bloomdark");
+  // v11.0 — wallpaper is remembered per-theme: Light uses its own slot (default
+  // Bloom), Dark uses its own (default Bloom Dark); either is fully changeable and
+  // theme-switching never overwrites a pick. Guard: the paired signature ids are
+  // theme-specific, so a light "bloom" that ended up in the dark slot (or a
+  // "bloomdark" in the light slot) falls back to that theme's default rather than
+  // showing the wrong-theme wallpaper.
+  const wpId = (() => {
+    if (settings.theme === "light") {
+      const w = settings.wallpaperLight;
+      return (w && w !== "bloomdark") ? w : "bloom";
+    }
+    const w = settings.wallpaper || data?.wallpaper;
+    return (w && w !== "bloom") ? w : "bloomdark";
+  })();
   const widgets =settings.widgets   ||{};
   // Resolved device mode: user's saved preference overrides detection. "auto"
   // (or any unset/invalid value) defers to the viewport+touch heuristic.

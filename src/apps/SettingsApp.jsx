@@ -133,7 +133,10 @@ export function SettingsApp({ user, data, updateSettings, showToast, AC, onCusto
   // and writes whichever slot matches the active theme.
   const isLightWp = settings.theme === "light";
   const wpKey = isLightWp ? "wallpaperLight" : "wallpaper";
-  const wpId = isLightWp ? (settings.wallpaperLight || "bloom") : (settings.wallpaper || data?.wallpaper || "bloomdark");
+  const _darkW = settings.wallpaper || data?.wallpaper;
+  const wpId = isLightWp
+    ? ((settings.wallpaperLight && settings.wallpaperLight !== "bloomdark") ? settings.wallpaperLight : "bloom")
+    : ((_darkW && _darkW !== "bloom") ? _darkW : "bloomdark");
   const widgets = settings.widgets || {};
   function setWidget(id, val) { updateSettings({ widgets: { ...widgets, [id]: val } }); }
 
