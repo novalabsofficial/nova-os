@@ -222,7 +222,9 @@ export function AssetStudioApp({ AC, showToast }) {
   const ptrs = useRef(new Map());       // active pointerId -> {x,y} for move/pinch
   const gesture = useRef(null);         // current move/pinch descriptor
   const imgSrcCache = useRef(new Map()); // src -> decoded Image, so recolor doesn't re-decode each slider tick
-  const clipRef = useRef([]);            // internal layer clipboard — Ctrl+C copies layers; pasted via onPaste only when the system clipboard has no image
+  const clipRef = useRef([]);            // internal layer clipboard (the actual copied layers)
+  const clipTokenRef = useRef("");       // marker written to the system clipboard on copy, so paste knows if our copy is still the freshest
+  const clipSeqRef = useRef(0);
   useEffect(() => { layersRef.current = layers; }, [layers]);
   useEffect(() => { selRef.current = selIds; }, [selIds]);
   useEffect(() => { cropRef.current = cropMode; }, [cropMode]);
@@ -289,14 +291,20 @@ export function AssetStudioApp({ AC, showToast }) {
       if (!hot.current) return;
       const ae = document.activeElement, at = ae && ae.tagName;
       if (at === "INPUT" || at === "TEXTAREA" || at === "SELECT" || (ae && ae.isContentEditable)) return;   // typing -> native paste
-      const items = e.clipboardData?.items || [];
-      // An image on the system clipboard always wins (e.g. a logo copied from a
-      // webpage). Only when there's no image do we fall back to the internal
-      // layer clipboard — so an external copy is never shadowed by an old in-app one.
+      const cd = e.clipboardData;
+      const marker = cd ? (cd.getData("text/plain") || "") : "";
+      // Our copy marker is still on the clipboard -> our in-app copy was the most
+      // recent action, so paste the faithful layers.
+      if (clipRef.current.length && clipTokenRef.current && marker === clipTokenRef.current) {
+        e.preventDefault(); pasteInternal(); return;
+      }
+      // Otherwise a newer external image wins (e.g. a logo copied from a webpage).
+      const items = cd?.items || [];
       for (const it of items) {
         if (it.type?.startsWith("image/")) { const f = it.getAsFile(); if (f) { const r = new FileReader(); r.onload = () => addImageFromSrc(r.result); r.readAsDataURL(f); e.preventDefault(); showToast?.("Pasted image added"); } return; }
       }
-      if (clipRef.current && clipRef.current.length) { e.preventDefault(); pasteInternal(); }
+      // No image and no marker — last-resort internal paste.
+      if (clipRef.current.length) { e.preventDefault(); pasteInternal(); }
     }
     function onDown(e) { hot.current = !!rootRef.current && rootRef.current.contains(e.target); }
     function onKey(e) {
@@ -308,8 +316,9 @@ export function AssetStudioApp({ AC, showToast }) {
         if (window.getSelection && String(window.getSelection())) return;
         e.preventDefault();
         if (selRef.current.length) {   // copy the selected layers (faithful duplicate on paste)
-          clipRef.current = layersRef.current.filter(l => selRef.current.includes(l.id)).map(l => ({ ...l }));
-          showToast?.(clipRef.current.length > 1 ? clipRef.current.length + " layers copied" : "Layer copied");
+          const sel = layersRef.current.filter(l => selRef.current.includes(l.id));
+          copySelectionToClipboard(sel);
+          showToast?.(sel.length > 1 ? sel.length + " layers copied" : "Layer copied");
         } else copyImage();           // nothing selected -> copy the whole image to the system clipboard
         return;
       }
@@ -511,8 +520,8 @@ export function AssetStudioApp({ AC, showToast }) {
   }
 
   // Draw every layer into ctx using CW×CH as the coordinate space.
-  async function renderLayers(ctx, CW, CH) {
-    for (const l of layersRef.current) {
+  async function renderLayers(ctx, CW, CH, list) {
+    for (const l of (list || layersRef.current)) {
       ctx.save();
       ctx.globalAlpha = (l.opacity ?? 100) / 100;
       const dw = l.w * CW, dh = l.h * CH, cx = l.x * CW + dw / 2, cy = l.y * CH + dh / 2;
@@ -592,6 +601,24 @@ export function AssetStudioApp({ AC, showToast }) {
       await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
       showToast?.("Copied to clipboard ✓"); setBusy(false);
     } catch { showToast?.("Copy failed — clipboard blocked"); setBusy(false); }
+  }
+  // v11.0 — copy the selected layers internally AND stamp a unique marker (plus a
+  // PNG of the selection) onto the system clipboard. On paste, if that marker is
+  // still there our copy was the most recent action -> paste faithful layers; if
+  // a newer external image replaced it on the clipboard, that image wins instead.
+  async function copySelectionToClipboard(sel) {
+    clipRef.current = sel.map(l => ({ ...l }));
+    clipTokenRef.current = "nova-clip:" + (clipSeqRef.current += 1);
+    try {
+      if (typeof ClipboardItem === "undefined" || !navigator.clipboard?.write) return;
+      const W = preset.w, H = preset.h;
+      const c = document.createElement("canvas"); c.width = W; c.height = H;
+      const ctx = c.getContext("2d");
+      await renderLayers(ctx, W, H, sel);
+      const blob = await new Promise(res => c.toBlob(res, "image/png"));
+      if (!blob) return;
+      await navigator.clipboard.write([new ClipboardItem({ "image/png": blob, "text/plain": new Blob([clipTokenRef.current], { type: "text/plain" }) })]);
+    } catch { /* clipboard blocked — internal paste still works via the no-image fallback */ }
   }
   // v11.0 — drag image files from the OS / another app onto the canvas to add them.
   function onDropFiles(e) {
