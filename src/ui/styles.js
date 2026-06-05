@@ -149,6 +149,7 @@ export const CSS = `
     --nv-scroll:rgba(255,255,255,0.14);
     --nv-scroll-hover:rgba(255,255,255,0.24);
     --nv-glass-blur:28px;
+    --nv-card-shadow:0 2px 4px rgba(0,0,0,0.22), 0 10px 30px rgba(0,0,0,0.45), 0 1px 0 rgba(255,255,255,0.08) inset;
   }
   /* ── v11.0 Light mode. Flips the --nv-* tokens; every surface that uses them
      reskins automatically. (Apps still on hardcoded colors get migrated to
@@ -159,7 +160,7 @@ export const CSS = `
        opaque so the wallpaper doesn't muddy them; borders + text carry a touch
        more contrast so cards stay defined instead of washing out. */
     --nv-body-bg:#d7dbe4;
-    --nv-surface:rgba(244,246,250,0.93);
+    --nv-surface:rgba(245,247,251,0.96);
     --nv-surface-solid:rgba(246,248,251,0.99);
     --nv-elevated:rgba(20,28,48,0.05);
     --nv-border:rgba(20,28,48,0.16);
@@ -171,10 +172,16 @@ export const CSS = `
     --nv-input-bg:rgba(20,28,48,0.05);
     --nv-scroll:rgba(20,28,48,0.24);
     --nv-scroll-hover:rgba(20,28,48,0.36);
+    /* soft, light drop-shadow so cards (widgets, windows) float gently instead
+       of casting the heavy dark shadow from dark mode — keeps the light theme airy */
+    --nv-card-shadow:0 2px 6px rgba(30,41,59,0.07), 0 12px 30px rgba(30,41,59,0.12), 0 1px 0 rgba(255,255,255,0.6) inset;
   }
+  /* v11.0 — with glass on, keep every light surface the SAME clean shade so the
+     taskbar + widgets + windows read as one consistent material (was 0.66 vs 0.8,
+     which made the glassy taskbar/widgets look greyer than the windows). */
   html[data-theme="light"][data-glass="on"]{
-    --nv-surface:rgba(244,246,250,0.66);
-    --nv-surface-solid:rgba(246,248,251,0.8);
+    --nv-surface:rgba(245,247,251,0.88);
+    --nv-surface-solid:rgba(246,248,251,0.92);
   }
 
   /* ── v9.0 Liquid Glass. When enabled (html[data-glass="on"]), surfaces get

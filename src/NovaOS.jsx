@@ -2460,7 +2460,7 @@ export default function NovaOS(){
                 </div>
               )}
             </div>
-            <span style={{fontFamily:FFB,fontWeight:600,fontSize:10.5,color:lightT?"var(--nv-text-strong)":"#fff",textAlign:"center",lineHeight:1.25,textShadow:lightT?"0 1px 2px rgba(255,255,255,0.55)":"0 1px 3px rgba(0,0,0,0.9), 0 0 8px rgba(0,0,0,0.5)",pointerEvents:"none",letterSpacing:0.15}}>{app.label}</span>
+            <span style={{fontFamily:FFB,fontWeight:600,fontSize:10.5,color:lightT?"var(--nv-text-strong)":"#fff",textAlign:"center",lineHeight:1.25,textShadow:lightT?"0 1px 3px rgba(255,255,255,0.95), 0 0 10px rgba(255,255,255,0.7)":"0 1px 3px rgba(0,0,0,0.9), 0 0 8px rgba(0,0,0,0.5)",pointerEvents:"none",letterSpacing:0.15}}>{app.label}</span>
           </div>
         );
       }); })()}

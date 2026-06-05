@@ -31,7 +31,7 @@ export function WidgetShell({ id, state, onDragStart, onResizeStart, onClose, ch
       border:"1px solid var(--nv-border)",
       borderRadius:16,
       overflow:"hidden",
-      boxShadow:"0 2px 4px rgba(0,0,0,0.22), 0 10px 30px rgba(0,0,0,0.45), 0 1px 0 rgba(255,255,255,0.08) inset",
+      boxShadow:"var(--nv-card-shadow)",
       display:"flex",flexDirection:"column",
     }}>
       {handles.map(hh => (
