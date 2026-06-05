@@ -115,6 +115,19 @@ const MATERIALS = [
   { id: "neon", label: "Neon", glow: true, filter: "brightness(1.12)" },
 ];
 const matById = (id) => MATERIALS.find(m => m.id === id);
+
+// v11.0 — text layers. A handful of default font stacks (no bundled webfonts —
+// these are system families that render identically in the DOM preview and the
+// canvas export). The text size scales with the layer box height.
+const FONTS = [
+  { id: "sans", label: "Sans", css: "'Inter','Segoe UI',system-ui,sans-serif" },
+  { id: "serif", label: "Serif", css: "Georgia,'Times New Roman',serif" },
+  { id: "mono", label: "Mono", css: "'JetBrains Mono',Consolas,monospace" },
+  { id: "round", label: "Rounded", css: "'Trebuchet MS','Segoe UI',sans-serif" },
+  { id: "display", label: "Display", css: "'Arial Black',Impact,sans-serif" },
+];
+const fontCss = (id) => (FONTS.find(f => f.id === id) || FONTS[0]).css;
+const TEXT_FIT = 0.74;   // font size as a fraction of the layer-box height
 const glowColor = (l) => l.fill || l.stroke || "#ffffff";
 function matFilter(mat, l) {
   if (!mat || mat.id === "flat") return "none";
@@ -173,6 +186,7 @@ export function AssetStudioApp({ AC, showToast }) {
   const [busy, setBusy] = useState(false);
   const rootRef = useRef(null);
   const [dragActive, setDragActive] = useState(false);   // v11.0 — drag-drop image files onto the canvas
+  const [canvasPx, setCanvasPx] = useState({ w: 0, h: 0 }); // on-screen canvas size, so text scales WYSIWYG
   const canvasRef = useRef(null);
   const fileRef = useRef(null);
   const layersRef = useRef(layers);
@@ -182,11 +196,16 @@ export function AssetStudioApp({ AC, showToast }) {
   const ptrs = useRef(new Map());       // active pointerId -> {x,y} for move/pinch
   const gesture = useRef(null);         // current move/pinch descriptor
   const imgSrcCache = useRef(new Map()); // src -> decoded Image, so recolor doesn't re-decode each slider tick
-  const clipRef = useRef([]);            // internal layer clipboard — Ctrl+C/Ctrl+V duplicates objects faithfully
-  const justPastedInternal = useRef(false);
+  const clipRef = useRef([]);            // internal layer clipboard — Ctrl+C copies layers; pasted via onPaste only when the system clipboard has no image
   useEffect(() => { layersRef.current = layers; }, [layers]);
   useEffect(() => { selRef.current = selIds; }, [selIds]);
   useEffect(() => { cropRef.current = cropMode; }, [cropMode]);
+  useEffect(() => {
+    const el = canvasRef.current; if (!el || typeof ResizeObserver === "undefined") return;
+    const read = () => { const r = el.getBoundingClientRect(); setCanvasPx({ w: r.width, h: r.height }); };
+    read(); const ro = new ResizeObserver(read); ro.observe(el);
+    return () => ro.disconnect();
+  }, [ar]);
 
   const ar = preset.w / preset.h;
   const isSel = (id) => selIds.includes(id);
@@ -197,9 +216,13 @@ export function AssetStudioApp({ AC, showToast }) {
   const ref0 = single || selLayers[0];
   const imgSel = selLayers.filter(l => l.type === "image");
   const imgRef = imgSel[0];
+  const anyText = selLayers.some(l => l.type === "text");
+  const isText = !!(single && single.type === "text");
+  const textRef = selLayers.find(l => l.type === "text");
 
   const patch = (id, p) => setLayers(ls => ls.map(l => l.id === id ? { ...l, ...p } : l));
   const patchSel = (p) => setLayers(ls => ls.map(l => selIds.includes(l.id) ? { ...l, ...p } : l));
+  const patchText = (p) => setLayers(ls => ls.map(l => (selIds.includes(l.id) && l.type === "text") ? { ...l, ...p } : l));   // text-only, so a mixed selection's shapes aren't clobbered
   const toggleSel = (key) => setLayers(ls => ls.map(l => selIds.includes(l.id) ? { ...l, [key]: !l[key] } : l));
 
   function addShape(type) {
@@ -207,6 +230,12 @@ export function AssetStudioApp({ AC, showToast }) {
     const w = 0.34, h = 0.34;
     const layer = { id: nid(), type, x: 0.5 - w / 2, y: 0.5 - h / 2, w, h, rotation: 0, opacity: 100, flipH: false, flipV: false,
       fill: type === "line" ? null : AC, stroke: "#ffffff", strokeW: type === "line" ? 6 : 0 };
+    setLayers(ls => [...ls, layer]); setSelIds([layer.id]);
+  }
+  function addText() {
+    setShapeMenu(false);
+    const w = 0.5, h = 0.16;
+    const layer = { id: nid(), type: "text", text: "Text", x: 0.5 - w / 2, y: 0.5 - h / 2, w, h, rotation: 0, opacity: 100, flipH: false, flipV: false, fill: "#ffffff", font: "sans", weight: 800, align: "center" };
     setLayers(ls => [...ls, layer]); setSelIds([layer.id]);
   }
   function addImageFromSrc(src) {
@@ -225,11 +254,16 @@ export function AssetStudioApp({ AC, showToast }) {
   useEffect(() => {
     function onPaste(e) {
       if (!hot.current) return;
-      if (justPastedInternal.current) { justPastedInternal.current = false; return; }   // Ctrl+V already pasted internal layers
-      const items = e.clipboardData?.items; if (!items) return;
+      const ae = document.activeElement, at = ae && ae.tagName;
+      if (at === "INPUT" || at === "TEXTAREA" || at === "SELECT" || (ae && ae.isContentEditable)) return;   // typing -> native paste
+      const items = e.clipboardData?.items || [];
+      // An image on the system clipboard always wins (e.g. a logo copied from a
+      // webpage). Only when there's no image do we fall back to the internal
+      // layer clipboard — so an external copy is never shadowed by an old in-app one.
       for (const it of items) {
-        if (it.type?.startsWith("image/")) { const f = it.getAsFile(); if (f) { const r = new FileReader(); r.onload = () => addImageFromSrc(r.result); r.readAsDataURL(f); e.preventDefault(); showToast?.("Pasted image added"); } break; }
+        if (it.type?.startsWith("image/")) { const f = it.getAsFile(); if (f) { const r = new FileReader(); r.onload = () => addImageFromSrc(r.result); r.readAsDataURL(f); e.preventDefault(); showToast?.("Pasted image added"); } return; }
       }
+      if (clipRef.current && clipRef.current.length) { e.preventDefault(); pasteInternal(); }
     }
     function onDown(e) { hot.current = !!rootRef.current && rootRef.current.contains(e.target); }
     function onKey(e) {
@@ -246,16 +280,8 @@ export function AssetStudioApp({ AC, showToast }) {
         } else copyImage();           // nothing selected -> copy the whole image to the system clipboard
         return;
       }
-      if ((e.metaKey || e.ctrlKey) && (e.key === "v" || e.key === "V")) {
-        const a = document.activeElement, t = a && a.tagName;
-        if (t === "INPUT" || t === "TEXTAREA" || t === "SELECT" || (a && a.isContentEditable)) return;   // let real text paste through
-        if (clipRef.current && clipRef.current.length) {   // paste internal layers; external images go through onPaste
-          e.preventDefault(); pasteInternal();
-          justPastedInternal.current = true;
-          setTimeout(() => { justPastedInternal.current = false; }, 150);
-        }
-        return;
-      }
+      // Ctrl+V is handled in onPaste so the real system clipboard always takes
+      // priority (a fresh image copied from elsewhere beats a stale internal copy).
       if (e.key !== "Backspace" && e.key !== "Delete") return;
       const el = document.activeElement, tag = el && el.tagName;
       if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || (el && el.isContentEditable)) return;
@@ -452,6 +478,14 @@ export function AssetStudioApp({ AC, showToast }) {
       const mat = matById(l.material); ctx.filter = matFilter(mat, l);
       if (l.type === "image") { const img = await loadImage(l.tintedSrc || l.src).catch(() => null); if (img) ctx.drawImage(img, -dw / 2, -dh / 2, dw, dh); }
       else if (l.type === "line") { ctx.strokeStyle = l.stroke || "#fff"; ctx.lineWidth = Math.max(1, l.strokeW || 4); ctx.lineCap = "round"; ctx.beginPath(); ctx.moveTo(-dw / 2, 0); ctx.lineTo(dw / 2, 0); ctx.stroke(); }
+      else if (l.type === "text") {
+        const fs = Math.max(2, dh * TEXT_FIT);
+        ctx.font = (l.weight || 700) + " " + fs + "px " + fontCss(l.font);
+        ctx.fillStyle = l.fill || "#fff"; ctx.textBaseline = "middle";
+        ctx.textAlign = l.align === "left" ? "left" : l.align === "right" ? "right" : "center";
+        const tx = l.align === "left" ? -dw / 2 : l.align === "right" ? dw / 2 : 0;
+        ctx.fillText(l.text || "", tx, 0);
+      }
       else {
         ctx.beginPath();
         if (l.type === "rect") ctx.rect(-dw / 2, -dh / 2, dw, dh);
@@ -551,13 +585,24 @@ export function AssetStudioApp({ AC, showToast }) {
     return null;
   }
 
+  // Text layer preview — font size scales with the layer-box height (in on-screen
+  // px) so it matches the export exactly.
+  function textInner(l, flip) {
+    const fs = Math.max(4, l.h * (canvasPx.h || 420) * TEXT_FIT);
+    return (
+      <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: l.align === "left" ? "flex-start" : l.align === "right" ? "flex-end" : "center", color: l.fill || "#fff", fontFamily: fontCss(l.font), fontWeight: l.weight || 700, fontSize: fs, lineHeight: 1.05, whiteSpace: "nowrap", overflow: "visible", textAlign: l.align || "center", transform: flip, pointerEvents: "none", userSelect: "none" }}>{l.text || " "}</div>
+    );
+  }
+
   function layerEl(l) {
     const flip = "scaleX(" + (l.flipH ? -1 : 1) + ") scaleY(" + (l.flipV ? -1 : 1) + ")";
     const box = { position: "absolute", left: l.x * 100 + "%", top: l.y * 100 + "%", width: l.w * 100 + "%", height: l.h * 100 + "%", transform: "rotate(" + (l.rotation || 0) + "deg)", opacity: (l.opacity ?? 100) / 100, cursor: "move", outline: isSel(l.id) ? "2px solid " + AC : "none", outlineOffset: 1, pointerEvents: cropMode ? "none" : "auto", touchAction: "none" };
     const mat = matById(l.material);
     const inner = l.type === "image"
       ? <img src={l.tintedSrc || l.src} alt="" draggable={false} style={{ width: "100%", height: "100%", objectFit: "contain", pointerEvents: "none", display: "block", transform: flip }} />
-      : shapeInner(l, flip);
+      : l.type === "text"
+        ? textInner(l, flip)
+        : shapeInner(l, flip);
     const showHandles = single && single.id === l.id && !cropMode;
     return (
       <div key={l.id} onPointerDown={e => onLayerPointerDown(e, l)} style={box}>
@@ -604,6 +649,7 @@ export function AssetStudioApp({ AC, showToast }) {
         <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8, padding: "10px 12px", borderBottom: "1px solid var(--nv-border)" }}>
           <span style={{ fontFamily: FFB, fontWeight: 800, fontSize: 14, color: "var(--nv-text-strong)", marginRight: 2 }}>🪄 Asset Studio</span>
           <button style={tbtn(false)} onClick={() => fileRef.current?.click()}>＋ Image</button>
+          <button style={tbtn(false)} onClick={addText}>T Text</button>
           <div style={{ position: "relative" }}>
             <button style={tbtn(shapeMenu)} onClick={() => setShapeMenu(v => !v)}>◇ Shape ▾</button>
             {shapeMenu && (
@@ -653,6 +699,24 @@ export function AssetStudioApp({ AC, showToast }) {
           )}
           {allShapes && (
             <span style={lblS}>{selLayers.every(l => l.type === "line") ? "Thickness" : "Border"} <input type="range" min="0" max="40" value={ref0.strokeW || 0} onChange={e => patchSel({ strokeW: +e.target.value })} style={{ width: 72 }} /></span>
+          )}
+
+          {anyText && (
+            <>
+              {isText && <input value={single.text} onChange={e => patch(single.id, { text: e.target.value })} placeholder="Type here…" style={{ padding: "6px 9px", borderRadius: 7, background: "var(--nv-input-bg)", color: "var(--nv-text)", border: "1px solid var(--nv-border-strong)", fontFamily: FF, fontSize: 12.5, minWidth: 120, maxWidth: 220 }} />}
+              <span style={lblS}>Font
+                <select value={textRef?.font || "sans"} onChange={e => patchText({ font: e.target.value })} style={matSel}>
+                  {FONTS.map(f => <option key={f.id} value={f.id}>{f.label}</option>)}
+                </select>
+              </span>
+              <span style={lblS}>Color <input type="color" value={textRef?.fill || "#ffffff"} onChange={e => patchText({ fill: e.target.value })} style={swatch} /></span>
+              <span style={{ display: "flex", gap: 4 }}>
+                <button style={{ ...ibtn, ...(textRef?.align === "left" ? { borderColor: bdr(AC), color: AC } : {}) }} title="Align left" onClick={() => patchText({ align: "left" })}>⇤</button>
+                <button style={{ ...ibtn, ...((textRef?.align || "center") === "center" ? { borderColor: bdr(AC), color: AC } : {}) }} title="Align center" onClick={() => patchText({ align: "center" })}>≡</button>
+                <button style={{ ...ibtn, ...(textRef?.align === "right" ? { borderColor: bdr(AC), color: AC } : {}) }} title="Align right" onClick={() => patchText({ align: "right" })}>⇥</button>
+                <button style={{ ...ibtn, ...((textRef?.weight || 700) >= 700 ? { borderColor: bdr(AC), color: AC } : {}) }} title="Bold" onClick={() => patchText({ weight: (textRef?.weight || 700) >= 700 ? 400 : 800 })}><b>B</b></button>
+              </span>
+            </>
           )}
 
           {imgSel.length > 0 && (
