@@ -7,6 +7,7 @@
 import { useState, useEffect } from "react";
 import { FF, FFB, FFM } from "../ui/styles.js";
 import { WIDGET_CONFIGS, WGT_HANDLES_MOUSE, WGT_HANDLES_TOUCH, WMO } from "../ui/constants.js";
+import { WeatherGlyph } from "../ui/WeatherGlyph.jsx";
 // v7.1: weather widget gains NWS alerts + unit toggle, mirroring Atmos
 import { alertsUrl, parseAlerts, isLikelyUS } from "../lib/weather.js";
 // v8.7: real CPU/RAM metrics on the Tauri desktop build (null on web).
@@ -44,7 +45,6 @@ export function WidgetShell({ id, state, onDragStart, onResizeStart, onClose, ch
           borderBottom:"1px solid var(--nv-border)",
           cursor:"grab",userSelect:"none",flexShrink:0,zIndex:11,touchAction:"none",
         }}>
-        {cfg?.emoji && <span style={{fontSize:10,opacity:0.6,lineHeight:1}}>{cfg.emoji}</span>}
         <span style={{fontFamily:FFB,fontWeight:600,fontSize:9.5,letterSpacing:1.4,color:"var(--nv-text-dim)",textTransform:"uppercase",flex:1}}>{cfg?.label || id}</span>
         <button onClick={e => { e.stopPropagation(); onClose(); }}
           title="Hide widget"
@@ -200,10 +200,10 @@ export function WeatherWidgetContent({ state, data, updateSettings }) {
         </div>
       )}
       {status==="loading" && <div style={{display:"flex",alignItems:"center",gap:8}}><div style={{width:16,height:16,border:"2px solid rgba(255,255,255,0.15)",borderTopColor:"#fff",borderRadius:"50%",animation:"spin 0.8s linear infinite"}}/><span style={{fontFamily:FF,fontSize:11,color:"var(--nv-text-dim)"}}>Getting weather…</span></div>}
-      {status==="error" && <div style={{fontFamily:FF,fontSize:11,color:"var(--nv-text-dim)",textAlign:"center"}}>🌡️ Unavailable<br/><span style={{fontSize:9,opacity:0.6}}>Allow location access</span></div>}
+      {status==="error" && <div style={{fontFamily:FF,fontSize:11,color:"var(--nv-text-dim)",textAlign:"center"}}>Unavailable<br/><span style={{fontSize:9,opacity:0.6}}>Allow location access</span></div>}
       {status==="ok" && weather && (<>
         <div style={{display:"flex",alignItems:"center",gap:10}}>
-          <span style={{fontSize:iconSize,lineHeight:1}}>{WMO[weather.weathercode] || "🌡️"}</span>
+          <span style={{display:"flex",lineHeight:1}}><WeatherGlyph code={weather.weathercode} size={iconSize}/></span>
           <div>
             <div style={{fontFamily:FFM,fontSize:tempSize,fontWeight:400,color:"var(--nv-text-strong)",lineHeight:1}}>{Math.round(weather.temperature_2m)}{tempSymbol}</div>
             {loc && w > 170 && <div style={{fontFamily:FF,fontSize:Math.max(9,tempSize*0.32),color:"var(--nv-text-dim)",marginTop:3}}>{loc}</div>}

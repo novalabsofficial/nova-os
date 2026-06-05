@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { FF, FFB, FFM, INP, SEC } from "../ui/styles.js";
 import { fill, bdr, hexRgb } from "../lib/format.js";
 import { WMO } from "../ui/constants.js";
+import { WeatherGlyph } from "../ui/WeatherGlyph.jsx";
 import { AiAssist } from "../ui/AiAssist.jsx";
 import { wmoIcon, wmoLabel, geocodeUrl, parseGeocode, forecastUrl, parseForecast, alertsUrl, parseAlerts, isLikelyUS } from "../lib/weather.js";
 import { speak, cancelSpeech, playSound } from "../lib/audio.js";
@@ -426,7 +427,7 @@ export function AtmosApp({AC,showToast,pushNotification,openNovaAi,data,updateSe
                 }}/>
               </div>
               <div style={{display:"flex",alignItems:"center",gap:16,marginTop:6}}>
-                <div style={{fontSize:72,lineHeight:1,filter:"drop-shadow(0 2px 14px rgba("+wRgb+",0.45))"}}>{wmoIcon(forecast.current.code)}</div>
+                <div style={{lineHeight:1,filter:"drop-shadow(0 2px 14px rgba("+wRgb+",0.45))"}}><WeatherGlyph code={forecast.current.code} size={74}/></div>
                 <div style={{flex:1,minWidth:0}}>
                   <div style={{fontFamily:FFM,fontWeight:200,fontSize:56,color:"var(--nv-text-strong)",lineHeight:1,letterSpacing:-1}}>{Math.round(forecast.current.temp)}<span style={{fontSize:28,opacity:0.7,letterSpacing:0}}>{forecast.units.temp}</span></div>
                   <div style={{fontSize:14,color:"var(--nv-text)",marginTop:4,fontFamily:FFB,fontWeight:500,letterSpacing:0.3}}>{wmoLabel(forecast.current.code)}</div>
@@ -503,7 +504,7 @@ export function AtmosApp({AC,showToast,pushNotification,openNovaAi,data,updateSe
                   {forecast.hourly.map((h,i)=>(
                     <div key={i} style={{flex:"0 0 auto",minWidth:62,padding:"8px 6px",background:"var(--nv-elevated)",border:"1px solid var(--nv-border)",borderRadius:8,textAlign:"center"}}>
                       <div style={{fontSize:10,fontFamily:FFM,color:"var(--nv-text-dim)"}}>{i===0?"Now":fmtHour(h.time)}</div>
-                      <div style={{fontSize:20,marginTop:2}}>{wmoIcon(h.code)}</div>
+                      <div style={{marginTop:2,display:"flex",justifyContent:"center"}}><WeatherGlyph code={h.code} size={24}/></div>
                       <div style={{fontFamily:FFM,fontSize:13,fontWeight:500,color:"var(--nv-text-strong)",marginTop:1}}>{Math.round(h.temp)}°</div>
                       {h.pop>0&&<div style={{fontSize:9,color:"#88c8ff",fontFamily:FFM}}>{h.pop}%</div>}
                     </div>
@@ -533,7 +534,7 @@ export function AtmosApp({AC,showToast,pushNotification,openNovaAi,data,updateSe
                   return (
                     <div key={d.date} style={{display:"flex",alignItems:"center",gap:10,padding:"9px 12px",marginBottom:4,background:"var(--nv-elevated)",border:"1px solid var(--nv-border)",borderRadius:8}}>
                       <div style={{width:54,fontFamily:FFB,fontWeight:600,fontSize:12,color:"var(--nv-text)"}}>{i===0?"Today":fmtDay(d.date)}</div>
-                      <div style={{fontSize:22,width:34,textAlign:"center",filter:"drop-shadow(0 2px 4px rgba(0,0,0,0.4))"}}>{wmoIcon(d.code)}</div>
+                      <div style={{width:34,display:"flex",justifyContent:"center",filter:"drop-shadow(0 2px 4px rgba(0,0,0,0.4))"}}><WeatherGlyph code={d.code} size={26}/></div>
                       <div style={{fontFamily:FFM,fontSize:12,color:"var(--nv-text-dim)",minWidth:32,textAlign:"right"}}>{Math.round(d.low)}°</div>
                       <div style={{flex:1,position:"relative",height:6,background:"var(--nv-elevated)",borderRadius:3,overflow:"hidden"}}>
                         <div style={{position:"absolute",left:dayLoPct+"%",width:Math.max(8,dayHiPct-dayLoPct)+"%",top:0,bottom:0,background:"linear-gradient(90deg, #60a5fa, #fbbf24, #f87171)",borderRadius:3}}/>

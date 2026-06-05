@@ -46,6 +46,7 @@ import { CommandBar } from "./ui/CommandBar.jsx";
 import { TaskView } from "./ui/TaskView.jsx";
 import { MobileShell } from "./ui/MobileShell.jsx";
 import { SetupWizard } from "./ui/SetupWizard.jsx";
+import { WeatherGlyph } from "./ui/WeatherGlyph.jsx";
 import { NovaSvgIcon, AppIconDisplay, NovaLogo, WindowControlIcon, UserAvatar } from "./ui/icons.jsx";
 import { subscribeDrag, moveDrag, endDrag, getDrag } from "./lib/dragStore.js";
 import { Toggle } from "./ui/Toggle.jsx";
@@ -251,7 +252,7 @@ function TaskbarWeather({ data, onClick }) {
     const city = savedLoc?.label ? savedLoc.label.split(",")[0].trim() : "";
     return (
       <button className="sb" onClick={onClick} title={(city ? city + " · " : "") + wx.temp + tempSymbol + " — open Atmos"} style={pill}>
-        <span style={{ fontSize: 18, lineHeight: 1 }}>{WMO[wx.code] || "🌡️"}</span>
+        <span style={{ display: "flex", lineHeight: 1 }}><WeatherGlyph code={wx.code} size={20} /></span>
         <span style={{ fontFamily: FFM, fontWeight: 500, fontSize: 14, color: "var(--nv-text-strong)", lineHeight: 1 }}>{wx.temp}°</span>
       </button>
     );
@@ -2503,7 +2504,7 @@ export default function NovaOS(){
               {icon:"📋", label:"Copy app name", onClick:()=>{try{navigator.clipboard?.writeText(app.label);showToast("Copied");}catch{}}},
             ])}>
             <div style={{position:"relative",pointerEvents:"none",display:"flex",alignItems:"center",justifyContent:"center",filter:"drop-shadow(0 3px 8px rgba(0,0,0,0.55))"}}>
-              <AppIconDisplay app={app} size={44} glass={glass}/>
+              <AppIconDisplay app={app} size={40} glass={glass}/>
               {/* v8.1: notification badge — small numeric circle in the
                   upper-right of the icon when the app has unread items. */}
               {appBadgeCounts[app.id]>0 && (
