@@ -101,6 +101,64 @@ function tintImage(img, color, amt) {
   return out.toDataURL("image/png");
 }
 
+// v11.0 — material presets (shininess). Each is a CSS filter string applied
+// identically in the DOM preview (style.filter) and the canvas export
+// (ctx.filter) so it's WYSIWYG, plus an optional specular "sheen" highlight
+// clipped to the shape. Neon's glow color is the layer's own fill.
+const MATERIALS = [
+  { id: "flat", label: "Flat" },
+  { id: "matte", label: "Matte", filter: "drop-shadow(0 2px 4px rgba(0,0,0,0.30)) saturate(0.94)" },
+  { id: "glossy", label: "Glossy", filter: "drop-shadow(0 3px 7px rgba(0,0,0,0.38)) brightness(1.05) contrast(1.05)", sheen: "gloss", sheenA: 0.45 },
+  { id: "shiny", label: "Shiny", filter: "drop-shadow(0 4px 9px rgba(0,0,0,0.42)) brightness(1.09) contrast(1.10) saturate(1.08)", sheen: "gloss", sheenA: 0.72 },
+  { id: "metal", label: "Metallic", filter: "drop-shadow(0 3px 7px rgba(0,0,0,0.42)) contrast(1.14) brightness(1.04)", sheen: "metal", sheenA: 0.55 },
+  { id: "glass", label: "Glass", filter: "drop-shadow(0 6px 16px rgba(0,0,0,0.30)) brightness(1.08)", sheen: "gloss", sheenA: 0.40 },
+  { id: "neon", label: "Neon", glow: true, filter: "brightness(1.12)" },
+];
+const matById = (id) => MATERIALS.find(m => m.id === id);
+const glowColor = (l) => l.fill || l.stroke || "#ffffff";
+function matFilter(mat, l) {
+  if (!mat || mat.id === "flat") return "none";
+  if (mat.glow) { const c = glowColor(l); return "drop-shadow(0 0 5px " + c + ") drop-shadow(0 0 13px " + c + ") brightness(1.12)"; }
+  return mat.filter || "none";
+}
+// Shared gloss/metal gradient stops — `addStop(offset0to1, cssColor)` is fed by
+// both the DOM (linear-gradient) and the canvas (createLinearGradient).
+function sheenGrad(kind, a, addStop) {
+  if (kind === "metal") {
+    addStop(0, "rgba(255,255,255,0)"); addStop(0.16, "rgba(255,255,255," + a + ")"); addStop(0.36, "rgba(255,255,255,0)");
+    addStop(0.6, "rgba(0,0,0," + (a * 0.45) + ")"); addStop(0.84, "rgba(255,255,255," + (a * 0.85) + ")"); addStop(1, "rgba(255,255,255,0)");
+  } else {
+    addStop(0, "rgba(255,255,255," + a + ")"); addStop(0.34, "rgba(255,255,255," + (a * 0.35) + ")"); addStop(0.58, "rgba(255,255,255,0)");
+  }
+}
+function sheenCss(mat) {
+  const stops = [];
+  sheenGrad(mat.sheen, mat.sheenA ?? 0.5, (o, c) => stops.push(c + " " + (o * 100) + "%"));
+  return "linear-gradient(to bottom, " + stops.join(", ") + ")";
+}
+// The on-screen sheen overlay, clipped to the shape (area shapes only — a gloss
+// over an image's transparent areas or a thin line reads wrong, so those rely on
+// the filter alone).
+function sheenOverlay(l, mat, flip) {
+  if (!mat || !mat.sheen || l.type === "image" || l.type === "line") return null;
+  const base = { position: "absolute", inset: 0, pointerEvents: "none", background: sheenCss(mat), mixBlendMode: "screen", transform: flip };
+  if (l.type === "rect") return <div style={base} />;
+  if (l.type === "roundrect") return <div style={{ ...base, borderRadius: "16%" }} />;
+  if (l.type === "ellipse") return <div style={{ ...base, borderRadius: "50%" }} />;
+  if (POLY[l.type]) {
+    const a = mat.sheenA ?? 0.5, gid = "sheen-" + l.id;
+    return (
+      <svg viewBox="0 0 100 100" preserveAspectRatio="none" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", pointerEvents: "none", overflow: "visible", transform: flip, mixBlendMode: "screen" }}>
+        <defs><linearGradient id={gid} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#fff" stopOpacity={a} /><stop offset="34%" stopColor="#fff" stopOpacity={a * 0.35} /><stop offset="58%" stopColor="#fff" stopOpacity="0" />
+        </linearGradient></defs>
+        <polygon points={POLY[l.type].map(([px, py]) => (px * 100) + "," + (py * 100)).join(" ")} fill={"url(#" + gid + ")"} />
+      </svg>
+    );
+  }
+  return null;
+}
+
 export function AssetStudioApp({ AC, showToast }) {
   const [preset, setPreset] = useState(PRESETS[0]);
   const [transparent, setTransparent] = useState(true);
@@ -124,6 +182,8 @@ export function AssetStudioApp({ AC, showToast }) {
   const ptrs = useRef(new Map());       // active pointerId -> {x,y} for move/pinch
   const gesture = useRef(null);         // current move/pinch descriptor
   const imgSrcCache = useRef(new Map()); // src -> decoded Image, so recolor doesn't re-decode each slider tick
+  const clipRef = useRef([]);            // internal layer clipboard — Ctrl+C/Ctrl+V duplicates objects faithfully
+  const justPastedInternal = useRef(false);
   useEffect(() => { layersRef.current = layers; }, [layers]);
   useEffect(() => { selRef.current = selIds; }, [selIds]);
   useEffect(() => { cropRef.current = cropMode; }, [cropMode]);
@@ -165,6 +225,7 @@ export function AssetStudioApp({ AC, showToast }) {
   useEffect(() => {
     function onPaste(e) {
       if (!hot.current) return;
+      if (justPastedInternal.current) { justPastedInternal.current = false; return; }   // Ctrl+V already pasted internal layers
       const items = e.clipboardData?.items; if (!items) return;
       for (const it of items) {
         if (it.type?.startsWith("image/")) { const f = it.getAsFile(); if (f) { const r = new FileReader(); r.onload = () => addImageFromSrc(r.result); r.readAsDataURL(f); e.preventDefault(); showToast?.("Pasted image added"); } break; }
@@ -178,7 +239,22 @@ export function AssetStudioApp({ AC, showToast }) {
         const a = document.activeElement, t = a && a.tagName;
         if (t === "INPUT" || t === "TEXTAREA" || t === "SELECT" || (a && a.isContentEditable)) return;   // let real text copy through
         if (window.getSelection && String(window.getSelection())) return;
-        e.preventDefault(); copyImage(); return;
+        e.preventDefault();
+        if (selRef.current.length) {   // copy the selected layers (faithful duplicate on paste)
+          clipRef.current = layersRef.current.filter(l => selRef.current.includes(l.id)).map(l => ({ ...l }));
+          showToast?.(clipRef.current.length > 1 ? clipRef.current.length + " layers copied" : "Layer copied");
+        } else copyImage();           // nothing selected -> copy the whole image to the system clipboard
+        return;
+      }
+      if ((e.metaKey || e.ctrlKey) && (e.key === "v" || e.key === "V")) {
+        const a = document.activeElement, t = a && a.tagName;
+        if (t === "INPUT" || t === "TEXTAREA" || t === "SELECT" || (a && a.isContentEditable)) return;   // let real text paste through
+        if (clipRef.current && clipRef.current.length) {   // paste internal layers; external images go through onPaste
+          e.preventDefault(); pasteInternal();
+          justPastedInternal.current = true;
+          setTimeout(() => { justPastedInternal.current = false; }, 150);
+        }
+        return;
       }
       if (e.key !== "Backspace" && e.key !== "Delete") return;
       const el = document.activeElement, tag = el && el.tagName;
@@ -354,6 +430,15 @@ export function AssetStudioApp({ AC, showToast }) {
     for (const l of imgs) { const img = await getImg(l.src); if (img) made[l.id] = tintImage(img, color, amt); }
     setLayers(ls => ls.map(l => made[l.id] ? { ...l, tint: color, tintAmt: amt, tintedSrc: made[l.id] } : l));
   }
+  // Paste the internally-copied layers as faithful duplicates (same type/size/
+  // style), nudged so they don't sit exactly on the originals.
+  function pasteInternal() {
+    const src = clipRef.current;
+    if (!src || !src.length) return;
+    const copies = src.map(l => ({ ...l, id: nid(), x: Math.min((l.x || 0) + 0.04, 0.92), y: Math.min((l.y || 0) + 0.04, 0.92) }));
+    setLayers(ls => [...ls, ...copies]); setSelIds(copies.map(c => c.id));
+    showToast?.(copies.length > 1 ? copies.length + " layers pasted" : "Pasted");
+  }
 
   // Draw every layer into ctx using CW×CH as the coordinate space.
   async function renderLayers(ctx, CW, CH) {
@@ -364,6 +449,7 @@ export function AssetStudioApp({ AC, showToast }) {
       ctx.translate(cx, cy);
       ctx.rotate((l.rotation || 0) * Math.PI / 180);
       ctx.scale(l.flipH ? -1 : 1, l.flipV ? -1 : 1);
+      const mat = matById(l.material); ctx.filter = matFilter(mat, l);
       if (l.type === "image") { const img = await loadImage(l.tintedSrc || l.src).catch(() => null); if (img) ctx.drawImage(img, -dw / 2, -dh / 2, dw, dh); }
       else if (l.type === "line") { ctx.strokeStyle = l.stroke || "#fff"; ctx.lineWidth = Math.max(1, l.strokeW || 4); ctx.lineCap = "round"; ctx.beginPath(); ctx.moveTo(-dw / 2, 0); ctx.lineTo(dw / 2, 0); ctx.stroke(); }
       else {
@@ -374,6 +460,19 @@ export function AssetStudioApp({ AC, showToast }) {
         else if (POLY[l.type]) { POLY[l.type].forEach(([px, py], i) => { const X = (px - 0.5) * dw, Y = (py - 0.5) * dh; if (i) ctx.lineTo(X, Y); else ctx.moveTo(X, Y); }); ctx.closePath(); }
         if (l.fill) { ctx.fillStyle = l.fill; ctx.fill(); }
         if (l.strokeW > 0) { ctx.strokeStyle = l.stroke; ctx.lineWidth = l.strokeW; ctx.lineJoin = "round"; ctx.stroke(); }
+        if (mat && mat.sheen) {
+          ctx.filter = "none"; ctx.save();
+          ctx.beginPath();
+          if (l.type === "rect") ctx.rect(-dw / 2, -dh / 2, dw, dh);
+          else if (l.type === "roundrect") roundRectPath(ctx, -dw / 2, -dh / 2, dw, dh, Math.min(dw, dh) * 0.16);
+          else if (l.type === "ellipse") ctx.ellipse(0, 0, Math.abs(dw / 2), Math.abs(dh / 2), 0, 0, Math.PI * 2);
+          else if (POLY[l.type]) { POLY[l.type].forEach(([px, py], i) => { const X = (px - 0.5) * dw, Y = (py - 0.5) * dh; if (i) ctx.lineTo(X, Y); else ctx.moveTo(X, Y); }); ctx.closePath(); }
+          ctx.clip(); ctx.globalCompositeOperation = "screen";
+          const sg = ctx.createLinearGradient(0, -dh / 2, 0, dh / 2);
+          sheenGrad(mat.sheen, mat.sheenA ?? 0.5, (o, c) => sg.addColorStop(o, c));
+          ctx.fillStyle = sg; ctx.fillRect(-dw / 2, -dh / 2, dw, dh);
+          ctx.restore();
+        }
       }
       ctx.restore();
     }
@@ -455,13 +554,17 @@ export function AssetStudioApp({ AC, showToast }) {
   function layerEl(l) {
     const flip = "scaleX(" + (l.flipH ? -1 : 1) + ") scaleY(" + (l.flipV ? -1 : 1) + ")";
     const box = { position: "absolute", left: l.x * 100 + "%", top: l.y * 100 + "%", width: l.w * 100 + "%", height: l.h * 100 + "%", transform: "rotate(" + (l.rotation || 0) + "deg)", opacity: (l.opacity ?? 100) / 100, cursor: "move", outline: isSel(l.id) ? "2px solid " + AC : "none", outlineOffset: 1, pointerEvents: cropMode ? "none" : "auto", touchAction: "none" };
+    const mat = matById(l.material);
     const inner = l.type === "image"
       ? <img src={l.tintedSrc || l.src} alt="" draggable={false} style={{ width: "100%", height: "100%", objectFit: "contain", pointerEvents: "none", display: "block", transform: flip }} />
       : shapeInner(l, flip);
     const showHandles = single && single.id === l.id && !cropMode;
     return (
       <div key={l.id} onPointerDown={e => onLayerPointerDown(e, l)} style={box}>
-        {inner}
+        <div style={{ position: "absolute", inset: 0, filter: matFilter(mat, l) }}>
+          {inner}
+          {sheenOverlay(l, mat, flip)}
+        </div>
         {showHandles && HANDLES.map(h => (
           <div key={h.id} onPointerDown={e => startResize(e, l, h)} style={{ position: "absolute", left: h.hx * 100 + "%", top: h.hy * 100 + "%", width: 13, height: 13, transform: "translate(-50%,-50%)", background: "#fff", border: "2px solid " + AC, borderRadius: (h.ax && h.ay) ? 2 : 7, cursor: CURS[h.id], touchAction: "none", zIndex: 6 }} />
         ))}
@@ -474,6 +577,7 @@ export function AssetStudioApp({ AC, showToast }) {
   const lblS = { display: "flex", alignItems: "center", gap: 6, fontSize: 11.5, color: "var(--nv-text-dim)", fontFamily: FF };
   const swatch = { width: 28, height: 28, borderRadius: 6, border: "1px solid var(--nv-border)", background: "none", cursor: "pointer", padding: 0 };
   const dlBtn = (disabled) => ({ padding: "8px 16px", borderRadius: 8, border: "1px solid " + bdr(AC), background: fill(AC), color: AC, cursor: disabled ? "default" : "pointer", fontFamily: FFB, fontWeight: 700, fontSize: 13, opacity: disabled ? 0.5 : 1 });
+  const matSel = { padding: "5px 7px", borderRadius: 7, background: "var(--nv-input-bg)", color: "var(--nv-text)", border: "1px solid var(--nv-border-strong)", fontFamily: FF, fontSize: 11.5, cursor: "pointer" };
   const cropArea = cropRect && (cropRect.x1 - cropRect.x0) > 0.01 && (cropRect.y1 - cropRect.y0) > 0.01;
 
   return (
@@ -516,7 +620,7 @@ export function AssetStudioApp({ AC, showToast }) {
           {!transparent && <input type="color" value={bgColor} onChange={e => setBgColor(e.target.value)} title="Background color" style={swatch} />}
           <div style={{ flex: 1 }} />
           <button style={tbtn(false)} onClick={() => { setCropMode(true); setCropRect(null); setSelIds([]); }}>✂ Snip</button>
-          <button onClick={copyImage} disabled={busy} style={tbtn(false)} title="Copy image to clipboard (Ctrl/Cmd+C)">⧉ Copy</button>
+          <button onClick={copyImage} disabled={busy} style={tbtn(false)} title="Copy the whole image to the clipboard">⧉ Copy</button>
           <button onClick={download} disabled={busy} style={dlBtn(busy)}>⬇ Download PNG</button>
           <input ref={fileRef} type="file" accept="image/*" onChange={onFile} style={{ display: "none" }} />
         </div>
@@ -561,6 +665,11 @@ export function AssetStudioApp({ AC, showToast }) {
 
           <span style={lblS}>Opacity <input type="range" min="10" max="100" value={ref0.opacity ?? 100} onChange={e => patchSel({ opacity: +e.target.value })} style={{ width: 72 }} /></span>
           <span style={lblS}>Rotate <input type="range" min="0" max="360" value={ref0.rotation || 0} onChange={e => patchSel({ rotation: +e.target.value })} style={{ width: 72 }} /></span>
+          <span style={lblS} title="Material — shadow, gloss, metallic, glass or neon">Material
+            <select value={ref0.material || "flat"} onChange={e => patchSel({ material: e.target.value })} style={matSel}>
+              {MATERIALS.map(m => <option key={m.id} value={m.id}>{m.label}</option>)}
+            </select>
+          </span>
 
           {(anyImage || single) && (
             <span style={{ display: "flex", gap: 4 }}>
