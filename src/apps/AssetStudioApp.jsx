@@ -39,6 +39,7 @@ const SHAPES = [
   { type: "pentagon", glyph: "⬠", label: "Pentagon" },
   { type: "star", glyph: "★", label: "Star" },
   { type: "line", glyph: "╱", label: "Line" },
+  { type: "curve", glyph: "⌒", label: "Curved line" },
 ];
 
 // Resize handles: 4 corners (resize both axes) + 4 edge midpoints (one axis).
@@ -219,6 +220,8 @@ export function AssetStudioApp({ AC, showToast }) {
   const anyText = selLayers.some(l => l.type === "text");
   const isText = !!(single && single.type === "text");
   const textRef = selLayers.find(l => l.type === "text");
+  const everyLineLike = selLayers.length > 0 && selLayers.every(l => l.type === "line" || l.type === "curve");   // stroke-only shapes
+  const curveRef = selLayers.find(l => l.type === "curve");
 
   const patch = (id, p) => setLayers(ls => ls.map(l => l.id === id ? { ...l, ...p } : l));
   const patchSel = (p) => setLayers(ls => ls.map(l => selIds.includes(l.id) ? { ...l, ...p } : l));
@@ -228,8 +231,10 @@ export function AssetStudioApp({ AC, showToast }) {
   function addShape(type) {
     setShapeMenu(false);
     const w = 0.34, h = 0.34;
+    const lineLike = (type === "line" || type === "curve");   // stroke-only, no fill
     const layer = { id: nid(), type, x: 0.5 - w / 2, y: 0.5 - h / 2, w, h, rotation: 0, opacity: 100, flipH: false, flipV: false,
-      fill: type === "line" ? null : AC, stroke: "#ffffff", strokeW: type === "line" ? 6 : 0 };
+      fill: lineLike ? null : AC, stroke: "#ffffff", strokeW: lineLike ? 6 : 0,
+      ...(type === "curve" ? { curve: 0.6 } : {}) };
     setLayers(ls => [...ls, layer]); setSelIds([layer.id]);
   }
   function addText() {
@@ -478,6 +483,7 @@ export function AssetStudioApp({ AC, showToast }) {
       const mat = matById(l.material); ctx.filter = matFilter(mat, l);
       if (l.type === "image") { const img = await loadImage(l.tintedSrc || l.src).catch(() => null); if (img) ctx.drawImage(img, -dw / 2, -dh / 2, dw, dh); }
       else if (l.type === "line") { ctx.strokeStyle = l.stroke || "#fff"; ctx.lineWidth = Math.max(1, l.strokeW || 4); ctx.lineCap = "round"; ctx.beginPath(); ctx.moveTo(-dw / 2, 0); ctx.lineTo(dw / 2, 0); ctx.stroke(); }
+      else if (l.type === "curve") { ctx.strokeStyle = l.stroke || "#fff"; ctx.lineWidth = Math.max(1, l.strokeW || 4); ctx.lineCap = "round"; ctx.beginPath(); ctx.moveTo(-dw / 2, 0); ctx.quadraticCurveTo(0, -(l.curve ?? 0.6) * 0.5 * dh, dw / 2, 0); ctx.stroke(); }
       else if (l.type === "text") {
         const fs = Math.max(2, dh * TEXT_FIT);
         ctx.font = (l.weight || 700) + " " + fs + "px " + fontCss(l.font);
@@ -577,6 +583,11 @@ export function AssetStudioApp({ AC, showToast }) {
     if (l.type === "roundrect") return <div style={{ width: "100%", height: "100%", background: l.fill || "transparent", border: border, borderRadius: "16%", boxSizing: "border-box", transform: flip }} />;
     if (l.type === "ellipse") return <div style={{ width: "100%", height: "100%", background: l.fill || "transparent", border: border, borderRadius: "50%", boxSizing: "border-box", transform: flip }} />;
     if (l.type === "line") return <div style={{ position: "absolute", top: "50%", left: 0, width: "100%", height: Math.max(2, l.strokeW || 4), background: l.stroke || "#fff", transform: "translateY(-50%)", borderRadius: 999 }} />;
+    if (l.type === "curve") return (
+      <svg viewBox="0 0 100 100" preserveAspectRatio="none" style={{ width: "100%", height: "100%", display: "block", overflow: "visible", transform: flip }}>
+        <path d={"M 0,50 Q 50," + ((0.5 - (l.curve ?? 0.6) * 0.5) * 100) + " 100,50"} fill="none" stroke={l.stroke || "#fff"} strokeWidth={Math.max(1, l.strokeW || 4)} vectorEffect="non-scaling-stroke" strokeLinecap="round" />
+      </svg>
+    );
     if (POLY[l.type]) return (
       <svg viewBox="0 0 100 100" preserveAspectRatio="none" style={{ width: "100%", height: "100%", display: "block", overflow: "visible", transform: flip }}>
         <polygon points={POLY[l.type].map(([px, py]) => (px * 100) + "," + (py * 100)).join(" ")} fill={l.fill || "none"} stroke={l.strokeW > 0 ? l.stroke : "none"} strokeWidth={l.strokeW || 0} vectorEffect="non-scaling-stroke" strokeLinejoin="round" />
@@ -691,14 +702,17 @@ export function AssetStudioApp({ AC, showToast }) {
         <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 10, padding: "10px 12px", borderTop: "1px solid var(--nv-border)", background:"var(--nv-elevated)" }}>
           <span style={{ fontFamily: FFB, fontWeight: 700, fontSize: 12, color: "var(--nv-text-strong)", textTransform: "capitalize" }}>{single ? single.type : selLayers.length + " selected"}</span>
 
-          {allShapes && selLayers.every(l => l.type !== "line") && (
+          {allShapes && !anyText && selLayers.every(l => l.type !== "line" && l.type !== "curve") && (
             <span style={lblS}>Fill <input type="color" value={ref0.fill || "#000000"} onChange={e => patchSel({ fill: e.target.value })} style={swatch} /><button onClick={() => patchSel({ fill: null })} title="No fill" style={{ ...ibtn, fontSize: 11, padding: "4px 7px" }}>none</button></span>
           )}
-          {allShapes && (
-            <span style={lblS}>{selLayers.every(l => l.type === "line") ? "Color" : "Stroke"} <input type="color" value={ref0.stroke || "#ffffff"} onChange={e => patchSel({ stroke: e.target.value })} style={swatch} /></span>
+          {allShapes && !anyText && (
+            <span style={lblS}>{everyLineLike ? "Color" : "Stroke"} <input type="color" value={ref0.stroke || "#ffffff"} onChange={e => patchSel({ stroke: e.target.value })} style={swatch} /></span>
           )}
-          {allShapes && (
-            <span style={lblS}>{selLayers.every(l => l.type === "line") ? "Thickness" : "Border"} <input type="range" min="0" max="40" value={ref0.strokeW || 0} onChange={e => patchSel({ strokeW: +e.target.value })} style={{ width: 72 }} /></span>
+          {allShapes && !anyText && (
+            <span style={lblS}>{everyLineLike ? "Thickness" : "Border"} <input type="range" min="0" max="40" value={ref0.strokeW || 0} onChange={e => patchSel({ strokeW: +e.target.value })} style={{ width: 72 }} /></span>
+          )}
+          {curveRef && (
+            <span style={lblS}>Curve <input type="range" min="-100" max="100" value={Math.round((curveRef.curve ?? 0.6) * 100)} onChange={e => patchSel({ curve: +e.target.value / 100 })} style={{ width: 72 }} /></span>
           )}
 
           {anyText && (
