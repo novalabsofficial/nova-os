@@ -36,7 +36,7 @@ import { DEFAULT_AC, FF, FFB, FFM, INP, SEC, CSS } from "./ui/styles.js";
 import {
   COLL, WIDGET_CONFIGS, DEFAULT_WIDGET_STATE, DEFAULT_SIZES, APPS,
   STORE_CATALOG, STORE_CATS, BOOT_MSGS, ACCENT_PRESETS, BOOKMARKS, PAINT_COLORS,
-  WALLPAPERS, WMO, HAS_SVG_ICON, NOVA_VERSION,
+  WALLPAPERS, WMO, HAS_SVG_ICON, NOVA_VERSION, DEFAULT_DESKTOP_APPS,
 } from "./ui/constants.js";
 import { Wallpaper, NovaBg, BlissBg, AuroraBg, MeshBg, SupernovaBg } from "./ui/wallpapers.jsx";
 import { isDesktop, powerOff, quitApp } from "./lib/system.js";
@@ -45,6 +45,7 @@ import { watchMyGames } from "./lib/chess-game.js";
 import { CommandBar } from "./ui/CommandBar.jsx";
 import { TaskView } from "./ui/TaskView.jsx";
 import { MobileShell } from "./ui/MobileShell.jsx";
+import { SetupWizard } from "./ui/SetupWizard.jsx";
 import { NovaSvgIcon, AppIconDisplay, NovaLogo, WindowControlIcon, UserAvatar } from "./ui/icons.jsx";
 import { subscribeDrag, moveDrag, endDrag, getDrag } from "./lib/dragStore.js";
 import { Toggle } from "./ui/Toggle.jsx";
@@ -1881,7 +1882,11 @@ export default function NovaOS(){
 
     // v6.3: auth goes through Firebase Auth. The new auth.js handles both
     // greenfield accounts and silent migration of pre-6.3 plaintext accounts.
-    const initData={notes:[],tasks:[],wallpaper:"supernova",bio:"",joined:Date.now(),settings:{},installedApps:[],folders:[],hiddenFromDesktop:[],pinnedToTaskbar:[],migratedTo41:true,migratedTo52:true};
+    const initData={notes:[],tasks:[],wallpaper:"supernova",bio:"",joined:Date.now(),settings:{},installedApps:[],folders:[],hiddenFromDesktop:[],pinnedToTaskbar:[],migratedTo41:true,migratedTo52:true,
+      // v11.0 Phase B — new accounts start with the curated desktop set and an
+      // un-finished setup so the first-run wizard appears once. (Existing accounts
+      // have neither field, so they migrate to the whitelist lazily + skip the wizard.)
+      desktopApps:[...DEFAULT_DESKTOP_APPS], setupComplete:false};
 
     if(mode==="register"){
       try {
@@ -3151,6 +3156,15 @@ export default function NovaOS(){
         </>
       )}
       {ctxMenu && <ContextMenu x={ctxMenu.x} y={ctxMenu.y} items={ctxMenu.items} onClose={closeContextMenu} AC={AC}/>}
+      {/* v11.0 Phase B — first-run setup wizard, shown once for brand-new accounts
+          (setupComplete strictly false; existing accounts have it undefined). */}
+      {data && data.setupComplete===false && (
+        <SetupWizard
+          AC={AC} user={user} apps={allApps} theme={theme} glass={glass}
+          onPickTheme={(t)=>updateSettings({theme:t})}
+          onComplete={(picked)=>updateData(p=>({...p,desktopApps:picked,setupComplete:true}))}
+        />
+      )}
       {MobileNotice}
     </div>
   );

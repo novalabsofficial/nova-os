@@ -295,6 +295,11 @@ export const PAINT_COLORS = ["#fff","#000","#ff4444","#ff8800","#ffdd00","#44dd4
 // Each wallpaper also carries a `semitones` value that shifts the system
 // sound palette up or down. The default (mesh) is 0; positive values brighten
 // the chime tones, negative values darken them. See src/lib/audio.js.
+// v11.0 Phase B — the apps a brand-new account starts with on its desktop (the
+// first-run wizard pre-selects these; the user can trim/add before finishing,
+// and change anytime via right-click). A curated, productivity-first set.
+export const DEFAULT_DESKTOP_APPS = ["files","browser","chat","notes","tasks","calculator","clock","calendar","atmos","music","photos","novaai","settings","store"];
+
 export const WALLPAPERS = {
   // v8.5: "Auto" is dynamic — the Wallpaper component swaps the real wallpaper
   // by time of day (see autoWallpaperId in wallpapers.jsx). Listed here so it
