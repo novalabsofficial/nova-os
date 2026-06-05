@@ -911,6 +911,11 @@ export default function NovaOS(){
   // tokens (styles.js) kick in for windows, taskbar, menus and widgets.
   useEffect(()=>{ document.documentElement.setAttribute("data-glass", glass?"on":"off"); },[glass]);
 
+  // v11.0 — expose the live accent as CSS vars so global CSS (focus rings, the
+  // button focus glow) can tint with the user's accent instead of a hardcoded
+  // indigo. --nv-accent = solid hex, --nv-accent-fill = faint accent wash.
+  useEffect(()=>{ const r=document.documentElement.style; r.setProperty("--nv-accent",AC); r.setProperty("--nv-accent-fill",fill(AC)); },[AC]);
+
   // v9.0/v9.1 — watch community store apps so installed ones render on the
   // desktop. v9.1: hardened against the "newly installed apps don't appear"
   // bug from v9.0. Two changes:

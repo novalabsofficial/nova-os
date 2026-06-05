@@ -249,7 +249,7 @@ export const CSS = `
   @keyframes wp-drift{0%{transform:scale(1.12) translate(-2.4%,-1.6%);}50%{transform:scale(1.2) translate(2.4%,1.6%);}100%{transform:scale(1.12) translate(-2.4%,-1.6%);}}
 
   /* v8.0 — soft accent-tinged glow ring on focused buttons (used by .sb:focus-visible) */
-  @keyframes ring-in{from{box-shadow:0 0 0 0 rgba(99,102,241,0);}to{box-shadow:0 0 0 3px rgba(99,102,241,0.35);}}
+  @keyframes ring-in{from{box-shadow:0 0 0 0 rgba(99,102,241,0);}to{box-shadow:0 0 0 3px var(--nv-accent-fill,rgba(99,102,241,0.35));}}
 
   /* ── Interactive class hover states ────────────────────────────────────
      Standardized on var(--nv-ease) (Material standard).
@@ -362,6 +362,6 @@ export const CSS = `
   /* Focus rings — only visible from keyboard navigation, never from mouse clicks */
   button:focus-visible,input:focus-visible,textarea:focus-visible{
     outline:none;
-    box-shadow:0 0 0 2px rgba(99,102,241,0.55), 0 0 0 4px rgba(99,102,241,0.18);
+    box-shadow:0 0 0 2px var(--nv-accent,#6366f1), 0 0 0 4px var(--nv-accent-fill,rgba(99,102,241,0.18));
   }
 `;
