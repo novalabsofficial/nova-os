@@ -54,6 +54,7 @@ import { BrowserNav } from "./ui/BrowserNav.jsx";
 import { ResizeHandles } from "./ui/ResizeHandles.jsx";
 import { ContextMenu } from "./ui/ContextMenu.jsx";
 import { AiAssist } from "./ui/AiAssist.jsx";
+import { StickyNotes } from "./ui/StickyNotes.jsx";
 // Widgets
 import {
   WidgetShell,
@@ -1446,6 +1447,11 @@ export default function NovaOS(){
   const updateData    =useCallback((patch)=>{setData(prev=>{const next=typeof patch==="function"?patch(prev):{...prev,...patch};saveData(next);return next;});},[saveData]);
   const updateSettings=useCallback((patch)=>{updateData(prev=>({...prev,settings:{...(prev.settings||{}),...patch}}));},[updateData]);
   const handleCustomWallpaper=useCallback(async(url)=>{setCustomWp(url);await db.set("user:"+user+":wpimg",url);updateSettings({[theme==="light"?"wallpaperLight":"wallpaper"]:"custom"});showToast("Custom wallpaper set ✓");},[user,updateSettings,showToast,theme]);
+  // v11.0 Phase B — desktop sticky notes (stored in data.stickyNotes, so they
+  // ride along in profile backups). Text persists on blur; position/color/delete persist on the action.
+  const addStickyNote=useCallback((x,y)=>{const id="note-"+Date.now()+"-"+Math.floor(Math.random()*1000);const W=212;const nx=Math.max(8,Math.min((x||140)-30,window.innerWidth-W-8));const ny=Math.max(8,Math.min((y||140)-12,window.innerHeight-200));updateData(d=>({...d,stickyNotes:[...(d.stickyNotes||[]),{id,text:"",color:"yellow",x:nx,y:ny}]}));showToast("Sticky note added");},[updateData,showToast]);
+  const updateStickyNote=useCallback((id,patch)=>{updateData(d=>({...d,stickyNotes:(d.stickyNotes||[]).map(n=>n.id===id?{...n,...patch}:n)}));},[updateData]);
+  const removeStickyNote=useCallback((id)=>{updateData(d=>({...d,stickyNotes:(d.stickyNotes||[]).filter(n=>n.id!==id)}));},[updateData]);
 
   // v10.0 Supernova — AI command-bar executor. Maps a planned {tool, args}
   // step to a real OS action and returns a short result string (or null for
@@ -2297,7 +2303,9 @@ export default function NovaOS(){
         // Only fire if the click is on the desktop itself, not on a child
         // (icons + windows have their own onContextMenu that stopPropagation).
         if(e.target !== e.currentTarget && !e.target.classList?.contains("di-empty-space")) return;
+        const mx=e.clientX, my=e.clientY;
         openContextMenu(e, [
+          {icon:"📝", label:"New sticky note", onClick:()=>addStickyNote(mx,my)},
           {icon:"⚙", label:"Open Settings", onClick:()=>openApp("settings")},
           {icon:"🎨", label:"Change wallpaper", onClick:()=>{openApp("settings");}},
           {type:"divider"},
@@ -2524,7 +2532,10 @@ export default function NovaOS(){
           </WidgetShell>
         );
       })}
- 
+
+      {/* v11.0 Phase B — desktop sticky notes */}
+      <StickyNotes notes={data?.stickyNotes||[]} onUpdate={updateStickyNote} onRemove={removeStickyNote}/>
+
       {/* Desktop icons */}
       {/* v9.3 (#21): compute one coherent layout for the whole desktop per
           render. Saved positions are honored when in-bounds; the rest pack
