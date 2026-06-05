@@ -1882,7 +1882,7 @@ export default function NovaOS(){
 
     // v6.3: auth goes through Firebase Auth. The new auth.js handles both
     // greenfield accounts and silent migration of pre-6.3 plaintext accounts.
-    const initData={notes:[],tasks:[],wallpaper:"supernova",bio:"",joined:Date.now(),settings:{},installedApps:[],folders:[],hiddenFromDesktop:[],pinnedToTaskbar:[],migratedTo41:true,migratedTo52:true,
+    const initData={notes:[],tasks:[],wallpaper:"bloomdark",bio:"",joined:Date.now(),settings:{},installedApps:[],folders:[],hiddenFromDesktop:[],pinnedToTaskbar:[],migratedTo41:true,migratedTo52:true,
       // v11.0 Phase B — new accounts start with the curated desktop set and an
       // un-finished setup so the first-run wizard appears once. (Existing accounts
       // have neither field, so they migrate to the whitelist lazily + skip the wizard.)
