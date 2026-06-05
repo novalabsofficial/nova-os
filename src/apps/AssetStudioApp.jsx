@@ -129,6 +129,30 @@ const FONTS = [
 ];
 const fontCss = (id) => (FONTS.find(f => f.id === id) || FONTS[0]).css;
 const TEXT_FIT = 0.74;   // font size as a fraction of the layer-box height
+
+// v11.0 — sample the dominant colors of an uploaded image so you can reuse a
+// color that's already in it. Images are data URLs (same-origin), so reading
+// pixels is allowed. Colors are bucketed coarsely (4 bits/channel) and the most
+// common buckets are averaged back to a hex swatch.
+function rgbToHex(r, g, b) { return "#" + [r, g, b].map(v => Math.max(0, Math.min(255, v)).toString(16).padStart(2, "0")).join(""); }
+function hexToRgb(h) { const n = parseInt(h.slice(1), 16); return { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255 }; }
+function colorDist(a, b) { const x = hexToRgb(a), y = hexToRgb(b); return Math.abs(x.r - y.r) + Math.abs(x.g - y.g) + Math.abs(x.b - y.b); }
+function mergePalette(prev, next, cap = 12) { const out = [...prev]; for (const c of next) { if (!out.some(p => colorDist(p, c) < 30)) out.push(c); } return out.slice(0, cap); }
+function extractPalette(img) {
+  try {
+    const S = 28, c = document.createElement("canvas"); c.width = S; c.height = S;
+    const x = c.getContext("2d"); x.drawImage(img, 0, 0, S, S);
+    const data = x.getImageData(0, 0, S, S).data, buckets = new Map();
+    for (let i = 0; i < data.length; i += 4) {
+      if (data[i + 3] < 128) continue;   // skip transparent pixels
+      const r = data[i], g = data[i + 1], b = data[i + 2];
+      const key = (r >> 4) + "," + (g >> 4) + "," + (b >> 4);
+      const e = buckets.get(key) || { r: 0, g: 0, b: 0, n: 0 };
+      e.r += r; e.g += g; e.b += b; e.n++; buckets.set(key, e);
+    }
+    return [...buckets.values()].sort((a, b) => b.n - a.n).slice(0, 6).map(e => rgbToHex(Math.round(e.r / e.n), Math.round(e.g / e.n), Math.round(e.b / e.n)));
+  } catch { return []; }
+}
 const glowColor = (l) => l.fill || l.stroke || "#ffffff";
 function matFilter(mat, l) {
   if (!mat || mat.id === "flat") return "none";
@@ -188,6 +212,7 @@ export function AssetStudioApp({ AC, showToast }) {
   const rootRef = useRef(null);
   const [dragActive, setDragActive] = useState(false);   // v11.0 — drag-drop image files onto the canvas
   const [canvasPx, setCanvasPx] = useState({ w: 0, h: 0 }); // on-screen canvas size, so text scales WYSIWYG
+  const [palette, setPalette] = useState([]);   // dominant colors sampled from uploaded images
   const canvasRef = useRef(null);
   const fileRef = useRef(null);
   const layersRef = useRef(layers);
@@ -236,7 +261,7 @@ export function AssetStudioApp({ AC, showToast }) {
     const lineLike = (type === "line" || type === "curve");   // stroke-only, no fill
     const layer = { id: nid(), type, x: 0.5 - w / 2, y: 0.5 - h / 2, w, h, rotation: 0, opacity: 100, flipH: false, flipV: false,
       fill: lineLike ? null : AC, stroke: "#ffffff", strokeW: lineLike ? 6 : 0,
-      ...(type === "curve" ? { curve: 0.6 } : {}) };
+      ...(type === "curve" ? { curve: 0.6, curveSkew: 0 } : {}) };
     setLayers(ls => [...ls, layer]); setSelIds([layer.id]);
   }
   function addText() {
@@ -251,6 +276,7 @@ export function AssetStudioApp({ AC, showToast }) {
       const w = 0.5, h = w * ar / iar;
       const layer = { id: nid(), type: "image", src, x: (1 - w) / 2, y: (1 - h) / 2, w, h, rotation: 0, opacity: 100, flipH: false, flipV: false };
       setLayers(ls => [...ls, layer]); setSelIds([layer.id]);
+      const pal = extractPalette(img); if (pal.length) setPalette(prev => mergePalette(prev, pal));
     }).catch(() => showToast?.("Couldn't load that image"));
   }
   function onFile(e) { const f = e.target.files?.[0]; if (!f) return; const r = new FileReader(); r.onload = () => addImageFromSrc(r.result); r.readAsDataURL(f); e.target.value = ""; }
@@ -472,6 +498,17 @@ export function AssetStudioApp({ AC, showToast }) {
     setLayers(ls => [...ls, ...copies]); setSelIds(copies.map(c => c.id));
     showToast?.(copies.length > 1 ? copies.length + " layers pasted" : "Pasted");
   }
+  // Apply a clicked image-palette color to the selection: image -> recolor,
+  // line/curve -> stroke, text + filled shapes -> fill.
+  function applyPaletteColor(c) {
+    const sel = layers.filter(l => selIds.includes(l.id));
+    if (sel.length && sel.every(l => l.type === "image")) { recolorSelected(c); return; }
+    setLayers(ls => ls.map(l => {
+      if (!selIds.includes(l.id) || l.type === "image") return l;
+      if (l.type === "line" || l.type === "curve") return { ...l, stroke: c };
+      return { ...l, fill: c };
+    }));
+  }
 
   // Draw every layer into ctx using CW×CH as the coordinate space.
   async function renderLayers(ctx, CW, CH) {
@@ -485,7 +522,7 @@ export function AssetStudioApp({ AC, showToast }) {
       const mat = matById(l.material); ctx.filter = matFilter(mat, l);
       if (l.type === "image") { const img = await loadImage(l.tintedSrc || l.src).catch(() => null); if (img) ctx.drawImage(img, -dw / 2, -dh / 2, dw, dh); }
       else if (l.type === "line") { ctx.strokeStyle = l.stroke || "#fff"; ctx.lineWidth = Math.max(1, l.strokeW || 4); ctx.lineCap = "round"; ctx.beginPath(); ctx.moveTo(-dw / 2, 0); ctx.lineTo(dw / 2, 0); ctx.stroke(); }
-      else if (l.type === "curve") { ctx.strokeStyle = l.stroke || "#fff"; ctx.lineWidth = Math.max(1, l.strokeW || 4); ctx.lineCap = "round"; ctx.beginPath(); ctx.moveTo(-dw / 2, 0); ctx.quadraticCurveTo(0, -(l.curve ?? 0.6) * 0.5 * dh, dw / 2, 0); ctx.stroke(); }
+      else if (l.type === "curve") { ctx.strokeStyle = l.stroke || "#fff"; ctx.lineWidth = Math.max(1, l.strokeW || 4); ctx.lineCap = "round"; ctx.beginPath(); ctx.moveTo(-dw / 2, 0); ctx.quadraticCurveTo((l.curveSkew ?? 0) * 0.5 * dw, -(l.curve ?? 0.6) * 0.5 * dh, dw / 2, 0); ctx.stroke(); }
       else if (l.type === "text") {
         const fs = Math.max(2, dh * TEXT_FIT);
         ctx.font = (l.weight || 700) + " " + fs + "px " + fontCss(l.font);
@@ -585,11 +622,14 @@ export function AssetStudioApp({ AC, showToast }) {
     if (l.type === "roundrect") return <div style={{ width: "100%", height: "100%", background: l.fill || "transparent", border: border, borderRadius: "16%", boxSizing: "border-box", transform: flip }} />;
     if (l.type === "ellipse") return <div style={{ width: "100%", height: "100%", background: l.fill || "transparent", border: border, borderRadius: "50%", boxSizing: "border-box", transform: flip }} />;
     if (l.type === "line") return <div style={{ position: "absolute", top: "50%", left: 0, width: "100%", height: Math.max(2, l.strokeW || 4), background: l.stroke || "#fff", transform: "translateY(-50%)", borderRadius: 999 }} />;
-    if (l.type === "curve") return (
-      <svg viewBox="0 0 100 100" preserveAspectRatio="none" style={{ width: "100%", height: "100%", display: "block", overflow: "visible", transform: flip }}>
-        <path d={"M 0,50 Q 50," + ((0.5 - (l.curve ?? 0.6) * 0.5) * 100) + " 100,50"} fill="none" stroke={l.stroke || "#fff"} strokeWidth={Math.max(1, l.strokeW || 4)} vectorEffect="non-scaling-stroke" strokeLinecap="round" />
-      </svg>
-    );
+    if (l.type === "curve") {
+      const cxn = (0.5 + (l.curveSkew ?? 0) * 0.5) * 100, cyn = (0.5 - (l.curve ?? 0.6) * 0.5) * 100;
+      return (
+        <svg viewBox="0 0 100 100" preserveAspectRatio="none" style={{ width: "100%", height: "100%", display: "block", overflow: "visible", transform: flip }}>
+          <path d={"M 0,50 Q " + cxn + "," + cyn + " 100,50"} fill="none" stroke={l.stroke || "#fff"} strokeWidth={Math.max(1, l.strokeW || 4)} vectorEffect="non-scaling-stroke" strokeLinecap="round" />
+        </svg>
+      );
+    }
     if (POLY[l.type]) return (
       <svg viewBox="0 0 100 100" preserveAspectRatio="none" style={{ width: "100%", height: "100%", display: "block", overflow: "visible", transform: flip }}>
         <polygon points={POLY[l.type].map(([px, py]) => (px * 100) + "," + (py * 100)).join(" ")} fill={l.fill || "none"} stroke={l.strokeW > 0 ? l.stroke : "none"} strokeWidth={l.strokeW || 0} vectorEffect="non-scaling-stroke" strokeLinejoin="round" />
@@ -714,7 +754,10 @@ export function AssetStudioApp({ AC, showToast }) {
             <span style={lblS}>{everyLineLike ? "Thickness" : "Border"} <input type="range" min="0" max="40" value={ref0.strokeW || 0} onChange={e => patchSel({ strokeW: +e.target.value })} style={{ width: 72 }} /></span>
           )}
           {curveRef && (
-            <span style={lblS}>Curve <input type="range" min="-100" max="100" value={Math.round((curveRef.curve ?? 0.6) * 100)} onChange={e => patchSel({ curve: +e.target.value / 100 })} style={{ width: 72 }} /></span>
+            <span style={lblS}>Curve <input type="range" min="-150" max="150" value={Math.round((curveRef.curve ?? 0.6) * 100)} onChange={e => patchSel({ curve: +e.target.value / 100 })} style={{ width: 80 }} /></span>
+          )}
+          {curveRef && (
+            <span style={lblS} title="Shift the bend left/right for a sharper, angled curve">Skew <input type="range" min="-100" max="100" value={Math.round((curveRef.curveSkew ?? 0) * 100)} onChange={e => patchSel({ curveSkew: +e.target.value / 100 })} style={{ width: 72 }} /></span>
           )}
 
           {anyText && (
@@ -740,6 +783,14 @@ export function AssetStudioApp({ AC, showToast }) {
               <input type="color" value={imgRef.tint || "#ffffff"} onChange={e => recolorSelected(e.target.value, imgRef.tintAmt ?? 1)} style={swatch} />
               {imgRef.tint && <input type="range" min="15" max="100" value={Math.round((imgRef.tintAmt ?? 1) * 100)} onChange={e => recolorSelected(imgRef.tint, +e.target.value / 100)} style={{ width: 64 }} title="Strength" />}
               {imgRef.tint && <button onClick={() => recolorSelected(null)} title="Remove recolor" style={{ ...ibtn, fontSize: 11, padding: "4px 7px" }}>reset</button>}
+            </span>
+          )}
+
+          {palette.length > 0 && (
+            <span style={{ ...lblS, gap: 5 }} title="Colors sampled from your image — click to apply">Image colors
+              {palette.map((c, i) => (
+                <button key={i} onClick={() => applyPaletteColor(c)} title={"Use " + c} style={{ width: 18, height: 18, borderRadius: 5, border: "1px solid var(--nv-border-strong)", background: c, cursor: "pointer", padding: 0 }} />
+              ))}
             </span>
           )}
 
