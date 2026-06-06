@@ -60,8 +60,14 @@ solid. This combined release **absorbs everything that was tentatively scoped as
 > timeline: Media/Sound/Text + custom layers; import video/image/audio; trim,
 > split, move, snapping; text/title overlays; per-clip speed, volume/mute, fade
 > in/out; drag clips between tracks; .webm export via canvas+WebAudio MediaRecorder,
-> no ffmpeg). **Remaining Phase C:** code editor, whiteboard, mini spreadsheet,
-> full Paint competitor.
+> no ffmpeg). **Code editor shipped** (mini VS Code — multi-tab, syntax highlight,
+> live HTML/CSS/JS preview). **Whiteboard shipped** (infinite canvas, pen/shapes/
+> notes, PNG export). **Forum shipped** (Reddit/Quora-style board — nova_forum
+> Firestore: posts, topics, Hot/New/Top, threaded comments, up/down voting; author
+> or NovaMod can delete). **POS shipped** (restricted register — register/catalog/
+> sales tabs + a NovaMod-only Access panel that grants specific users access via a
+> nova_pos username allowlist; the app is invisible in every launcher surface to
+> anyone not granted). **Remaining Phase C:** mini spreadsheet, full Paint competitor.
 
 ## A · Design foundation — the bedrock everything else sits on
 - **Design system / tokens.** One shared scale for spacing, corner radius,

@@ -508,6 +508,54 @@ service cloud.firestore {
         isMod();
     }
 
+    // ── forum (v11.0) ─────────────────────────────────────────────────────
+    // Reddit/Quora-style board. One doc per post in nova_forum, with votes
+    // (`voters` map + derived `score`) and `comments` array embedded so a
+    // vote or comment is a single-doc update.
+    //
+    //   • read   — any signed-in user.
+    //   • create — author stamps own uid; title must be a non-empty string.
+    //   • update — the author or a mod can change anything; ANY signed-in user
+    //              may update only the vote/comment fields (so voting and
+    //              commenting work without exposing title/body/author to edits
+    //              by non-authors). The hasOnly() check tolerates first-write
+    //              cases where these keys are newly added.
+    //   • delete — author or mod.
+    match /nova_forum/{postId} {
+      allow read: if signedIn();
+      allow create: if willOwnUid('uid') &&
+        request.resource.data.title is string &&
+        request.resource.data.title.size() > 0 &&
+        request.resource.data.title.size() <= 200;
+      allow update: if signedIn() && (
+        resource.data.uid == request.auth.uid ||
+        isMod() ||
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['voters', 'score', 'comments'])
+      );
+      allow delete: if signedIn() && (
+        resource.data.uid == request.auth.uid || isMod()
+      );
+    }
+
+    // ── point of sale (v11.0) ─────────────────────────────────────────────
+    // Restricted register app. Three fixed docs in nova_pos:
+    //   access  — { users: [usernames granted POS access] }  (mod-managed)
+    //   catalog — { items: [...] }                            (mod-managed)
+    //   sales   — { log: [...] }                              (cashier-appended)
+    //
+    // The app itself is HIDDEN client-side from anyone who isn't a mod or on
+    // the access list (see NovaOS visibleApps). Because access is keyed by
+    // username while rules are keyed by uid, fine-grained cashier writes can't
+    // be expressed here — so we keep the sensitive docs (access + catalog)
+    // mod-only and let any signed-in user append to the sales ledger (the same
+    // low-stakes posture as the leaderboards). Reads are open to signed-in
+    // users; the catalog/sales aren't secret, the *app entry point* is what's
+    // gated.
+    match /nova_pos/{docId} {
+      allow read: if signedIn();
+      allow write: if isMod() || docId == 'sales';
+    }
+
     // ── catch-all ────────────────────────────────────────────────────────
     // Anything else is denied. New collections need an explicit rule above.
     match /{document=**} {

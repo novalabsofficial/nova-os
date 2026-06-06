@@ -25,6 +25,7 @@ import { wmoIcon, wmoLabel, geocodeUrl, parseGeocode, forecastUrl, parseForecast
 import { PROVIDERS as AI_PROVIDERS, streamResponse as aiStream, deriveTitle as aiDeriveTitle } from "./lib/ai.js";
 import { playTone, speak, cancelSpeech, playSound, getSoundConfig, setSoundConfig, setSoundWallpaper, subscribeSoundConfig } from "./lib/audio.js";
 import { db, setDbUid, getDbUid } from "./lib/db.js";
+import { fetchAccessList as fetchPosAccess } from "./lib/pos.js";
 import { watchMyThreads, otherParticipantName } from "./lib/dms.js";
 import { watchMyServers } from "./lib/servers.js";
 import { openExternalUrl } from "./lib/openUrl.js";
@@ -137,6 +138,8 @@ const AssetStudioApp  = lazyApp(() => import("./apps/AssetStudioApp.jsx").then(m
 const VideoEditorApp  = lazyApp(() => import("./apps/VideoEditorApp.jsx").then(m  => ({default: m.VideoEditorApp})));
 const WhiteboardApp   = lazyApp(() => import("./apps/WhiteboardApp.jsx").then(m   => ({default: m.WhiteboardApp})));
 const CodeApp         = lazyApp(() => import("./apps/CodeApp.jsx").then(m         => ({default: m.CodeApp})));
+const ForumApp        = lazyApp(() => import("./apps/ForumApp.jsx").then(m        => ({default: m.ForumApp})));
+const PosApp          = lazyApp(() => import("./apps/PosApp.jsx").then(m          => ({default: m.PosApp})));
 const AtlasApp        = lazyApp(() => import("./apps/AtlasApp.jsx").then(m        => ({default: m.AtlasApp})));
 // v10.9 — utilities pack
 const CurrencyApp     = lazyApp(() => import("./apps/CurrencyApp.jsx").then(m     => ({default: m.CurrencyApp})));
@@ -610,6 +613,11 @@ export default function NovaOS(){
   // username drives all UI ("@username", mod check, doc-key building); the
   // uid drives Firestore security rule checks.
   const [uid,        setUid]        = useState(null);
+  // v11.0 Phase C — POS is a restricted app. NovaMod always has access; everyone
+  // else only if NovaMod added their username to the `nova_pos/access` allowlist.
+  // We fetch the allowlist on sign-in so the launcher can hide the app entirely.
+  const [posGrants,  setPosGrants]  = useState([]);
+  const posAccessRef = useRef(false);   // kept in sync below; lets openApp gate the restricted POS
   const [data,       setData]       = useState(null);
   const [customWp,   setCustomWp]   = useState(null);
   const [wins,       setWins]       = useState([]);
@@ -816,6 +824,11 @@ export default function NovaOS(){
     }));
   },[deviceMode]);
   useEffect(()=>{if(user&&wpId==="custom")db.get("user:"+user+":wpimg").then(url=>{if(url)setCustomWp(url);});},[user,wpId]);
+  // v11.0 Phase C — pull the POS access allowlist on sign-in so the restricted
+  // POS app appears in the launcher for granted users (NovaMod is always allowed,
+  // checked separately). Re-fetches when the POS admin grants/revokes (posGrantsBump).
+  const [posGrantsBump,setPosGrantsBump]=useState(0);
+  useEffect(()=>{ let live=true; if(!user){setPosGrants([]);return;} fetchPosAccess().then(list=>{ if(live) setPosGrants(Array.isArray(list)?list:[]); }); return ()=>{live=false;}; },[user,posGrantsBump]);
   // v6.2: tell the sound system which wallpaper is active so system tones
   // transpose to the matching musical key. Fires both on initial data load
   // (when wpId resolves from Firestore) and on every subsequent wallpaper
@@ -1594,6 +1607,10 @@ export default function NovaOS(){
   // We still stash the windowed position in prevBounds so toggling out of
   // maximize restores to a sane place if the user later switches modes.
   const openApp=useCallback((appId)=>{
+    // v11.0 — never launch a restricted app (POS) for a user without access,
+    // even via a stale restored window or desktop pin. posAccessRef already
+    // folds in the NovaMod (isAdmin) check, so this also lets NovaMod through.
+    if(appId==="pos" && !posAccessRef.current) return;
     setMenuOpen(false);
     // v8.1: opening an app clears its notification badge. Special-cased
     // for "chat" inside markAppNotificationsRead (bumps lastChatOpenTs
@@ -1735,6 +1752,8 @@ export default function NovaOS(){
         {appId==="videoeditor"&&<VideoEditorApp AC={AC} showToast={showToast}/>}
         {appId==="whiteboard" &&<WhiteboardApp AC={AC} showToast={showToast}/>}
         {appId==="code"       &&<CodeApp AC={AC} showToast={showToast}/>}
+        {appId==="forum"      &&<ForumApp AC={AC} user={user} showToast={showToast}/>}
+        {appId==="pos"        &&<PosApp AC={AC} user={user} showToast={showToast}/>}
         {appId==="atlas"      &&<AtlasApp AC={AC} showToast={showToast}/>}
         {appId==="currency"   &&<CurrencyApp AC={AC}/>}
         {appId==="dictionary" &&<DictionaryApp AC={AC}/>}
@@ -2137,9 +2156,19 @@ export default function NovaOS(){
   const matchesInstalled=a=>installedApps.includes(a.id)||(a.legacyId&&installedApps.includes(a.legacyId));
   const commIcons=commApps.filter(a=>isPubliclyVisible(a)&&matchesInstalled(a)).map(a=>({id:"store_"+a.id,icon:a.icon,label:a.name,desc:a.desc,storeApp:a}));
   const storeIcons=[...catalogIcons,...commIcons];
+  // v11.0 Phase C — restricted-app gating. `restricted:true` apps (currently the
+  // POS) are invisible in every discovery surface unless the signed-in user is a
+  // moderator (NovaMod) OR their username is on the POS allowlist NovaMod manages
+  // from inside the app. visibleApps drives the launcher/Spotlight/command bar;
+  // metadata lookups elsewhere still use the full APPS so an already-open
+  // restricted window keeps its icon/label.
+  const posAccess = isAdmin(user) || posGrants.includes((user||"").toLowerCase());
+  posAccessRef.current = posAccess;
+  const appAllowed = (a)=> !a.restricted || (a.id==="pos" ? posAccess : false);
+  const visibleApps = APPS.filter(appAllowed);
   // allApps = every app launcher entry that should appear in the start menu —
-  // always the full list, regardless of what's pinned to the desktop.
-  const allApps=[...APPS,...storeIcons];
+  // always the full list (minus restricted apps the user can't see).
+  const allApps=[...visibleApps,...storeIcons];
   // v7.7 — Desktop pinning (blacklist model). Users can hide apps from the
   // desktop via right-click; they're still launchable from the start menu and
   // taskbar. Default is empty array → every app shows on the desktop, so
@@ -2410,7 +2439,7 @@ export default function NovaOS(){
         <Spotlight
           AC={AC}
           data={data}
-          apps={APPS}
+          apps={visibleApps}
           storeCatalog={STORE_CATALOG}
           commApps={commApps}
           isPubliclyVisible={isPubliclyVisible}
@@ -2426,8 +2455,8 @@ export default function NovaOS(){
         <CommandBar
           AC={AC}
           context={{
-            appIds: APPS.map(a => a.id),
-            appLabels: Object.fromEntries(APPS.map(a => [a.id, a.label])),
+            appIds: visibleApps.map(a => a.id),
+            appLabels: Object.fromEntries(visibleApps.map(a => [a.id, a.label])),
             wallpaperIds: Object.keys(WALLPAPERS),
             accents: ACCENT_PRESETS,
           }}

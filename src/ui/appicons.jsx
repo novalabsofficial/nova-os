@@ -314,6 +314,22 @@ const SPECS = {
       <path d="M20 20 L16 24 L20 28 M28 20 L32 24 L28 28" fill="none" stroke="#2563eb" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
     </>),
   },
+  forum: {
+    color: "#f43f5e",
+    glyph: (<>
+      <path d="M13 17 a3 3 0 0 1 3-3 h11 a3 3 0 0 1 3 3 v6 a3 3 0 0 1 -3 3 h-7 l-5 4 v-4 a3 3 0 0 1 -2 -3 Z" fill="#fff" />
+      <circle cx="18.5" cy="20" r="1.4" fill="#f43f5e" />
+      <circle cx="22.5" cy="20" r="1.4" fill="#f43f5e" />
+      <circle cx="26.5" cy="20" r="1.4" fill="#f43f5e" />
+    </>),
+  },
+  pos: {
+    color: "#0d9488",
+    glyph: (<>
+      <path d="M14 18 h20 l-2 13 a2 2 0 0 1 -2 2 h-12 a2 2 0 0 1 -2 -2 Z" fill="#fff" />
+      <path d="M19 19 v-2.5 a5 5 0 0 1 10 0 V19" fill="none" stroke="#fff" strokeWidth="2.4" strokeLinecap="round" />
+    </>),
+  },
   atlas: {
     color: "#16b3a0",
     glyph: (<>
