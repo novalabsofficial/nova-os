@@ -299,6 +299,14 @@ const SPECS = {
       <path d="M21.5 20.5 L28 24 L21.5 27.5 Z" fill="#e0397a" />
     </>),
   },
+  whiteboard: {
+    color: "#0ea5e9",
+    glyph: (<>
+      <rect x="12.5" y="14" width="23" height="16" rx="2.5" fill="#fff" />
+      <path d="M16 26 q3.5 -6 6.5 -2.5 t6.5 -3" fill="none" stroke="#0ea5e9" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+      <rect x="22" y="31.5" width="4" height="3" rx="1" fill="#fff" />
+    </>),
+  },
   atlas: {
     color: "#16b3a0",
     glyph: (<>
