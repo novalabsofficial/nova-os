@@ -28,6 +28,8 @@ const clipDur = (c) => c.kind === "text" ? Math.max(MIN_CLIP, c.duration) : Math
 const clipEnd = (c) => c.start + clipDur(c);
 const projectTotal = (cs) => cs.reduce((m, c) => Math.max(m, clipEnd(c)), 0);
 const fmt = (s) => { s = Math.max(0, s || 0); const m = Math.floor(s / 60), sec = Math.floor(s % 60), cs = Math.floor((s * 100) % 100); return m + ":" + String(sec).padStart(2, "0") + "." + String(cs).padStart(2, "0"); };
+// Snap a time to the nearest reference line within tolerance (else unchanged).
+const snapTime = (t, lines, tol) => { let best = t, bd = tol; for (const L of lines) { const d = Math.abs(t - L); if (d <= bd) { bd = d; best = L; } } return best; };
 
 export function VideoEditorApp({ AC, showToast }) {
   const [tracks, setTracks] = useState(() => [{ id: uid(), kind: "text" }, { id: uid(), kind: "media" }, { id: uid(), kind: "sound" }]);
@@ -53,6 +55,15 @@ export function VideoEditorApp({ AC, showToast }) {
   const rafRef = useRef(0);
   const lastTsRef = useRef(0);
   const readoutTsRef = useRef(0);
+  // export (Stage 3) — WebAudio mix + MediaRecorder
+  const audioCtxRef = useRef(null);
+  const masterRef = useRef(null);
+  const mixDestRef = useRef(null);
+  const srcNodes = useRef(new Map());   // url -> MediaElementAudioSourceNode (created lazily during export)
+  const exportingRef = useRef(false);
+  const recRef = useRef(null);
+  const recChunksRef = useRef([]);
+  const [exporting, setExporting] = useState(false);
   const tickRef = useRef(null);
   const loopRef = useRef(null);
   if (!loopRef.current) loopRef.current = (ts) => { if (tickRef.current) tickRef.current(ts); };
@@ -100,6 +111,7 @@ export function VideoEditorApp({ AC, showToast }) {
       const el = c.kind === "video" ? vids.current.get(c.url) : auds.current.get(c.url);
       (c.kind === "video" ? activeV : activeA).add(c.url);
       if (!el) continue;
+      if (exportingRef.current) routeAudio(c.url, el);   // pull this clip's audio into the export mix
       const expected = c.inPt + (t - c.start);
       if (Math.abs(el.currentTime - expected) > 0.25) { try { el.currentTime = expected; } catch { /* */ } if (!isPlaying) el.addEventListener("seeked", () => drawFrame(timeRef.current), { once: true }); }
       if (isPlaying && el.paused) el.play().catch(() => {});
@@ -121,10 +133,50 @@ export function VideoEditorApp({ AC, showToast }) {
     rafRef.current = requestAnimationFrame(loopRef.current);
   };
 
-  function stopPlay(t) { playingRef.current = false; setPlaying(false); cancelAnimationFrame(rafRef.current); vids.current.forEach(v => { if (!v.paused) v.pause(); }); auds.current.forEach(a => { if (!a.paused) a.pause(); }); setTime(t != null ? t : timeRef.current); }
+  function stopPlay(t) { playingRef.current = false; setPlaying(false); cancelAnimationFrame(rafRef.current); vids.current.forEach(v => { if (!v.paused) v.pause(); }); auds.current.forEach(a => { if (!a.paused) a.pause(); }); setTime(t != null ? t : timeRef.current); if (exportingRef.current && recRef.current && recRef.current.state !== "inactive") { try { recRef.current.stop(); } catch { /* */ } } }
   function play() { const total = projectTotal(clipsRef.current); if (!total) return; if (timeRef.current >= total - 0.02) { timeRef.current = 0; setHead(0); } playingRef.current = true; setPlaying(true); lastTsRef.current = 0; readoutTsRef.current = 0; rafRef.current = requestAnimationFrame(loopRef.current); }
   function togglePlay() { if (playingRef.current) stopPlay(); else play(); }
   function seek(t) { const total = projectTotal(clipsRef.current); t = Math.max(0, Math.min(t, total || 0)); timeRef.current = t; setHead(t); setTime(t); syncMedia(t, playingRef.current); drawFrame(t); }
+
+  // ── export (Stage 3): record the preview canvas + a WebAudio mix to .webm ──
+  function ensureAudioGraph() {
+    if (audioCtxRef.current) return true;
+    try {
+      const Ctx = window.AudioContext || window.webkitAudioContext; if (!Ctx) return false;
+      const ctx = new Ctx(); const master = ctx.createGain(); const dest = ctx.createMediaStreamDestination();
+      master.connect(ctx.destination); master.connect(dest);
+      audioCtxRef.current = ctx; masterRef.current = master; mixDestRef.current = dest; return true;
+    } catch { return false; }
+  }
+  function routeAudio(url, el) {
+    if (!audioCtxRef.current || !masterRef.current || srcNodes.current.has(url)) return;
+    try { const n = audioCtxRef.current.createMediaElementSource(el); n.connect(masterRef.current); srcNodes.current.set(url, n); } catch { /* already routed elsewhere */ }
+  }
+  async function exportVideo() {
+    if (exportingRef.current) return;
+    if (!projectTotal(clipsRef.current)) { showToast?.("Add clips to export"); return; }
+    const cv = canvasRef.current;
+    if (!cv || !cv.captureStream || !window.MediaRecorder) { showToast?.("Export isn't supported in this browser"); return; }
+    ensureAudioGraph(); try { await audioCtxRef.current?.resume(); } catch { /* */ }
+    const trk = [...cv.captureStream(30).getVideoTracks()];
+    if (mixDestRef.current) trk.push(...mixDestRef.current.stream.getAudioTracks());
+    const mime = ["video/webm;codecs=vp9,opus", "video/webm;codecs=vp8,opus", "video/webm"].find(m => MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(m)) || "video/webm";
+    let rec; try { rec = new MediaRecorder(new MediaStream(trk), { mimeType: mime }); } catch { showToast?.("Export isn't supported here"); return; }
+    recChunksRef.current = [];
+    rec.ondataavailable = (e) => { if (e.data && e.data.size) recChunksRef.current.push(e.data); };
+    rec.onstop = () => {
+      const blob = new Blob(recChunksRef.current, { type: "video/webm" });
+      const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = "nova-export-" + Date.now() + ".webm"; a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+      exportingRef.current = false; setExporting(false); showToast?.("Exported .webm ✓");
+    };
+    recRef.current = rec;
+    exportingRef.current = true; setExporting(true);
+    timeRef.current = 0; setHead(0); setTime(0);
+    showToast?.("Recording — playing through once…");
+    try { rec.start(); } catch { exportingRef.current = false; setExporting(false); showToast?.("Export failed to start"); return; }
+    play();
+  }
 
   // ── import ──────────────────────────────────────────────────────────────
   function firstTrack(kind) { return tracksRef.current.find(t => t.kind === kind); }
@@ -189,11 +241,24 @@ export function VideoEditorApp({ AC, showToast }) {
     if (selRef.current === id) setSelId(null);
     setTimeout(() => drawFrame(timeRef.current), 0);
   }
+  // Reference lines to snap to: t=0, the playhead, and every other clip's edges.
+  function snapLines(exceptId) { const L = [0, timeRef.current]; for (const o of clipsRef.current) { if (o.id === exceptId) continue; L.push(o.start, clipEnd(o)); } return L; }
   function startMove(e, id) {
     e.stopPropagation(); setSelId(id);
     const c0 = clipsRef.current.find(c => c.id === id); if (!c0) return;
-    const startX = e.clientX, s0 = c0.start;
-    const move = (ev) => { const ns = Math.max(0, s0 + (ev.clientX - startX) / ppsRef.current); setClips(cs => cs.map(c => c.id === id ? { ...c, start: ns } : c)); };
+    const startX = e.clientX, s0 = c0.start, dur = clipDur(c0);
+    const move = (ev) => {
+      const pps = ppsRef.current, tol = 8 / pps;
+      let ns = Math.max(0, s0 + (ev.clientX - startX) / pps);
+      const lines = snapLines(id);   // snap whichever edge (start or end) lands closest to a line
+      let best = null;
+      for (const L of lines) {
+        const ds = Math.abs(ns - L); if (ds <= tol && (!best || ds < best.d)) best = { v: L, d: ds };
+        const de = Math.abs(ns + dur - L); if (de <= tol && L - dur >= 0 && (!best || de < best.d)) best = { v: L - dur, d: de };
+      }
+      if (best) ns = best.v;
+      setClips(cs => cs.map(c => c.id === id ? { ...c, start: ns } : c));
+    };
     const up = () => { window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", up); drawFrame(timeRef.current); };
     window.addEventListener("pointermove", move); window.addEventListener("pointerup", up);
   }
@@ -201,16 +266,19 @@ export function VideoEditorApp({ AC, showToast }) {
     e.stopPropagation(); e.preventDefault();
     const c0 = clipsRef.current.find(c => c.id === id); if (!c0) return;
     const startX = e.clientX, s0 = c0.start, in0 = c0.inPt, out0 = c0.outPt, dur0 = c0.duration;
+    const end0 = c0.kind === "text" ? s0 + (dur0 || 0) : s0 + (out0 - in0);
     const move = (ev) => {
-      const d = (ev.clientX - startX) / ppsRef.current;
+      const pps = ppsRef.current, tol = 8 / pps, d = (ev.clientX - startX) / pps, lines = snapLines(id);
       setClips(cs => cs.map(c => {
         if (c.id !== id) return c;
-        if (c.kind === "text") {
-          if (edge === "left") { const ns = Math.max(0, Math.min(s0 + d, s0 + dur0 - MIN_CLIP)); return { ...c, start: ns, duration: dur0 - (ns - s0) }; }
-          return { ...c, duration: Math.max(MIN_CLIP, dur0 + d) };
+        if (edge === "left") {
+          const ds = snapTime(s0 + d, lines, tol);
+          if (c.kind === "text") { const ns = Math.max(0, Math.min(ds, s0 + dur0 - MIN_CLIP)); return { ...c, start: ns, duration: dur0 - (ns - s0) }; }
+          const ni = Math.max(0, Math.min(in0 + (ds - s0), out0 - MIN_CLIP)); return { ...c, inPt: ni, start: Math.max(0, s0 + (ni - in0)) };
         }
-        if (edge === "left") { const ni = Math.max(0, Math.min(in0 + d, out0 - MIN_CLIP)); return { ...c, inPt: ni, start: Math.max(0, s0 + (ni - in0)) }; }
-        return { ...c, outPt: Math.min(c.sourceDur, Math.max(in0 + MIN_CLIP, out0 + d)) };
+        const de = snapTime(end0 + d, lines, tol);
+        if (c.kind === "text") return { ...c, duration: Math.max(MIN_CLIP, de - s0) };
+        return { ...c, outPt: Math.min(c.sourceDur, Math.max(in0 + MIN_CLIP, in0 + (de - s0))) };
       }));
     };
     const up = () => { window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", up); drawFrame(timeRef.current); };
@@ -240,6 +308,7 @@ export function VideoEditorApp({ AC, showToast }) {
     vids.current.forEach((v, url) => { try { v.pause(); v.removeAttribute("src"); v.load(); } catch { /* */ } URL.revokeObjectURL(url); });
     auds.current.forEach((a, url) => { try { a.pause(); } catch { /* */ } URL.revokeObjectURL(url); });
     imgs.current.forEach((_, url) => URL.revokeObjectURL(url));
+    try { audioCtxRef.current?.close(); } catch { /* */ }
   }, []);
 
   const total = projectTotal(clips);
@@ -269,7 +338,7 @@ export function VideoEditorApp({ AC, showToast }) {
         <span style={{ fontSize: 11.5, color: "#8b93a7" }}>Zoom</span>
         <button style={iBtn} title="Zoom out" onClick={() => setPps(p => Math.max(20, Math.round(p / 1.3)))}>−</button>
         <button style={iBtn} title="Zoom in" onClick={() => setPps(p => Math.min(220, Math.round(p * 1.3)))}>+</button>
-        <button style={{ ...tBtn(false), opacity: 0.5, cursor: "default" }} title="Export arrives in Stage 3">⬇ Export (soon)</button>
+        <button style={{ ...tBtn(false), opacity: (exporting || !clips.length) ? 0.5 : 1, cursor: (exporting || !clips.length) ? "default" : "pointer" }} disabled={exporting || !clips.length} title="Export the timeline to a .webm video" onClick={exportVideo}>{exporting ? "● Exporting…" : "⬇ Export"}</button>
       </div>
 
       {/* Preview */}
