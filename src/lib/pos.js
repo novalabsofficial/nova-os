@@ -76,7 +76,7 @@ export async function createStore({ name, username, password, byUid }) {
     const store = {
       id, name: (name || username).trim().slice(0, 60), username: norm(username),
       passHash: await hashPw(password), taxRate: 0, state: "", items: [], sales: [], agg: emptyAgg(),
-      createdAt: Date.now(), createdByUid: byUid || null,
+      expenses: [], createdAt: Date.now(), createdByUid: byUid || null,
     };
     await setDoc(ref, store);
     return { store: { ...store, items: [] } };

@@ -52,6 +52,21 @@ let _pid = 0;
 const newId = () => "i" + Date.now().toString(36) + (_pid++).toString(36);
 const startOfToday = () => { const d = new Date(); d.setHours(0, 0, 0, 0); return d.getTime(); };
 
+// Recurring-expense accrual. Each expense has { name, amount, period }; we convert
+// to a per-day rate so costs (rent, payroll…) accrue automatically over time.
+const PERIODS = [{ id: "daily", label: "Per day", days: 1 }, { id: "weekly", label: "Per week", days: 7 }, { id: "monthly", label: "Per month", days: 30.4368 }, { id: "yearly", label: "Per year", days: 365.25 }];
+const periodDays = (p) => (PERIODS.find(x => x.id === p) || PERIODS[2]).days;
+const dailyRate = (e) => (Number(e.amount) || 0) / periodDays(e.period);
+const dailyExpenseTotal = (exps) => (exps || []).reduce((s, e) => s + dailyRate(e), 0);
+const monthlyExpense = (e) => dailyRate(e) * 30.4368;
+function dayLabel(ts) {
+  const today = startOfToday();
+  if (ts === today) return "Today";
+  if (ts === today - 86400000) return "Yesterday";
+  const d = new Date(ts);
+  return d.toLocaleDateString([], { weekday: "short", month: "short", day: "numeric", ...(d.getFullYear() !== new Date().getFullYear() ? { year: "numeric" } : {}) });
+}
+
 // downscale an uploaded image to a small JPEG dataURL (keeps the store doc light)
 function downscale(file, max = 200, q = 0.62) {
   return new Promise((res) => {
@@ -206,7 +221,16 @@ function Shell({ AC, user, showToast, onExit, store, setStore }) {
     showToast?.(ok ? `Sale complete — ${money(sale.total)}` : "Saved locally (sync failed)");
   }, [store.id, setStore, showToast]);
 
-  const TABS = [{ id: "register", label: "Register", icon: "🧾" }, { id: "items", label: "Items", icon: "🏷️" }, { id: "revenue", label: "Revenue", icon: "📈" }];
+  // expenses update instantly in the UI; the Firestore write is debounced so
+  // typing in the expense fields doesn't fire a write per keystroke.
+  const expTimer = useRef(null);
+  const setExpenses = useCallback((next) => {
+    setStore(s => ({ ...s, expenses: next }));
+    clearTimeout(expTimer.current);
+    expTimer.current = setTimeout(() => saveStoreMeta(store.id, { expenses: next }), 600);
+  }, [store.id, setStore]);
+
+  const TABS = [{ id: "register", label: "Register", icon: "🧾" }, { id: "items", label: "Items", icon: "🏷️" }, { id: "revenue", label: "Revenue", icon: "📈" }, { id: "expenses", label: "Expenses", icon: "🧮" }];
   const tabBtn = (on) => ({ display: "flex", alignItems: "center", gap: 7, padding: "8px 15px", borderRadius: 10, fontFamily: FFB, fontSize: 13.5, cursor: "pointer", border: "1px solid " + (on ? "transparent" : "var(--nv-border)"), background: on ? AC : "var(--nv-elevated)", color: on ? "#fff" : "var(--nv-text)" });
   const signOut = () => { setStore(null); };
 
@@ -231,7 +255,8 @@ function Shell({ AC, user, showToast, onExit, store, setStore }) {
       <div style={{ flex: 1, minHeight: 0 }}>
         {tab === "register" && <Register AC={AC} items={items} taxRate={store.taxRate || 0} onSale={onSale} showToast={showToast} />}
         {tab === "items" && <Items AC={AC} items={items} taxRate={store.taxRate || 0} setTax={setTax} stateCode={store.state || ""} setStateLoc={setStateLoc} onChange={persistItems} showToast={showToast} />}
-        {tab === "revenue" && <Revenue AC={AC} agg={store.agg || {}} sales={store.sales || []} />}
+        {tab === "revenue" && <Revenue AC={AC} agg={store.agg || {}} sales={store.sales || []} expenses={store.expenses || []} createdAt={store.createdAt || Date.now()} />}
+        {tab === "expenses" && <Expenses AC={AC} expenses={store.expenses || []} onChange={setExpenses} showToast={showToast} />}
       </div>
     </div>
   );
@@ -502,43 +527,116 @@ function ItemEditor({ AC, draft, setDraft, onSave, exists, showToast }) {
 }
 
 // ────────────────────────────────────────────────────────────── revenue ────
-function Revenue({ AC, agg, sales }) {
+function Revenue({ AC, agg, sales, expenses, createdAt }) {
+  const perDayExp = dailyExpenseTotal(expenses);
+  const daysOpen = Math.max(0, (Date.now() - (createdAt || Date.now())) / 86400000);
+  const opEx = perDayExp * daysOpen;                 // operating expenses accrued to date
+  const grossProfit = agg.profit || 0;
+  const net = grossProfit - opEx;
+
   const today = useMemo(() => { const t = startOfToday(); return (sales || []).filter(s => s.at >= t); }, [sales]);
   const tRev = today.reduce((s, x) => s + (x.revenue || 0), 0);
   const tProfit = today.reduce((s, x) => s + (x.profit || 0), 0);
 
+  // group sales by calendar day, newest first
+  const days = useMemo(() => {
+    const m = new Map();
+    for (const s of (sales || [])) {
+      const d = new Date(s.at); d.setHours(0, 0, 0, 0); const k = d.getTime();
+      if (!m.has(k)) m.set(k, { day: k, sales: [], revenue: 0, profit: 0 });
+      const g = m.get(k); g.sales.push(s); g.revenue += s.revenue || 0; g.profit += s.profit || 0;
+    }
+    return [...m.values()].sort((a, b) => b.day - a.day);
+  }, [sales]);
+
   return (
-    <div style={{ height: "100%", overflow: "auto", padding: "16px 18px", maxWidth: 880, margin: "0 auto" }}>
+    <div style={{ height: "100%", overflow: "auto", padding: "16px 18px", maxWidth: 900, margin: "0 auto" }}>
       <div style={{ fontFamily: FFB, fontSize: 18, marginBottom: 12 }}>Revenue & profit</div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))", gap: 11, marginBottom: 16 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(165px, 1fr))", gap: 11, marginBottom: 16 }}>
         <Stat label="Total revenue" value={money(agg.revenue)} sub="Pre-tax sales" AC={AC} big />
-        <Stat label="Total profit" value={money(agg.profit)} sub="Revenue − cost of goods" color="#16a34a" big />
-        <Stat label="Cost of goods" value={money(agg.cost)} sub="What you paid for sold stock" />
+        <Stat label="Net profit" value={money(net)} sub="Profit − expenses to date" color={net >= 0 ? "#16a34a" : "#ef4444"} big />
+        <Stat label="Gross profit" value={money(grossProfit)} sub="Revenue − cost of goods" />
+        <Stat label="Operating expenses" value={money(opEx)} sub={perDayExp > 0 ? `${money(perDayExp)}/day · accrued` : "None set →  Expenses tab"} />
+        <Stat label="Cost of goods" value={money(agg.cost)} sub="Paid for sold stock" />
         <Stat label="Tax collected" value={money(agg.tax)} sub="Set aside for remittance" />
         <Stat label="Gross collected" value={money(agg.gross)} sub="Incl. tax" />
         <Stat label="Transactions" value={String(agg.count || 0)} sub="Completed sales" />
       </div>
 
       <div style={{ display: "flex", gap: 11, marginBottom: 18, flexWrap: "wrap" }}>
-        <Stat label="Today's revenue" value={money(tRev)} sub={`${today.length} sale${today.length === 1 ? "" : "s"} today`} AC={AC} />
-        <Stat label="Today's profit" value={money(tProfit)} sub="So far today" color="#16a34a" />
+        <Stat label="Today's revenue" value={money(tRev)} sub={`${today.length} sale${today.length === 1 ? "" : "s"}`} AC={AC} />
+        <Stat label="Today's profit" value={money(tProfit)} sub="Before expenses" color="#16a34a" />
+        {perDayExp > 0 && <Stat label="Today's net" value={money(tProfit - perDayExp)} sub={`after ${money(perDayExp)} expenses`} color={(tProfit - perDayExp) >= 0 ? "#16a34a" : "#ef4444"} />}
       </div>
 
-      <div style={{ fontFamily: FFB, fontSize: 14.5, marginBottom: 8 }}>Recent transactions</div>
-      <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
-        {(!sales || sales.length === 0) ? <Center>No sales recorded yet.</Center>
-          : sales.map(s => (
-            <div key={s.id} style={{ padding: "11px 14px", borderRadius: 12, border: "1px solid var(--nv-border)", background: "var(--nv-surface-solid)" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
-                <span style={{ fontFamily: FFB, fontSize: 15.5 }}>{money(s.total)}</span>
-                <span style={{ fontSize: 11.5, padding: "1px 8px", borderRadius: 999, background: "var(--nv-elevated)", color: "var(--nv-text-dim)" }}>{s.tender === "cash" ? "💵 Cash" : "💳 Card"}</span>
-                <span style={{ fontSize: 12, color: "#16a34a", fontFamily: FFB }}>+{money(s.profit)} profit</span>
-                <div style={{ flex: 1 }} />
-                <span style={{ fontSize: 11.5, color: "var(--nv-text-dim)" }}>{new Date(s.at).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</span>
-              </div>
-              <div style={{ fontSize: 12.5, color: "var(--nv-text-dim)", marginTop: 4 }}>{(s.lines || []).map(l => `${l.qty}× ${l.name}`).join(", ")}</div>
+      <div style={{ fontFamily: FFB, fontSize: 14.5, marginBottom: 8 }}>Sales by day</div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        {days.length === 0 ? <Center>No sales recorded yet.</Center>
+          : days.map(g => <DayGroup key={g.day} g={g} perDayExp={perDayExp} />)}
+      </div>
+    </div>
+  );
+}
+
+function DayGroup({ g, perDayExp }) {
+  const [open, setOpen] = useState(false);
+  const net = g.profit - perDayExp;
+  return (
+    <div style={{ border: "1px solid var(--nv-border)", borderRadius: 12, background: "var(--nv-surface-solid)", overflow: "hidden" }}>
+      <div onClick={() => setOpen(o => !o)} style={{ display: "flex", alignItems: "center", gap: 10, padding: "11px 14px", cursor: "pointer" }}>
+        <span style={{ transform: open ? "rotate(90deg)" : "none", transition: "transform .15s", color: "var(--nv-text-dim)", fontSize: 12 }}>▸</span>
+        <span style={{ fontFamily: FFB, fontSize: 14 }}>{dayLabel(g.day)}</span>
+        <span style={{ fontSize: 11.5, color: "var(--nv-text-dim)" }}>{g.sales.length} sale{g.sales.length === 1 ? "" : "s"}</span>
+        <div style={{ flex: 1 }} />
+        <span style={{ fontSize: 12.5, color: "var(--nv-text-dim)" }}>Rev {money(g.revenue)}</span>
+        <span style={{ fontFamily: FFB, fontSize: 13.5, color: perDayExp > 0 ? (net >= 0 ? "#16a34a" : "#ef4444") : "#16a34a" }}>{perDayExp > 0 ? `Net ${money(net)}` : `+${money(g.profit)}`}</span>
+      </div>
+      {open && (
+        <div style={{ borderTop: "1px solid var(--nv-border)", padding: "4px 12px 8px" }}>
+          {perDayExp > 0 && <div style={{ fontSize: 11.5, color: "var(--nv-text-dim)", padding: "6px 0" }}>Revenue {money(g.revenue)} · profit {money(g.profit)} − expenses {money(perDayExp)} = <b style={{ color: net >= 0 ? "#16a34a" : "#ef4444" }}>net {money(net)}</b></div>}
+          {g.sales.map(s => (
+            <div key={s.id} style={{ display: "flex", alignItems: "center", gap: 9, padding: "6px 2px", borderTop: "1px solid var(--nv-border)" }}>
+              <span style={{ fontFamily: FFB, fontSize: 13.5 }}>{money(s.total)}</span>
+              <span style={{ fontSize: 11, padding: "1px 7px", borderRadius: 999, background: "var(--nv-elevated)", color: "var(--nv-text-dim)" }}>{s.tender === "cash" ? "💵" : "💳"}</span>
+              <span style={{ fontSize: 11.5, color: "#16a34a" }}>+{money(s.profit)}</span>
+              <span style={{ flex: 1, fontSize: 11.5, color: "var(--nv-text-dim)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{(s.lines || []).map(l => `${l.qty}× ${l.name}`).join(", ")}</span>
+              <span style={{ fontSize: 11, color: "var(--nv-text-dim)" }}>{new Date(s.at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}</span>
             </div>
           ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Expenses({ AC, expenses, onChange, showToast }) {
+  const monthly = (expenses || []).reduce((s, e) => s + monthlyExpense(e), 0);
+  const update = (id, patch) => onChange(expenses.map(e => e.id === id ? { ...e, ...patch } : e));
+  const add = () => onChange([...(expenses || []), { id: newId(), name: "", amount: "", period: "monthly" }]);
+  const del = (id) => onChange(expenses.filter(e => e.id !== id));
+  const fld = { padding: "8px 10px", borderRadius: 9, border: "1px solid var(--nv-border)", background: "var(--nv-elevated)", color: "var(--nv-text)", fontFamily: FF, fontSize: 13.5, boxSizing: "border-box" };
+  return (
+    <div style={{ height: "100%", overflow: "auto", padding: "16px 18px", maxWidth: 760, margin: "0 auto" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 6 }}>
+        <div style={{ fontFamily: FFB, fontSize: 18 }}>Recurring expenses</div>
+        <div style={{ flex: 1 }} />
+        <button onClick={add} style={{ padding: "9px 15px", borderRadius: 10, border: "none", background: AC, color: "#fff", fontFamily: FFB, fontSize: 14, cursor: "pointer" }}>+ Add expense</button>
+      </div>
+      <div style={{ fontSize: 12.5, color: "var(--nv-text-dim)", marginBottom: 16, lineHeight: 1.5 }}>
+        Fixed costs like building rent or payroll. They accrue automatically over time and are subtracted from profit on the Revenue page (net profit). Current total: <b style={{ color: "var(--nv-text)" }}>{money(monthly)}/month</b>.
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        {(expenses || []).map(e => (
+          <div key={e.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 11px", borderRadius: 11, border: "1px solid var(--nv-border)", background: "var(--nv-surface-solid)" }}>
+            <input value={e.name} onChange={ev => update(e.id, { name: ev.target.value })} placeholder="e.g. Rent, Payroll, Utilities" style={{ ...fld, flex: 1 }} />
+            <span style={{ color: "var(--nv-text-dim)", fontFamily: FFB }}>$</span>
+            <input type="number" inputMode="decimal" value={e.amount} onChange={ev => update(e.id, { amount: ev.target.value })} placeholder="0" style={{ ...fld, width: 88 }} />
+            <select value={e.period} onChange={ev => update(e.id, { period: ev.target.value })} style={{ ...fld, width: 116 }}>{PERIODS.map(p => <option key={p.id} value={p.id}>{p.label}</option>)}</select>
+            <span style={{ fontSize: 11.5, color: "var(--nv-text-dim)", width: 86, textAlign: "right" }}>{money(monthlyExpense(e))}/mo</span>
+            <span onClick={() => del(e.id)} style={{ cursor: "pointer", color: "#ef4444", fontSize: 12.5 }}>Delete</span>
+          </div>
+        ))}
+        {(!expenses || expenses.length === 0) && <Center>No recurring expenses yet. Add building rent, payroll, utilities…</Center>}
       </div>
     </div>
   );

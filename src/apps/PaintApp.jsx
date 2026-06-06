@@ -14,12 +14,12 @@
 // Canvas is fixed-resolution (CW×CH); a transformed wrapper handles zoom/pan, so
 // pointer mapping divides by the live displayed size and stays correct at any zoom.
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef } from "react";
 import { FF, FFB, FFM } from "../ui/styles.js";
 import { fill, bdr } from "../lib/format.js";
 import { PAINT_COLORS } from "../ui/constants.js";
 
-const CW = 1000, CH = 680;
+const DEFAULT_W = 1000, DEFAULT_H = 680;   // fallback until the stage is measured
 const UNDO_LIMIT = 20;
 let _lid = 0;
 const newLayerId = () => "L" + (++_lid);
@@ -91,21 +91,35 @@ export function PaintApp({ showToast, AC, onSetWallpaper }) {
   const [textFont, setTextFont] = useState(TEXT_FONTS[0].id);
   const [undoN, setUndoN] = useState(0);
   const [redoN, setRedoN] = useState(0);
+  const [dim, setDim] = useState({ w: DEFAULT_W, h: DEFAULT_H });
+  const CW = dim.w, CH = dim.h;            // alias so the rest of the app reads live dims
+  const sizedRef = useRef("");
 
   const active = activeId || layers[0]?.id;
   const activeCanvas = () => canvasEls.current[active];
   const actx = () => activeCanvas()?.getContext("2d");
 
-  // init background fill + first fit
+  // On first open, size the document to the display so it starts at 100% and
+  // fills the window — no more tiny floating canvas at an odd zoom.
   useEffect(() => {
     if (initedRef.current) return;
-    const el = canvasEls.current[layers[0].id];
-    if (!el) return;
-    const ctx = el.getContext("2d"); ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, CW, CH);
-    setActiveId(layers[0].id);
+    const stage = stageRef.current; if (!stage || !stage.clientWidth) return;
     initedRef.current = true;
-    fitView();
+    setDim({ w: Math.max(400, Math.round(stage.clientWidth)), h: Math.max(300, Math.round(stage.clientHeight)) });
   }, [layers]);
+
+  // Paint the background white once the (newly measured) document size is applied
+  // to the background canvas, then reset to a clean 100% view.
+  useEffect(() => {
+    const key = dim.w + "x" + dim.h;
+    if (sizedRef.current === key) return;
+    const el = canvasEls.current[layers[0]?.id];
+    if (!el || el.width !== dim.w || el.height !== dim.h) return;
+    sizedRef.current = key;
+    const ctx = el.getContext("2d"); ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, dim.w, dim.h);
+    setActiveId(layers[0].id);
+    setZoom(1); setPan({ x: 0, y: 0 });
+  }, [dim, layers]);
 
   // duplicate copy once the new canvas mounts
   useEffect(() => {
@@ -114,17 +128,11 @@ export function PaintApp({ showToast, AC, onSetWallpaper }) {
     if (s && d) { d.getContext("2d").drawImage(s, 0, 0); pendingCopy.current = null; }
   });
 
-  useEffect(() => {
-    const onResize = () => fitView();
-    window.addEventListener("resize", onResize);
-    return () => window.removeEventListener("resize", onResize);
-  }, []);
-
-  const fitView = useCallback(() => {
+  const fitView = () => {
     const el = stageRef.current; if (!el) return;
-    const z = Math.min(el.clientWidth / CW, el.clientHeight / CH) * 0.92;
-    setZoom(z); setPan({ x: (el.clientWidth - CW * z) / 2, y: (el.clientHeight - CH * z) / 2 });
-  }, []);
+    const z = Math.min(el.clientWidth / dim.w, el.clientHeight / dim.h) * 0.97;
+    setZoom(z); setPan({ x: (el.clientWidth - dim.w * z) / 2, y: (el.clientHeight - dim.h * z) / 2 });
+  };
 
   // ── undo / redo (per-layer pixel snapshots) ─────────────────────────────
   const sync = () => { setUndoN(undoStack.current.length); setRedoN(redoStack.current.length); };
