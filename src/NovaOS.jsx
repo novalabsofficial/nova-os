@@ -630,6 +630,7 @@ export default function NovaOS(){
   // (drives the ghost preview); snapRef mirrors it so the pointerup handler can
   // read the final zone without being re-bound on every zone change.
   const [snap,       setSnap]       = useState(null);
+  const dragGeomRef                 = useRef(null);   // live window geometry during a drag/resize (avoids per-frame re-renders)
   const snapRef = useRef(null);
   // v8.6 AFK screensaver — `screensaver` shows the blurred-clock overlay after
   // an idle period. ssActiveRef mirrors it so the high-frequency activity
@@ -842,15 +843,38 @@ export default function NovaOS(){
   // pointercancel fires if the OS interrupts the gesture (system gesture, call, etc.);
   // we clean up exactly like pointerup so the dragged item doesn't get stuck.
 
-  // Window drag/resize
+  // Window drag/resize — imperative during the gesture: move the DOM node
+  // directly + stash live geometry in dragGeomRef, so we DON'T setState (and
+  // re-render the whole desktop) on every pointermove. The render reads
+  // dragGeomRef for the dragged window so any incidental re-render (snap-zone
+  // change, clock tick) keeps it in place. State is committed once on release.
   useEffect(()=>{
-    function onMove(e){if(!drag)return;if(drag.type==="move"){setWins(ws=>ws.map(w=>{if(w.id!==drag.winId)return w;return{...w,x:Math.max(0,e.clientX-drag.ox),y:Math.max(0,Math.min(e.clientY-drag.oy,window.innerHeight-80))};}));
-      // v8.5: live snap-zone detection while dragging (desktop only). Update
-      // the ghost only when the zone actually changes to avoid extra renders.
-      if(deviceMode==="desktop"){const z=computeSnapZone(e.clientX,e.clientY);if(snapRef.current!==z){snapRef.current=z;setSnap(z);}}
-    }else if(drag.type==="resize"){const dx=e.clientX-drag.sx,dy=e.clientY-drag.sy;setWins(ws=>ws.map(w=>{if(w.id!==drag.winId)return w;let nx=drag.wx,ny=drag.wy,nw=drag.ww,nh=drag.wh;if(drag.edge.includes("e"))nw=Math.max(MIN_W,drag.ww+dx);if(drag.edge.includes("s"))nh=Math.max(MIN_H,drag.wh+dy);if(drag.edge.includes("w")){nw=Math.max(MIN_W,drag.ww-dx);nx=drag.wx+drag.ww-nw;}if(drag.edge.includes("n")){nh=Math.max(MIN_H,drag.wh-dy);ny=drag.wy+drag.wh-nh;}return{...w,x:nx,y:ny,width:nw,height:nh};}));}}
-    function onUp(){if(drag&&drag.type==="move"&&snapRef.current)applySnap(drag.winId,snapRef.current);snapRef.current=null;setSnap(null);setDrag(null);}
-    window.addEventListener("pointermove",onMove);window.addEventListener("pointerup",onUp);window.addEventListener("pointercancel",onUp);return()=>{window.removeEventListener("pointermove",onMove);window.removeEventListener("pointerup",onUp);window.removeEventListener("pointercancel",onUp);};
+    if(!drag) return;
+    const node = (typeof document !== "undefined") ? document.querySelector('[data-win-id="'+drag.winId+'"]') : null;
+    function onMove(e){
+      if(drag.type==="move"){
+        const x=Math.max(0,e.clientX-drag.ox), y=Math.max(0,Math.min(e.clientY-drag.oy,window.innerHeight-80));
+        dragGeomRef.current={x,y};
+        if(node){ node.style.left=x+"px"; node.style.top=y+"px"; }
+        if(deviceMode==="desktop"){const z=computeSnapZone(e.clientX,e.clientY);if(snapRef.current!==z){snapRef.current=z;setSnap(z);}}
+      }else if(drag.type==="resize"){
+        const dx=e.clientX-drag.sx,dy=e.clientY-drag.sy; let nx=drag.wx,ny=drag.wy,nw=drag.ww,nh=drag.wh;
+        if(drag.edge.includes("e"))nw=Math.max(MIN_W,drag.ww+dx);
+        if(drag.edge.includes("s"))nh=Math.max(MIN_H,drag.wh+dy);
+        if(drag.edge.includes("w")){nw=Math.max(MIN_W,drag.ww-dx);nx=drag.wx+drag.ww-nw;}
+        if(drag.edge.includes("n")){nh=Math.max(MIN_H,drag.wh-dy);ny=drag.wy+drag.wh-nh;}
+        dragGeomRef.current={x:nx,y:ny,width:nw,height:nh};
+        if(node){ node.style.left=nx+"px"; node.style.top=ny+"px"; node.style.width=nw+"px"; node.style.height=nh+"px"; }
+      }
+    }
+    function onUp(){
+      const g=dragGeomRef.current;
+      if(drag.type==="move"&&snapRef.current){ applySnap(drag.winId,snapRef.current); }
+      else if(g){ setWins(ws=>ws.map(w=> w.id===drag.winId ? {...w,...g} : w)); }
+      dragGeomRef.current=null; snapRef.current=null; setSnap(null); setDrag(null);
+    }
+    window.addEventListener("pointermove",onMove);window.addEventListener("pointerup",onUp);window.addEventListener("pointercancel",onUp);
+    return()=>{window.removeEventListener("pointermove",onMove);window.removeEventListener("pointerup",onUp);window.removeEventListener("pointercancel",onUp);};
     // eslint-disable-next-line react-hooks/exhaustive-deps
   },[drag,deviceMode]);
 
@@ -2795,7 +2819,13 @@ export default function NovaOS(){
         // v10.0: maximized windows are position:absolute (not fixed) so they
         // stay confined to their virtual-desktop panel — a fixed element would
         // anchor to the transformed track and span every desktop at once.
-        const winStyle=isMax?{position:"absolute",top:0,left:0,width:"100vw",bottom:TASKBAR_H+"px",zIndex:win.z,borderRadius:0}:{position:"absolute",left:win.x,top:win.y,width:win.width,height:win.height,zIndex:win.z,borderRadius:winRadius};
+        // While this window is being dragged/resized, take its geometry from the
+        // live ref (set imperatively each pointermove) so an incidental re-render
+        // doesn't snap it back to the stale state position.
+        const dg = isDrg && dragGeomRef.current ? dragGeomRef.current : null;
+        const gx = dg ? dg.x : win.x, gy = dg ? dg.y : win.y;
+        const gw = (dg && dg.width != null) ? dg.width : win.width, gh = (dg && dg.height != null) ? dg.height : win.height;
+        const winStyle=isMax?{position:"absolute",top:0,left:0,width:"100vw",bottom:TASKBAR_H+"px",zIndex:win.z,borderRadius:0}:{position:"absolute",left:gx,top:gy,width:gw,height:gh,zIndex:win.z,borderRadius:winRadius};
         const minimizedStyle=isMin?{display:"none"}:{};
         // v10.0 — fx-driven open/close/minimize/restore animation. A settled
         // window has no animation (so it never re-plays on re-render); the
@@ -2822,7 +2852,7 @@ export default function NovaOS(){
                       : "none";
         const fxBusy = fx==="closing"||fx==="minimizing";
         return(
-          <div key={win.id} data-win="1" data-drop={win.app==="profile"?"avatar":"none"} onClick={()=>focusWin(win.id)} style={{...winStyle,...minimizedStyle,pointerEvents:fxBusy?"none":"auto",transformOrigin:fxOrigin,background:"var(--nv-surface-solid)",border:"1px solid "+(isFocused?"var(--nv-border-strong)":"var(--nv-border)"),boxShadow:winShadow,display:isMin?"none":"flex",flexDirection:"column",animation:winAnim,backdropFilter:"blur("+winBlur+"px) saturate(160%)",WebkitBackdropFilter:"blur("+winBlur+"px) saturate(160%)",transition:isDrg?"box-shadow 0.18s var(--nv-ease)":"box-shadow 0.22s var(--nv-ease), left 0.28s var(--nv-ease), top 0.28s var(--nv-ease), width 0.28s var(--nv-ease), height 0.28s var(--nv-ease)",overflow:"hidden"}}>
+          <div key={win.id} data-win="1" data-win-id={win.id} data-drop={win.app==="profile"?"avatar":"none"} onClick={()=>focusWin(win.id)} style={{...winStyle,...minimizedStyle,pointerEvents:fxBusy?"none":"auto",transformOrigin:fxOrigin,background:"var(--nv-surface-solid)",border:"1px solid "+(isFocused?"var(--nv-border-strong)":"var(--nv-border)"),boxShadow:winShadow,display:isMin?"none":"flex",flexDirection:"column",animation:winAnim,backdropFilter:"blur("+winBlur+"px) saturate(160%)",WebkitBackdropFilter:"blur("+winBlur+"px) saturate(160%)",transition:isDrg?"box-shadow 0.18s var(--nv-ease)":"box-shadow 0.22s var(--nv-ease), left 0.28s var(--nv-ease), top 0.28s var(--nv-ease), width 0.28s var(--nv-ease), height 0.28s var(--nv-ease)",overflow:"hidden"}}>
             {!isMax&&<ResizeHandles winId={win.id} onStartResize={startResize} touchy={touchy}/>}
             {/* v8.3 F1: title bar is now draggable even when maximized —
                 dragging restores the window and tears it off (Windows-style),
