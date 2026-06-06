@@ -36,6 +36,9 @@ export function MusicApp({ AC, showToast }) {
   const [dragging, setDragging] = useState(false);
   const [eq, setEq] = useState({ bass: 0, mid: 0, treble: 0, preamp: 1 });   // mixer / EQ
   const [vocal, setVocal] = useState(false);                                 // vocal remover (karaoke)
+  const [urlOpen, setUrlOpen] = useState(false);
+  const [urlVal, setUrlVal] = useState("");
+  const [urlBusy, setUrlBusy] = useState(false);
   const audioRef = useRef(null);
   const inputRef = useRef(null);
   const folderRef = useRef(null);
@@ -108,6 +111,27 @@ export function MusicApp({ AC, showToast }) {
     showToast?.(audioFiles.length + " track" + (audioFiles.length === 1 ? "" : "s") + " added");
   }
   function onPick(e) { addFiles(e.target.files); e.target.value = ""; }
+  // Import a direct audio link. Fetched to a local blob so it plays fully and
+  // works with the visualizer/mixer (needs a CORS-enabled host in the browser;
+  // unrestricted in the desktop build).
+  async function importUrl() {
+    const url = urlVal.trim(); if (!url || urlBusy) return;
+    setUrlBusy(true);
+    try {
+      const res = await fetch(url); if (!res.ok) throw new Error("status");
+      const blob = await res.blob();
+      const looksAudio = /audio\//.test(blob.type) || /\.(mp3|wav|ogg|m4a|aac|flac)(\?|#|$)/i.test(url);
+      if (!looksAudio) { showToast?.("That link doesn't look like an audio file"); setUrlBusy(false); return; }
+      const raw = decodeURIComponent((url.split("/").pop() || "track").split(/[?#]/)[0]) || "Imported track";
+      const t = { id: Date.now(), name: raw.replace(/\.[^.]+$/, "") || "Imported track", url: URL.createObjectURL(blob), size: blob.size, addedAt: Date.now() };
+      setTracks(prev => { const combined = [...prev, t]; if (playIds.length === 0) { setPlayIds([t.id]); setPlayPos(p => p < 0 ? 0 : p); } return combined; });
+      showToast?.("Imported “" + t.name + "”");
+      setUrlVal(""); setUrlOpen(false);
+    } catch {
+      showToast?.("Couldn't fetch that link — the site may block downloads (CORS). Try a direct, CORS-enabled audio link.");
+    }
+    setUrlBusy(false);
+  }
   function removeTrack(id) {
     const removed = tracks.find(t => t.id === id);
     if (removed) URL.revokeObjectURL(removed.url);
@@ -212,6 +236,15 @@ export function MusicApp({ AC, showToast }) {
           <button onClick={() => folderRef.current?.click()} style={{ display: "flex", alignItems: "center", gap: 9, padding: "8px 11px", marginTop: 4, background: "transparent", border: "1px solid var(--nv-border)", borderRadius: 8, cursor: "pointer", fontFamily: FFB, fontWeight: 600, fontSize: 11.5, color: "var(--nv-text)" }}>
             <span style={{ fontSize: 13, lineHeight: 1 }}>📁</span> Add a folder
           </button>
+          <button onClick={() => setUrlOpen(o => !o)} style={{ display: "flex", alignItems: "center", gap: 9, padding: "8px 11px", marginTop: 4, background: urlOpen ? fill(AC) : "transparent", border: "1px solid " + (urlOpen ? bdr(AC) : "var(--nv-border)"), borderRadius: 8, cursor: "pointer", fontFamily: FFB, fontWeight: 600, fontSize: 11.5, color: urlOpen ? AC : "var(--nv-text)" }}>
+            <span style={{ fontSize: 13, lineHeight: 1 }}>🔗</span> Add from link
+          </button>
+          {urlOpen && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 6 }}>
+              <input value={urlVal} onChange={e => setUrlVal(e.target.value)} onKeyDown={e => { if (e.key === "Enter") importUrl(); }} placeholder="https://…/song.mp3" spellCheck={false} style={{ padding: "7px 9px", borderRadius: 7, background: "var(--nv-input-bg)", color: "var(--nv-text)", border: "1px solid var(--nv-border-strong)", fontFamily: FF, fontSize: 11.5, outline: "none" }} />
+              <button onClick={importUrl} disabled={urlBusy || !urlVal.trim()} style={{ padding: "7px 11px", borderRadius: 7, border: "1px solid " + bdr(AC), background: fill(AC), color: AC, fontFamily: FFB, fontWeight: 700, fontSize: 11.5, cursor: (urlBusy || !urlVal.trim()) ? "default" : "pointer", opacity: (urlBusy || !urlVal.trim()) ? 0.5 : 1 }}>{urlBusy ? "Importing…" : "Import"}</button>
+            </div>
+          )}
           <div style={{ padding: "8px 10px 0", fontSize: 9.5, color: "var(--nv-text-dim)", lineHeight: 1.55 }}>Drag &amp; drop audio anywhere. MP3, WAV, OGG, M4A, FLAC.</div>
         </div>
 
