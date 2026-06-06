@@ -56,7 +56,12 @@ solid. This combined release **absorbs everything that was tentatively scoped as
 > JSON export/import w/ confirm + reload), desktop sticky notes (`data.stickyNotes`,
 > 6 colors, drag/edit/delete), and snap workspaces (`settings.workspaces` —
 > save/restore named window layouts via desktop right-click → Window layouts).
-> **Next: Phase C · Flagship apps** (video editor, code editor, …).
+> **Phase C · Flagship apps IN PROGRESS** — **Video Editor shipped** (multi-track
+> timeline: Media/Sound/Text + custom layers; import video/image/audio; trim,
+> split, move, snapping; text/title overlays; per-clip speed, volume/mute, fade
+> in/out; drag clips between tracks; .webm export via canvas+WebAudio MediaRecorder,
+> no ffmpeg). **Remaining Phase C:** code editor, whiteboard, mini spreadsheet,
+> full Paint competitor.
 
 ## A · Design foundation — the bedrock everything else sits on
 - **Design system / tokens.** One shared scale for spacing, corner radius,
