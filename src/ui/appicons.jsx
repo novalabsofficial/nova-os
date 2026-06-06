@@ -292,6 +292,13 @@ const SPECS = {
       <circle cx="29" cy="29" r="7" fill="none" stroke="#fff" strokeWidth="2.6" />
     </>),
   },
+  videoeditor: {
+    color: "#e0397a",
+    glyph: (<>
+      <rect x="13" y="15.5" width="22" height="17" rx="3" fill="#fff" />
+      <path d="M21.5 20.5 L28 24 L21.5 27.5 Z" fill="#e0397a" />
+    </>),
+  },
   atlas: {
     color: "#16b3a0",
     glyph: (<>

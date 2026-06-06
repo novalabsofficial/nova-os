@@ -134,6 +134,7 @@ const PhotosApp       = lazyApp(() => import("./apps/PhotosApp.jsx").then(m     
 const ScreenshotApp   = lazyApp(() => import("./apps/ScreenshotApp.jsx").then(m   => ({default: m.ScreenshotApp})));
 const SlidesApp       = lazyApp(() => import("./apps/SlidesApp.jsx").then(m       => ({default: m.SlidesApp})));
 const AssetStudioApp  = lazyApp(() => import("./apps/AssetStudioApp.jsx").then(m  => ({default: m.AssetStudioApp})));
+const VideoEditorApp  = lazyApp(() => import("./apps/VideoEditorApp.jsx").then(m  => ({default: m.VideoEditorApp})));
 const AtlasApp        = lazyApp(() => import("./apps/AtlasApp.jsx").then(m        => ({default: m.AtlasApp})));
 // v10.9 — utilities pack
 const CurrencyApp     = lazyApp(() => import("./apps/CurrencyApp.jsx").then(m     => ({default: m.CurrencyApp})));
@@ -1705,6 +1706,7 @@ export default function NovaOS(){
         {appId==="screenshot" &&<ScreenshotApp AC={AC} showToast={showToast} onSetWallpaper={handleCustomWallpaper}/>}
         {appId==="slides"     &&<SlidesApp AC={AC} data={data} updateData={updateData} showToast={showToast}/>}
         {appId==="assetstudio"&&<AssetStudioApp AC={AC} showToast={showToast}/>}
+        {appId==="videoeditor"&&<VideoEditorApp AC={AC} showToast={showToast}/>}
         {appId==="atlas"      &&<AtlasApp AC={AC} showToast={showToast}/>}
         {appId==="currency"   &&<CurrencyApp AC={AC}/>}
         {appId==="dictionary" &&<DictionaryApp AC={AC}/>}
