@@ -13,7 +13,14 @@ import { FF, FFB } from "../ui/styles.js";
 
 const MIN_CLIP = 0.3;
 const IMG_DUR = 4, TEXT_DUR = 3, IMG_CAP = 600;
-const CW = 960, CH = 540;
+// Aspect-ratio presets — preview/export render resolution per ratio.
+const ASPECTS = [
+  { id: "16:9", label: "16:9 · YouTube", w: 1280, h: 720 },
+  { id: "9:16", label: "9:16 · TikTok / Shorts", w: 720, h: 1280 },
+  { id: "1:1", label: "1:1 · Square", w: 1080, h: 1080 },
+  { id: "4:5", label: "4:5 · Portrait", w: 864, h: 1080 },
+  { id: "4:3", label: "4:3 · Classic", w: 960, h: 720 },
+];
 const GUTTER = 78;
 
 const TRACK = {
@@ -56,6 +63,9 @@ export function VideoEditorApp({ AC, showToast }) {
   const [pps, setPps] = useState(64);
   const [time, setTime] = useState(0);
   const [drop, setDrop] = useState(false);
+  const [aspect, setAspect] = useState("16:9");
+  const asp = ASPECTS.find(a => a.id === aspect) || ASPECTS[0];
+  const CW = asp.w, CH = asp.h;   // preview/export render resolution for the chosen ratio
 
   const clipsRef = useRef(clips); useEffect(() => { clipsRef.current = clips; }, [clips]);
   const tracksRef = useRef(tracks); useEffect(() => { tracksRef.current = tracks; }, [tracks]);
@@ -339,7 +349,7 @@ export function VideoEditorApp({ AC, showToast }) {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
-  useEffect(() => { drawFrame(timeRef.current); /* eslint-disable-next-line */ }, [clips, tracks, pps]);
+  useEffect(() => { drawFrame(timeRef.current); /* eslint-disable-next-line */ }, [clips, tracks, pps, aspect]);
   useEffect(() => () => {
     cancelAnimationFrame(rafRef.current);
     vids.current.forEach((v, url) => { try { v.pause(); v.removeAttribute("src"); v.load(); } catch { /* */ } URL.revokeObjectURL(url); });
@@ -374,6 +384,7 @@ export function VideoEditorApp({ AC, showToast }) {
         <button style={tBtn(false)} onClick={addText}>T Text</button>
         <input ref={fileRef} type="file" accept="video/*,image/*,audio/*" multiple style={{ display: "none" }} onChange={onFiles} />
         <div style={{ flex: 1 }} />
+        <span style={lblS}>Ratio<select value={aspect} onChange={e => setAspect(e.target.value)} title="Canvas aspect ratio" style={selS}>{ASPECTS.map(a => <option key={a.id} value={a.id}>{a.label}</option>)}</select></span>
         <span style={{ fontSize: 11.5, color: "#8b93a7" }}>Zoom</span>
         <button style={iBtn} title="Zoom out" onClick={() => setPps(p => Math.max(20, Math.round(p / 1.3)))}>−</button>
         <button style={iBtn} title="Zoom in" onClick={() => setPps(p => Math.min(220, Math.round(p * 1.3)))}>+</button>
@@ -389,7 +400,7 @@ export function VideoEditorApp({ AC, showToast }) {
             <div style={{ fontSize: 13, marginTop: 6, lineHeight: 1.5 }}>Drop or <strong>＋ Import</strong> video, image and audio onto the tracks below, add titles with <strong>T Text</strong>, then trim, split and arrange.</div>
           </div>
         )}
-        <canvas ref={canvasRef} width={CW} height={CH} style={{ display: clips.length ? "block" : "none", maxWidth: "100%", maxHeight: "100%", aspectRatio: "16 / 9", borderRadius: 8, background: "#000", boxShadow: "0 12px 40px rgba(0,0,0,0.5)" }} />
+        <canvas ref={canvasRef} width={CW} height={CH} style={{ display: clips.length ? "block" : "none", maxWidth: "100%", maxHeight: "100%", aspectRatio: CW + " / " + CH, borderRadius: 8, background: "#000", boxShadow: "0 12px 40px rgba(0,0,0,0.5)" }} />
         {drop && <div style={{ position: "absolute", inset: 12, border: "2.5px dashed " + AC, borderRadius: 14, background: "rgba(255,255,255,0.04)", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: FFB, fontWeight: 700, fontSize: 17, color: AC, pointerEvents: "none" }}>Drop clips to import</div>}
       </div>
 
