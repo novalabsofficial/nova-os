@@ -186,7 +186,8 @@ function Shell({ AC, user, showToast, onExit, store, setStore }) {
     const rate = code in US_STATE_TAX ? US_STATE_TAX[code] : 0;
     setStore(s => ({ ...s, state: code, taxRate: rate }));
     saveStoreMeta(store.id, { state: code, taxRate: rate });
-  }, [store.id, setStore]);
+    if (code) showToast?.(`${code} sales tax ${rate}% now applies to every sale`);
+  }, [store.id, setStore, showToast]);
 
   const onSale = useCallback(async (sale, nextItems) => {
     // optimistic local roll of the ledger + totals
@@ -218,6 +219,10 @@ function Shell({ AC, user, showToast, onExit, store, setStore }) {
           <div style={{ fontSize: 11.5, color: "var(--nv-text-dim)" }}>@{store.username} · cashier {user}</div>
         </div>
         <div style={{ display: "flex", gap: 7, marginLeft: 14 }}>{TABS.map(t => <div key={t.id} style={tabBtn(tab === t.id)} onClick={() => setTab(t.id)}>{t.icon} {t.label}</div>)}</div>
+        {(() => { const r = Number(store.taxRate) || 0; return (
+          <div title="Sales tax applied to every sale — set it in the Items tab" onClick={() => setTab("items")} style={{ cursor: "pointer", marginLeft: 6, fontSize: 11.5, fontFamily: FFB, padding: "5px 11px", borderRadius: 999, background: r > 0 ? AC : "var(--nv-elevated)", color: r > 0 ? "#fff" : "var(--nv-text-dim)", border: r > 0 ? "none" : "1px solid var(--nv-border)" }}>
+            {r > 0 ? `Tax ${r}%${store.state ? " · " + store.state : ""}` : "No tax — set state"}
+          </div>); })()}
         <div style={{ flex: 1 }} />
         <button onClick={signOut} style={{ ...closeBtn, position: "static", background: "var(--nv-elevated)", color: "var(--nv-text)", border: "1px solid var(--nv-border)" }}>Sign out</button>
         <button onClick={onExit} style={{ ...closeBtn, position: "static" }}>✕ Close POS</button>
@@ -252,7 +257,8 @@ function Register({ AC, items, taxRate, onSale, showToast }) {
     return { id, name: it.name, price: it.price || 0, cost: it.cost || 0, emoji: it.img ? null : "📦", img: it.img, qty, lineTotal: (it.price || 0) * qty };
   }).filter(Boolean), [cart, items]);
   const subtotal = useMemo(() => lines.reduce((s, l) => s + l.lineTotal, 0), [lines]);
-  const tax = subtotal * (taxRate / 100);
+  const rate = Number(taxRate) || 0;
+  const tax = subtotal * rate / 100;
   const total = subtotal + tax;
   const count = Object.values(cart).reduce((s, n) => s + n, 0);
 
@@ -332,7 +338,7 @@ function Register({ AC, items, taxRate, onSale, showToast }) {
         </div>
         <div style={{ padding: "13px 15px", borderTop: "1px solid var(--nv-border)" }}>
           <Row label="Subtotal" value={money(subtotal)} />
-          <Row label={`Tax (${taxRate}%)`} value={money(tax)} />
+          <Row label={`Tax (${rate}%)`} value={money(tax)} />
           <Row label="Total" value={money(total)} big />
           <button disabled={!lines.length} onClick={() => setTender({ method: "cash", cash: "" })}
             style={{ width: "100%", marginTop: 10, padding: "13px", borderRadius: 12, border: "none", background: lines.length ? AC : "var(--nv-border)", color: "#fff", fontFamily: FFB, fontSize: 16, cursor: lines.length ? "pointer" : "default" }}>
