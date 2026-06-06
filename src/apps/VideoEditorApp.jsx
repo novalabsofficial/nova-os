@@ -21,6 +21,19 @@ const TRACK = {
   sound: { label: "Sound", color: "#22c55e", h: 42, icon: "🔊" },
   text:  { label: "Text",  color: "#f59e0b", h: 38, icon: "T" },
 };
+// Title fonts. CapCut's "Classic" is a proprietary bundled typeface (can't be
+// shipped legally); it's a clean bold grotesque, so "Classic" maps to the
+// closest free Helvetica/Arial stack — the default.
+const TXT_FONTS = {
+  classic: "'Helvetica Neue',Helvetica,Arial,'Segoe UI',system-ui,sans-serif",
+  bold: "'Arial Black','Helvetica Neue',Arial,sans-serif",
+  serif: "Georgia,'Times New Roman',serif",
+  mono: "'JetBrains Mono',Consolas,monospace",
+  rounded: "'Trebuchet MS','Segoe UI',sans-serif",
+};
+const FONT_LABELS = { classic: "Classic", bold: "Bold", serif: "Serif", mono: "Mono", rounded: "Rounded" };
+// CapCut-style text presets.
+const TEXT_STYLES = [{ id: "outline", label: "Outline" }, { id: "none", label: "Plain" }, { id: "shadow", label: "Shadow" }, { id: "box", label: "Box" }];
 
 let _seq = 1;
 const uid = () => "c" + (_seq++) + Math.random().toString(36).slice(2, 5);
@@ -84,13 +97,26 @@ export function VideoEditorApp({ AC, showToast }) {
   }
   function drawText(ctx, c) {
     const fs = (c.fontSize || 0.09) * CH;
-    ctx.font = (c.weight || 800) + " " + fs + "px 'Inter','Segoe UI',system-ui,sans-serif";
+    ctx.font = (c.weight || 800) + " " + fs + "px " + (TXT_FONTS[c.font] || TXT_FONTS.classic);
     ctx.textAlign = "center"; ctx.textBaseline = "middle";
     const x = (c.x ?? 0.5) * CW, y = (c.y ?? 0.82) * CH;
-    ctx.lineJoin = "round"; ctx.lineWidth = fs * 0.14; ctx.strokeStyle = "rgba(0,0,0,0.5)";
-    ctx.strokeText(c.text || "", x, y);
-    ctx.fillStyle = c.color || "#ffffff";
-    ctx.fillText(c.text || "", x, y);
+    const txt = c.text || "", col = c.color || "#ffffff", style = c.style || "outline";
+    if (style === "box") {
+      const w = ctx.measureText(txt).width + fs * 0.9, h = fs * 1.5;
+      ctx.fillStyle = "rgba(0,0,0,0.62)";
+      if (ctx.roundRect) { ctx.beginPath(); ctx.roundRect(x - w / 2, y - h / 2, w, h, fs * 0.2); ctx.fill(); }
+      else ctx.fillRect(x - w / 2, y - h / 2, w, h);
+      ctx.fillStyle = col; ctx.fillText(txt, x, y);
+    } else if (style === "shadow") {
+      ctx.save(); ctx.shadowColor = "rgba(0,0,0,0.6)"; ctx.shadowBlur = fs * 0.22; ctx.shadowOffsetX = fs * 0.05; ctx.shadowOffsetY = fs * 0.09;
+      ctx.fillStyle = col; ctx.fillText(txt, x, y); ctx.restore();
+    } else if (style === "none") {
+      ctx.fillStyle = col; ctx.fillText(txt, x, y);
+    } else {   // "outline" — CapCut-classic white text with a black border
+      ctx.lineJoin = "round"; ctx.miterLimit = 2; ctx.lineWidth = fs * 0.2; ctx.strokeStyle = "rgba(0,0,0,0.92)";
+      ctx.strokeText(txt, x, y);
+      ctx.fillStyle = col; ctx.fillText(txt, x, y);
+    }
   }
   function drawFrame(t) {
     const cv = canvasRef.current; if (!cv) return;
@@ -228,7 +254,7 @@ export function VideoEditorApp({ AC, showToast }) {
   function addText() {
     const tr = firstTrack("text"); if (!tr) return;
     const id = uid();
-    setClips(cs => [...cs, { id, trackId: tr.id, kind: "text", text: "Your title", color: "#ffffff", fontSize: 0.1, weight: 800, x: 0.5, y: 0.82, start: timeRef.current, duration: TEXT_DUR }]);
+    setClips(cs => [...cs, { id, trackId: tr.id, kind: "text", text: "Your title", color: "#ffffff", font: "classic", style: "outline", fontSize: 0.1, weight: 800, x: 0.5, y: 0.82, start: timeRef.current, duration: TEXT_DUR }]);
     setSelId(id); setTimeout(() => drawFrame(timeRef.current), 0);
   }
 
@@ -377,6 +403,8 @@ export function VideoEditorApp({ AC, showToast }) {
           <span style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
             <input value={sel.text} onChange={e => patchClip(sel.id, { text: e.target.value })} placeholder="Title…" spellCheck={false} style={{ width: 150, padding: "6px 9px", borderRadius: 7, background: "#171922", color: "#e8eaf0", border: "1px solid rgba(255,255,255,0.16)", fontFamily: FF, fontSize: 12.5, outline: "none" }} />
             <input type="color" value={sel.color || "#ffffff"} onChange={e => patchClip(sel.id, { color: e.target.value })} title="Color" style={{ width: 28, height: 26, borderRadius: 6, border: "1px solid rgba(255,255,255,0.16)", background: "none", cursor: "pointer", padding: 0 }} />
+            <span style={lblS}>Font<select value={sel.font || "classic"} onChange={e => patchClip(sel.id, { font: e.target.value })} style={selS}>{Object.keys(TXT_FONTS).map(f => <option key={f} value={f}>{FONT_LABELS[f]}</option>)}</select></span>
+            <span style={lblS}>Style<select value={sel.style || "outline"} onChange={e => patchClip(sel.id, { style: e.target.value })} style={selS}>{TEXT_STYLES.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}</select></span>
             <span style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 11, color: "#8b93a7" }}>Size<input type="range" min="4" max="22" value={Math.round((sel.fontSize || 0.1) * 100)} onChange={e => patchClip(sel.id, { fontSize: +e.target.value / 100 })} style={{ width: 64 }} /></span>
             <span style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 11, color: "#8b93a7" }}>Y<input type="range" min="8" max="92" value={Math.round((sel.y ?? 0.82) * 100)} onChange={e => patchClip(sel.id, { y: +e.target.value / 100 })} style={{ width: 60 }} /></span>
             <span style={lblS} title="Fade in (s)">In<input type="range" min="0" max="30" value={Math.round((sel.fadeIn || 0) * 10)} onChange={e => patchClip(sel.id, { fadeIn: +e.target.value / 10 })} style={{ width: 46 }} /></span>
