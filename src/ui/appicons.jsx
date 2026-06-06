@@ -307,6 +307,13 @@ const SPECS = {
       <rect x="22" y="31.5" width="4" height="3" rx="1" fill="#fff" />
     </>),
   },
+  code: {
+    color: "#2563eb",
+    glyph: (<>
+      <rect x="11" y="13" width="26" height="22" rx="3" fill="#fff" />
+      <path d="M20 20 L16 24 L20 28 M28 20 L32 24 L28 28" fill="none" stroke="#2563eb" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+    </>),
+  },
   atlas: {
     color: "#16b3a0",
     glyph: (<>

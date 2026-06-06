@@ -75,6 +75,7 @@ export const DEFAULT_SIZES = {
   assetstudio:{w:980,h:700},
   videoeditor:{w:1120,h:760},
   whiteboard:{w:1040,h:720},
+  code:{w:1060,h:720},
   // v10.6 — Atlas (maps)
   atlas:{w:880,h:640},
   // v10.9 — utilities pack
@@ -129,6 +130,7 @@ export const APPS = [
   {id:"assetstudio",icon:"🪄",label:"Asset Studio", desc:"Decals, shapes & transparent PNGs"},
   {id:"videoeditor",icon:"🎬",label:"Video Editor", desc:"Trim, arrange & edit video clips"},
   {id:"whiteboard", icon:"🖊️",label:"Whiteboard",   desc:"Infinite canvas — draw, shapes, notes"},
+  {id:"code",       icon:"💻",label:"Code",         desc:"Code editor with live preview"},
   {id:"atlas",      icon:"🗺️",label:"Atlas",        desc:"Maps, search & your location"},
   // v10.9 — utilities pack
   {id:"currency",   icon:"💱",label:"Currency",    desc:"Convert world currencies"},

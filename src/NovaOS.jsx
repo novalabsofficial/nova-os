@@ -136,6 +136,7 @@ const SlidesApp       = lazyApp(() => import("./apps/SlidesApp.jsx").then(m     
 const AssetStudioApp  = lazyApp(() => import("./apps/AssetStudioApp.jsx").then(m  => ({default: m.AssetStudioApp})));
 const VideoEditorApp  = lazyApp(() => import("./apps/VideoEditorApp.jsx").then(m  => ({default: m.VideoEditorApp})));
 const WhiteboardApp   = lazyApp(() => import("./apps/WhiteboardApp.jsx").then(m   => ({default: m.WhiteboardApp})));
+const CodeApp         = lazyApp(() => import("./apps/CodeApp.jsx").then(m         => ({default: m.CodeApp})));
 const AtlasApp        = lazyApp(() => import("./apps/AtlasApp.jsx").then(m        => ({default: m.AtlasApp})));
 // v10.9 — utilities pack
 const CurrencyApp     = lazyApp(() => import("./apps/CurrencyApp.jsx").then(m     => ({default: m.CurrencyApp})));
@@ -1733,6 +1734,7 @@ export default function NovaOS(){
         {appId==="assetstudio"&&<AssetStudioApp AC={AC} showToast={showToast}/>}
         {appId==="videoeditor"&&<VideoEditorApp AC={AC} showToast={showToast}/>}
         {appId==="whiteboard" &&<WhiteboardApp AC={AC} showToast={showToast}/>}
+        {appId==="code"       &&<CodeApp AC={AC} showToast={showToast}/>}
         {appId==="atlas"      &&<AtlasApp AC={AC} showToast={showToast}/>}
         {appId==="currency"   &&<CurrencyApp AC={AC}/>}
         {appId==="dictionary" &&<DictionaryApp AC={AC}/>}
