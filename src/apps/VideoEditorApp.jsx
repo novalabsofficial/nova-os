@@ -1,53 +1,55 @@
-// Video Editor (CapCut-style) — v11.0 Phase C, Stage 1: the editing core.
-// Import video/image clips, arrange them on a single main track, preview the
-// composited frame on a canvas, play back with a moving playhead, and
-// trim / split / delete / reorder. Playback is driven by a wall-clock playhead;
-// the active clip's <video> element supplies synced audio + frames (re-synced on
-// drift), so the preview canvas is the single source of truth for a frame —
-// which makes a later MediaRecorder export drop-in. Text overlays, transitions
-// and export land in Stage 2.
+// Video Editor (CapCut-style) — v11.0 Phase C.
+// Stage 1: import / preview / playback / trim-split-delete on a single track.
+// Stage 2: multi-track timeline (default Media + Sound + Text tracks, add as many
+//          layers as you like), text/title overlays composited over the video,
+//          audio clips mixed into playback, free clip positioning, Backspace to
+//          delete the selected clip.
+// Playback is a wall-clock playhead; every active video/audio clip's element is
+// kept playing & synced (re-synced on >0.25s drift). The preview canvas is the
+// single source of truth for a frame, so a MediaRecorder export (Stage 3) drops in.
 
 import { useState, useRef, useEffect } from "react";
 import { FF, FFB } from "../ui/styles.js";
 
-const MIN_CLIP = 0.3;            // shortest a clip can be trimmed to (seconds)
-const IMG_DUR = 4;               // default on-timeline length for an imported image
-const IMG_CAP = 600;            // images have no real duration; cap how long they can stretch
-const CW = 960, CH = 540;        // preview render resolution (16:9)
+const MIN_CLIP = 0.3;
+const IMG_DUR = 4, TEXT_DUR = 3, IMG_CAP = 600;
+const CW = 960, CH = 540;
+const GUTTER = 78;
+
+const TRACK = {
+  media: { label: "Media", color: "#3b82f6", h: 60, icon: "🎞" },
+  sound: { label: "Sound", color: "#22c55e", h: 42, icon: "🔊" },
+  text:  { label: "Text",  color: "#f59e0b", h: 38, icon: "T" },
+};
 
 let _seq = 1;
 const uid = () => "c" + (_seq++) + Math.random().toString(36).slice(2, 5);
-const clipLen = (c) => Math.max(MIN_CLIP, (c.outPt - c.inPt));
-// Resolve sequential clip start times + the project total length.
-function layoutClips(cs) {
-  let t = 0; const items = [];
-  for (const c of cs) { const len = clipLen(c); items.push({ ...c, start: t, len }); t += len; }
-  return { items, total: t };
-}
-const fmt = (s) => {
-  s = Math.max(0, s || 0);
-  const m = Math.floor(s / 60), sec = Math.floor(s % 60), cs = Math.floor((s * 100) % 100);
-  return m + ":" + String(sec).padStart(2, "0") + "." + String(cs).padStart(2, "0");
-};
+const clipDur = (c) => c.kind === "text" ? Math.max(MIN_CLIP, c.duration) : Math.max(MIN_CLIP, c.outPt - c.inPt);
+const clipEnd = (c) => c.start + clipDur(c);
+const projectTotal = (cs) => cs.reduce((m, c) => Math.max(m, clipEnd(c)), 0);
+const fmt = (s) => { s = Math.max(0, s || 0); const m = Math.floor(s / 60), sec = Math.floor(s % 60), cs = Math.floor((s * 100) % 100); return m + ":" + String(sec).padStart(2, "0") + "." + String(cs).padStart(2, "0"); };
 
 export function VideoEditorApp({ AC, showToast }) {
-  const [clips, setClips] = useState([]);   // {id, kind:"video"|"image", name, url, sourceDur, inPt, outPt, thumb}
+  const [tracks, setTracks] = useState(() => [{ id: uid(), kind: "text" }, { id: uid(), kind: "media" }, { id: uid(), kind: "sound" }]);
+  const [clips, setClips] = useState([]);
   const [selId, setSelId] = useState(null);
   const [playing, setPlaying] = useState(false);
-  const [pps, setPps] = useState(64);        // timeline zoom — pixels per second
-  const [time, setTime] = useState(0);       // playhead readout (throttled during playback)
+  const [pps, setPps] = useState(64);
+  const [time, setTime] = useState(0);
   const [drop, setDrop] = useState(false);
 
   const clipsRef = useRef(clips); useEffect(() => { clipsRef.current = clips; }, [clips]);
+  const tracksRef = useRef(tracks); useEffect(() => { tracksRef.current = tracks; }, [tracks]);
   const ppsRef = useRef(pps); useEffect(() => { ppsRef.current = pps; }, [pps]);
+  const selRef = useRef(selId); useEffect(() => { selRef.current = selId; }, [selId]);
   const timeRef = useRef(0);
   const playingRef = useRef(false);
-  const rootRef = useRef(null);
   const canvasRef = useRef(null);
   const playheadRef = useRef(null);
   const fileRef = useRef(null);
-  const vids = useRef(new Map());            // url -> HTMLVideoElement
-  const imgs = useRef(new Map());            // url -> HTMLImageElement
+  const vids = useRef(new Map());   // url -> <video>
+  const auds = useRef(new Map());   // url -> <audio>
+  const imgs = useRef(new Map());   // url -> <img>
   const rafRef = useRef(0);
   const lastTsRef = useRef(0);
   const readoutTsRef = useRef(0);
@@ -55,253 +57,311 @@ export function VideoEditorApp({ AC, showToast }) {
   const loopRef = useRef(null);
   if (!loopRef.current) loopRef.current = (ts) => { if (tickRef.current) tickRef.current(ts); };
 
-  // ── frame compositing ────────────────────────────────────────────────────
-  function frameAt(t) {
-    const { items, total } = layoutClips(clipsRef.current);
-    if (!items.length) return null;
-    const tt = Math.min(t, total - 0.0001);
-    for (const it of items) if (tt >= it.start && tt < it.start + it.len) return { clip: it, srcTime: it.inPt + (tt - it.start) };
-    const last = items[items.length - 1];
-    return { clip: last, srcTime: last.outPt - 0.0001 };
+  // ── compositing ───────────────────────────────────────────────────────────
+  function drawMedia(ctx, c) {
+    const el = c.kind === "video" ? vids.current.get(c.url) : imgs.current.get(c.url);
+    if (!el) return;
+    const ew = c.kind === "video" ? el.videoWidth : el.naturalWidth;
+    const eh = c.kind === "video" ? el.videoHeight : el.naturalHeight;
+    if (!ew || !eh) return;
+    const s = Math.min(CW / ew, CH / eh), dw = ew * s, dh = eh * s;
+    try { ctx.drawImage(el, (CW - dw) / 2, (CH - dh) / 2, dw, dh); } catch { /* not ready */ }
+  }
+  function drawText(ctx, c) {
+    const fs = (c.fontSize || 0.09) * CH;
+    ctx.font = (c.weight || 800) + " " + fs + "px 'Inter','Segoe UI',system-ui,sans-serif";
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    const x = (c.x ?? 0.5) * CW, y = (c.y ?? 0.82) * CH;
+    ctx.lineJoin = "round"; ctx.lineWidth = fs * 0.14; ctx.strokeStyle = "rgba(0,0,0,0.5)";
+    ctx.strokeText(c.text || "", x, y);
+    ctx.fillStyle = c.color || "#ffffff";
+    ctx.fillText(c.text || "", x, y);
   }
   function drawFrame(t) {
     const cv = canvasRef.current; if (!cv) return;
     const ctx = cv.getContext("2d");
     ctx.fillStyle = "#000"; ctx.fillRect(0, 0, CW, CH);
-    const f = frameAt(t); if (!f) return;
-    let el = null, ew = 0, eh = 0;
-    if (f.clip.kind === "video") { el = vids.current.get(f.clip.url); if (el) { ew = el.videoWidth; eh = el.videoHeight; } }
-    else { el = imgs.current.get(f.clip.url); if (el) { ew = el.naturalWidth; eh = el.naturalHeight; } }
-    if (el && ew && eh) {
-      const s = Math.min(CW / ew, CH / eh), dw = ew * s, dh = eh * s;
-      try { ctx.drawImage(el, (CW - dw) / 2, (CH - dh) / 2, dw, dh); } catch { /* frame not ready */ }
+    const mediaTracks = tracksRef.current.filter(tr => tr.kind === "media");
+    for (let i = mediaTracks.length - 1; i >= 0; i--) {       // upper timeline track paints last (on top)
+      const act = clipsRef.current.filter(c => c.trackId === mediaTracks[i].id && (c.kind === "video" || c.kind === "image") && t >= c.start && t < clipEnd(c));
+      const c = act[act.length - 1];
+      if (c) drawMedia(ctx, c);
     }
+    for (const c of clipsRef.current) if (c.kind === "text" && t >= c.start && t < clipEnd(c)) drawText(ctx, c);
   }
-  // Keep the active clip's <video> playing & in sync; pause everything else.
+  function setHead(t) { if (playheadRef.current) playheadRef.current.style.left = (GUTTER + t * ppsRef.current) + "px"; }
+
+  // Keep every active video/audio element playing & synced; pause the rest.
   function syncMedia(t, isPlaying) {
-    const f = frameAt(t);
-    const activeUrl = f && f.clip.kind === "video" ? f.clip.url : null;
-    vids.current.forEach((v, url) => { if (url !== activeUrl && !v.paused) v.pause(); });
-    if (activeUrl) {
-      const v = vids.current.get(activeUrl);
-      if (v) {
-        if (Math.abs(v.currentTime - f.srcTime) > 0.25) { try { v.currentTime = f.srcTime; } catch { /* */ } if (!isPlaying) v.addEventListener("seeked", () => drawFrame(timeRef.current), { once: true }); }
-        if (isPlaying && v.paused) v.play().catch(() => {});
-        if (!isPlaying && !v.paused) v.pause();
-      }
+    const activeV = new Set(), activeA = new Set();
+    for (const c of clipsRef.current) {
+      if (c.kind !== "video" && c.kind !== "audio") continue;
+      if (!(t >= c.start && t < clipEnd(c))) continue;
+      const el = c.kind === "video" ? vids.current.get(c.url) : auds.current.get(c.url);
+      (c.kind === "video" ? activeV : activeA).add(c.url);
+      if (!el) continue;
+      const expected = c.inPt + (t - c.start);
+      if (Math.abs(el.currentTime - expected) > 0.25) { try { el.currentTime = expected; } catch { /* */ } if (!isPlaying) el.addEventListener("seeked", () => drawFrame(timeRef.current), { once: true }); }
+      if (isPlaying && el.paused) el.play().catch(() => {});
+      if (!isPlaying && !el.paused) el.pause();
     }
+    vids.current.forEach((v, url) => { if (!activeV.has(url) && !v.paused) v.pause(); });
+    auds.current.forEach((a, url) => { if (!activeA.has(url) && !a.paused) a.pause(); });
   }
-  function setHead(t) { if (playheadRef.current) playheadRef.current.style.left = (t * ppsRef.current) + "px"; }
 
   tickRef.current = (ts) => {
     if (!playingRef.current) return;
     const dt = lastTsRef.current ? (ts - lastTsRef.current) / 1000 : 0;
     lastTsRef.current = ts;
     let t = timeRef.current + dt;
-    const { total } = layoutClips(clipsRef.current);
+    const total = projectTotal(clipsRef.current);
     if (t >= total) { timeRef.current = total; syncMedia(total, false); drawFrame(total); setHead(total); stopPlay(total); return; }
-    timeRef.current = t;
-    syncMedia(t, true);
-    drawFrame(t);
-    setHead(t);
+    timeRef.current = t; syncMedia(t, true); drawFrame(t); setHead(t);
     if (ts - readoutTsRef.current > 100) { readoutTsRef.current = ts; setTime(t); }
     rafRef.current = requestAnimationFrame(loopRef.current);
   };
 
-  function stopPlay(t) { playingRef.current = false; setPlaying(false); cancelAnimationFrame(rafRef.current); vids.current.forEach(v => { if (!v.paused) v.pause(); }); setTime(t != null ? t : timeRef.current); }
-  function play() {
-    const { total } = layoutClips(clipsRef.current);
-    if (!total) return;
-    if (timeRef.current >= total - 0.02) { timeRef.current = 0; setHead(0); }
-    playingRef.current = true; setPlaying(true); lastTsRef.current = 0; readoutTsRef.current = 0;
-    rafRef.current = requestAnimationFrame(loopRef.current);
-  }
+  function stopPlay(t) { playingRef.current = false; setPlaying(false); cancelAnimationFrame(rafRef.current); vids.current.forEach(v => { if (!v.paused) v.pause(); }); auds.current.forEach(a => { if (!a.paused) a.pause(); }); setTime(t != null ? t : timeRef.current); }
+  function play() { const total = projectTotal(clipsRef.current); if (!total) return; if (timeRef.current >= total - 0.02) { timeRef.current = 0; setHead(0); } playingRef.current = true; setPlaying(true); lastTsRef.current = 0; readoutTsRef.current = 0; rafRef.current = requestAnimationFrame(loopRef.current); }
   function togglePlay() { if (playingRef.current) stopPlay(); else play(); }
-  function seek(t) {
-    const { total } = layoutClips(clipsRef.current);
-    t = Math.max(0, Math.min(t, total));
-    timeRef.current = t; setHead(t); setTime(t);
-    syncMedia(t, playingRef.current); drawFrame(t);
-  }
+  function seek(t) { const total = projectTotal(clipsRef.current); t = Math.max(0, Math.min(t, total || 0)); timeRef.current = t; setHead(t); setTime(t); syncMedia(t, playingRef.current); drawFrame(t); }
 
-  // ── import (file picker + drag-drop) ──────────────────────────────────────
+  // ── import ──────────────────────────────────────────────────────────────
+  function firstTrack(kind) { return tracksRef.current.find(t => t.kind === kind); }
+  function trackEnd(trackId) { return clipsRef.current.filter(c => c.trackId === trackId).reduce((m, c) => Math.max(m, clipEnd(c)), 0); }
   function addFiles(list) {
-    const files = [...(list || [])];
-    let added = 0;
+    const files = [...(list || [])]; let added = 0;
     for (const file of files) {
       const url = URL.createObjectURL(file);
       if (file.type.startsWith("video/")) {
-        added++;
-        const v = document.createElement("video");
-        v.preload = "auto"; v.playsInline = true; v.src = url;
+        const tr = firstTrack("media"); if (!tr) { URL.revokeObjectURL(url); continue; }
+        added++; const start = trackEnd(tr.id);
+        const v = document.createElement("video"); v.preload = "auto"; v.playsInline = true; v.src = url;
         v.addEventListener("loadeddata", () => {
           vids.current.set(url, v);
           const dur = isFinite(v.duration) && v.duration > 0 ? v.duration : 10;
-          // grab a thumbnail from the first moment
-          const tc = document.createElement("canvas"); tc.width = 160; tc.height = 90;
-          const tx = tc.getContext("2d");
-          const grab = () => { try { const s = Math.min(160 / v.videoWidth, 90 / v.videoHeight), dw = v.videoWidth * s, dh = v.videoHeight * s; tx.fillStyle = "#000"; tx.fillRect(0, 0, 160, 90); tx.drawImage(v, (160 - dw) / 2, (90 - dh) / 2, dw, dh); } catch { /* */ } finishVid(tc.toDataURL("image/jpeg", 0.6)); };
-          const finishVid = (thumb) => { v.currentTime = 0; setClips(cs => [...cs, { id: uid(), kind: "video", name: file.name, url, sourceDur: dur, inPt: 0, outPt: dur, thumb }]); };
-          v.addEventListener("seeked", grab, { once: true });
-          try { v.currentTime = Math.min(0.1, dur); } catch { finishVid(""); }
+          const tc = document.createElement("canvas"); tc.width = 160; tc.height = 90; const tx = tc.getContext("2d");
+          const finish = (thumb) => { v.currentTime = 0; setClips(cs => [...cs, { id: uid(), trackId: tr.id, kind: "video", name: file.name, url, sourceDur: dur, inPt: 0, outPt: dur, start, thumb }]); };
+          v.addEventListener("seeked", () => { try { const s = Math.min(160 / v.videoWidth, 90 / v.videoHeight), dw = v.videoWidth * s, dh = v.videoHeight * s; tx.fillStyle = "#000"; tx.fillRect(0, 0, 160, 90); tx.drawImage(v, (160 - dw) / 2, (90 - dh) / 2, dw, dh); } catch { /* */ } finish(tc.toDataURL("image/jpeg", 0.6)); }, { once: true });
+          try { v.currentTime = Math.min(0.1, dur); } catch { finish(""); }
         }, { once: true });
-        v.addEventListener("error", () => { showToast?.("Couldn't load " + file.name); }, { once: true });
+        v.addEventListener("error", () => showToast?.("Couldn't load " + file.name), { once: true });
         v.load();
       } else if (file.type.startsWith("image/")) {
-        added++;
+        const tr = firstTrack("media"); if (!tr) { URL.revokeObjectURL(url); continue; }
+        added++; const start = trackEnd(tr.id);
         const img = new Image();
-        img.onload = () => { imgs.current.set(url, img); setClips(cs => [...cs, { id: uid(), kind: "image", name: file.name, url, sourceDur: IMG_CAP, inPt: 0, outPt: IMG_DUR, thumb: url }]); };
+        img.onload = () => { imgs.current.set(url, img); setClips(cs => [...cs, { id: uid(), trackId: tr.id, kind: "image", name: file.name, url, sourceDur: IMG_CAP, inPt: 0, outPt: IMG_DUR, start }]); };
         img.onerror = () => showToast?.("Couldn't load " + file.name);
         img.src = url;
+      } else if (file.type.startsWith("audio/")) {
+        const tr = firstTrack("sound"); if (!tr) { URL.revokeObjectURL(url); continue; }
+        added++; const start = timeRef.current;
+        const a = document.createElement("audio"); a.preload = "auto"; a.src = url;
+        a.addEventListener("loadedmetadata", () => { auds.current.set(url, a); const dur = isFinite(a.duration) && a.duration > 0 ? a.duration : 10; setClips(cs => [...cs, { id: uid(), trackId: tr.id, kind: "audio", name: file.name, url, sourceDur: dur, inPt: 0, outPt: dur, start }]); }, { once: true });
+        a.addEventListener("error", () => showToast?.("Couldn't load " + file.name), { once: true });
+        a.load();
       } else URL.revokeObjectURL(url);
     }
     if (added) showToast?.(added > 1 ? added + " clips imported" : "Clip imported");
   }
   function onFiles(e) { addFiles(e.target.files); e.target.value = ""; }
 
-  // ── clip edits ────────────────────────────────────────────────────────────
+  function addText() {
+    const tr = firstTrack("text"); if (!tr) return;
+    const id = uid();
+    setClips(cs => [...cs, { id, trackId: tr.id, kind: "text", text: "Your title", color: "#ffffff", fontSize: 0.1, weight: 800, x: 0.5, y: 0.82, start: timeRef.current, duration: TEXT_DUR }]);
+    setSelId(id); setTimeout(() => drawFrame(timeRef.current), 0);
+  }
+
+  // ── clip edits ──────────────────────────────────────────────────────────
+  function patchClip(id, p) { setClips(cs => cs.map(c => c.id === id ? { ...c, ...p } : c)); setTimeout(() => drawFrame(timeRef.current), 0); }
   function split() {
-    const t = timeRef.current; const { items } = layoutClips(clipsRef.current);
-    const it = items.find(x => t >= x.start && t < x.start + x.len);
-    if (!it) { showToast?.("Move the playhead onto a clip to split"); return; }
-    const srcT = it.inPt + (t - it.start);
-    if (srcT <= it.inPt + 0.05 || srcT >= it.outPt - 0.05) { showToast?.("Move the playhead inside a clip to split"); return; }
-    setClips(cs => { const idx = cs.findIndex(c => c.id === it.id); if (idx < 0) return cs; const c = cs[idx]; const next = [...cs]; next.splice(idx, 1, { ...c, outPt: srcT }, { ...c, id: uid(), inPt: srcT }); return next; });
+    const t = timeRef.current; const c = clipsRef.current.find(x => x.id === selRef.current);
+    if (!c || c.kind === "text") { showToast?.("Select a video/audio clip to split"); return; }
+    if (!(t > c.start + 0.05 && t < clipEnd(c) - 0.05)) { showToast?.("Move the playhead inside the clip to split"); return; }
+    const srcAt = c.inPt + (t - c.start);
+    setClips(cs => { const i = cs.findIndex(x => x.id === c.id); if (i < 0) return cs; const next = [...cs]; next.splice(i, 1, { ...c, outPt: srcAt }, { ...c, id: uid(), inPt: srcAt, start: t }); return next; });
     showToast?.("Clip split");
   }
   function delClip(id) {
-    setClips(cs => {
-      const gone = cs.find(c => c.id === id); const next = cs.filter(c => c.id !== id);
-      if (gone && !next.some(c => c.url === gone.url)) { URL.revokeObjectURL(gone.url); vids.current.delete(gone.url); imgs.current.delete(gone.url); }
-      return next;
-    });
-    if (selId === id) setSelId(null);
+    setClips(cs => { const gone = cs.find(c => c.id === id); const next = cs.filter(c => c.id !== id); if (gone && gone.url && !next.some(c => c.url === gone.url)) { URL.revokeObjectURL(gone.url); vids.current.delete(gone.url); auds.current.delete(gone.url); imgs.current.delete(gone.url); } return next; });
+    if (selRef.current === id) setSelId(null);
     setTimeout(() => drawFrame(timeRef.current), 0);
   }
-  function moveClip(id, dir) {
-    setClips(cs => { const i = cs.findIndex(c => c.id === id); const j = i + dir; if (i < 0 || j < 0 || j >= cs.length) return cs; const next = [...cs];[next[i], next[j]] = [next[j], next[i]]; return next; });
-    setTimeout(() => drawFrame(timeRef.current), 0);
+  function startMove(e, id) {
+    e.stopPropagation(); setSelId(id);
+    const c0 = clipsRef.current.find(c => c.id === id); if (!c0) return;
+    const startX = e.clientX, s0 = c0.start;
+    const move = (ev) => { const ns = Math.max(0, s0 + (ev.clientX - startX) / ppsRef.current); setClips(cs => cs.map(c => c.id === id ? { ...c, start: ns } : c)); };
+    const up = () => { window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", up); drawFrame(timeRef.current); };
+    window.addEventListener("pointermove", move); window.addEventListener("pointerup", up);
   }
   function startTrim(e, id, edge) {
     e.stopPropagation(); e.preventDefault();
     const c0 = clipsRef.current.find(c => c.id === id); if (!c0) return;
-    const startX = e.clientX, in0 = c0.inPt, out0 = c0.outPt;
+    const startX = e.clientX, s0 = c0.start, in0 = c0.inPt, out0 = c0.outPt, dur0 = c0.duration;
     const move = (ev) => {
       const d = (ev.clientX - startX) / ppsRef.current;
       setClips(cs => cs.map(c => {
         if (c.id !== id) return c;
-        if (edge === "right") return { ...c, outPt: Math.min(c.sourceDur, Math.max(in0 + MIN_CLIP, out0 + d)) };
-        return { ...c, inPt: Math.max(0, Math.min(out0 - MIN_CLIP, in0 + d)) };
+        if (c.kind === "text") {
+          if (edge === "left") { const ns = Math.max(0, Math.min(s0 + d, s0 + dur0 - MIN_CLIP)); return { ...c, start: ns, duration: dur0 - (ns - s0) }; }
+          return { ...c, duration: Math.max(MIN_CLIP, dur0 + d) };
+        }
+        if (edge === "left") { const ni = Math.max(0, Math.min(in0 + d, out0 - MIN_CLIP)); return { ...c, inPt: ni, start: Math.max(0, s0 + (ni - in0)) }; }
+        return { ...c, outPt: Math.min(c.sourceDur, Math.max(in0 + MIN_CLIP, out0 + d)) };
       }));
     };
     const up = () => { window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", up); drawFrame(timeRef.current); };
     window.addEventListener("pointermove", move); window.addEventListener("pointerup", up);
   }
 
-  // redraw on edits / mount; tidy up on unmount
-  useEffect(() => { drawFrame(timeRef.current); /* eslint-disable-next-line */ }, [clips, pps]);
+  // ── track management ──────────────────────────────────────────────────────
+  function addTrackAfter(id, kind) { setTracks(ts => { const i = ts.findIndex(t => t.id === id); const next = [...ts]; next.splice(i < 0 ? ts.length : i + 1, 0, { id: uid(), kind }); return next; }); }
+  function delTrack(id) { setTracks(ts => { const t = ts.find(x => x.id === id); if (!t || ts.filter(x => x.kind === t.kind).length <= 1) return ts; return ts.filter(x => x.id !== id); }); }
+
+  // ── keyboard: Backspace/Delete removes the selected clip ──────────────────
+  useEffect(() => {
+    function onKey(e) {
+      if (e.key !== "Backspace" && e.key !== "Delete") return;
+      const a = document.activeElement, tag = a && a.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || (a && a.isContentEditable)) return;
+      if (!selRef.current) return;
+      e.preventDefault(); delClip(selRef.current);
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
+  useEffect(() => { drawFrame(timeRef.current); /* eslint-disable-next-line */ }, [clips, tracks, pps]);
   useEffect(() => () => {
     cancelAnimationFrame(rafRef.current);
     vids.current.forEach((v, url) => { try { v.pause(); v.removeAttribute("src"); v.load(); } catch { /* */ } URL.revokeObjectURL(url); });
+    auds.current.forEach((a, url) => { try { a.pause(); } catch { /* */ } URL.revokeObjectURL(url); });
     imgs.current.forEach((_, url) => URL.revokeObjectURL(url));
   }, []);
 
-  const { items, total } = layoutClips(clips);
+  const total = projectTotal(clips);
   const sel = clips.find(c => c.id === selId);
+  const contentW = Math.max(total * pps + 60, 400);
 
-  // ── styles ──
-  const tBtn = (active) => ({ display: "inline-flex", alignItems: "center", gap: 5, padding: "7px 12px", borderRadius: 8, border: "1px solid " + (active ? AC : "rgba(255,255,255,0.14)"), background: active ? "rgba(255,255,255,0.06)" : "rgba(255,255,255,0.05)", color: active ? AC : "#dfe3ee", cursor: "pointer", fontFamily: FFB, fontWeight: 600, fontSize: 12.5, whiteSpace: "nowrap" });
-  const iBtn = { width: 34, height: 30, borderRadius: 7, border: "1px solid rgba(255,255,255,0.14)", background: "rgba(255,255,255,0.05)", color: "#dfe3ee", cursor: "pointer", fontSize: 13, lineHeight: 1 };
+  // styles
+  const tBtn = (active) => ({ display: "inline-flex", alignItems: "center", gap: 5, padding: "7px 12px", borderRadius: 8, border: "1px solid " + (active ? AC : "rgba(255,255,255,0.14)"), background: "rgba(255,255,255,0.05)", color: active ? AC : "#dfe3ee", cursor: "pointer", fontFamily: FFB, fontWeight: 600, fontSize: 12.5, whiteSpace: "nowrap" });
+  const iBtn = { width: 32, height: 28, borderRadius: 7, border: "1px solid rgba(255,255,255,0.14)", background: "rgba(255,255,255,0.05)", color: "#dfe3ee", cursor: "pointer", fontSize: 12.5, lineHeight: 1 };
   const secInterval = pps >= 80 ? 1 : pps >= 40 ? 2 : 5;
   const ticks = []; for (let s = 0; s <= Math.ceil(total) + secInterval; s += secInterval) ticks.push(s);
 
   return (
-    <div ref={rootRef}
+    <div
       onDragOver={e => { if ([...(e.dataTransfer?.items || [])].some(i => i.kind === "file")) { e.preventDefault(); if (!drop) setDrop(true); } }}
       onDragLeave={e => { if (e.target === e.currentTarget) setDrop(false); }}
       onDrop={e => { e.preventDefault(); setDrop(false); addFiles(e.dataTransfer?.files); }}
-      style={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0, fontFamily: FF, background: "#0e0f15", color: "#e8eaf0", position: "relative" }}>
+      style={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0, fontFamily: FF, background: "#0e0f15", color: "#e8eaf0" }}>
 
       {/* Toolbar */}
       <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 12px", borderBottom: "1px solid rgba(255,255,255,0.08)", flexShrink: 0 }}>
         <span style={{ fontFamily: FFB, fontWeight: 800, fontSize: 14, marginRight: 2 }}>🎬 Video Editor</span>
         <button style={tBtn(false)} onClick={() => fileRef.current?.click()}>＋ Import</button>
-        <input ref={fileRef} type="file" accept="video/*,image/*" multiple style={{ display: "none" }} onChange={onFiles} />
+        <button style={tBtn(false)} onClick={addText}>T Text</button>
+        <input ref={fileRef} type="file" accept="video/*,image/*,audio/*" multiple style={{ display: "none" }} onChange={onFiles} />
         <div style={{ flex: 1 }} />
         <span style={{ fontSize: 11.5, color: "#8b93a7" }}>Zoom</span>
         <button style={iBtn} title="Zoom out" onClick={() => setPps(p => Math.max(20, Math.round(p / 1.3)))}>−</button>
         <button style={iBtn} title="Zoom in" onClick={() => setPps(p => Math.min(220, Math.round(p * 1.3)))}>+</button>
-        <button style={{ ...tBtn(false), opacity: 0.5, cursor: "default" }} title="Export arrives in the next stage">⬇ Export (soon)</button>
+        <button style={{ ...tBtn(false), opacity: 0.5, cursor: "default" }} title="Export arrives in Stage 3">⬇ Export (soon)</button>
       </div>
 
-      {/* Preview stage */}
-      <div style={{ flex: 1, minHeight: 0, display: "flex", alignItems: "center", justifyContent: "center", background: "#06070b", padding: 16, position: "relative" }}>
+      {/* Preview */}
+      <div style={{ flex: 1, minHeight: 0, display: "flex", alignItems: "center", justifyContent: "center", background: "#06070b", padding: 14, position: "relative" }}>
         {clips.length === 0 && (
-          <div style={{ textAlign: "center", color: "#727a8e", maxWidth: 360 }}>
+          <div style={{ textAlign: "center", color: "#727a8e", maxWidth: 380, pointerEvents: "none" }}>
             <div style={{ fontSize: 40, marginBottom: 10 }}>🎬</div>
             <div style={{ fontFamily: FFB, fontWeight: 700, fontSize: 16, color: "#c8cde0" }}>Import to start editing</div>
-            <div style={{ fontSize: 13, marginTop: 6, lineHeight: 1.5 }}>Click <strong>＋ Import</strong> or drop video / image files here. Then trim, split and arrange them on the timeline below.</div>
+            <div style={{ fontSize: 13, marginTop: 6, lineHeight: 1.5 }}>Drop or <strong>＋ Import</strong> video, image and audio onto the tracks below, add titles with <strong>T Text</strong>, then trim, split and arrange.</div>
           </div>
         )}
         <canvas ref={canvasRef} width={CW} height={CH} style={{ display: clips.length ? "block" : "none", maxWidth: "100%", maxHeight: "100%", aspectRatio: "16 / 9", borderRadius: 8, background: "#000", boxShadow: "0 12px 40px rgba(0,0,0,0.5)" }} />
         {drop && <div style={{ position: "absolute", inset: 12, border: "2.5px dashed " + AC, borderRadius: 14, background: "rgba(255,255,255,0.04)", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: FFB, fontWeight: 700, fontSize: 17, color: AC, pointerEvents: "none" }}>Drop clips to import</div>}
       </div>
 
-      {/* Transport */}
-      <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", borderTop: "1px solid rgba(255,255,255,0.08)", background: "#0b0c12", flexShrink: 0 }}>
+      {/* Transport + properties */}
+      <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", borderTop: "1px solid rgba(255,255,255,0.08)", background: "#0b0c12", flexShrink: 0, flexWrap: "wrap" }}>
         <button style={iBtn} title="Back to start" onClick={() => seek(0)}>⏮</button>
-        <button onClick={togglePlay} disabled={!clips.length} title={playing ? "Pause" : "Play"} style={{ width: 38, height: 32, borderRadius: 8, border: "1px solid " + AC, background: "rgba(255,255,255,0.06)", color: AC, cursor: clips.length ? "pointer" : "default", fontSize: 14, opacity: clips.length ? 1 : 0.5 }}>{playing ? "⏸" : "▶"}</button>
-        <span style={{ fontFamily: "ui-monospace,Menlo,monospace", fontSize: 12.5, color: "#aeb6ca", minWidth: 130 }}>{fmt(time)} / {fmt(total)}</span>
+        <button onClick={togglePlay} disabled={!clips.length} title={playing ? "Pause" : "Play"} style={{ width: 38, height: 30, borderRadius: 8, border: "1px solid " + AC, background: "rgba(255,255,255,0.06)", color: AC, cursor: clips.length ? "pointer" : "default", fontSize: 14, opacity: clips.length ? 1 : 0.5 }}>{playing ? "⏸" : "▶"}</button>
+        <span style={{ fontFamily: "ui-monospace,Menlo,monospace", fontSize: 12.5, color: "#aeb6ca", minWidth: 124 }}>{fmt(time)} / {fmt(total)}</span>
         <div style={{ flex: 1 }} />
-        {sel ? (
-          <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <span style={{ fontSize: 11.5, color: "#8b93a7", maxWidth: 140, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{sel.name}</span>
-            <button style={tBtn(false)} onClick={split}>✂ Split</button>
-            <button style={iBtn} title="Move earlier" onClick={() => moveClip(sel.id, -1)}>◀</button>
-            <button style={iBtn} title="Move later" onClick={() => moveClip(sel.id, 1)}>▶</button>
-            <button style={{ ...iBtn, color: "#ff8a8a", borderColor: "rgba(255,80,80,0.3)" }} title="Delete clip" onClick={() => delClip(sel.id)}>🗑</button>
+        {sel && sel.kind === "text" && (
+          <span style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+            <input value={sel.text} onChange={e => patchClip(sel.id, { text: e.target.value })} placeholder="Title…" spellCheck={false} style={{ width: 150, padding: "6px 9px", borderRadius: 7, background: "#171922", color: "#e8eaf0", border: "1px solid rgba(255,255,255,0.16)", fontFamily: FF, fontSize: 12.5, outline: "none" }} />
+            <input type="color" value={sel.color || "#ffffff"} onChange={e => patchClip(sel.id, { color: e.target.value })} title="Color" style={{ width: 28, height: 26, borderRadius: 6, border: "1px solid rgba(255,255,255,0.16)", background: "none", cursor: "pointer", padding: 0 }} />
+            <span style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 11, color: "#8b93a7" }}>Size<input type="range" min="4" max="22" value={Math.round((sel.fontSize || 0.1) * 100)} onChange={e => patchClip(sel.id, { fontSize: +e.target.value / 100 })} style={{ width: 64 }} /></span>
+            <span style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 11, color: "#8b93a7" }}>Y<input type="range" min="8" max="92" value={Math.round((sel.y ?? 0.82) * 100)} onChange={e => patchClip(sel.id, { y: +e.target.value / 100 })} style={{ width: 60 }} /></span>
+            <button style={{ ...iBtn, color: "#ff8a8a", borderColor: "rgba(255,80,80,0.3)" }} title="Delete (or Backspace)" onClick={() => delClip(sel.id)}>🗑</button>
           </span>
-        ) : <span style={{ fontSize: 11.5, color: "#6b7286" }}>Select a clip to edit it · drag clip edges to trim</span>}
+        )}
+        {sel && sel.kind !== "text" && (
+          <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <span style={{ fontSize: 11.5, color: "#8b93a7", maxWidth: 150, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{sel.name}</span>
+            <button style={tBtn(false)} onClick={split}>✂ Split</button>
+            <button style={{ ...iBtn, color: "#ff8a8a", borderColor: "rgba(255,80,80,0.3)" }} title="Delete (or Backspace)" onClick={() => delClip(sel.id)}>🗑</button>
+          </span>
+        )}
+        {!sel && <span style={{ fontSize: 11.5, color: "#6b7286" }}>Select a clip to edit · drag a clip to move it, its edges to trim</span>}
       </div>
 
       {/* Timeline */}
-      <div style={{ height: 132, background: "#0a0b11", borderTop: "1px solid rgba(255,255,255,0.08)", overflowX: "auto", overflowY: "hidden", flexShrink: 0 }}>
-        <div style={{ position: "relative", height: "100%", width: Math.max(total * pps + 48, 100) + "px", minWidth: "100%" }}>
-          {/* ruler (click/drag to scrub) */}
-          <div onPointerDown={e => {
-            const r = e.currentTarget.getBoundingClientRect();
-            const go = (cx) => seek((cx - r.left) / pps);
-            go(e.clientX);
-            const mv = (ev) => go(ev.clientX);
-            const up = () => { window.removeEventListener("pointermove", mv); window.removeEventListener("pointerup", up); };
-            window.addEventListener("pointermove", mv); window.addEventListener("pointerup", up);
-          }} style={{ position: "relative", height: 24, borderBottom: "1px solid rgba(255,255,255,0.08)", cursor: "text", userSelect: "none" }}>
-            {ticks.map(s => (
-              <div key={s} style={{ position: "absolute", left: s * pps, top: 0, bottom: 0, borderLeft: "1px solid rgba(255,255,255,0.12)", paddingLeft: 4, fontSize: 10, color: "#6b7286", lineHeight: "24px" }}>{s}s</div>
-            ))}
+      <div style={{ height: 178, background: "#0a0b11", borderTop: "1px solid rgba(255,255,255,0.08)", overflow: "auto", flexShrink: 0 }}>
+        <div style={{ position: "relative", width: (GUTTER + contentW) + "px", minWidth: "100%" }}>
+          {/* ruler */}
+          <div style={{ display: "flex", height: 24 }}>
+            <div style={{ width: GUTTER, flexShrink: 0, position: "sticky", left: 0, zIndex: 3, background: "#0a0b11", borderRight: "1px solid rgba(255,255,255,0.08)", borderBottom: "1px solid rgba(255,255,255,0.08)" }} />
+            <div onPointerDown={e => { const r = e.currentTarget.getBoundingClientRect(); const go = c => seek((c - r.left) / pps); go(e.clientX); const mv = ev => go(ev.clientX); const up = () => { window.removeEventListener("pointermove", mv); window.removeEventListener("pointerup", up); }; window.addEventListener("pointermove", mv); window.addEventListener("pointerup", up); }}
+              style={{ position: "relative", width: contentW, borderBottom: "1px solid rgba(255,255,255,0.08)", cursor: "text", userSelect: "none" }}>
+              {ticks.map(s => <div key={s} style={{ position: "absolute", left: s * pps, top: 0, bottom: 0, borderLeft: "1px solid rgba(255,255,255,0.1)", paddingLeft: 4, fontSize: 10, color: "#6b7286", lineHeight: "24px" }}>{s}s</div>)}
+            </div>
           </div>
 
-          {/* main video track */}
-          <div onPointerDown={e => { if (e.target === e.currentTarget) { const r = e.currentTarget.getBoundingClientRect(); seek((e.clientX - r.left) / pps); } }}
-            style={{ position: "relative", height: 80, marginTop: 8, padding: "0 0 0 0" }}>
-            {items.map(it => {
-              const w = it.len * pps, on = it.id === selId;
-              return (
-                <div key={it.id} onPointerDown={e => { e.stopPropagation(); setSelId(it.id); }}
-                  style={{ position: "absolute", left: it.start * pps, top: 0, width: Math.max(2, w), height: 76, borderRadius: 8, overflow: "hidden", cursor: "pointer", border: "2px solid " + (on ? AC : "rgba(255,255,255,0.12)"), background: "#1a1d28", boxShadow: on ? "0 0 0 2px rgba(255,255,255,0.06)" : "none", boxSizing: "border-box" }}>
-                  {it.thumb && <img src={it.thumb} alt="" draggable={false} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", opacity: 0.55, pointerEvents: "none" }} />}
-                  <div style={{ position: "absolute", left: 6, bottom: 4, right: 6, fontSize: 10.5, fontFamily: FFB, fontWeight: 600, color: "#fff", textShadow: "0 1px 3px rgba(0,0,0,0.9)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", pointerEvents: "none" }}>{it.kind === "image" ? "🖼 " : "🎞 "}{it.name}</div>
-                  <div style={{ position: "absolute", left: 4, top: 4, fontSize: 9.5, color: "#cfd5e6", background: "rgba(0,0,0,0.45)", borderRadius: 4, padding: "1px 4px", pointerEvents: "none" }}>{it.len.toFixed(1)}s</div>
-                  {/* trim handles */}
-                  <div onPointerDown={e => startTrim(e, it.id, "left")} style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 8, cursor: "ew-resize", background: on ? AC : "transparent" }} />
-                  <div onPointerDown={e => startTrim(e, it.id, "right")} style={{ position: "absolute", right: 0, top: 0, bottom: 0, width: 8, cursor: "ew-resize", background: on ? AC : "transparent" }} />
+          {/* track rows */}
+          {tracks.map(tr => {
+            const cfg = TRACK[tr.kind];
+            const empty = !clips.some(c => c.trackId === tr.id);
+            const canDel = empty && tracks.filter(x => x.kind === tr.kind).length > 1;
+            return (
+              <div key={tr.id} style={{ display: "flex", borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
+                {/* gutter */}
+                <div style={{ width: GUTTER, flexShrink: 0, position: "sticky", left: 0, zIndex: 3, background: "#0d0e16", borderRight: "1px solid rgba(255,255,255,0.08)", padding: "5px 6px", display: "flex", flexDirection: "column", justifyContent: "center", gap: 3, height: cfg.h }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                    <span style={{ width: 7, height: 7, borderRadius: 2, background: cfg.color, flexShrink: 0 }} />
+                    <span style={{ fontSize: 10.5, fontFamily: FFB, fontWeight: 700, color: "#c2c8da", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{cfg.label}</span>
+                  </div>
+                  <div style={{ display: "flex", gap: 3 }}>
+                    <button title={"Add another " + cfg.label.toLowerCase() + " track"} onClick={() => addTrackAfter(tr.id, tr.kind)} style={{ width: 18, height: 16, borderRadius: 4, border: "1px solid rgba(255,255,255,0.14)", background: "rgba(255,255,255,0.05)", color: "#aeb6ca", fontSize: 11, lineHeight: 1, cursor: "pointer", padding: 0 }}>+</button>
+                    {canDel && <button title="Remove this empty track" onClick={() => delTrack(tr.id)} style={{ width: 18, height: 16, borderRadius: 4, border: "1px solid rgba(255,80,80,0.25)", background: "rgba(255,255,255,0.04)", color: "#ff9a9a", fontSize: 11, lineHeight: 1, cursor: "pointer", padding: 0 }}>×</button>}
+                  </div>
                 </div>
-              );
-            })}
-          </div>
+                {/* lane */}
+                <div onPointerDown={e => { if (e.target === e.currentTarget) { const r = e.currentTarget.getBoundingClientRect(); seek((e.clientX - r.left) / pps); } }}
+                  style={{ position: "relative", width: contentW, height: cfg.h, background: tr.kind === "media" ? "rgba(59,130,246,0.05)" : tr.kind === "sound" ? "rgba(34,197,94,0.05)" : "rgba(245,158,11,0.05)" }}>
+                  {clips.filter(c => c.trackId === tr.id).map(c => {
+                    const w = clipDur(c) * pps, on = c.id === selId;
+                    return (
+                      <div key={c.id} onPointerDown={e => startMove(e, c.id)} title={c.kind === "text" ? c.text : c.name}
+                        style={{ position: "absolute", left: c.start * pps, top: 3, width: Math.max(3, w), height: cfg.h - 6, borderRadius: 6, overflow: "hidden", cursor: "grab", boxSizing: "border-box", border: "2px solid " + (on ? AC : "rgba(255,255,255,0.14)"), background: tr.kind === "media" ? "#1a2436" : tr.kind === "sound" ? "#13301f" : "#332608" }}>
+                        {c.kind === "video" && c.thumb && <img src={c.thumb} alt="" draggable={false} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", opacity: 0.5, pointerEvents: "none" }} />}
+                        <div style={{ position: "absolute", left: 6, top: "50%", transform: "translateY(-50%)", right: 6, fontSize: 10.5, fontFamily: FFB, fontWeight: 600, color: "#fff", textShadow: "0 1px 3px rgba(0,0,0,0.9)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", pointerEvents: "none" }}>{cfg.icon === "T" ? "T " : cfg.icon + " "}{c.kind === "text" ? (c.text || "Text") : c.name}</div>
+                        <div onPointerDown={e => startTrim(e, c.id, "left")} style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 7, cursor: "ew-resize", background: on ? AC : "transparent" }} />
+                        <div onPointerDown={e => startTrim(e, c.id, "right")} style={{ position: "absolute", right: 0, top: 0, bottom: 0, width: 7, cursor: "ew-resize", background: on ? AC : "transparent" }} />
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
 
-          {/* playhead */}
-          <div ref={playheadRef} style={{ position: "absolute", top: 0, bottom: 0, left: time * pps, width: 2, background: "#ff4d6d", pointerEvents: "none", zIndex: 5 }}>
+          {/* playhead spans every row */}
+          <div ref={playheadRef} style={{ position: "absolute", top: 0, bottom: 0, left: GUTTER + time * pps, width: 2, background: "#ff4d6d", pointerEvents: "none", zIndex: 2 }}>
             <div style={{ position: "absolute", top: -1, left: -5, width: 12, height: 9, background: "#ff4d6d", clipPath: "polygon(0 0,100% 0,50% 100%)" }} />
           </div>
         </div>
