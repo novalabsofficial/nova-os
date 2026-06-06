@@ -25,23 +25,22 @@ export function TypingApp({ AC, user }) {
   const [showLb, setShowLb] = useState(false);
 
   const inputRef = useRef(null);
-  const tickRef = useRef(null);
   const caretRef = useRef(null);
   const typedRef = useRef("");
+  const endAtRef = useRef(0);
+  const [runId, setRunId] = useState(0);   // bump to remount the input on reset (clears any stale value)
 
-  useEffect(() => () => clearInterval(tickRef.current), []);
   useEffect(() => { localStorage.setItem("nova-typing-dur", String(duration)); if (status === "idle") setTimeLeft(duration); /* eslint-disable-next-line */ }, [duration]);
 
   const reset = useCallback(() => {
-    clearInterval(tickRef.current);
     setTarget(pickWords(140).join(" "));
     setTyped(""); typedRef.current = "";
     setStatus("idle"); setTimeLeft(duration); setResult(null);
+    setRunId(r => r + 1);
     setTimeout(() => inputRef.current?.focus(), 0);
   }, [duration]);
 
   const finish = useCallback(() => {
-    clearInterval(tickRef.current);
     const t = typedRef.current;
     let correct = 0;
     for (let i = 0; i < t.length; i++) if (t[i] === target[i]) correct++;
@@ -53,10 +52,18 @@ export function TypingApp({ AC, user }) {
     if (myUid && wpm > 0) submitScore(GAME, wpm, "high", myUid, user);
   }, [target, duration, myUid, user]);
 
-  // end the run when the clock hits zero
+  // The countdown lives only while running — a single interval cleaned up on
+  // every phase change (no leaks / stuck timers across tests). Time is derived
+  // from a fixed deadline so it can't drift or compound.
   useEffect(() => {
-    if (status === "running" && timeLeft <= 0) finish();
-  }, [timeLeft, status, finish]);
+    if (status !== "running") return;
+    const id = setInterval(() => {
+      const left = Math.ceil((endAtRef.current - Date.now()) / 1000);
+      setTimeLeft(left > 0 ? left : 0);
+      if (left <= 0) finish();
+    }, 200);
+    return () => clearInterval(id);
+  }, [status, finish]);
 
   // keep the caret in view as you type
   useEffect(() => { caretRef.current?.scrollIntoView({ block: "center" }); }, [typed]);
@@ -66,8 +73,8 @@ export function TypingApp({ AC, user }) {
     let v = e.target.value;
     if (v.length > target.length) v = v.slice(0, target.length);
     if (status === "idle" && v.length > 0) {
+      endAtRef.current = Date.now() + duration * 1000;
       setStatus("running");
-      tickRef.current = setInterval(() => setTimeLeft((tl) => tl - 1), 1000);
     }
     typedRef.current = v;
     setTyped(v);
@@ -127,7 +134,7 @@ export function TypingApp({ AC, user }) {
           })}
         </div>
         <input
-          ref={inputRef} value={typed} onChange={onType} autoFocus
+          key={runId} ref={inputRef} value={typed} onChange={onType} autoFocus
           autoCorrect="off" autoCapitalize="off" spellCheck="false"
           style={{ position: "absolute", opacity: 0, width: 1, height: 1, pointerEvents: "none" }}
         />
