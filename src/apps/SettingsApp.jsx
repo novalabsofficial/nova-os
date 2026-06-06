@@ -246,6 +246,7 @@ export function SettingsApp({ user, data, updateSettings, showToast, AC, onCusto
 
           <div style={SEC}>Window Blur</div>
           <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}><input type="range" min={0} max={30} value={settings.winBlur ?? 18} onChange={e => updateSettings({ winBlur: +e.target.value })} style={{ flex: 1, accentColor: AC }} /><span style={{ fontSize: 11, fontFamily: FFM, color: "var(--nv-text-dim)", width: 32 }}>{settings.winBlur ?? 18}px</span></div>
+          <div style={{ fontSize: 10.5, color: "var(--nv-text-dim)", fontStyle: "italic", marginTop: -2 }}>Windows are solid by default. Turn on <strong style={{ color: "var(--nv-text)" }}>Liquid Glass</strong> above for frosted windows — this slider sets how much they blur.</div>
         </>)}
 
         {section === "display" && (<>

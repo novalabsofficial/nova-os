@@ -2807,6 +2807,11 @@ export default function NovaOS(){
         // it's always obvious which window is active (real-OS depth).
         const isFocused = win.id===focusedWinId;
         const lightT = theme === "light";   // softer, blue-grey shadows in light mode
+        // v11.0 — windows are SOLID by default (opaque body, no see-through).
+        // The translucent frosted look + the Window-Blur slider only kick in when
+        // Liquid Glass is enabled (there's nothing for blur to show on a solid one).
+        const winBg = glass ? (lightT ? "rgba(245,247,251,0.86)" : "rgba(16,18,28,0.85)") : (lightT ? "#f6f8fc" : "#141620");
+        const winBackdrop = glass ? ("blur(" + winBlur + "px) saturate(150%)") : "none";
         const winShadow = isDrg
           ? (lightT
             ? "0 12px 24px rgba(30,41,59,0.16), 0 36px 80px rgba(30,41,59,0.2), 0 1px 0 rgba(255,255,255,0.6) inset"
@@ -2854,7 +2859,7 @@ export default function NovaOS(){
                       : "none";
         const fxBusy = fx==="closing"||fx==="minimizing";
         return(
-          <div key={win.id} data-win="1" data-win-id={win.id} data-drop={win.app==="profile"?"avatar":"none"} onClick={()=>focusWin(win.id)} style={{...winStyle,...minimizedStyle,pointerEvents:fxBusy?"none":"auto",transformOrigin:fxOrigin,background:"var(--nv-surface-solid)",border:"1px solid "+(isFocused?"var(--nv-border-strong)":"var(--nv-border)"),boxShadow:winShadow,display:isMin?"none":"flex",flexDirection:"column",animation:winAnim,backdropFilter:"blur("+winBlur+"px) saturate(160%)",WebkitBackdropFilter:"blur("+winBlur+"px) saturate(160%)",transition:isDrg?"box-shadow 0.18s var(--nv-ease)":"box-shadow 0.22s var(--nv-ease), left 0.28s var(--nv-ease), top 0.28s var(--nv-ease), width 0.28s var(--nv-ease), height 0.28s var(--nv-ease)",overflow:"hidden"}}>
+          <div key={win.id} data-win="1" data-win-id={win.id} data-drop={win.app==="profile"?"avatar":"none"} onClick={()=>focusWin(win.id)} style={{...winStyle,...minimizedStyle,pointerEvents:fxBusy?"none":"auto",transformOrigin:fxOrigin,background:winBg,border:"1px solid "+(isFocused?"var(--nv-border-strong)":"var(--nv-border)"),boxShadow:winShadow,display:isMin?"none":"flex",flexDirection:"column",animation:winAnim,backdropFilter:winBackdrop,WebkitBackdropFilter:winBackdrop,transition:isDrg?"box-shadow 0.18s var(--nv-ease)":"box-shadow 0.22s var(--nv-ease), left 0.28s var(--nv-ease), top 0.28s var(--nv-ease), width 0.28s var(--nv-ease), height 0.28s var(--nv-ease)",overflow:"hidden"}}>
             {!isMax&&<ResizeHandles winId={win.id} onStartResize={startResize} touchy={touchy}/>}
             {/* v8.3 F1: title bar is now draggable even when maximized —
                 dragging restores the window and tears it off (Windows-style),
