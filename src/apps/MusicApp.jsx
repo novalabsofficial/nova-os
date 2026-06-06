@@ -34,31 +34,64 @@ export function MusicApp({ AC, showToast }) {
   const [repeat, setRepeat] = useState("off");
   const [view, setView] = useState("home");      // home | library | queue | now
   const [dragging, setDragging] = useState(false);
+  const [eq, setEq] = useState({ bass: 0, mid: 0, treble: 0, preamp: 1 });   // mixer / EQ
+  const [vocal, setVocal] = useState(false);                                 // vocal remover (karaoke)
   const audioRef = useRef(null);
   const inputRef = useRef(null);
   const folderRef = useRef(null);
 
   // Web Audio analyser (created lazily on first play gesture).
-  const acxRef = useRef(null), analyserRef = useRef(null), srcRef = useRef(null);
+  const analyserRef = useRef(null);
+  const eqRef = useRef({});                                     // live Web Audio nodes
+  const eqValsRef = useRef({ bass: 0, mid: 0, treble: 0, preamp: 1 });
+  const vocalRef = useRef(false);
+  // Build the graph once: source → preamp → bass → mid → treble → [vocal] → analyser → out
   function ensureAnalyser() {
     try {
-      if (analyserRef.current) { acxRef.current?.resume?.(); return; }
+      if (eqRef.current.ctx) { eqRef.current.ctx.resume?.(); return; }
       const Ctx = window.AudioContext || window.webkitAudioContext;
       if (!Ctx || !audioRef.current) return;
       const ctx = new Ctx();
       const src = ctx.createMediaElementSource(audioRef.current);
+      const preamp = ctx.createGain();
+      const bassF = ctx.createBiquadFilter(); bassF.type = "lowshelf"; bassF.frequency.value = 200;
+      const midF = ctx.createBiquadFilter(); midF.type = "peaking"; midF.frequency.value = 1100; midF.Q.value = 0.9;
+      const trebF = ctx.createBiquadFilter(); trebF.type = "highshelf"; trebF.frequency.value = 3200;
       const an = ctx.createAnalyser(); an.fftSize = 512; an.smoothingTimeConstant = 0.82;
-      src.connect(an); an.connect(ctx.destination);
-      acxRef.current = ctx; srcRef.current = src; analyserRef.current = an;
+      const splitter = ctx.createChannelSplitter(2);
+      const invGain = ctx.createGain(); invGain.gain.value = -1;
+      const sumGain = ctx.createGain();
+      src.connect(preamp); preamp.connect(bassF); bassF.connect(midF); midF.connect(trebF);
+      trebF.connect(an); an.connect(ctx.destination);
+      eqRef.current = { ctx, preamp, bassF, midF, trebF, an, splitter, invGain, sumGain, vocalOn: false };
+      analyserRef.current = an;
+      applyEq();
       ctx.resume?.();
-    } catch { /* not supported */ }
+    } catch { /* Web Audio unavailable */ }
+  }
+  function applyEq() {
+    const e = eqRef.current; if (!e.ctx) return;
+    const v = eqValsRef.current;
+    e.preamp.gain.value = v.preamp; e.bassF.gain.value = v.bass; e.midF.gain.value = v.mid; e.trebF.gain.value = v.treble;
+    wireVocal(vocalRef.current);
+  }
+  // Karaoke = center-channel cancellation: out = L − R (removes most lead vocals).
+  function wireVocal(on) {
+    const e = eqRef.current; if (!e.ctx || e.vocalOn === on) return;
+    try {
+      e.trebF.disconnect();
+      if (on) { e.trebF.connect(e.splitter); e.splitter.connect(e.sumGain, 0); e.splitter.connect(e.invGain, 1); e.invGain.connect(e.sumGain); e.sumGain.connect(e.an); }
+      else { try { e.splitter.disconnect(); } catch { /* */ } try { e.invGain.disconnect(); } catch { /* */ } try { e.sumGain.disconnect(); } catch { /* */ } e.trebF.connect(e.an); }
+      e.vocalOn = on;
+    } catch { /* */ }
   }
 
   const curId = playPos >= 0 ? playIds[playPos] : null;
   const cur = curId ? tracks.find(t => t.id === curId) : null;
 
   useEffect(() => { if (audioRef.current) audioRef.current.volume = volume; }, [volume]);
-  useEffect(() => () => { tracks.forEach(t => URL.revokeObjectURL(t.url)); try { acxRef.current?.close(); } catch { /* */ } }, []); // eslint-disable-line
+  useEffect(() => { eqValsRef.current = eq; vocalRef.current = vocal; applyEq(); }, [eq, vocal]);   // live-apply mixer to the graph
+  useEffect(() => () => { tracks.forEach(t => URL.revokeObjectURL(t.url)); try { eqRef.current.ctx?.close(); } catch { /* */ } }, []); // eslint-disable-line
 
   // ── tracks ──
   function addFiles(fileList) {
@@ -168,6 +201,7 @@ export function MusicApp({ AC, showToast }) {
           <RailItem ac={AC} active={view === "library"} onClick={() => setView("library")} icon={<LibraryGlyph />} label="Your Library" badge={tracks.length || null} />
           <RailItem ac={AC} active={view === "queue"} onClick={() => setView("queue")} icon={<QueueGlyph />} label="Queue" badge={queueItems.length || null} />
           <RailItem ac={AC} active={view === "now"} onClick={() => setView("now")} icon={<EqBars playing={playing && view !== "now"} color="currentColor" />} label="Now Playing" />
+          <RailItem ac={AC} active={view === "mixer"} onClick={() => setView("mixer")} icon={<MixerGlyph />} label="Mixer / EQ" />
 
           <div style={{ height: 12 }} />
           <input ref={inputRef} type="file" accept="audio/*" multiple onChange={onPick} style={{ display: "none" }} />
@@ -187,6 +221,7 @@ export function MusicApp({ AC, showToast }) {
           {view === "library" && <LibraryView tracks={tracks} curId={curId} playing={playing} startWithTrack={startWithTrack} addToQueue={addToQueue} removeTrack={removeTrack} duration={duration} fmt={fmt} trackGradient={trackGradient} pick={() => inputRef.current?.click()} AC={AC} />}
           {view === "queue" && <QueueView queueItems={queueItems} playIds={playIds} playPos={playPos} playing={playing} jumpTo={jumpTo} removeFromQueue={removeFromQueue} moveInQueue={moveInQueue} clearQueue={clearQueue} trackGradient={trackGradient} AC={AC} />}
           {view === "now" && <NowPlaying cur={cur} playing={playing} progress={progress} duration={duration} progPct={progPct} seek={seek} fmt={fmt} analyserRef={analyserRef} trackGradient={trackGradient} AC={AC} />}
+          {view === "mixer" && <MixerView eq={eq} setEq={setEq} vocal={vocal} setVocal={setVocal} AC={AC} />}
         </div>
       </div>
 
@@ -419,6 +454,51 @@ function QueueView({ queueItems, playIds, playPos, playing, jumpTo, removeFromQu
     </div>
   );
 }
+
+function MixerView({ eq, setEq, vocal, setVocal, AC }) {
+  const set = (k, v) => setEq(p => ({ ...p, [k]: v }));
+  const presets = [
+    { id: "flat", label: "Flat", eq: { bass: 0, mid: 0, treble: 0, preamp: 1 }, vocal: false },
+    { id: "bass", label: "Bass Boost", eq: { bass: 9, mid: 0, treble: -1, preamp: 1 }, vocal: false },
+    { id: "vocal", label: "Vocal Boost", eq: { bass: -2, mid: 5, treble: 2, preamp: 1 }, vocal: false },
+    { id: "treble", label: "Treble", eq: { bass: -1, mid: 0, treble: 8, preamp: 1 }, vocal: false },
+    { id: "lofi", label: "Lo-Fi", eq: { bass: 5, mid: -2, treble: -9, preamp: 1 }, vocal: false },
+    { id: "karaoke", label: "Karaoke", eq: { bass: 2, mid: -3, treble: 1, preamp: 1.1 }, vocal: true },
+  ];
+  const band = (k, label, min, max, step, fmtv) => (
+    <div key={k} style={{ marginBottom: 16 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 6 }}>
+        <span style={{ fontFamily: FFB, fontWeight: 700, color: "var(--nv-text-strong)" }}>{label}</span>
+        <span style={{ fontFamily: FFM, color: "var(--nv-text-dim)" }}>{fmtv(eq[k])}</span>
+      </div>
+      <input type="range" min={min} max={max} step={step} value={eq[k]} onChange={e => set(k, +e.target.value)} style={{ width: "100%", accentColor: AC }} />
+    </div>
+  );
+  const db = v => (v > 0 ? "+" : "") + v + " dB";
+  return (
+    <div style={{ padding: "24px 24px 28px", maxWidth: 580 }}>
+      <div style={{ fontFamily: FFB, fontWeight: 800, fontSize: 22, color: "var(--nv-text-strong)" }}>Mixer / EQ</div>
+      <div style={{ fontSize: 12, color: "var(--nv-text-dim)", marginTop: 3, marginBottom: 18 }}>Shape your sound in real time — it affects playback and the visualizer.</div>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 22 }}>
+        {presets.map(p => <button key={p.id} onClick={() => { setEq(p.eq); setVocal(p.vocal); }} style={{ padding: "7px 13px", borderRadius: 20, border: "1px solid var(--nv-border)", background: "var(--nv-elevated)", color: "var(--nv-text-strong)", fontFamily: FFB, fontWeight: 600, fontSize: 12, cursor: "pointer" }}>{p.label}</button>)}
+      </div>
+      {band("bass", "Bass", -12, 12, 1, db)}
+      {band("mid", "Mids", -12, 12, 1, db)}
+      {band("treble", "Treble", -12, 12, 1, db)}
+      {band("preamp", "Preamp", 0.5, 2, 0.05, v => Math.round(v * 100) + "%")}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, padding: "14px 16px", marginTop: 8, background: "var(--nv-elevated)", border: "1px solid var(--nv-border)", borderRadius: 12 }}>
+        <div>
+          <div style={{ fontFamily: FFB, fontWeight: 700, fontSize: 13, color: "var(--nv-text-strong)" }}>Vocal remover (Karaoke)</div>
+          <div style={{ fontSize: 11, color: "var(--nv-text-dim)", marginTop: 2, lineHeight: 1.45, maxWidth: 380 }}>Cancels center-panned audio to strip most lead vocals. Collapses to mono and can dim centered bass/drums — it's an effect, not perfect isolation.</div>
+        </div>
+        <button onClick={() => setVocal(v => !v)} title={vocal ? "On" : "Off"} style={{ width: 46, height: 26, borderRadius: 13, border: "none", cursor: "pointer", background: vocal ? AC : "var(--nv-border-strong)", position: "relative", flexShrink: 0, transition: "background 0.15s" }}>
+          <span style={{ position: "absolute", top: 3, left: vocal ? 23 : 3, width: 20, height: 20, borderRadius: "50%", background: "#fff", transition: "left 0.15s" }} />
+        </button>
+      </div>
+    </div>
+  );
+}
+function MixerGlyph() { return (<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" style={{ display: "block" }}><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M2 14h4M10 8h4M18 16h4" /></svg>); }
 
 function EqBars({ playing, color }) {
   return (
