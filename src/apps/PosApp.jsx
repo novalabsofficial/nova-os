@@ -319,9 +319,12 @@ function TenderModal({ AC, total, state, setState, onCancel, onConfirm }) {
   const change = cashNum - total;
   const quick = [total, Math.ceil(total), Math.ceil(total / 5) * 5, Math.ceil(total / 10) * 10].filter((v, i, a) => a.indexOf(v) === i);
   const ok = state.method === "card" || cashNum >= total;
+  const downRef = useRef(false);   // only dismiss if the press STARTED on the backdrop
   return (
-    <div onClick={onCancel} style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.55)", display: "grid", placeItems: "center", zIndex: 30 }}>
-      <div onClick={e => e.stopPropagation()} style={{ width: 360, background: "var(--nv-surface-solid)", border: "1px solid var(--nv-border)", borderRadius: 18, padding: 20, fontFamily: FF }}>
+    <div onPointerDown={e => { downRef.current = e.target === e.currentTarget; }}
+         onClick={e => { if (downRef.current && e.target === e.currentTarget) onCancel(); }}
+         style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.55)", display: "grid", placeItems: "center", zIndex: 30 }}>
+      <div onPointerDown={e => e.stopPropagation()} onClick={e => e.stopPropagation()} style={{ width: 360, background: "var(--nv-surface-solid)", border: "1px solid var(--nv-border)", borderRadius: 18, padding: 20, fontFamily: FF }}>
         <div style={{ fontFamily: FFB, fontSize: 18 }}>Take payment</div>
         <div style={{ fontSize: 13.5, color: "var(--nv-text-dim)", marginBottom: 16 }}>Amount due <b style={{ color: "var(--nv-text)" }}>{money(total)}</b></div>
         <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
@@ -409,6 +412,8 @@ function Items({ AC, items, taxRate, setTax, onChange, showToast }) {
 
 function ItemEditor({ AC, draft, setDraft, onSave, exists, showToast }) {
   const fileRef = useRef(null);
+  const downRef = useRef(false);   // only dismiss if the press STARTED on the backdrop
+  const close = () => setDraft(null);
   const fld = { padding: "10px 12px", borderRadius: 10, border: "1px solid var(--nv-border)", background: "var(--nv-elevated)", color: "var(--nv-text)", fontFamily: FF, fontSize: 14, boxSizing: "border-box", width: "100%" };
   const pickImg = async (e) => {
     const f = e.target.files?.[0]; if (!f) return;
@@ -416,8 +421,10 @@ function ItemEditor({ AC, draft, setDraft, onSave, exists, showToast }) {
     if (url) setDraft(d => ({ ...d, img: url })); else showToast?.("Couldn't read that image");
   };
   return (
-    <div onClick={() => setDraft(null)} style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.55)", display: "grid", placeItems: "center", zIndex: 30 }}>
-      <div onClick={e => e.stopPropagation()} style={{ width: 380, maxWidth: "92vw", background: "var(--nv-surface-solid)", border: "1px solid var(--nv-border)", borderRadius: 18, padding: 20, fontFamily: FF, display: "flex", flexDirection: "column", gap: 12 }}>
+    <div onPointerDown={e => { downRef.current = e.target === e.currentTarget; }}
+         onClick={e => { if (downRef.current && e.target === e.currentTarget) close(); }}
+         style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.55)", display: "grid", placeItems: "center", zIndex: 30 }}>
+      <div onPointerDown={e => e.stopPropagation()} onClick={e => e.stopPropagation()} style={{ width: 380, maxWidth: "92vw", background: "var(--nv-surface-solid)", border: "1px solid var(--nv-border)", borderRadius: 18, padding: 20, fontFamily: FF, display: "flex", flexDirection: "column", gap: 12 }}>
         <div style={{ fontFamily: FFB, fontSize: 17 }}>{exists ? "Edit item" : "New item"}</div>
         <div style={{ display: "flex", gap: 13, alignItems: "center" }}>
           <div onClick={() => fileRef.current?.click()} style={{ width: 70, height: 70, borderRadius: 13, background: "var(--nv-elevated)", border: "1px dashed var(--nv-border)", display: "grid", placeItems: "center", overflow: "hidden", cursor: "pointer", flexShrink: 0 }}>
