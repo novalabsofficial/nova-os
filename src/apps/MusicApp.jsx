@@ -303,16 +303,18 @@ export function MusicApp({ AC, showToast }) {
 function shuffleArray(arr) { for (let i = arr.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1));[arr[i], arr[j]] = [arr[j], arr[i]]; } return arr; }
 
 // ───────── Visualizer: vibrant, beat-reactive frequency bars ─────────
-function Visualizer({ analyserRef, AC, height = 240 }) {
+function Visualizer({ analyserRef, AC, playing, height = 240 }) {
   const ref = useRef(null);
   useEffect(() => {
     const canvas = ref.current; if (!canvas) return;
     const ctx = canvas.getContext("2d");
     const baseHue = hexToHue(AC);
     const data = new Uint8Array(256);
-    let raf = 0, phase = 0;
+    let raf = 0, phase = 0, fc = 0;
     const draw = () => {
       raf = requestAnimationFrame(draw);
+      fc++;
+      if (!playing && (fc & 3)) return;   // idle → ~15fps so a paused player doesn't burn the main thread
       const W = canvas.width, H = canvas.height, mid = H / 2;
       ctx.clearRect(0, 0, W, H);
       const an = analyserRef.current;
@@ -337,7 +339,7 @@ function Visualizer({ analyserRef, AC, height = 240 }) {
     };
     raf = requestAnimationFrame(draw);
     return () => cancelAnimationFrame(raf);
-  }, [AC]);
+  }, [AC, playing]);
   return <canvas ref={ref} width={1000} height={300} style={{ width: "100%", height, display: "block" }} />;
 }
 
@@ -354,7 +356,7 @@ function NowPlaying({ cur, playing, progress, duration, progPct, seek, fmt, anal
         </div>
       </div>
       {/* visualizer */}
-      <div style={{ height: 150, flexShrink: 0, padding: "0 4px" }}><Visualizer analyserRef={analyserRef} AC={AC} height={150} /></div>
+      <div style={{ height: 150, flexShrink: 0, padding: "0 4px" }}><Visualizer analyserRef={analyserRef} AC={AC} playing={playing} height={150} /></div>
       {/* progress */}
       <div style={{ padding: "6px 28px 26px", flexShrink: 0 }}>
         <div onClick={seek} style={{ height: 6, borderRadius: 3, background: "rgba(255,255,255,0.14)", cursor: cur ? "pointer" : "default", position: "relative", overflow: "hidden" }}>
