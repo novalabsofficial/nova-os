@@ -24,8 +24,12 @@ const TRACK = {
 
 let _seq = 1;
 const uid = () => "c" + (_seq++) + Math.random().toString(36).slice(2, 5);
-const clipDur = (c) => c.kind === "text" ? Math.max(MIN_CLIP, c.duration) : Math.max(MIN_CLIP, c.outPt - c.inPt);
+const spd = (c) => c.speed || 1;
+const clipDur = (c) => c.kind === "text" ? Math.max(MIN_CLIP, c.duration) : Math.max(MIN_CLIP, (c.outPt - c.inPt) / spd(c));
 const clipEnd = (c) => c.start + clipDur(c);
+const clipTrackKind = (c) => c.kind === "audio" ? "sound" : c.kind === "text" ? "text" : "media";
+// Fade-in/out opacity (and audio-gain) factor at time t, 0..1.
+const fadeAlpha = (c, t) => { const local = t - c.start, dur = clipDur(c); let a = 1; if (c.fadeIn > 0 && local < c.fadeIn) a = Math.min(a, local / c.fadeIn); if (c.fadeOut > 0 && dur - local < c.fadeOut) a = Math.min(a, (dur - local) / c.fadeOut); return Math.max(0, Math.min(1, a)); };
 const projectTotal = (cs) => cs.reduce((m, c) => Math.max(m, clipEnd(c)), 0);
 const fmt = (s) => { s = Math.max(0, s || 0); const m = Math.floor(s / 60), sec = Math.floor(s % 60), cs = Math.floor((s * 100) % 100); return m + ":" + String(sec).padStart(2, "0") + "." + String(cs).padStart(2, "0"); };
 // Snap a time to the nearest reference line within tolerance (else unchanged).
@@ -96,9 +100,9 @@ export function VideoEditorApp({ AC, showToast }) {
     for (let i = mediaTracks.length - 1; i >= 0; i--) {       // upper timeline track paints last (on top)
       const act = clipsRef.current.filter(c => c.trackId === mediaTracks[i].id && (c.kind === "video" || c.kind === "image") && t >= c.start && t < clipEnd(c));
       const c = act[act.length - 1];
-      if (c) drawMedia(ctx, c);
+      if (c) { ctx.globalAlpha = fadeAlpha(c, t); drawMedia(ctx, c); ctx.globalAlpha = 1; }
     }
-    for (const c of clipsRef.current) if (c.kind === "text" && t >= c.start && t < clipEnd(c)) drawText(ctx, c);
+    for (const c of clipsRef.current) if (c.kind === "text" && t >= c.start && t < clipEnd(c)) { ctx.globalAlpha = fadeAlpha(c, t); drawText(ctx, c); ctx.globalAlpha = 1; }
   }
   function setHead(t) { if (playheadRef.current) playheadRef.current.style.left = (GUTTER + t * ppsRef.current) + "px"; }
 
@@ -112,7 +116,9 @@ export function VideoEditorApp({ AC, showToast }) {
       (c.kind === "video" ? activeV : activeA).add(c.url);
       if (!el) continue;
       if (exportingRef.current) routeAudio(c.url, el);   // pull this clip's audio into the export mix
-      const expected = c.inPt + (t - c.start);
+      const expected = c.inPt + (t - c.start) * spd(c);
+      try { el.playbackRate = spd(c); } catch { /* */ }
+      el.volume = Math.max(0, Math.min(1, (c.muted ? 0 : (c.volume ?? 1)) * fadeAlpha(c, t)));
       if (Math.abs(el.currentTime - expected) > 0.25) { try { el.currentTime = expected; } catch { /* */ } if (!isPlaying) el.addEventListener("seeked", () => drawFrame(timeRef.current), { once: true }); }
       if (isPlaying && el.paused) el.play().catch(() => {});
       if (!isPlaying && !el.paused) el.pause();
@@ -257,7 +263,12 @@ export function VideoEditorApp({ AC, showToast }) {
         const de = Math.abs(ns + dur - L); if (de <= tol && L - dur >= 0 && (!best || de < best.d)) best = { v: L - dur, d: de };
       }
       if (best) ns = best.v;
-      setClips(cs => cs.map(c => c.id === id ? { ...c, start: ns } : c));
+      // move between tracks of a compatible kind (lane under the pointer)
+      let trk = null;
+      const hit = document.elementFromPoint(ev.clientX, ev.clientY);
+      const lane = hit && hit.closest && hit.closest("[data-lane-kind]");
+      if (lane && lane.dataset.laneKind === clipTrackKind(c0)) trk = lane.dataset.laneId;
+      setClips(cs => cs.map(c => c.id === id ? { ...c, start: ns, ...(trk ? { trackId: trk } : {}) } : c));
     };
     const up = () => { window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", up); drawFrame(timeRef.current); };
     window.addEventListener("pointermove", move); window.addEventListener("pointerup", up);
@@ -318,6 +329,8 @@ export function VideoEditorApp({ AC, showToast }) {
   // styles
   const tBtn = (active) => ({ display: "inline-flex", alignItems: "center", gap: 5, padding: "7px 12px", borderRadius: 8, border: "1px solid " + (active ? AC : "rgba(255,255,255,0.14)"), background: "rgba(255,255,255,0.05)", color: active ? AC : "#dfe3ee", cursor: "pointer", fontFamily: FFB, fontWeight: 600, fontSize: 12.5, whiteSpace: "nowrap" });
   const iBtn = { width: 32, height: 28, borderRadius: 7, border: "1px solid rgba(255,255,255,0.14)", background: "rgba(255,255,255,0.05)", color: "#dfe3ee", cursor: "pointer", fontSize: 12.5, lineHeight: 1 };
+  const lblS = { display: "flex", alignItems: "center", gap: 4, fontSize: 11, color: "#8b93a7" };
+  const selS = { padding: "4px 6px", borderRadius: 6, background: "#171922", color: "#e8eaf0", border: "1px solid rgba(255,255,255,0.16)", fontFamily: FF, fontSize: 11.5, cursor: "pointer" };
   const secInterval = pps >= 80 ? 1 : pps >= 40 ? 2 : 5;
   const ticks = []; for (let s = 0; s <= Math.ceil(total) + secInterval; s += secInterval) ticks.push(s);
 
@@ -366,12 +379,25 @@ export function VideoEditorApp({ AC, showToast }) {
             <input type="color" value={sel.color || "#ffffff"} onChange={e => patchClip(sel.id, { color: e.target.value })} title="Color" style={{ width: 28, height: 26, borderRadius: 6, border: "1px solid rgba(255,255,255,0.16)", background: "none", cursor: "pointer", padding: 0 }} />
             <span style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 11, color: "#8b93a7" }}>Size<input type="range" min="4" max="22" value={Math.round((sel.fontSize || 0.1) * 100)} onChange={e => patchClip(sel.id, { fontSize: +e.target.value / 100 })} style={{ width: 64 }} /></span>
             <span style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 11, color: "#8b93a7" }}>Y<input type="range" min="8" max="92" value={Math.round((sel.y ?? 0.82) * 100)} onChange={e => patchClip(sel.id, { y: +e.target.value / 100 })} style={{ width: 60 }} /></span>
+            <span style={lblS} title="Fade in (s)">In<input type="range" min="0" max="30" value={Math.round((sel.fadeIn || 0) * 10)} onChange={e => patchClip(sel.id, { fadeIn: +e.target.value / 10 })} style={{ width: 46 }} /></span>
+            <span style={lblS} title="Fade out (s)">Out<input type="range" min="0" max="30" value={Math.round((sel.fadeOut || 0) * 10)} onChange={e => patchClip(sel.id, { fadeOut: +e.target.value / 10 })} style={{ width: 46 }} /></span>
             <button style={{ ...iBtn, color: "#ff8a8a", borderColor: "rgba(255,80,80,0.3)" }} title="Delete (or Backspace)" onClick={() => delClip(sel.id)}>🗑</button>
           </span>
         )}
         {sel && sel.kind !== "text" && (
-          <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <span style={{ fontSize: 11.5, color: "#8b93a7", maxWidth: 150, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{sel.name}</span>
+          <span style={{ display: "flex", alignItems: "center", gap: 7, flexWrap: "wrap", justifyContent: "flex-end" }}>
+            <span style={{ fontSize: 11.5, color: "#8b93a7", maxWidth: 120, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{sel.name}</span>
+            {(sel.kind === "video" || sel.kind === "audio") && (
+              <span style={lblS}>Speed<select value={sel.speed || 1} onChange={e => patchClip(sel.id, { speed: +e.target.value })} style={selS}>{[0.25, 0.5, 1, 1.5, 2, 4].map(s => <option key={s} value={s}>{s}×</option>)}</select></span>
+            )}
+            {(sel.kind === "video" || sel.kind === "audio") && (
+              <button title={sel.muted ? "Unmute" : "Mute"} onClick={() => patchClip(sel.id, { muted: !sel.muted })} style={{ ...iBtn, color: sel.muted ? "#ff8a8a" : "#dfe3ee" }}>{sel.muted ? "🔇" : "🔊"}</button>
+            )}
+            {(sel.kind === "video" || sel.kind === "audio") && (
+              <span style={lblS}>Vol<input type="range" min="0" max="100" value={Math.round((sel.volume ?? 1) * 100)} onChange={e => patchClip(sel.id, { volume: +e.target.value / 100 })} style={{ width: 54 }} /></span>
+            )}
+            <span style={lblS} title="Fade in (s)">In<input type="range" min="0" max="30" value={Math.round((sel.fadeIn || 0) * 10)} onChange={e => patchClip(sel.id, { fadeIn: +e.target.value / 10 })} style={{ width: 46 }} /></span>
+            <span style={lblS} title="Fade out (s)">Out<input type="range" min="0" max="30" value={Math.round((sel.fadeOut || 0) * 10)} onChange={e => patchClip(sel.id, { fadeOut: +e.target.value / 10 })} style={{ width: 46 }} /></span>
             <button style={tBtn(false)} onClick={split}>✂ Split</button>
             <button style={{ ...iBtn, color: "#ff8a8a", borderColor: "rgba(255,80,80,0.3)" }} title="Delete (or Backspace)" onClick={() => delClip(sel.id)}>🗑</button>
           </span>
@@ -410,7 +436,7 @@ export function VideoEditorApp({ AC, showToast }) {
                   </div>
                 </div>
                 {/* lane */}
-                <div onPointerDown={e => { if (e.target === e.currentTarget) { const r = e.currentTarget.getBoundingClientRect(); seek((e.clientX - r.left) / pps); } }}
+                <div data-lane-kind={tr.kind} data-lane-id={tr.id} onPointerDown={e => { if (e.target === e.currentTarget) { const r = e.currentTarget.getBoundingClientRect(); seek((e.clientX - r.left) / pps); } }}
                   style={{ position: "relative", width: contentW, height: cfg.h, background: tr.kind === "media" ? "rgba(59,130,246,0.05)" : tr.kind === "sound" ? "rgba(34,197,94,0.05)" : "rgba(245,158,11,0.05)" }}>
                   {clips.filter(c => c.trackId === tr.id).map(c => {
                     const w = clipDur(c) * pps, on = c.id === selId;
