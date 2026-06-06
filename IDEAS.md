@@ -72,8 +72,11 @@ solid. This combined release **absorbs everything that was tentatively scoped as
 > total revenue / profit / COGS / tax / transactions + today + history. Still gated
 > by the NovaMod launcher allowlist (managed from the POS sign-in admin panel). Card
 > readers (Square): a pure web/Tauri app can't drive a physical reader — needs a
-> native app or backend + Terminal API, so shipped record-only card. **Remaining
-> Phase C:** mini spreadsheet, full Paint competitor.
+> native app or backend + Terminal API, so shipped record-only card. **Sheets shipped**
+> (mini spreadsheet — lib/sheets.js formula engine: cell refs, ranges, arithmetic,
+> SUM/AVERAGE/IF/MIN/MAX/ROUND/etc, circular-ref detection; grid with sticky headers,
+> formula bar, click-drag range select + Sum/Avg/Count status bar, bold/italic/align,
+> CSV import/export, localStorage). **Remaining Phase C:** full Paint competitor.
 
 ## A · Design foundation — the bedrock everything else sits on
 - **Design system / tokens.** One shared scale for spacing, corner radius,

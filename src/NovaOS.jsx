@@ -140,6 +140,7 @@ const WhiteboardApp   = lazyApp(() => import("./apps/WhiteboardApp.jsx").then(m 
 const CodeApp         = lazyApp(() => import("./apps/CodeApp.jsx").then(m         => ({default: m.CodeApp})));
 const ForumApp        = lazyApp(() => import("./apps/ForumApp.jsx").then(m        => ({default: m.ForumApp})));
 const PosApp          = lazyApp(() => import("./apps/PosApp.jsx").then(m          => ({default: m.PosApp})));
+const SheetsApp       = lazyApp(() => import("./apps/SheetsApp.jsx").then(m       => ({default: m.SheetsApp})));
 const AtlasApp        = lazyApp(() => import("./apps/AtlasApp.jsx").then(m        => ({default: m.AtlasApp})));
 // v10.9 — utilities pack
 const CurrencyApp     = lazyApp(() => import("./apps/CurrencyApp.jsx").then(m     => ({default: m.CurrencyApp})));
@@ -1758,6 +1759,7 @@ export default function NovaOS(){
         {appId==="whiteboard" &&<WhiteboardApp AC={AC} showToast={showToast}/>}
         {appId==="code"       &&<CodeApp AC={AC} showToast={showToast}/>}
         {appId==="forum"      &&<ForumApp AC={AC} user={user} showToast={showToast}/>}
+        {appId==="sheets"     &&<SheetsApp AC={AC} showToast={showToast}/>}
         {/* POS renders as a full-screen kiosk overlay (see posMode), not a window. */}
         {appId==="atlas"      &&<AtlasApp AC={AC} showToast={showToast}/>}
         {appId==="currency"   &&<CurrencyApp AC={AC}/>}

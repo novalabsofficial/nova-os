@@ -76,9 +76,10 @@ export const DEFAULT_SIZES = {
   videoeditor:{w:1120,h:760},
   whiteboard:{w:1040,h:720},
   code:{w:1060,h:720},
-  // v11.0 Phase C — forum + (gated) POS
+  // v11.0 Phase C — forum + (gated) POS + sheets
   forum:{w:880,h:720},
   pos:{w:1120,h:740},
+  sheets:{w:1000,h:680},
   // v10.6 — Atlas (maps)
   atlas:{w:880,h:640},
   // v10.9 — utilities pack
@@ -135,6 +136,7 @@ export const APPS = [
   {id:"whiteboard", icon:"🖊️",label:"Whiteboard",   desc:"Infinite canvas — draw, shapes, notes"},
   {id:"code",       icon:"💻",label:"Code",         desc:"Code editor with live preview"},
   {id:"forum",      icon:"💬",label:"Forum",        desc:"Discuss & vote — Nova's community board"},
+  {id:"sheets",     icon:"🔢",label:"Sheets",       desc:"Spreadsheet with formulas & CSV"},
   // v11.0 — POS is RESTRICTED: hidden from the launcher unless the signed-in
   // user is a moderator (NovaMod) or has been granted access. See gating in
   // NovaOS.jsx (visibleApps) — the `restricted` flag is what triggers the check.

@@ -330,6 +330,16 @@ const SPECS = {
       <path d="M19 19 v-2.5 a5 5 0 0 1 10 0 V19" fill="none" stroke="#fff" strokeWidth="2.4" strokeLinecap="round" />
     </>),
   },
+  sheets: {
+    color: "#1a8f5a",
+    glyph: (<>
+      <rect x="13" y="13" width="22" height="22" rx="2.5" fill="#fff" />
+      <rect x="13" y="13" width="22" height="6" rx="2.5" fill="#0f7a47" />
+      <line x1="24" y1="19" x2="24" y2="35" stroke="#1a8f5a" strokeWidth="1.8" />
+      <line x1="13" y1="25" x2="35" y2="25" stroke="#1a8f5a" strokeWidth="1.8" />
+      <line x1="13" y1="30.5" x2="35" y2="30.5" stroke="#1a8f5a" strokeWidth="1.8" />
+    </>),
+  },
   atlas: {
     color: "#16b3a0",
     glyph: (<>
