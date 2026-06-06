@@ -56,7 +56,7 @@ solid. This combined release **absorbs everything that was tentatively scoped as
 > JSON export/import w/ confirm + reload), desktop sticky notes (`data.stickyNotes`,
 > 6 colors, drag/edit/delete), and snap workspaces (`settings.workspaces` —
 > save/restore named window layouts via desktop right-click → Window layouts).
-> **Phase C · Flagship apps IN PROGRESS** — **Video Editor shipped** (multi-track
+> **Phase C · Flagship apps COMPLETE** — **Video Editor shipped** (multi-track
 > timeline: Media/Sound/Text + custom layers; import video/image/audio; trim,
 > split, move, snapping; text/title overlays; per-clip speed, volume/mute, fade
 > in/out; drag clips between tracks; .webm export via canvas+WebAudio MediaRecorder,
@@ -76,7 +76,11 @@ solid. This combined release **absorbs everything that was tentatively scoped as
 > (mini spreadsheet — lib/sheets.js formula engine: cell refs, ranges, arithmetic,
 > SUM/AVERAGE/IF/MIN/MAX/ROUND/etc, circular-ref detection; grid with sticky headers,
 > formula bar, click-drag range select + Sum/Avg/Count status bar, bold/italic/align,
-> CSV import/export, localStorage). **Remaining Phase C:** full Paint competitor.
+> CSV import/export, localStorage). **Paint rebuilt into a layered editor** — multi-layer
+> stack (add/duplicate/delete/reorder, per-layer visibility + opacity, rename), zoom
+> (wheel-to-cursor) + pan (Hand tool / Space), tools brush/eraser(true alpha)/line/
+> rect/ellipse/fill/eyedropper(composite)/spray/text, per-layer undo/redo, flatten on
+> export. **Phase C is complete.** (Next up: Phase D small wins.)
 
 ## A · Design foundation — the bedrock everything else sits on
 - **Design system / tokens.** One shared scale for spacing, corner radius,
