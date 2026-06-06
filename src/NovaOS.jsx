@@ -3448,7 +3448,19 @@ export default function NovaOS(){
       {/* v11.0 POS remaster — full-screen kiosk. Sits above the taskbar/desktop
           and everything else; "Close POS" inside the app calls onExit. */}
       {posMode && (
-        <div style={{ position:"fixed", inset:0, zIndex:2000000, background:"var(--nv-surface)" }}>
+        <div style={{
+          position:"fixed", inset:0, zIndex:2000000,
+          // The kiosk sits over the wallpaper, so it must NOT use the translucent
+          // Liquid-Glass surface tokens (they'd let the wallpaper bleed through and
+          // make text unreadable). Override the surface/border vars with SOLID,
+          // theme-aware values for this subtree — children inherit them unchanged.
+          background: theme==="light" ? "#eef1f6" : "#0f1120",
+          "--nv-surface":        theme==="light" ? "#eef1f6" : "#0f1120",
+          "--nv-surface-solid":  theme==="light" ? "#ffffff" : "#191d2c",
+          "--nv-elevated":       theme==="light" ? "#e9eef7" : "#222840",
+          "--nv-border":         theme==="light" ? "#d6dded" : "#2c3346",
+          "--nv-border-strong":  theme==="light" ? "#c2cbdc" : "#3a4259",
+        }}>
           <Suspense fallback={<div style={{display:"grid",placeItems:"center",height:"100%",fontFamily:FF,color:"var(--nv-text)"}}>Loading POS…</div>}>
             <PosApp AC={AC} user={user} showToast={showToast} onExit={()=>setPosMode(false)}/>
           </Suspense>
