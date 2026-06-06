@@ -1,391 +1,509 @@
-// Point of Sale — v11.0 Phase C. A small register/POS built into Nova OS,
-// RESTRICTED to the NovaMod account and anyone NovaMod grants access to (the
-// launcher hides it from everyone else — see NovaOS.jsx visibleApps). Tabs:
-//   • Register — product grid → cart → charge (cash/card, change calc)
-//   • Catalog  — manage products + tax rate
-//   • Sales    — today's totals + recent transaction history
-//   • Access   — (NovaMod only) grant/revoke which users can see & use the POS
-// State is shared across devices via Firestore (lib/pos.js).
+// Point of Sale — v11.0 (remastered). A full-screen register that takes over the
+// Nova OS UI (launched as a kiosk overlay from NovaOS; "Close POS" calls onExit).
+//
+// Flow: open → store sign-in (per-store username/password) → register / items /
+// revenue. Each store owns its catalog (items with image, price, purchase cost,
+// stock), sales ledger and running revenue/profit totals. Adding to a cart draws
+// down available stock; completing a sale decrements real stock and rolls the
+// revenue/profit numbers. Card payments are RECORD-ONLY (a pure web app can't talk
+// to a physical Square reader — that needs a native app or a backend + Terminal API).
+//
+// The Nova-OS launcher gate (who can even open this app) is separate and lives in
+// NovaOS.jsx; NovaMod manages that allowlist from the admin panel on the sign-in
+// screen here.
 
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { FF, FFB } from "../ui/styles.js";
 import { getDbUid } from "../lib/db.js";
 import { isAdmin } from "../lib/moderation.js";
 import {
-  fetchCatalog, saveCatalog, fetchSales, recordSale,
-  fetchAccessList, grantAccess, revokeAccess, SEED_CATALOG,
+  createStore, loginStore, saveItems, saveTaxRate, commitSale,
+  fetchAccessList, grantAccess, revokeAccess,
 } from "../lib/pos.js";
 
 const money = (n) => "$" + (Number(n) || 0).toFixed(2);
-const TAX_LS = "nova-pos-tax";
+const LS_LAST = "nova-pos-last-store";
 let _pid = 0;
 const newId = () => "i" + Date.now().toString(36) + (_pid++).toString(36);
+const startOfToday = () => { const d = new Date(); d.setHours(0, 0, 0, 0); return d.getTime(); };
 
-export function PosApp({ AC = "#6366f1", user, showToast }) {
-  const myUid = getDbUid();
+// downscale an uploaded image to a small JPEG dataURL (keeps the store doc light)
+function downscale(file, max = 200, q = 0.62) {
+  return new Promise((res) => {
+    const url = URL.createObjectURL(file); const img = new Image();
+    img.onload = () => {
+      const sc = Math.min(1, max / Math.max(img.width, img.height));
+      const w = Math.max(1, Math.round(img.width * sc)), h = Math.max(1, Math.round(img.height * sc));
+      const c = document.createElement("canvas"); c.width = w; c.height = h;
+      c.getContext("2d").drawImage(img, 0, 0, w, h);
+      URL.revokeObjectURL(url);
+      try { res(c.toDataURL("image/jpeg", q)); } catch { res(null); }
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); res(null); };
+    img.src = url;
+  });
+}
+
+export function PosApp({ AC = "#6366f1", user, showToast, onExit }) {
+  const [store, setStore] = useState(null);
+  if (!store) return <StoreAuth AC={AC} user={user} showToast={showToast} onExit={onExit} onAuthed={setStore} />;
+  return <Shell AC={AC} user={user} showToast={showToast} onExit={onExit} store={store} setStore={setStore} />;
+}
+
+// ───────────────────────────────────────────────────────────── sign-in ─────
+function StoreAuth({ AC, user, showToast, onExit, onAuthed }) {
+  const [mode, setMode] = useState("signin");          // signin | create
+  const [u, setU] = useState(() => localStorage.getItem(LS_LAST) || "");
+  const [name, setName] = useState("");
+  const [pw, setPw] = useState("");
+  const [pw2, setPw2] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const [adminOpen, setAdminOpen] = useState(false);
   const mod = isAdmin(user);
 
-  const [tab, setTab] = useState("register");
-  const [catalog, setCatalog] = useState([]);
-  const [sales, setSales] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [cart, setCart] = useState({});                 // { itemId: qty }
-  const [taxRate, setTaxRate] = useState(() => Number(localStorage.getItem(TAX_LS) || 0));
+  const go = async () => {
+    setErr(""); if (busy) return;
+    if (!u.trim() || !pw) { setErr("Enter a username and password."); return; }
+    setBusy(true);
+    if (mode === "create") {
+      if (pw !== pw2) { setErr("Passwords don't match."); setBusy(false); return; }
+      const r = await createStore({ name, username: u, password: pw, byUid: getDbUid() });
+      if (r.error) { setErr(r.error); setBusy(false); return; }
+      localStorage.setItem(LS_LAST, r.store.username); showToast?.("Store created"); onAuthed(r.store);
+    } else {
+      const r = await loginStore({ username: u, password: pw });
+      if (r.error) { setErr(r.error); setBusy(false); return; }
+      localStorage.setItem(LS_LAST, r.store.username); onAuthed(r.store);
+    }
+  };
 
-  // initial load (+ seed an empty catalog for the owner)
-  useEffect(() => {
-    let live = true;
-    (async () => {
-      const [cat, sl] = await Promise.all([fetchCatalog(), fetchSales()]);
-      if (!live) return;
-      if (cat && cat.length) setCatalog(cat);
-      else if (mod) { setCatalog(SEED_CATALOG); saveCatalog(SEED_CATALOG); }
-      else setCatalog(cat || []);
-      setSales(sl || []);
-      setLoading(false);
-    })();
-    return () => { live = false; };
-  }, [mod]);
-
-  const persistCatalog = useCallback((next) => { setCatalog(next); saveCatalog(next); }, []);
-  const setTax = useCallback((v) => { const n = Math.max(0, Math.min(100, Number(v) || 0)); setTaxRate(n); localStorage.setItem(TAX_LS, String(n)); }, []);
-
-  // ---- cart math -----------------------------------------------------------
-  const lines = useMemo(() => Object.entries(cart).map(([id, qty]) => {
-    const it = catalog.find(c => c.id === id); if (!it) return null;
-    return { ...it, qty, lineTotal: it.price * qty };
-  }).filter(Boolean), [cart, catalog]);
-  const subtotal = useMemo(() => lines.reduce((s, l) => s + l.lineTotal, 0), [lines]);
-  const tax = useMemo(() => subtotal * (taxRate / 100), [subtotal, taxRate]);
-  const total = subtotal + tax;
-  const cartCount = useMemo(() => Object.values(cart).reduce((s, q) => s + q, 0), [cart]);
-
-  const addToCart = (id) => setCart(c => ({ ...c, [id]: (c[id] || 0) + 1 }));
-  const setQty = (id, q) => setCart(c => { const n = { ...c }; if (q <= 0) delete n[id]; else n[id] = q; return n; });
-  const clearCart = () => setCart({});
-
-  const completeSale = useCallback(async ({ method, paid }) => {
-    const sale = {
-      id: newId(), at: Date.now(),
-      items: lines.map(l => ({ id: l.id, name: l.name, price: l.price, qty: l.qty })),
-      subtotal: +subtotal.toFixed(2), tax: +tax.toFixed(2), total: +total.toFixed(2),
-      tender: method, paid: +(+paid).toFixed(2), cashier: user || "—",
-    };
-    setSales(s => [sale, ...s]);     // optimistic
-    clearCart();
-    const ok = await recordSale(sale);
-    showToast?.(ok ? `Sale complete — ${money(sale.total)}` : "Saved locally (sync failed)");
-  }, [lines, subtotal, tax, total, user, showToast]);
-
-  const TABS = [
-    { id: "register", label: "Register", icon: "🧾" },
-    { id: "catalog",  label: "Catalog",  icon: "🏷️" },
-    { id: "sales",    label: "Sales",    icon: "📈" },
-    ...(mod ? [{ id: "access", label: "Access", icon: "🔑" }] : []),
-  ];
-
-  const tabBtn = (on) => ({ display: "flex", alignItems: "center", gap: 7, padding: "8px 14px", borderRadius: 10, fontFamily: FFB, fontSize: 13.5, cursor: "pointer", border: "1px solid " + (on ? "transparent" : "var(--nv-border)"), background: on ? AC : "var(--nv-elevated)", color: on ? "#fff" : "var(--nv-text)" });
+  const fld = { width: "100%", padding: "12px 13px", borderRadius: 11, border: "1px solid var(--nv-border)", background: "var(--nv-elevated)", color: "var(--nv-text)", fontFamily: FF, fontSize: 15, boxSizing: "border-box" };
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100%", fontFamily: FF, color: "var(--nv-text)", background: "var(--nv-surface)" }}>
-      {/* header */}
-      <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", borderBottom: "1px solid var(--nv-border)", flexShrink: 0 }}>
-        <div style={{ width: 28, height: 28, borderRadius: 8, background: AC, display: "grid", placeItems: "center", fontSize: 16 }}>🛒</div>
-        <span style={{ fontFamily: FFB, fontSize: 16 }}>Nova POS</span>
-        <span style={{ fontSize: 11.5, color: "var(--nv-text-dim)", border: "1px solid var(--nv-border)", padding: "2px 8px", borderRadius: 999 }}>{mod ? "Owner" : "Cashier"} · {user}</span>
-        <div style={{ flex: 1 }} />
-        <div style={{ display: "flex", gap: 7 }}>{TABS.map(t => <div key={t.id} style={tabBtn(tab === t.id)} onClick={() => setTab(t.id)}>{t.icon} {t.label}</div>)}</div>
-      </div>
+    <div style={{ position: "relative", height: "100%", width: "100%", display: "grid", placeItems: "center", fontFamily: FF, color: "var(--nv-text)", background: "radial-gradient(1200px 600px at 50% -10%, " + AC + "22, transparent), var(--nv-surface)" }}>
+      <button onClick={onExit} style={closeBtn}>✕ Close POS</button>
+      <div style={{ width: 360, maxWidth: "90vw" }}>
+        <div style={{ textAlign: "center", marginBottom: 22 }}>
+          <div style={{ width: 60, height: 60, borderRadius: 17, background: AC, display: "grid", placeItems: "center", fontSize: 32, margin: "0 auto 12px", boxShadow: "0 12px 30px " + AC + "55" }}>🛒</div>
+          <div style={{ fontFamily: FFB, fontSize: 24 }}>Nova POS</div>
+          <div style={{ fontSize: 13, color: "var(--nv-text-dim)", marginTop: 2 }}>{mode === "create" ? "Set up a new store" : "Sign in to your store"}</div>
+        </div>
 
-      <div style={{ flex: 1, minHeight: 0 }}>
-        {loading ? <Center>Loading…</Center>
-        : tab === "register" ? (
-          <Register catalog={catalog} cart={cart} lines={lines} subtotal={subtotal} tax={tax} total={total} taxRate={taxRate} cartCount={cartCount}
-            AC={AC} onAdd={addToCart} onQty={setQty} onClear={clearCart} onCharge={completeSale} mod={mod} />
-        ) : tab === "catalog" ? (
-          <Catalog catalog={catalog} onSave={persistCatalog} taxRate={taxRate} setTax={setTax} AC={AC} mod={mod} showToast={showToast} />
-        ) : tab === "sales" ? (
-          <Sales sales={sales} AC={AC} />
-        ) : (
-          <Access AC={AC} myUid={myUid} owner={user} showToast={showToast} />
+        <div style={{ display: "flex", gap: 6, background: "var(--nv-elevated)", padding: 4, borderRadius: 12, marginBottom: 16 }}>
+          {["signin", "create"].map(m => (
+            <div key={m} onClick={() => { setMode(m); setErr(""); }} style={{ flex: 1, textAlign: "center", padding: "8px", borderRadius: 9, cursor: "pointer", fontFamily: FFB, fontSize: 13.5, background: mode === m ? AC : "transparent", color: mode === m ? "#fff" : "var(--nv-text-dim)" }}>{m === "signin" ? "Sign in" : "Create store"}</div>
+          ))}
+        </div>
+
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          {mode === "create" && <input value={name} onChange={e => setName(e.target.value)} placeholder="Store name (e.g. Corner Café)" style={fld} />}
+          <input value={u} onChange={e => setU(e.target.value)} placeholder="Store username" autoCapitalize="none" style={fld} />
+          <input value={pw} onChange={e => setPw(e.target.value)} type="password" placeholder="Password" onKeyDown={e => e.key === "Enter" && mode === "signin" && go()} style={fld} />
+          {mode === "create" && <input value={pw2} onChange={e => setPw2(e.target.value)} type="password" placeholder="Confirm password" onKeyDown={e => e.key === "Enter" && go()} style={fld} />}
+          {err && <div style={{ color: "#ef4444", fontSize: 13, textAlign: "center" }}>{err}</div>}
+          <button onClick={go} disabled={busy} style={{ marginTop: 4, padding: "13px", borderRadius: 12, border: "none", background: AC, color: "#fff", fontFamily: FFB, fontSize: 15.5, cursor: busy ? "default" : "pointer", opacity: busy ? 0.7 : 1 }}>
+            {busy ? "Please wait…" : mode === "create" ? "Create store" : "Sign in"}
+          </button>
+        </div>
+
+        {mod && (
+          <div style={{ marginTop: 22, borderTop: "1px solid var(--nv-border)", paddingTop: 14 }}>
+            <div onClick={() => setAdminOpen(o => !o)} style={{ fontSize: 12.5, color: "var(--nv-text-dim)", cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}>
+              <span style={{ transform: adminOpen ? "rotate(90deg)" : "none", transition: "transform .15s" }}>▸</span> Admin · who can open POS in Nova OS
+            </div>
+            {adminOpen && <AccessAdmin AC={AC} showToast={showToast} />}
+          </div>
         )}
       </div>
     </div>
   );
 }
 
-// ---------------------------------------------------------------- Register --
-function Register({ catalog, cart, lines, subtotal, tax, total, taxRate, cartCount, AC, onAdd, onQty, onClear, onCharge, mod }) {
+// NovaMod-only: manage which Nova accounts can even see/open the POS app.
+function AccessAdmin({ AC, showToast }) {
+  const [list, setList] = useState(null);
+  const [name, setName] = useState("");
+  useEffect(() => { fetchAccessList().then(l => setList(l || [])); }, []);
+  const add = async () => { const u = name.trim(); if (!u) return; setList(await grantAccess(u)); setName(""); showToast?.(`Granted POS access to @${u.toLowerCase()}`); };
+  const rm = async (u) => { setList(await revokeAccess(u)); showToast?.(`Removed @${u}`); };
+  const fld = { flex: 1, padding: "8px 10px", borderRadius: 9, border: "1px solid var(--nv-border)", background: "var(--nv-elevated)", color: "var(--nv-text)", fontFamily: FF, fontSize: 13 };
+  return (
+    <div style={{ marginTop: 10 }}>
+      <div style={{ fontSize: 12, color: "var(--nv-text-dim)", marginBottom: 8, lineHeight: 1.4 }}>The POS app is hidden from regular Nova users. Add a Nova username to make the app visible on their account (you, NovaMod, always have it).</div>
+      <div style={{ display: "flex", gap: 6, marginBottom: 8 }}>
+        <input value={name} onChange={e => setName(e.target.value)} onKeyDown={e => e.key === "Enter" && add()} placeholder="Nova username" style={fld} />
+        <button onClick={add} style={{ padding: "8px 13px", borderRadius: 9, border: "none", background: AC, color: "#fff", fontFamily: FFB, fontSize: 13, cursor: "pointer" }}>Grant</button>
+      </div>
+      {list === null ? null : list.length === 0 ? <div style={{ fontSize: 12, color: "var(--nv-text-dim)" }}>No one else has access.</div>
+        : <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>{list.map(x => <span key={x} style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "4px 9px", borderRadius: 999, background: "var(--nv-elevated)", fontSize: 12.5 }}>@{x}<span onClick={() => rm(x)} style={{ cursor: "pointer", color: "#ef4444" }}>✕</span></span>)}</div>}
+    </div>
+  );
+}
+
+// ───────────────────────────────────────────────────────────── shell ───────
+function Shell({ AC, user, showToast, onExit, store, setStore }) {
+  const [tab, setTab] = useState("register");
+  const items = store.items || [];
+
+  const persistItems = useCallback((nextItems) => {
+    setStore(s => ({ ...s, items: nextItems }));
+    saveItems(store.id, nextItems);
+  }, [store.id, setStore]);
+
+  const setTax = useCallback((rate) => {
+    const r = Math.max(0, Math.min(100, Number(rate) || 0));
+    setStore(s => ({ ...s, taxRate: r })); saveTaxRate(store.id, r);
+  }, [store.id, setStore]);
+
+  const onSale = useCallback(async (sale, nextItems) => {
+    // optimistic local roll of the ledger + totals
+    setStore(s => {
+      const a = s.agg || {};
+      return {
+        ...s, items: nextItems, sales: [sale, ...(s.sales || [])].slice(0, 200),
+        agg: {
+          revenue: (a.revenue || 0) + sale.revenue, cost: (a.cost || 0) + sale.cost,
+          profit: (a.profit || 0) + sale.profit, tax: (a.tax || 0) + sale.tax,
+          gross: (a.gross || 0) + sale.total, count: (a.count || 0) + 1,
+        },
+      };
+    });
+    const ok = await commitSale(store.id, { items: nextItems, sale });
+    showToast?.(ok ? `Sale complete — ${money(sale.total)}` : "Saved locally (sync failed)");
+  }, [store.id, setStore, showToast]);
+
+  const TABS = [{ id: "register", label: "Register", icon: "🧾" }, { id: "items", label: "Items", icon: "🏷️" }, { id: "revenue", label: "Revenue", icon: "📈" }];
+  const tabBtn = (on) => ({ display: "flex", alignItems: "center", gap: 7, padding: "8px 15px", borderRadius: 10, fontFamily: FFB, fontSize: 13.5, cursor: "pointer", border: "1px solid " + (on ? "transparent" : "var(--nv-border)"), background: on ? AC : "var(--nv-elevated)", color: on ? "#fff" : "var(--nv-text)" });
+  const signOut = () => { setStore(null); };
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", height: "100%", width: "100%", fontFamily: FF, color: "var(--nv-text)", background: "var(--nv-surface)" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "11px 16px", borderBottom: "1px solid var(--nv-border)", flexShrink: 0 }}>
+        <div style={{ width: 30, height: 30, borderRadius: 9, background: AC, display: "grid", placeItems: "center", fontSize: 17 }}>🛒</div>
+        <div style={{ minWidth: 0 }}>
+          <div style={{ fontFamily: FFB, fontSize: 16, lineHeight: 1.1 }}>{store.name}</div>
+          <div style={{ fontSize: 11.5, color: "var(--nv-text-dim)" }}>@{store.username} · cashier {user}</div>
+        </div>
+        <div style={{ display: "flex", gap: 7, marginLeft: 14 }}>{TABS.map(t => <div key={t.id} style={tabBtn(tab === t.id)} onClick={() => setTab(t.id)}>{t.icon} {t.label}</div>)}</div>
+        <div style={{ flex: 1 }} />
+        <button onClick={signOut} style={{ ...closeBtn, position: "static", background: "var(--nv-elevated)", color: "var(--nv-text)", border: "1px solid var(--nv-border)" }}>Sign out</button>
+        <button onClick={onExit} style={{ ...closeBtn, position: "static" }}>✕ Close POS</button>
+      </div>
+
+      <div style={{ flex: 1, minHeight: 0 }}>
+        {tab === "register" && <Register AC={AC} items={items} taxRate={store.taxRate || 0} onSale={onSale} showToast={showToast} />}
+        {tab === "items" && <Items AC={AC} items={items} taxRate={store.taxRate || 0} setTax={setTax} onChange={persistItems} showToast={showToast} />}
+        {tab === "revenue" && <Revenue AC={AC} agg={store.agg || {}} sales={store.sales || []} />}
+      </div>
+    </div>
+  );
+}
+
+// ──────────────────────────────────────────────────────────── register ─────
+function Register({ AC, items, taxRate, onSale, showToast }) {
+  const [cart, setCart] = useState({});          // { itemId: qty }
   const [q, setQ] = useState("");
   const [cat, setCat] = useState("All");
-  const [tender, setTender] = useState(null);   // { method, cash }
-  const cats = useMemo(() => ["All", ...Array.from(new Set(catalog.map(c => c.category).filter(Boolean)))], [catalog]);
-  const shown = catalog.filter(c => (cat === "All" || c.category === cat) && c.name.toLowerCase().includes(q.toLowerCase()));
+  const [tender, setTender] = useState(null);    // { method, cash }
+
+  const cats = useMemo(() => ["All", ...Array.from(new Set(items.map(i => i.category).filter(Boolean)))], [items]);
+  const shown = items.filter(i => (cat === "All" || i.category === cat) && i.name.toLowerCase().includes(q.toLowerCase()));
+  const avail = (it) => (it.stock ?? 0) - (cart[it.id] || 0);
+
+  const add = (it) => { if (avail(it) <= 0) { showToast?.("Out of stock"); return; } setCart(c => ({ ...c, [it.id]: (c[it.id] || 0) + 1 })); };
+  const setQty = (id, qty) => setCart(c => { const n = { ...c }; if (qty <= 0) delete n[id]; else n[id] = qty; return n; });
+  const cancel = () => setCart({});
+
+  const lines = useMemo(() => Object.entries(cart).map(([id, qty]) => {
+    const it = items.find(x => x.id === id); if (!it) return null;
+    return { id, name: it.name, price: it.price || 0, cost: it.cost || 0, emoji: it.img ? null : "📦", img: it.img, qty, lineTotal: (it.price || 0) * qty };
+  }).filter(Boolean), [cart, items]);
+  const subtotal = useMemo(() => lines.reduce((s, l) => s + l.lineTotal, 0), [lines]);
+  const tax = subtotal * (taxRate / 100);
+  const total = subtotal + tax;
+  const count = Object.values(cart).reduce((s, n) => s + n, 0);
+
+  const complete = ({ method, paid }) => {
+    const cogs = lines.reduce((s, l) => s + l.cost * l.qty, 0);
+    const sale = {
+      id: newId(), at: Date.now(), tender: method, paid: +(+paid).toFixed(2), cashier: "",
+      lines: lines.map(l => ({ id: l.id, name: l.name, price: l.price, cost: l.cost, qty: l.qty })),
+      subtotal: +subtotal.toFixed(2), tax: +tax.toFixed(2), total: +total.toFixed(2),
+      revenue: +subtotal.toFixed(2), cost: +cogs.toFixed(2), profit: +(subtotal - cogs).toFixed(2),
+    };
+    const nextItems = items.map(it => cart[it.id] ? { ...it, stock: Math.max(0, (it.stock ?? 0) - cart[it.id]) } : it);
+    onSale(sale, nextItems);
+    setCart({}); setTender(null);
+  };
 
   return (
     <div style={{ display: "flex", height: "100%" }}>
-      {/* products */}
       <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column" }}>
-        <div style={{ display: "flex", gap: 8, padding: "10px 12px", flexShrink: 0 }}>
-          <input value={q} onChange={e => setQ(e.target.value)} placeholder="Search products…" style={{ flex: 1, padding: "8px 11px", borderRadius: 9, border: "1px solid var(--nv-border)", background: "var(--nv-elevated)", color: "var(--nv-text)", fontFamily: FF, fontSize: 13.5 }} />
+        <div style={{ display: "flex", gap: 8, padding: "12px 14px 8px", flexShrink: 0 }}>
+          <input value={q} onChange={e => setQ(e.target.value)} placeholder="Search products…" style={{ flex: 1, padding: "9px 12px", borderRadius: 10, border: "1px solid var(--nv-border)", background: "var(--nv-elevated)", color: "var(--nv-text)", fontFamily: FF, fontSize: 14 }} />
         </div>
-        <div style={{ display: "flex", gap: 6, padding: "0 12px 8px", overflowX: "auto", flexShrink: 0 }}>
-          {cats.map(c => <div key={c} onClick={() => setCat(c)} style={{ padding: "4px 11px", borderRadius: 999, fontSize: 12.5, fontFamily: FFB, cursor: "pointer", whiteSpace: "nowrap", color: cat === c ? "#fff" : "var(--nv-text-dim)", background: cat === c ? AC : "transparent", border: "1px solid " + (cat === c ? "transparent" : "var(--nv-border)") }}>{c}</div>)}
+        <div style={{ display: "flex", gap: 6, padding: "0 14px 10px", overflowX: "auto", flexShrink: 0 }}>
+          {cats.map(c => <div key={c} onClick={() => setCat(c)} style={{ padding: "5px 12px", borderRadius: 999, fontSize: 12.5, fontFamily: FFB, cursor: "pointer", whiteSpace: "nowrap", color: cat === c ? "#fff" : "var(--nv-text-dim)", background: cat === c ? AC : "transparent", border: "1px solid " + (cat === c ? "transparent" : "var(--nv-border)") }}>{c}</div>)}
         </div>
-        <div style={{ flex: 1, overflow: "auto", padding: "0 12px 14px" }}>
-          {shown.length === 0 ? <Center>{catalog.length === 0 ? (mod ? "No products yet — add some in the Catalog tab." : "No products available.") : "No matches."}</Center>
-          : <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(108px, 1fr))", gap: 9 }}>
-              {shown.map(it => (
-                <div key={it.id} onClick={() => onAdd(it.id)} style={{ cursor: "pointer", borderRadius: 12, border: "1px solid var(--nv-border)", background: "var(--nv-surface-solid)", padding: "12px 10px", display: "flex", flexDirection: "column", alignItems: "center", gap: 4, textAlign: "center", userSelect: "none" }}>
-                  <div style={{ fontSize: 30, lineHeight: 1 }}>{it.emoji || "📦"}</div>
-                  <div style={{ fontFamily: FFB, fontSize: 13, lineHeight: 1.2 }}>{it.name}</div>
-                  <div style={{ fontSize: 12.5, color: AC, fontFamily: FFB }}>{money(it.price)}</div>
-                </div>
-              ))}
-            </div>}
+        <div style={{ flex: 1, overflow: "auto", padding: "0 14px 16px" }}>
+          {items.length === 0 ? <Center>No products yet — add some in the <b>Items</b> tab.</Center>
+            : shown.length === 0 ? <Center>No matches.</Center>
+              : <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(124px, 1fr))", gap: 11 }}>
+                  {shown.map(it => {
+                    const a = avail(it); const out = a <= 0;
+                    return (
+                      <div key={it.id} onClick={() => add(it)} style={{ cursor: out ? "default" : "pointer", borderRadius: 14, border: "1px solid var(--nv-border)", background: "var(--nv-surface-solid)", overflow: "hidden", opacity: out ? 0.55 : 1, userSelect: "none" }}>
+                        <div style={{ height: 80, background: "var(--nv-elevated)", display: "grid", placeItems: "center", overflow: "hidden" }}>
+                          {it.img ? <img src={it.img} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <span style={{ fontSize: 34 }}>📦</span>}
+                        </div>
+                        <div style={{ padding: "8px 10px" }}>
+                          <div style={{ fontFamily: FFB, fontSize: 13, lineHeight: 1.2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{it.name}</div>
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 3 }}>
+                            <span style={{ fontFamily: FFB, fontSize: 13, color: AC }}>{money(it.price)}</span>
+                            <span style={{ fontSize: 11, color: out ? "#ef4444" : "var(--nv-text-dim)" }}>{out ? "Out" : a + " left"}</span>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>}
         </div>
       </div>
 
       {/* cart */}
-      <div style={{ width: 300, flexShrink: 0, borderLeft: "1px solid var(--nv-border)", display: "flex", flexDirection: "column", background: "var(--nv-surface-solid)" }}>
-        <div style={{ padding: "12px 14px", borderBottom: "1px solid var(--nv-border)", display: "flex", alignItems: "center" }}>
-          <span style={{ fontFamily: FFB, fontSize: 15 }}>Cart</span>
-          <span style={{ marginLeft: 8, fontSize: 12, color: "var(--nv-text-dim)" }}>{cartCount} item{cartCount === 1 ? "" : "s"}</span>
+      <div style={{ width: 320, flexShrink: 0, borderLeft: "1px solid var(--nv-border)", display: "flex", flexDirection: "column", background: "var(--nv-surface-solid)" }}>
+        <div style={{ padding: "13px 15px", borderBottom: "1px solid var(--nv-border)", display: "flex", alignItems: "center" }}>
+          <span style={{ fontFamily: FFB, fontSize: 16 }}>Cart</span>
+          <span style={{ marginLeft: 8, fontSize: 12, color: "var(--nv-text-dim)" }}>{count} item{count === 1 ? "" : "s"}</span>
           <div style={{ flex: 1 }} />
-          {cartCount > 0 && <span onClick={onClear} style={{ fontSize: 12, color: "#ef4444", cursor: "pointer" }}>Clear</span>}
+          {count > 0 && <button onClick={cancel} style={{ padding: "5px 11px", borderRadius: 8, border: "1px solid var(--nv-border)", background: "transparent", color: "#ef4444", fontFamily: FFB, fontSize: 12, cursor: "pointer" }}>Cancel cart</button>}
         </div>
         <div style={{ flex: 1, overflow: "auto", padding: "8px 10px" }}>
           {lines.length === 0 ? <Center>Tap a product to start a sale.</Center>
-          : lines.map(l => (
-            <div key={l.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 4px", borderBottom: "1px solid var(--nv-border)" }}>
-              <span style={{ fontSize: 18 }}>{l.emoji || "📦"}</span>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontFamily: FFB, fontSize: 13, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{l.name}</div>
-                <div style={{ fontSize: 11.5, color: "var(--nv-text-dim)" }}>{money(l.price)} ea</div>
+            : lines.map(l => (
+              <div key={l.id} style={{ display: "flex", alignItems: "center", gap: 9, padding: "8px 4px", borderBottom: "1px solid var(--nv-border)" }}>
+                {l.img ? <img src={l.img} alt="" style={{ width: 30, height: 30, borderRadius: 7, objectFit: "cover" }} /> : <span style={{ fontSize: 20 }}>📦</span>}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontFamily: FFB, fontSize: 13, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{l.name}</div>
+                  <div style={{ fontSize: 11.5, color: "var(--nv-text-dim)" }}>{money(l.price)} ea</div>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                  <Stepper onClick={() => setQty(l.id, l.qty - 1)}>–</Stepper>
+                  <span style={{ minWidth: 18, textAlign: "center", fontFamily: FFB, fontSize: 13 }}>{l.qty}</span>
+                  <Stepper onClick={() => setQty(l.id, l.qty + 1)}>+</Stepper>
+                </div>
+                <div style={{ width: 50, textAlign: "right", fontFamily: FFB, fontSize: 13 }}>{money(l.lineTotal)}</div>
+                <span onClick={() => setQty(l.id, 0)} title="Remove" style={{ cursor: "pointer", color: "var(--nv-text-dim)", fontSize: 15, padding: "0 2px" }}>✕</span>
               </div>
-              <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                <Stepper onClick={() => onQty(l.id, l.qty - 1)}>–</Stepper>
-                <span style={{ minWidth: 18, textAlign: "center", fontFamily: FFB, fontSize: 13 }}>{l.qty}</span>
-                <Stepper onClick={() => onQty(l.id, l.qty + 1)}>+</Stepper>
-              </div>
-              <div style={{ width: 54, textAlign: "right", fontFamily: FFB, fontSize: 13 }}>{money(l.lineTotal)}</div>
-            </div>
-          ))}
+            ))}
         </div>
-        <div style={{ padding: "12px 14px", borderTop: "1px solid var(--nv-border)" }}>
+        <div style={{ padding: "13px 15px", borderTop: "1px solid var(--nv-border)" }}>
           <Row label="Subtotal" value={money(subtotal)} />
           <Row label={`Tax (${taxRate}%)`} value={money(tax)} />
           <Row label="Total" value={money(total)} big />
-          <button disabled={lines.length === 0} onClick={() => setTender({ method: "cash", cash: "" })}
-            style={{ width: "100%", marginTop: 10, padding: "12px", borderRadius: 11, border: "none", background: lines.length ? AC : "var(--nv-border)", color: "#fff", fontFamily: FFB, fontSize: 15, cursor: lines.length ? "pointer" : "default" }}>
+          <button disabled={!lines.length} onClick={() => setTender({ method: "cash", cash: "" })}
+            style={{ width: "100%", marginTop: 10, padding: "13px", borderRadius: 12, border: "none", background: lines.length ? AC : "var(--nv-border)", color: "#fff", fontFamily: FFB, fontSize: 16, cursor: lines.length ? "pointer" : "default" }}>
             Charge {money(total)}
           </button>
         </div>
       </div>
 
-      {tender && <TenderModal total={total} AC={AC} state={tender} setState={setTender}
-        onConfirm={(paid) => { onCharge({ method: tender.method, paid }); setTender(null); }}
-        onCancel={() => setTender(null)} />}
+      {tender && <TenderModal AC={AC} total={total} state={tender} setState={setTender} onCancel={() => setTender(null)} onConfirm={complete} />}
     </div>
   );
 }
 
-function TenderModal({ total, AC, state, setState, onConfirm, onCancel }) {
+function TenderModal({ AC, total, state, setState, onCancel, onConfirm }) {
   const cashNum = Number(state.cash) || 0;
   const change = cashNum - total;
   const quick = [total, Math.ceil(total), Math.ceil(total / 5) * 5, Math.ceil(total / 10) * 10].filter((v, i, a) => a.indexOf(v) === i);
-  const canCash = state.method === "cash" ? cashNum >= total : true;
+  const ok = state.method === "card" || cashNum >= total;
   return (
-    <div onClick={onCancel} style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.5)", display: "grid", placeItems: "center", zIndex: 20 }}>
-      <div onClick={e => e.stopPropagation()} style={{ width: 340, background: "var(--nv-surface-solid)", border: "1px solid var(--nv-border)", borderRadius: 16, padding: 18, fontFamily: FF }}>
-        <div style={{ fontFamily: FFB, fontSize: 17, marginBottom: 4 }}>Take payment</div>
-        <div style={{ fontSize: 13, color: "var(--nv-text-dim)", marginBottom: 14 }}>Amount due <b style={{ color: "var(--nv-text)" }}>{money(total)}</b></div>
+    <div onClick={onCancel} style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.55)", display: "grid", placeItems: "center", zIndex: 30 }}>
+      <div onClick={e => e.stopPropagation()} style={{ width: 360, background: "var(--nv-surface-solid)", border: "1px solid var(--nv-border)", borderRadius: 18, padding: 20, fontFamily: FF }}>
+        <div style={{ fontFamily: FFB, fontSize: 18 }}>Take payment</div>
+        <div style={{ fontSize: 13.5, color: "var(--nv-text-dim)", marginBottom: 16 }}>Amount due <b style={{ color: "var(--nv-text)" }}>{money(total)}</b></div>
         <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
-          {["cash", "card"].map(m => (
-            <div key={m} onClick={() => setState(s => ({ ...s, method: m }))} style={{ flex: 1, textAlign: "center", padding: "9px", borderRadius: 10, cursor: "pointer", fontFamily: FFB, fontSize: 13.5, textTransform: "capitalize", border: "1px solid " + (state.method === m ? "transparent" : "var(--nv-border)"), background: state.method === m ? AC : "var(--nv-elevated)", color: state.method === m ? "#fff" : "var(--nv-text)" }}>{m === "cash" ? "💵 Cash" : "💳 Card"}</div>
-          ))}
+          {["cash", "card"].map(m => <div key={m} onClick={() => setState(s => ({ ...s, method: m }))} style={{ flex: 1, textAlign: "center", padding: "10px", borderRadius: 11, cursor: "pointer", fontFamily: FFB, fontSize: 14, border: "1px solid " + (state.method === m ? "transparent" : "var(--nv-border)"), background: state.method === m ? AC : "var(--nv-elevated)", color: state.method === m ? "#fff" : "var(--nv-text)" }}>{m === "cash" ? "💵 Cash" : "💳 Card"}</div>)}
         </div>
-        {state.method === "cash" && (
-          <div style={{ marginBottom: 14 }}>
+        {state.method === "cash" ? (
+          <div style={{ marginBottom: 16 }}>
             <input autoFocus type="number" inputMode="decimal" value={state.cash} onChange={e => setState(s => ({ ...s, cash: e.target.value }))} placeholder="Cash received"
-              style={{ width: "100%", padding: "11px 12px", borderRadius: 10, border: "1px solid var(--nv-border)", background: "var(--nv-elevated)", color: "var(--nv-text)", fontFamily: FFB, fontSize: 16, boxSizing: "border-box" }} />
-            <div style={{ display: "flex", gap: 6, marginTop: 8, flexWrap: "wrap" }}>
-              {quick.map(v => <div key={v} onClick={() => setState(s => ({ ...s, cash: String(v.toFixed(2)) }))} style={{ padding: "5px 11px", borderRadius: 999, border: "1px solid var(--nv-border)", fontSize: 12.5, fontFamily: FFB, cursor: "pointer", color: "var(--nv-text)" }}>{money(v)}</div>)}
-            </div>
-            {cashNum > 0 && <div style={{ marginTop: 10, fontFamily: FFB, fontSize: 14, color: change >= 0 ? "#22c55e" : "#ef4444" }}>{change >= 0 ? `Change ${money(change)}` : `${money(-change)} short`}</div>}
+              style={{ width: "100%", padding: "12px 13px", borderRadius: 11, border: "1px solid var(--nv-border)", background: "var(--nv-elevated)", color: "var(--nv-text)", fontFamily: FFB, fontSize: 17, boxSizing: "border-box" }} />
+            <div style={{ display: "flex", gap: 6, marginTop: 8, flexWrap: "wrap" }}>{quick.map(v => <div key={v} onClick={() => setState(s => ({ ...s, cash: v.toFixed(2) }))} style={{ padding: "6px 12px", borderRadius: 999, border: "1px solid var(--nv-border)", fontSize: 12.5, fontFamily: FFB, cursor: "pointer" }}>{money(v)}</div>)}</div>
+            {cashNum > 0 && <div style={{ marginTop: 11, fontFamily: FFB, fontSize: 15, color: change >= 0 ? "#22c55e" : "#ef4444" }}>{change >= 0 ? `Change ${money(change)}` : `${money(-change)} short`}</div>}
+          </div>
+        ) : (
+          <div style={{ marginBottom: 16, padding: "11px 13px", borderRadius: 11, background: "var(--nv-elevated)", fontSize: 12.5, color: "var(--nv-text-dim)", lineHeight: 1.45 }}>
+            Records the sale for your books. This build can't charge a physical card reader — that needs a real payment processor.
           </div>
         )}
         <div style={{ display: "flex", gap: 8 }}>
-          <button onClick={onCancel} style={{ flex: 1, padding: "11px", borderRadius: 10, border: "1px solid var(--nv-border)", background: "var(--nv-elevated)", color: "var(--nv-text)", fontFamily: FFB, fontSize: 14, cursor: "pointer" }}>Cancel</button>
-          <button disabled={!canCash} onClick={() => onConfirm(state.method === "cash" ? cashNum : total)} style={{ flex: 1.4, padding: "11px", borderRadius: 10, border: "none", background: canCash ? AC : "var(--nv-border)", color: "#fff", fontFamily: FFB, fontSize: 14, cursor: canCash ? "pointer" : "default" }}>Complete sale</button>
+          <button onClick={onCancel} style={{ flex: 1, padding: "12px", borderRadius: 11, border: "1px solid var(--nv-border)", background: "var(--nv-elevated)", color: "var(--nv-text)", fontFamily: FFB, fontSize: 14, cursor: "pointer" }}>Cancel</button>
+          <button disabled={!ok} onClick={() => onConfirm({ method: state.method, paid: state.method === "cash" ? cashNum : total })} style={{ flex: 1.4, padding: "12px", borderRadius: 11, border: "none", background: ok ? AC : "var(--nv-border)", color: "#fff", fontFamily: FFB, fontSize: 14, cursor: ok ? "pointer" : "default" }}>Complete sale</button>
         </div>
       </div>
     </div>
   );
 }
 
-// ----------------------------------------------------------------- Catalog --
-function Catalog({ catalog, onSave, taxRate, setTax, AC, mod, showToast }) {
-  const [draft, setDraft] = useState(null);   // editing/new item
-  const blank = () => ({ id: newId(), name: "", price: "", emoji: "📦", category: "" });
+// ─────────────────────────────────────────────────────────────── items ─────
+function Items({ AC, items, taxRate, setTax, onChange, showToast }) {
+  const [draft, setDraft] = useState(null);
+  const blank = () => ({ id: newId(), name: "", price: "", cost: "", stock: "", category: "", img: null });
 
+  const adjustStock = (id, delta) => onChange(items.map(it => it.id === id ? { ...it, stock: Math.max(0, (it.stock ?? 0) + delta) } : it));
+  const del = (id) => onChange(items.filter(i => i.id !== id));
   const commit = () => {
     if (!draft.name.trim()) { showToast?.("Name required"); return; }
-    const item = { ...draft, name: draft.name.trim(), price: Number(draft.price) || 0, category: (draft.category || "").trim() };
-    const exists = catalog.some(c => c.id === item.id);
-    onSave(exists ? catalog.map(c => c.id === item.id ? item : c) : [...catalog, item]);
+    const item = { ...draft, name: draft.name.trim(), price: Number(draft.price) || 0, cost: Number(draft.cost) || 0, stock: Math.max(0, Math.round(Number(draft.stock) || 0)), category: (draft.category || "").trim() };
+    const exists = items.some(i => i.id === item.id);
+    onChange(exists ? items.map(i => i.id === item.id ? item : i) : [...items, item]);
     setDraft(null);
   };
-  const del = (id) => onSave(catalog.filter(c => c.id !== id));
-
-  const fld = { padding: "9px 11px", borderRadius: 9, border: "1px solid var(--nv-border)", background: "var(--nv-elevated)", color: "var(--nv-text)", fontFamily: FF, fontSize: 13.5, boxSizing: "border-box" };
 
   return (
-    <div style={{ height: "100%", overflow: "auto", padding: "14px 16px", maxWidth: 760, margin: "0 auto" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14, flexWrap: "wrap" }}>
-        <div style={{ fontFamily: FFB, fontSize: 17 }}>Products</div>
+    <div style={{ height: "100%", overflow: "auto", padding: "16px 18px", maxWidth: 820, margin: "0 auto" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16, flexWrap: "wrap" }}>
+        <div style={{ fontFamily: FFB, fontSize: 18 }}>Products</div>
         <div style={{ flex: 1 }} />
         <label style={{ fontSize: 12.5, color: "var(--nv-text-dim)", display: "flex", alignItems: "center", gap: 6 }}>
-          Tax rate
-          <input type="number" value={taxRate} onChange={e => setTax(e.target.value)} disabled={!mod} style={{ ...fld, width: 70, padding: "6px 8px" }} /> %
+          Tax <input type="number" value={taxRate} onChange={e => setTax(e.target.value)} style={{ width: 64, padding: "7px 9px", borderRadius: 9, border: "1px solid var(--nv-border)", background: "var(--nv-elevated)", color: "var(--nv-text)", fontFamily: FF, fontSize: 13 }} /> %
         </label>
-        {mod && <button onClick={() => setDraft(blank())} style={{ padding: "8px 14px", borderRadius: 9, border: "none", background: AC, color: "#fff", fontFamily: FFB, fontSize: 13.5, cursor: "pointer" }}>+ Add product</button>}
+        <button onClick={() => setDraft(blank())} style={{ padding: "9px 15px", borderRadius: 10, border: "none", background: AC, color: "#fff", fontFamily: FFB, fontSize: 14, cursor: "pointer" }}>+ Add item</button>
       </div>
 
-      {!mod && <div style={{ fontSize: 12.5, color: "var(--nv-text-dim)", marginBottom: 10 }}>Only the owner can edit the catalog.</div>}
-
-      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-        {catalog.map(it => (
-          <div key={it.id} style={{ display: "flex", alignItems: "center", gap: 11, padding: "10px 12px", borderRadius: 11, border: "1px solid var(--nv-border)", background: "var(--nv-surface-solid)" }}>
-            <span style={{ fontSize: 24 }}>{it.emoji || "📦"}</span>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontFamily: FFB, fontSize: 14 }}>{it.name}</div>
-              <div style={{ fontSize: 12, color: "var(--nv-text-dim)" }}>{it.category || "Uncategorized"}</div>
-            </div>
-            <div style={{ fontFamily: FFB, fontSize: 14, color: AC }}>{money(it.price)}</div>
-            {mod && <>
-              <span onClick={() => setDraft({ ...it, price: String(it.price) })} style={{ cursor: "pointer", fontSize: 12.5, color: "var(--nv-text-dim)" }}>Edit</span>
+      <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
+        {items.map(it => {
+          const margin = (it.price || 0) - (it.cost || 0);
+          return (
+            <div key={it.id} style={{ display: "flex", alignItems: "center", gap: 13, padding: "11px 13px", borderRadius: 13, border: "1px solid var(--nv-border)", background: "var(--nv-surface-solid)" }}>
+              <div style={{ width: 46, height: 46, borderRadius: 10, background: "var(--nv-elevated)", display: "grid", placeItems: "center", overflow: "hidden", flexShrink: 0 }}>
+                {it.img ? <img src={it.img} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <span style={{ fontSize: 22 }}>📦</span>}
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontFamily: FFB, fontSize: 14.5 }}>{it.name}</div>
+                <div style={{ fontSize: 12, color: "var(--nv-text-dim)" }}>{money(it.price)} · cost {money(it.cost)} · <span style={{ color: margin >= 0 ? "#16a34a" : "#ef4444" }}>{margin >= 0 ? "+" : ""}{money(margin)} margin</span>{it.category ? " · " + it.category : ""}</div>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                <Stepper onClick={() => adjustStock(it.id, -1)}>–</Stepper>
+                <div style={{ minWidth: 44, textAlign: "center" }}>
+                  <div style={{ fontFamily: FFB, fontSize: 15, color: (it.stock ?? 0) <= 0 ? "#ef4444" : "var(--nv-text)" }}>{it.stock ?? 0}</div>
+                  <div style={{ fontSize: 10, color: "var(--nv-text-dim)" }}>in stock</div>
+                </div>
+                <Stepper onClick={() => adjustStock(it.id, 1)}>+</Stepper>
+              </div>
+              <span onClick={() => setDraft({ ...it, price: String(it.price ?? ""), cost: String(it.cost ?? ""), stock: String(it.stock ?? "") })} style={{ cursor: "pointer", fontSize: 12.5, color: "var(--nv-text-dim)" }}>Edit</span>
               <span onClick={() => del(it.id)} style={{ cursor: "pointer", fontSize: 12.5, color: "#ef4444" }}>Delete</span>
-            </>}
-          </div>
-        ))}
-        {catalog.length === 0 && <Center>No products yet.</Center>}
+            </div>
+          );
+        })}
+        {items.length === 0 && <Center>No products yet. Click <b>+ Add item</b> to build your catalog.</Center>}
       </div>
 
-      {draft && (
-        <div onClick={() => setDraft(null)} style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.5)", display: "grid", placeItems: "center", zIndex: 20 }}>
-          <div onClick={e => e.stopPropagation()} style={{ width: 340, background: "var(--nv-surface-solid)", border: "1px solid var(--nv-border)", borderRadius: 16, padding: 18, fontFamily: FF, display: "flex", flexDirection: "column", gap: 10 }}>
-            <div style={{ fontFamily: FFB, fontSize: 16 }}>{catalog.some(c => c.id === draft.id) ? "Edit product" : "New product"}</div>
-            <div style={{ display: "flex", gap: 10 }}>
-              <input value={draft.emoji} onChange={e => setDraft(d => ({ ...d, emoji: e.target.value.slice(0, 2) }))} placeholder="📦" style={{ ...fld, width: 52, textAlign: "center", fontSize: 20 }} />
-              <input autoFocus value={draft.name} onChange={e => setDraft(d => ({ ...d, name: e.target.value }))} placeholder="Product name" style={{ ...fld, flex: 1 }} />
-            </div>
-            <div style={{ display: "flex", gap: 10 }}>
-              <input type="number" inputMode="decimal" value={draft.price} onChange={e => setDraft(d => ({ ...d, price: e.target.value }))} placeholder="Price" style={{ ...fld, flex: 1 }} />
-              <input value={draft.category} onChange={e => setDraft(d => ({ ...d, category: e.target.value }))} placeholder="Category" style={{ ...fld, flex: 1 }} />
-            </div>
-            <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
-              <button onClick={() => setDraft(null)} style={{ flex: 1, padding: "10px", borderRadius: 10, border: "1px solid var(--nv-border)", background: "var(--nv-elevated)", color: "var(--nv-text)", fontFamily: FFB, fontSize: 13.5, cursor: "pointer" }}>Cancel</button>
-              <button onClick={commit} style={{ flex: 1, padding: "10px", borderRadius: 10, border: "none", background: AC, color: "#fff", fontFamily: FFB, fontSize: 13.5, cursor: "pointer" }}>Save</button>
-            </div>
-          </div>
-        </div>
-      )}
+      {draft && <ItemEditor AC={AC} draft={draft} setDraft={setDraft} onSave={commit} exists={items.some(i => i.id === draft.id)} showToast={showToast} />}
     </div>
   );
 }
 
-// ------------------------------------------------------------------- Sales --
-function Sales({ sales, AC }) {
-  const startToday = useMemo(() => { const d = new Date(); d.setHours(0, 0, 0, 0); return d.getTime(); }, []);
-  const today = sales.filter(s => s.at >= startToday);
-  const todayTotal = today.reduce((s, x) => s + (x.total || 0), 0);
-  const allTotal = sales.reduce((s, x) => s + (x.total || 0), 0);
-
-  return (
-    <div style={{ height: "100%", overflow: "auto", padding: "14px 16px", maxWidth: 720, margin: "0 auto" }}>
-      <div style={{ display: "flex", gap: 10, marginBottom: 14, flexWrap: "wrap" }}>
-        <Stat label="Today's sales" value={money(todayTotal)} sub={`${today.length} transaction${today.length === 1 ? "" : "s"}`} AC={AC} />
-        <Stat label="All-time" value={money(allTotal)} sub={`${sales.length} transaction${sales.length === 1 ? "" : "s"}`} />
-      </div>
-      <div style={{ fontFamily: FFB, fontSize: 14, marginBottom: 8 }}>Recent transactions</div>
-      <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
-        {sales.length === 0 ? <Center>No sales recorded yet.</Center>
-        : sales.map(s => (
-          <div key={s.id} style={{ padding: "10px 13px", borderRadius: 11, border: "1px solid var(--nv-border)", background: "var(--nv-surface-solid)" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <span style={{ fontFamily: FFB, fontSize: 15 }}>{money(s.total)}</span>
-              <span style={{ fontSize: 11.5, padding: "1px 8px", borderRadius: 999, background: "var(--nv-elevated)", color: "var(--nv-text-dim)" }}>{s.tender === "cash" ? "💵 Cash" : "💳 Card"}</span>
-              <div style={{ flex: 1 }} />
-              <span style={{ fontSize: 11.5, color: "var(--nv-text-dim)" }}>{new Date(s.at).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</span>
-            </div>
-            <div style={{ fontSize: 12.5, color: "var(--nv-text-dim)", marginTop: 4 }}>
-              {(s.items || []).map(i => `${i.qty}× ${i.name}`).join(", ")} · {s.cashier}
-              {s.tender === "cash" && typeof s.paid === "number" && s.paid > s.total ? ` · change ${money(s.paid - s.total)}` : ""}
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-// ------------------------------------------------------------------ Access --
-function Access({ AC, owner, showToast }) {
-  const [list, setList] = useState(null);
-  const [name, setName] = useState("");
-  const [busy, setBusy] = useState(false);
-  useEffect(() => { fetchAccessList().then(l => setList(l || [])); }, []);
-
-  const add = async () => {
-    const u = name.trim(); if (!u || busy) return; setBusy(true);
-    const next = await grantAccess(u); setList(next); setName(""); setBusy(false);
-    showToast?.(`Granted POS access to @${u.toLowerCase()}`);
+function ItemEditor({ AC, draft, setDraft, onSave, exists, showToast }) {
+  const fileRef = useRef(null);
+  const fld = { padding: "10px 12px", borderRadius: 10, border: "1px solid var(--nv-border)", background: "var(--nv-elevated)", color: "var(--nv-text)", fontFamily: FF, fontSize: 14, boxSizing: "border-box", width: "100%" };
+  const pickImg = async (e) => {
+    const f = e.target.files?.[0]; if (!f) return;
+    const url = await downscale(f);
+    if (url) setDraft(d => ({ ...d, img: url })); else showToast?.("Couldn't read that image");
   };
-  const remove = async (u) => { setBusy(true); const next = await revokeAccess(u); setList(next); setBusy(false); showToast?.(`Removed @${u}`); };
+  return (
+    <div onClick={() => setDraft(null)} style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.55)", display: "grid", placeItems: "center", zIndex: 30 }}>
+      <div onClick={e => e.stopPropagation()} style={{ width: 380, maxWidth: "92vw", background: "var(--nv-surface-solid)", border: "1px solid var(--nv-border)", borderRadius: 18, padding: 20, fontFamily: FF, display: "flex", flexDirection: "column", gap: 12 }}>
+        <div style={{ fontFamily: FFB, fontSize: 17 }}>{exists ? "Edit item" : "New item"}</div>
+        <div style={{ display: "flex", gap: 13, alignItems: "center" }}>
+          <div onClick={() => fileRef.current?.click()} style={{ width: 70, height: 70, borderRadius: 13, background: "var(--nv-elevated)", border: "1px dashed var(--nv-border)", display: "grid", placeItems: "center", overflow: "hidden", cursor: "pointer", flexShrink: 0 }}>
+            {draft.img ? <img src={draft.img} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <span style={{ fontSize: 11, color: "var(--nv-text-dim)", textAlign: "center" }}>Add<br />image</span>}
+          </div>
+          <div style={{ flex: 1 }}>
+            <input value={draft.name} onChange={e => setDraft(d => ({ ...d, name: e.target.value }))} placeholder="Item name" autoFocus style={{ ...fld, fontFamily: FFB }} />
+            {draft.img && <div onClick={() => setDraft(d => ({ ...d, img: null }))} style={{ fontSize: 12, color: "#ef4444", marginTop: 6, cursor: "pointer" }}>Remove image</div>}
+          </div>
+          <input ref={fileRef} type="file" accept="image/*" onChange={pickImg} style={{ display: "none" }} />
+        </div>
+        <div style={{ display: "flex", gap: 10 }}>
+          <label style={{ flex: 1, fontSize: 11.5, color: "var(--nv-text-dim)" }}>Price<input type="number" inputMode="decimal" value={draft.price} onChange={e => setDraft(d => ({ ...d, price: e.target.value }))} placeholder="0.00" style={{ ...fld, marginTop: 3 }} /></label>
+          <label style={{ flex: 1, fontSize: 11.5, color: "var(--nv-text-dim)" }}>Purchase cost<input type="number" inputMode="decimal" value={draft.cost} onChange={e => setDraft(d => ({ ...d, cost: e.target.value }))} placeholder="0.00" style={{ ...fld, marginTop: 3 }} /></label>
+        </div>
+        <div style={{ display: "flex", gap: 10 }}>
+          <label style={{ flex: 1, fontSize: 11.5, color: "var(--nv-text-dim)" }}>Stock<input type="number" inputMode="numeric" value={draft.stock} onChange={e => setDraft(d => ({ ...d, stock: e.target.value }))} placeholder="0" style={{ ...fld, marginTop: 3 }} /></label>
+          <label style={{ flex: 1, fontSize: 11.5, color: "var(--nv-text-dim)" }}>Category<input value={draft.category} onChange={e => setDraft(d => ({ ...d, category: e.target.value }))} placeholder="optional" style={{ ...fld, marginTop: 3 }} /></label>
+        </div>
+        <div style={{ display: "flex", gap: 8, marginTop: 2 }}>
+          <button onClick={() => setDraft(null)} style={{ flex: 1, padding: "11px", borderRadius: 11, border: "1px solid var(--nv-border)", background: "var(--nv-elevated)", color: "var(--nv-text)", fontFamily: FFB, fontSize: 14, cursor: "pointer" }}>Cancel</button>
+          <button onClick={onSave} style={{ flex: 1, padding: "11px", borderRadius: 11, border: "none", background: AC, color: "#fff", fontFamily: FFB, fontSize: 14, cursor: "pointer" }}>Save</button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
-  const fld = { padding: "10px 12px", borderRadius: 10, border: "1px solid var(--nv-border)", background: "var(--nv-elevated)", color: "var(--nv-text)", fontFamily: FF, fontSize: 14, boxSizing: "border-box" };
+// ────────────────────────────────────────────────────────────── revenue ────
+function Revenue({ AC, agg, sales }) {
+  const today = useMemo(() => { const t = startOfToday(); return (sales || []).filter(s => s.at >= t); }, [sales]);
+  const tRev = today.reduce((s, x) => s + (x.revenue || 0), 0);
+  const tProfit = today.reduce((s, x) => s + (x.profit || 0), 0);
 
   return (
-    <div style={{ height: "100%", overflow: "auto", padding: "16px", maxWidth: 560, margin: "0 auto" }}>
-      <div style={{ fontFamily: FFB, fontSize: 17, marginBottom: 4 }}>POS access</div>
-      <div style={{ fontSize: 13, color: "var(--nv-text-dim)", lineHeight: 1.5, marginBottom: 16 }}>
-        The Point of Sale app is hidden from everyone by default. You ({owner}) always have access. Add a Nova username below to make the app appear on their account too — they'll see it next time they sign in.
+    <div style={{ height: "100%", overflow: "auto", padding: "16px 18px", maxWidth: 880, margin: "0 auto" }}>
+      <div style={{ fontFamily: FFB, fontSize: 18, marginBottom: 12 }}>Revenue & profit</div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))", gap: 11, marginBottom: 16 }}>
+        <Stat label="Total revenue" value={money(agg.revenue)} sub="Pre-tax sales" AC={AC} big />
+        <Stat label="Total profit" value={money(agg.profit)} sub="Revenue − cost of goods" color="#16a34a" big />
+        <Stat label="Cost of goods" value={money(agg.cost)} sub="What you paid for sold stock" />
+        <Stat label="Tax collected" value={money(agg.tax)} sub="Set aside for remittance" />
+        <Stat label="Gross collected" value={money(agg.gross)} sub="Incl. tax" />
+        <Stat label="Transactions" value={String(agg.count || 0)} sub="Completed sales" />
       </div>
-      <div style={{ display: "flex", gap: 8, marginBottom: 18 }}>
-        <input value={name} onChange={e => setName(e.target.value)} onKeyDown={e => e.key === "Enter" && add()} placeholder="Nova username" style={{ ...fld, flex: 1 }} />
-        <button onClick={add} disabled={!name.trim() || busy} style={{ padding: "10px 18px", borderRadius: 10, border: "none", background: name.trim() ? AC : "var(--nv-border)", color: "#fff", fontFamily: FFB, fontSize: 14, cursor: name.trim() ? "pointer" : "default" }}>Grant</button>
+
+      <div style={{ display: "flex", gap: 11, marginBottom: 18, flexWrap: "wrap" }}>
+        <Stat label="Today's revenue" value={money(tRev)} sub={`${today.length} sale${today.length === 1 ? "" : "s"} today`} AC={AC} />
+        <Stat label="Today's profit" value={money(tProfit)} sub="So far today" color="#16a34a" />
       </div>
-      <div style={{ fontFamily: FFB, fontSize: 13.5, marginBottom: 8 }}>Granted users</div>
-      {list === null ? <Center>Loading…</Center>
-      : list.length === 0 ? <div style={{ fontSize: 13, color: "var(--nv-text-dim)" }}>No one else has access yet.</div>
-      : <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
-          {list.map(u => (
-            <div key={u} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 13px", borderRadius: 10, border: "1px solid var(--nv-border)", background: "var(--nv-surface-solid)" }}>
-              <span style={{ width: 28, height: 28, borderRadius: "50%", background: AC, color: "#fff", display: "grid", placeItems: "center", fontFamily: FFB, fontSize: 13 }}>{u[0]?.toUpperCase()}</span>
-              <span style={{ flex: 1, fontFamily: FFB, fontSize: 13.5 }}>@{u}</span>
-              <span onClick={() => remove(u)} style={{ cursor: "pointer", fontSize: 12.5, color: "#ef4444" }}>Revoke</span>
+
+      <div style={{ fontFamily: FFB, fontSize: 14.5, marginBottom: 8 }}>Recent transactions</div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+        {(!sales || sales.length === 0) ? <Center>No sales recorded yet.</Center>
+          : sales.map(s => (
+            <div key={s.id} style={{ padding: "11px 14px", borderRadius: 12, border: "1px solid var(--nv-border)", background: "var(--nv-surface-solid)" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
+                <span style={{ fontFamily: FFB, fontSize: 15.5 }}>{money(s.total)}</span>
+                <span style={{ fontSize: 11.5, padding: "1px 8px", borderRadius: 999, background: "var(--nv-elevated)", color: "var(--nv-text-dim)" }}>{s.tender === "cash" ? "💵 Cash" : "💳 Card"}</span>
+                <span style={{ fontSize: 12, color: "#16a34a", fontFamily: FFB }}>+{money(s.profit)} profit</span>
+                <div style={{ flex: 1 }} />
+                <span style={{ fontSize: 11.5, color: "var(--nv-text-dim)" }}>{new Date(s.at).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</span>
+              </div>
+              <div style={{ fontSize: 12.5, color: "var(--nv-text-dim)", marginTop: 4 }}>{(s.lines || []).map(l => `${l.qty}× ${l.name}`).join(", ")}</div>
             </div>
           ))}
-        </div>}
+      </div>
     </div>
   );
 }
 
-// ----------------------------------------------------------------- helpers --
+// ────────────────────────────────────────────────────────────── helpers ────
+const closeBtn = { position: "absolute", top: 16, right: 16, padding: "8px 14px", borderRadius: 10, border: "none", background: "#ef4444", color: "#fff", fontFamily: FFB, fontSize: 13, cursor: "pointer" };
 function Stepper({ children, onClick }) {
-  return <span onClick={onClick} style={{ width: 22, height: 22, borderRadius: 6, border: "1px solid var(--nv-border)", display: "grid", placeItems: "center", cursor: "pointer", fontFamily: FFB, fontSize: 14, userSelect: "none", background: "var(--nv-elevated)" }}>{children}</span>;
+  return <span onClick={onClick} style={{ width: 24, height: 24, borderRadius: 7, border: "1px solid var(--nv-border)", display: "grid", placeItems: "center", cursor: "pointer", fontFamily: FFB, fontSize: 15, userSelect: "none", background: "var(--nv-elevated)" }}>{children}</span>;
 }
 function Row({ label, value, big }) {
-  return <div style={{ display: "flex", justifyContent: "space-between", padding: big ? "6px 0 2px" : "2px 0", fontFamily: big ? FFB : FF, fontSize: big ? 17 : 13, color: big ? "var(--nv-text)" : "var(--nv-text-dim)" }}><span>{label}</span><span style={big ? {} : { color: "var(--nv-text)" }}>{value}</span></div>;
+  return <div style={{ display: "flex", justifyContent: "space-between", padding: big ? "7px 0 2px" : "2px 0", fontFamily: big ? FFB : FF, fontSize: big ? 18 : 13, color: big ? "var(--nv-text)" : "var(--nv-text-dim)" }}><span>{label}</span><span style={big ? {} : { color: "var(--nv-text)" }}>{value}</span></div>;
 }
-function Stat({ label, value, sub, AC }) {
-  return <div style={{ flex: 1, minWidth: 150, padding: "14px 16px", borderRadius: 14, border: "1px solid var(--nv-border)", background: "var(--nv-surface-solid)" }}>
+function Stat({ label, value, sub, AC, color, big }) {
+  return <div style={{ flex: 1, minWidth: 150, padding: "15px 17px", borderRadius: 15, border: "1px solid var(--nv-border)", background: "var(--nv-surface-solid)" }}>
     <div style={{ fontSize: 12.5, color: "var(--nv-text-dim)" }}>{label}</div>
-    <div style={{ fontFamily: FFB, fontSize: 26, color: AC || "var(--nv-text)", margin: "2px 0" }}>{value}</div>
-    <div style={{ fontSize: 12, color: "var(--nv-text-dim)" }}>{sub}</div>
+    <div style={{ fontFamily: FFB, fontSize: big ? 28 : 23, color: color || AC || "var(--nv-text)", margin: "3px 0" }}>{value}</div>
+    <div style={{ fontSize: 11.5, color: "var(--nv-text-dim)" }}>{sub}</div>
   </div>;
 }
 function Center({ children }) {
-  return <div style={{ display: "grid", placeItems: "center", height: "100%", minHeight: 120, color: "var(--nv-text-dim)", fontFamily: FF, fontSize: 13.5, textAlign: "center", padding: 24 }}>{children}</div>;
+  return <div style={{ display: "grid", placeItems: "center", height: "100%", minHeight: 140, color: "var(--nv-text-dim)", fontFamily: FF, fontSize: 14, textAlign: "center", padding: 26 }}>{children}</div>;
 }

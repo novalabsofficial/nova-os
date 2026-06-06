@@ -556,6 +556,25 @@ service cloud.firestore {
       allow write: if isMod() || docId == 'sales';
     }
 
+    // v11.0 POS remaster — per-store data. Each store is its own login (the
+    // password is SHA-256 hashed client-side and compared after a read, so the
+    // store doc must be readable to signed-in users). Any signed-in user who can
+    // open the POS (gated client-side by the nova_pos/access allowlist) may
+    // create a store and edit its own catalog/sales; only mods can delete a
+    // store. This is a pragmatic client-trust model for a personal project, not
+    // backend-verified auth.
+    //   nova_pos_stores/{storeId} — credentials + catalog + sales + totals
+    //   nova_pos_imgs/{storeId}   — item image blobs (kept out of the store doc)
+    match /nova_pos_stores/{storeId} {
+      allow read: if signedIn();
+      allow create, update: if signedIn();
+      allow delete: if isMod();
+    }
+    match /nova_pos_imgs/{storeId} {
+      allow read: if signedIn();
+      allow write: if signedIn();
+    }
+
     // ── catch-all ────────────────────────────────────────────────────────
     // Anything else is denied. New collections need an explicit rule above.
     match /{document=**} {

@@ -618,6 +618,10 @@ export default function NovaOS(){
   // We fetch the allowlist on sign-in so the launcher can hide the app entirely.
   const [posGrants,  setPosGrants]  = useState([]);
   const posAccessRef = useRef(false);   // kept in sync below; lets openApp gate the restricted POS
+  // v11.0 POS remaster — the POS runs as a full-screen kiosk overlay (hides the
+  // taskbar/desktop) rather than a normal window. posMode drives that overlay.
+  const [posMode,    setPosMode]    = useState(false);
+  const posModeRef = useRef(false); posModeRef.current = posMode;
   const [data,       setData]       = useState(null);
   const [customWp,   setCustomWp]   = useState(null);
   const [wins,       setWins]       = useState([]);
@@ -1610,7 +1614,8 @@ export default function NovaOS(){
     // v11.0 — never launch a restricted app (POS) for a user without access,
     // even via a stale restored window or desktop pin. posAccessRef already
     // folds in the NovaMod (isAdmin) check, so this also lets NovaMod through.
-    if(appId==="pos" && !posAccessRef.current) return;
+    // POS opens as a full-screen kiosk overlay (no window), not a desktop window.
+    if(appId==="pos"){ if(!posAccessRef.current) return; setMenuOpen(false); setPosMode(true); return; }
     setMenuOpen(false);
     // v8.1: opening an app clears its notification badge. Special-cased
     // for "chat" inside markAppNotificationsRead (bumps lastChatOpenTs
@@ -1753,7 +1758,7 @@ export default function NovaOS(){
         {appId==="whiteboard" &&<WhiteboardApp AC={AC} showToast={showToast}/>}
         {appId==="code"       &&<CodeApp AC={AC} showToast={showToast}/>}
         {appId==="forum"      &&<ForumApp AC={AC} user={user} showToast={showToast}/>}
-        {appId==="pos"        &&<PosApp AC={AC} user={user} showToast={showToast}/>}
+        {/* POS renders as a full-screen kiosk overlay (see posMode), not a window. */}
         {appId==="atlas"      &&<AtlasApp AC={AC} showToast={showToast}/>}
         {appId==="currency"   &&<CurrencyApp AC={AC}/>}
         {appId==="dictionary" &&<DictionaryApp AC={AC}/>}
@@ -1893,6 +1898,7 @@ export default function NovaOS(){
     function onKey(e){
       const h = kbHandlersRef.current;
       if(!h || h.screen !== "desktop") return;  // shortcuts only matter once signed in
+      if(posModeRef.current) return;            // POS kiosk takes over — no OS shortcuts
       const mod = e.ctrlKey || e.metaKey;
       const target = e.target;
       const isTyping = target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable);
@@ -3438,6 +3444,15 @@ export default function NovaOS(){
           onPickTheme={(t)=>updateSettings({theme:t})}
           onComplete={(picked)=>updateData(p=>({...p,desktopApps:picked,setupComplete:true}))}
         />
+      )}
+      {/* v11.0 POS remaster — full-screen kiosk. Sits above the taskbar/desktop
+          and everything else; "Close POS" inside the app calls onExit. */}
+      {posMode && (
+        <div style={{ position:"fixed", inset:0, zIndex:2000000, background:"var(--nv-surface)" }}>
+          <Suspense fallback={<div style={{display:"grid",placeItems:"center",height:"100%",fontFamily:FF,color:"var(--nv-text)"}}>Loading POS…</div>}>
+            <PosApp AC={AC} user={user} showToast={showToast} onExit={()=>setPosMode(false)}/>
+          </Suspense>
+        </div>
       )}
       {MobileNotice}
     </div>

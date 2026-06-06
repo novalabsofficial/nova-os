@@ -64,10 +64,16 @@ solid. This combined release **absorbs everything that was tentatively scoped as
 > live HTML/CSS/JS preview). **Whiteboard shipped** (infinite canvas, pen/shapes/
 > notes, PNG export). **Forum shipped** (Reddit/Quora-style board — nova_forum
 > Firestore: posts, topics, Hot/New/Top, threaded comments, up/down voting; author
-> or NovaMod can delete). **POS shipped** (restricted register — register/catalog/
-> sales tabs + a NovaMod-only Access panel that grants specific users access via a
-> nova_pos username allowlist; the app is invisible in every launcher surface to
-> anyone not granted). **Remaining Phase C:** mini spreadsheet, full Paint competitor.
+> or NovaMod can delete). **POS shipped + remastered** — full-screen kiosk that takes
+> over the Nova OS UI (Close POS exits); per-store username/password logins
+> (nova_pos_stores, SHA-256 hashed); item manager with images, price, **purchase
+> cost** and stock controls; register draws down stock on add, per-line Remove +
+> Cancel cart; cash (change calc) + record-only card; **Revenue page** auto-computes
+> total revenue / profit / COGS / tax / transactions + today + history. Still gated
+> by the NovaMod launcher allowlist (managed from the POS sign-in admin panel). Card
+> readers (Square): a pure web/Tauri app can't drive a physical reader — needs a
+> native app or backend + Terminal API, so shipped record-only card. **Remaining
+> Phase C:** mini spreadsheet, full Paint competitor.
 
 ## A · Design foundation — the bedrock everything else sits on
 - **Design system / tokens.** One shared scale for spacing, corner radius,
