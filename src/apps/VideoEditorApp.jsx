@@ -75,6 +75,7 @@ export function VideoEditorApp({ AC, showToast }) {
   const playingRef = useRef(false);
   const canvasRef = useRef(null);
   const playheadRef = useRef(null);
+  const timelineScrollRef = useRef(null);
   const fileRef = useRef(null);
   const vids = useRef(new Map());   // url -> <video>
   const auds = useRef(new Map());   // url -> <audio>
@@ -445,12 +446,28 @@ export function VideoEditorApp({ AC, showToast }) {
       </div>
 
       {/* Timeline */}
-      <div style={{ height: 178, background: "#0a0b11", borderTop: "1px solid rgba(255,255,255,0.08)", overflow: "auto", flexShrink: 0 }}>
+      <div ref={timelineScrollRef} style={{ height: 178, background: "#0a0b11", borderTop: "1px solid rgba(255,255,255,0.08)", overflow: "auto", flexShrink: 0 }}>
         <div style={{ position: "relative", width: (GUTTER + contentW) + "px", minWidth: "100%" }}>
           {/* ruler */}
           <div style={{ display: "flex", height: 24 }}>
             <div style={{ width: GUTTER, flexShrink: 0, position: "sticky", left: 0, zIndex: 3, background: "#0a0b11", borderRight: "1px solid rgba(255,255,255,0.08)", borderBottom: "1px solid rgba(255,255,255,0.08)" }} />
-            <div onPointerDown={e => { const r = e.currentTarget.getBoundingClientRect(); const go = c => seek((c - r.left) / pps); go(e.clientX); const mv = ev => go(ev.clientX); const up = () => { window.removeEventListener("pointermove", mv); window.removeEventListener("pointerup", up); }; window.addEventListener("pointermove", mv); window.addEventListener("pointerup", up); }}
+            <div onPointerDown={e => {
+              const rulerEl = e.currentTarget;
+              const go = (cx) => { const r = rulerEl.getBoundingClientRect(); seek((cx - r.left) / pps); };   // rect re-read so it stays right as we auto-scroll
+              let lastX = e.clientX, raf = 0;
+              const edge = () => {   // near a viewport edge: keep scrolling + scrubbing through the project
+                raf = 0; const sc = timelineScrollRef.current; if (!sc) return;
+                const sr = sc.getBoundingClientRect();
+                if (lastX > sr.right - 50) sc.scrollLeft += 16;
+                else if (lastX < sr.left + GUTTER + 50) sc.scrollLeft -= 16;
+                else return;
+                go(lastX); raf = requestAnimationFrame(edge);
+              };
+              go(e.clientX);
+              const mv = (ev) => { lastX = ev.clientX; go(ev.clientX); if (!raf) edge(); };
+              const up = () => { window.removeEventListener("pointermove", mv); window.removeEventListener("pointerup", up); if (raf) cancelAnimationFrame(raf); };
+              window.addEventListener("pointermove", mv); window.addEventListener("pointerup", up);
+            }}
               style={{ position: "relative", width: contentW, borderBottom: "1px solid rgba(255,255,255,0.08)", cursor: "text", userSelect: "none" }}>
               {ticks.map(s => <div key={s} style={{ position: "absolute", left: s * pps, top: 0, bottom: 0, borderLeft: "1px solid rgba(255,255,255,0.1)", paddingLeft: 4, fontSize: 10, color: "#6b7286", lineHeight: "24px" }}>{s}s</div>)}
             </div>
