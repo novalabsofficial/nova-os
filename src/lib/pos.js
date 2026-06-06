@@ -75,7 +75,7 @@ export async function createStore({ name, username, password, byUid }) {
     if ((await getDoc(ref)).exists()) return { error: "A store with that username already exists." };
     const store = {
       id, name: (name || username).trim().slice(0, 60), username: norm(username),
-      passHash: await hashPw(password), taxRate: 0, items: [], sales: [], agg: emptyAgg(),
+      passHash: await hashPw(password), taxRate: 0, state: "", items: [], sales: [], agg: emptyAgg(),
       createdAt: Date.now(), createdByUid: byUid || null,
     };
     await setDoc(ref, store);
@@ -109,6 +109,11 @@ export async function saveItems(id, items) {
 export async function saveTaxRate(id, taxRate) {
   try { await updateDoc(doc(firestoreDb, STORES, id), { taxRate: Math.max(0, Math.min(100, Number(taxRate) || 0)) }); return true; }
   catch (e) { console.warn("[pos] saveTax", e?.message || e); return false; }
+}
+// Generic small-field patch (e.g. { state, taxRate }).
+export async function saveStoreMeta(id, patch) {
+  try { await updateDoc(doc(firestoreDb, STORES, id), patch); return true; }
+  catch (e) { console.warn("[pos] saveMeta", e?.message || e); return false; }
 }
 
 // Commit a completed sale: write the stock-decremented catalog, prepend the sale

@@ -17,11 +17,36 @@ import { FF, FFB } from "../ui/styles.js";
 import { getDbUid } from "../lib/db.js";
 import { isAdmin } from "../lib/moderation.js";
 import {
-  createStore, loginStore, saveItems, saveTaxRate, commitSale,
+  createStore, loginStore, saveItems, saveTaxRate, saveStoreMeta, commitSale,
   fetchAccessList, grantAccess, revokeAccess,
 } from "../lib/pos.js";
 
 const money = (n) => "$" + (Number(n) || 0).toFixed(2);
+
+// US statewide base sales-tax rates (%), used to auto-fill the register's tax.
+// These are STATE-level base rates — county/city taxes can add more, so the rate
+// stays editable for local adjustment. AK/DE/MT/NH/OR have no state sales tax.
+const US_STATE_TAX = {
+  AL: 4.0, AK: 0.0, AZ: 5.6, AR: 6.5, CA: 7.25, CO: 2.9, CT: 6.35, DE: 0.0, DC: 6.0,
+  FL: 6.0, GA: 4.0, HI: 4.0, ID: 6.0, IL: 6.25, IN: 7.0, IA: 6.0, KS: 6.5, KY: 6.0,
+  LA: 5.0, ME: 5.5, MD: 6.0, MA: 6.25, MI: 6.0, MN: 6.875, MS: 7.0, MO: 4.225,
+  MT: 0.0, NE: 5.5, NV: 6.85, NH: 0.0, NJ: 6.625, NM: 4.875, NY: 4.0, NC: 4.75,
+  ND: 5.0, OH: 5.75, OK: 4.5, OR: 0.0, PA: 6.0, RI: 7.0, SC: 6.0, SD: 4.2, TN: 7.0,
+  TX: 6.25, UT: 6.1, VT: 6.0, VA: 5.3, WA: 6.5, WV: 6.0, WI: 5.0, WY: 4.0,
+};
+const US_STATES = [
+  ["AL","Alabama"],["AK","Alaska"],["AZ","Arizona"],["AR","Arkansas"],["CA","California"],
+  ["CO","Colorado"],["CT","Connecticut"],["DE","Delaware"],["DC","District of Columbia"],
+  ["FL","Florida"],["GA","Georgia"],["HI","Hawaii"],["ID","Idaho"],["IL","Illinois"],
+  ["IN","Indiana"],["IA","Iowa"],["KS","Kansas"],["KY","Kentucky"],["LA","Louisiana"],
+  ["ME","Maine"],["MD","Maryland"],["MA","Massachusetts"],["MI","Michigan"],["MN","Minnesota"],
+  ["MS","Mississippi"],["MO","Missouri"],["MT","Montana"],["NE","Nebraska"],["NV","Nevada"],
+  ["NH","New Hampshire"],["NJ","New Jersey"],["NM","New Mexico"],["NY","New York"],
+  ["NC","North Carolina"],["ND","North Dakota"],["OH","Ohio"],["OK","Oklahoma"],["OR","Oregon"],
+  ["PA","Pennsylvania"],["RI","Rhode Island"],["SC","South Carolina"],["SD","South Dakota"],
+  ["TN","Tennessee"],["TX","Texas"],["UT","Utah"],["VT","Vermont"],["VA","Virginia"],
+  ["WA","Washington"],["WV","West Virginia"],["WI","Wisconsin"],["WY","Wyoming"],
+];
 const LS_LAST = "nova-pos-last-store";
 let _pid = 0;
 const newId = () => "i" + Date.now().toString(36) + (_pid++).toString(36);
@@ -156,6 +181,13 @@ function Shell({ AC, user, showToast, onExit, store, setStore }) {
     setStore(s => ({ ...s, taxRate: r })); saveTaxRate(store.id, r);
   }, [store.id, setStore]);
 
+  // Pick a US state → auto-apply its base sales-tax rate (still editable after).
+  const setStateLoc = useCallback((code) => {
+    const rate = code in US_STATE_TAX ? US_STATE_TAX[code] : 0;
+    setStore(s => ({ ...s, state: code, taxRate: rate }));
+    saveStoreMeta(store.id, { state: code, taxRate: rate });
+  }, [store.id, setStore]);
+
   const onSale = useCallback(async (sale, nextItems) => {
     // optimistic local roll of the ledger + totals
     setStore(s => {
@@ -193,7 +225,7 @@ function Shell({ AC, user, showToast, onExit, store, setStore }) {
 
       <div style={{ flex: 1, minHeight: 0 }}>
         {tab === "register" && <Register AC={AC} items={items} taxRate={store.taxRate || 0} onSale={onSale} showToast={showToast} />}
-        {tab === "items" && <Items AC={AC} items={items} taxRate={store.taxRate || 0} setTax={setTax} onChange={persistItems} showToast={showToast} />}
+        {tab === "items" && <Items AC={AC} items={items} taxRate={store.taxRate || 0} setTax={setTax} stateCode={store.state || ""} setStateLoc={setStateLoc} onChange={persistItems} showToast={showToast} />}
         {tab === "revenue" && <Revenue AC={AC} agg={store.agg || {}} sales={store.sales || []} />}
       </div>
     </div>
@@ -352,7 +384,7 @@ function TenderModal({ AC, total, state, setState, onCancel, onConfirm }) {
 }
 
 // ─────────────────────────────────────────────────────────────── items ─────
-function Items({ AC, items, taxRate, setTax, onChange, showToast }) {
+function Items({ AC, items, taxRate, setTax, stateCode, setStateLoc, onChange, showToast }) {
   const [draft, setDraft] = useState(null);
   const blank = () => ({ id: newId(), name: "", price: "", cost: "", stock: "", category: "", img: null });
 
@@ -368,13 +400,23 @@ function Items({ AC, items, taxRate, setTax, onChange, showToast }) {
 
   return (
     <div style={{ height: "100%", overflow: "auto", padding: "16px 18px", maxWidth: 820, margin: "0 auto" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16, flexWrap: "wrap" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 6, flexWrap: "wrap" }}>
         <div style={{ fontFamily: FFB, fontSize: 18 }}>Products</div>
         <div style={{ flex: 1 }} />
+        <label style={{ fontSize: 12.5, color: "var(--nv-text-dim)", display: "flex", alignItems: "center", gap: 6 }}>
+          State
+          <select value={stateCode} onChange={e => setStateLoc(e.target.value)} style={{ padding: "7px 9px", borderRadius: 9, border: "1px solid var(--nv-border)", background: "var(--nv-elevated)", color: "var(--nv-text)", fontFamily: FF, fontSize: 13, maxWidth: 160 }}>
+            <option value="">— Select —</option>
+            {US_STATES.map(([code, name]) => <option key={code} value={code}>{name} ({US_STATE_TAX[code]}%)</option>)}
+          </select>
+        </label>
         <label style={{ fontSize: 12.5, color: "var(--nv-text-dim)", display: "flex", alignItems: "center", gap: 6 }}>
           Tax <input type="number" value={taxRate} onChange={e => setTax(e.target.value)} style={{ width: 64, padding: "7px 9px", borderRadius: 9, border: "1px solid var(--nv-border)", background: "var(--nv-elevated)", color: "var(--nv-text)", fontFamily: FF, fontSize: 13 }} /> %
         </label>
         <button onClick={() => setDraft(blank())} style={{ padding: "9px 15px", borderRadius: 10, border: "none", background: AC, color: "#fff", fontFamily: FFB, fontSize: 14, cursor: "pointer" }}>+ Add item</button>
+      </div>
+      <div style={{ fontSize: 11.5, color: "var(--nv-text-dim)", marginBottom: 14 }}>
+        Picking a state fills in its base sales-tax rate. County/city taxes vary — adjust the % above if your local rate differs. Tax applies to every sale at the register.
       </div>
 
       <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
