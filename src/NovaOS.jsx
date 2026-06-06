@@ -2391,8 +2391,8 @@ export default function NovaOS(){
       {screensaver && (
         <div onPointerDown={()=>{ssActiveRef.current=false;setScreensaver(false);}} style={{
           position:"fixed",inset:0,zIndex:100000,
-          background:"rgba(5,6,14,0.4)",
-          backdropFilter:"blur(28px) saturate(120%)",WebkitBackdropFilter:"blur(28px) saturate(120%)",
+          background:"rgba(6,7,16,0.88)",
+          backdropFilter:"blur(34px) saturate(115%)",WebkitBackdropFilter:"blur(34px) saturate(115%)",
           display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",
           cursor:"none",userSelect:"none",animation:"ss-fade 0.7s ease both",
         }}>
