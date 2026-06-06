@@ -2807,11 +2807,14 @@ export default function NovaOS(){
         // it's always obvious which window is active (real-OS depth).
         const isFocused = win.id===focusedWinId;
         const lightT = theme === "light";   // softer, blue-grey shadows in light mode
-        // v11.0 — windows are SOLID by default (opaque body, no see-through).
-        // The translucent frosted look + the Window-Blur slider only kick in when
-        // Liquid Glass is enabled (there's nothing for blur to show on a solid one).
-        const winBg = glass ? (lightT ? "rgba(245,247,251,0.86)" : "rgba(16,18,28,0.85)") : (lightT ? "#f6f8fc" : "#141620");
-        const winBackdrop = glass ? ("blur(" + winBlur + "px) saturate(150%)") : "none";
+        // v11.0 — windows are ALWAYS a solid opaque body so app content stays
+        // readable. (Frosted-glass windows aren't viable: windows live inside the
+        // virtual-desktop track, whose CSS transform defeats backdrop-filter, so a
+        // translucent window can't actually frost the wallpaper — it just bleeds
+        // through. Liquid Glass instead frosts the dock/widgets, which sit at the
+        // root where backdrop-filter works.)
+        const winBg = lightT ? "#f6f8fc" : "#141620";
+        const winBackdrop = "none";
         const winShadow = isDrg
           ? (lightT
             ? "0 12px 24px rgba(30,41,59,0.16), 0 36px 80px rgba(30,41,59,0.2), 0 1px 0 rgba(255,255,255,0.6) inset"
