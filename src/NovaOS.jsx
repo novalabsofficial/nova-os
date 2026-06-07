@@ -1688,7 +1688,7 @@ export default function NovaOS(){
       if(ptrRef.current) launchPt.current[newId]={x:ptrRef.current.x,y:ptrRef.current.y};
       markFx(newId,"entering",340);
     }
-  },[deviceMode,markAppNotificationsRead,markFx,bumpApp]);
+  },[deviceMode,markAppNotificationsRead,markFx]);
   // v10.0 — virtual-desktop operations.
   const addDesktop=useCallback(()=>{
     setDeskCount(c=>{ if(c>=MAX_DESKTOPS) return c; setCurDesk(c); return c+1; });
