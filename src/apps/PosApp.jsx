@@ -22,13 +22,39 @@ import {
 const money = (n) => "$" + (Number(n) || 0).toFixed(2);
 const LS_LAST = "nova-pos-last-account";
 
-// POS types — each re-labels the register to fit the kind of business. (More can
-// be added; behaviour is the same engine, the terminology is what changes.)
+// POS types — each one tailors the register to a kind of business: the wording,
+// the item fields (cost label, whether stock is tracked), the price label, and
+// whether a sale carries a per-line multiplier (e.g. hotel nights). Same engine,
+// genuinely different behaviour. More types are just another entry here.
 const POS_TYPES = {
-  retail:     { label: "Store / Retail",     icon: "🏪", desc: "Shops, boutiques, kiosks",        items: "Products", cart: "Cart",   product: "product",         add: "Add item",            charge: "Charge" },
-  restaurant: { label: "Restaurant / Café",  icon: "🍽️", desc: "Restaurants, cafés, bars",        items: "Menu",     cart: "Order",  product: "menu item",       add: "Add menu item",       charge: "Charge" },
-  hotel:      { label: "Hotel / Lodging",    icon: "🛎️", desc: "Hotels, motels, B&Bs",           items: "Rooms & services", cart: "Folio", product: "room or service", add: "Add room / service", charge: "Charge to folio" },
-  services:   { label: "Services / Salon",   icon: "💈", desc: "Salons, spas, repair, bookings",  items: "Services", cart: "Ticket", product: "service",         add: "Add service",         charge: "Charge" },
+  retail: {
+    label: "Store / Retail", icon: "🏪", desc: "Shops, boutiques, kiosks",
+    items: "Products", cart: "Cart", product: "product", add: "Add item", charge: "Charge",
+    priceLabel: "Price", costLabel: "Purchase cost",
+    tracksStock: true, stockLabel: "Stock", stockWord: "left",
+    unit: null,
+  },
+  restaurant: {
+    label: "Restaurant / Café", icon: "🍽️", desc: "Restaurants, cafés, bars",
+    items: "Menu", cart: "Order", product: "menu item", add: "Add menu item", charge: "Charge",
+    priceLabel: "Price", costLabel: "Food cost",
+    tracksStock: false,
+    unit: null,
+  },
+  hotel: {
+    label: "Hotel / Lodging", icon: "🛎️", desc: "Hotels, motels, B&Bs",
+    items: "Rooms & services", cart: "Folio", product: "room or service", add: "Add room / service", charge: "Charge to folio",
+    priceLabel: "Nightly rate", costLabel: "Maintenance cost",
+    tracksStock: true, stockLabel: "Rooms available", stockWord: "free",
+    unit: { label: "Nights", suffix: "/night", word: "nights", one: "night", default: 1 },
+  },
+  services: {
+    label: "Services / Salon", icon: "💈", desc: "Salons, spas, repair, bookings",
+    items: "Services", cart: "Ticket", product: "service", add: "Add service", charge: "Charge",
+    priceLabel: "Price", costLabel: "Service cost",
+    tracksStock: false,
+    unit: null,
+  },
 };
 const POS_TYPE_LIST = Object.entries(POS_TYPES).map(([id, t]) => ({ id, ...t }));
 const posType = (k) => POS_TYPES[k] || POS_TYPES.retail;
@@ -329,31 +355,34 @@ function Register({ AC, items, taxRate, onSale, showToast, terms = POS_TYPES.ret
 
   const cats = useMemo(() => ["All", ...Array.from(new Set(items.map(i => i.category).filter(Boolean)))], [items]);
   const shown = items.filter(i => (cat === "All" || i.category === cat) && i.name.toLowerCase().includes(q.toLowerCase()));
-  const avail = (it) => (it.stock ?? 0) - (cart[it.id] || 0);
+  const unitDef = terms.unit ? terms.unit.default : 1;
+  const avail = (it) => terms.tracksStock ? (it.stock ?? 0) - (cart[it.id]?.qty || 0) : Infinity;
 
-  const add = (it) => { if (avail(it) <= 0) { showToast?.("Out of stock"); return; } setCart(c => ({ ...c, [it.id]: (c[it.id] || 0) + 1 })); };
-  const setQty = (id, qty) => setCart(c => { const n = { ...c }; if (qty <= 0) delete n[id]; else n[id] = qty; return n; });
+  const add = (it) => { if (avail(it) <= 0) { showToast?.("Out of stock"); return; } setCart(c => { const e = c[it.id]; return { ...c, [it.id]: { qty: (e?.qty || 0) + 1, units: e?.units || unitDef } }; }); };
+  const setQty = (id, qty) => setCart(c => { const n = { ...c }; if (qty <= 0) delete n[id]; else n[id] = { ...n[id], qty }; return n; });
+  const setUnits = (id, u) => setCart(c => c[id] ? { ...c, [id]: { ...c[id], units: Math.max(1, u) } } : c);
   const cancel = () => setCart({});
 
-  const lines = useMemo(() => Object.entries(cart).map(([id, qty]) => {
+  const lines = useMemo(() => Object.entries(cart).map(([id, e]) => {
     const it = items.find(x => x.id === id); if (!it) return null;
-    return { id, name: it.name, price: it.price || 0, cost: it.cost || 0, img: it.img, qty, lineTotal: (it.price || 0) * qty };
-  }).filter(Boolean), [cart, items]);
+    const units = terms.unit ? (e.units || 1) : 1;
+    return { id, name: it.name, price: it.price || 0, cost: it.cost || 0, img: it.img, qty: e.qty, units, lineTotal: (it.price || 0) * e.qty * units };
+  }).filter(Boolean), [cart, items, terms.unit]);
   const subtotal = useMemo(() => lines.reduce((s, l) => s + l.lineTotal, 0), [lines]);
   const rate = Number(taxRate) || 0;
   const tax = subtotal * rate / 100;
   const total = subtotal + tax;
-  const count = Object.values(cart).reduce((s, n) => s + n, 0);
+  const count = Object.values(cart).reduce((s, e) => s + (e.qty || 0), 0);
 
   const complete = ({ method, paid }) => {
-    const cogs = lines.reduce((s, l) => s + l.cost * l.qty, 0);
+    const cogs = lines.reduce((s, l) => s + l.cost * l.qty, 0);   // cost is per item/room, not per unit-night
     const sale = {
       id: newId(), at: Date.now(), tender: method, paid: +(+paid).toFixed(2),
-      lines: lines.map(l => ({ id: l.id, name: l.name, price: l.price, cost: l.cost, qty: l.qty })),
+      lines: lines.map(l => ({ id: l.id, name: l.name, price: l.price, cost: l.cost, qty: l.qty, units: l.units, unit: terms.unit ? terms.unit.word : null })),
       subtotal: +subtotal.toFixed(2), tax: +tax.toFixed(2), total: +total.toFixed(2),
       revenue: +subtotal.toFixed(2), cost: +cogs.toFixed(2), profit: +(subtotal - cogs).toFixed(2),
     };
-    const nextItems = items.map(it => cart[it.id] ? { ...it, stock: Math.max(0, (it.stock ?? 0) - cart[it.id]) } : it);
+    const nextItems = items.map(it => (terms.tracksStock && cart[it.id]) ? { ...it, stock: Math.max(0, (it.stock ?? 0) - cart[it.id].qty) } : it);
     onSale(sale, nextItems); setCart({}); setTender(null);
   };
 
@@ -380,8 +409,8 @@ function Register({ AC, items, taxRate, onSale, showToast, terms = POS_TYPES.ret
                         <div style={{ padding: "8px 10px" }}>
                           <div style={{ fontFamily: FFB, fontSize: 13, lineHeight: 1.2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{it.name}</div>
                           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 3 }}>
-                            <span style={{ fontFamily: FFB, fontSize: 13, color: AC }}>{money(it.price)}</span>
-                            <span style={{ fontSize: 11, color: out ? "#ef4444" : "var(--nv-text-dim)" }}>{out ? "Out" : a + " left"}</span>
+                            <span style={{ fontFamily: FFB, fontSize: 13, color: AC }}>{money(it.price)}{terms.unit ? terms.unit.suffix : ""}</span>
+                            {terms.tracksStock && <span style={{ fontSize: 11, color: out ? "#ef4444" : "var(--nv-text-dim)" }}>{out ? "Out" : a + " " + (terms.stockWord || "left")}</span>}
                           </div>
                         </div>
                       </div>
@@ -399,21 +428,32 @@ function Register({ AC, items, taxRate, onSale, showToast, terms = POS_TYPES.ret
           {count > 0 && <button onClick={cancel} style={{ padding: "5px 11px", borderRadius: 8, border: "1px solid var(--nv-border)", background: "transparent", color: "#ef4444", fontFamily: FFB, fontSize: 12, cursor: "pointer" }}>Cancel {terms.cart.toLowerCase()}</button>}
         </div>
         <div style={{ flex: 1, overflow: "auto", padding: "8px 10px" }}>
-          {lines.length === 0 ? <Center>Tap a product to start a sale.</Center>
+          {lines.length === 0 ? <Center>Tap a {terms.product} to start.</Center>
             : lines.map(l => (
-              <div key={l.id} style={{ display: "flex", alignItems: "center", gap: 9, padding: "8px 4px", borderBottom: "1px solid var(--nv-border)" }}>
-                {l.img ? <img src={l.img} alt="" style={{ width: 30, height: 30, borderRadius: 7, objectFit: "cover" }} /> : <span style={{ fontSize: 20 }}>📦</span>}
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontFamily: FFB, fontSize: 13, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{l.name}</div>
-                  <div style={{ fontSize: 11.5, color: "var(--nv-text-dim)" }}>{money(l.price)} ea</div>
+              <div key={l.id} style={{ padding: "8px 4px", borderBottom: "1px solid var(--nv-border)" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
+                  {l.img ? <img src={l.img} alt="" style={{ width: 30, height: 30, borderRadius: 7, objectFit: "cover" }} /> : <span style={{ fontSize: 20 }}>📦</span>}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontFamily: FFB, fontSize: 13, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{l.name}</div>
+                    <div style={{ fontSize: 11.5, color: "var(--nv-text-dim)" }}>{money(l.price)}{terms.unit ? terms.unit.suffix : " ea"}</div>
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                    <Stepper onClick={() => setQty(l.id, l.qty - 1)}>–</Stepper>
+                    <span style={{ minWidth: 18, textAlign: "center", fontFamily: FFB, fontSize: 13 }}>{l.qty}</span>
+                    <Stepper onClick={() => setQty(l.id, l.qty + 1)}>+</Stepper>
+                  </div>
+                  <div style={{ width: 54, textAlign: "right", fontFamily: FFB, fontSize: 13 }}>{money(l.lineTotal)}</div>
+                  <span onClick={() => setQty(l.id, 0)} title="Remove" style={{ cursor: "pointer", color: "var(--nv-text-dim)", fontSize: 15, padding: "0 2px" }}>✕</span>
                 </div>
-                <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                  <Stepper onClick={() => setQty(l.id, l.qty - 1)}>–</Stepper>
-                  <span style={{ minWidth: 18, textAlign: "center", fontFamily: FFB, fontSize: 13 }}>{l.qty}</span>
-                  <Stepper onClick={() => setQty(l.id, l.qty + 1)}>+</Stepper>
-                </div>
-                <div style={{ width: 50, textAlign: "right", fontFamily: FFB, fontSize: 13 }}>{money(l.lineTotal)}</div>
-                <span onClick={() => setQty(l.id, 0)} title="Remove" style={{ cursor: "pointer", color: "var(--nv-text-dim)", fontSize: 15, padding: "0 2px" }}>✕</span>
+                {terms.unit && (
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 6, paddingLeft: 39 }}>
+                    <span style={{ fontSize: 11.5, color: "var(--nv-text-dim)" }}>{terms.unit.label}:</span>
+                    <Stepper onClick={() => setUnits(l.id, l.units - 1)}>–</Stepper>
+                    <span style={{ minWidth: 16, textAlign: "center", fontFamily: FFB, fontSize: 12.5 }}>{l.units}</span>
+                    <Stepper onClick={() => setUnits(l.id, l.units + 1)}>+</Stepper>
+                    <span style={{ fontSize: 11, color: "var(--nv-text-dim)" }}>× {l.qty} {l.qty === 1 ? terms.product : terms.product + "s"}</span>
+                  </div>
+                )}
               </div>
             ))}
         </div>
@@ -500,16 +540,18 @@ function Items({ AC, items, onChange, showToast, terms = POS_TYPES.retail }) {
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontFamily: FFB, fontSize: 14.5 }}>{it.name}</div>
-                <div style={{ fontSize: 12, color: "var(--nv-text-dim)" }}>{money(it.price)} · cost {money(it.cost)} · <span style={{ color: margin >= 0 ? "#16a34a" : "#ef4444" }}>{margin >= 0 ? "+" : ""}{money(margin)} margin</span>{it.category ? " · " + it.category : ""}</div>
+                <div style={{ fontSize: 12, color: "var(--nv-text-dim)" }}>{money(it.price)}{terms.unit ? terms.unit.suffix : ""} · cost {money(it.cost)} · <span style={{ color: margin >= 0 ? "#16a34a" : "#ef4444" }}>{margin >= 0 ? "+" : ""}{money(margin)} margin</span>{it.category ? " · " + it.category : ""}</div>
               </div>
-              <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
-                <Stepper onClick={() => adjustStock(it.id, -1)}>–</Stepper>
-                <div style={{ minWidth: 44, textAlign: "center" }}>
-                  <div style={{ fontFamily: FFB, fontSize: 15, color: (it.stock ?? 0) <= 0 ? "#ef4444" : "var(--nv-text)" }}>{it.stock ?? 0}</div>
-                  <div style={{ fontSize: 10, color: "var(--nv-text-dim)" }}>in stock</div>
+              {terms.tracksStock && (
+                <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                  <Stepper onClick={() => adjustStock(it.id, -1)}>–</Stepper>
+                  <div style={{ minWidth: 44, textAlign: "center" }}>
+                    <div style={{ fontFamily: FFB, fontSize: 15, color: (it.stock ?? 0) <= 0 ? "#ef4444" : "var(--nv-text)" }}>{it.stock ?? 0}</div>
+                    <div style={{ fontSize: 10, color: "var(--nv-text-dim)" }}>in stock</div>
+                  </div>
+                  <Stepper onClick={() => adjustStock(it.id, 1)}>+</Stepper>
                 </div>
-                <Stepper onClick={() => adjustStock(it.id, 1)}>+</Stepper>
-              </div>
+              )}
               <span onClick={() => setDraft({ ...it, price: String(it.price ?? ""), cost: String(it.cost ?? ""), stock: String(it.stock ?? "") })} style={{ cursor: "pointer", fontSize: 12.5, color: "var(--nv-text-dim)" }}>Edit</span>
               <span onClick={() => del(it.id)} style={{ cursor: "pointer", fontSize: 12.5, color: "#ef4444" }}>Delete</span>
             </div>
@@ -517,12 +559,12 @@ function Items({ AC, items, onChange, showToast, terms = POS_TYPES.retail }) {
         })}
         {items.length === 0 && <Center>No {terms.product}s yet. Click <b>+ {terms.add}</b> to build your catalog.</Center>}
       </div>
-      {draft && <ItemEditor AC={AC} draft={draft} setDraft={setDraft} onSave={commit} exists={items.some(i => i.id === draft.id)} showToast={showToast} />}
+      {draft && <ItemEditor AC={AC} draft={draft} setDraft={setDraft} onSave={commit} exists={items.some(i => i.id === draft.id)} showToast={showToast} terms={terms} />}
     </div>
   );
 }
 
-function ItemEditor({ AC, draft, setDraft, onSave, exists, showToast }) {
+function ItemEditor({ AC, draft, setDraft, onSave, exists, showToast, terms = POS_TYPES.retail }) {
   const fileRef = useRef(null);
   const downRef = useRef(false);
   const close = () => setDraft(null);
@@ -532,23 +574,23 @@ function ItemEditor({ AC, draft, setDraft, onSave, exists, showToast }) {
     <div onPointerDown={e => { downRef.current = e.target === e.currentTarget; }} onClick={e => { if (downRef.current && e.target === e.currentTarget) close(); }}
       style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.55)", display: "grid", placeItems: "center", zIndex: 30 }}>
       <div onPointerDown={e => e.stopPropagation()} onClick={e => e.stopPropagation()} style={{ width: 380, maxWidth: "92vw", background: "var(--nv-surface-solid)", border: "1px solid var(--nv-border)", borderRadius: 18, padding: 20, fontFamily: FF, display: "flex", flexDirection: "column", gap: 12 }}>
-        <div style={{ fontFamily: FFB, fontSize: 17 }}>{exists ? "Edit item" : "New item"}</div>
+        <div style={{ fontFamily: FFB, fontSize: 17 }}>{exists ? "Edit " : "New "}{terms.product}</div>
         <div style={{ display: "flex", gap: 13, alignItems: "center" }}>
           <div onClick={() => fileRef.current?.click()} style={{ width: 70, height: 70, borderRadius: 13, background: "var(--nv-elevated)", border: "1px dashed var(--nv-border)", display: "grid", placeItems: "center", overflow: "hidden", cursor: "pointer", flexShrink: 0 }}>
             {draft.img ? <img src={draft.img} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <span style={{ fontSize: 11, color: "var(--nv-text-dim)", textAlign: "center" }}>Add<br />image</span>}
           </div>
           <div style={{ flex: 1 }}>
-            <input value={draft.name} onChange={e => setDraft(d => ({ ...d, name: e.target.value }))} placeholder="Item name" autoFocus style={{ ...fld, fontFamily: FFB }} />
+            <input value={draft.name} onChange={e => setDraft(d => ({ ...d, name: e.target.value }))} placeholder={terms.product.charAt(0).toUpperCase() + terms.product.slice(1) + " name"} autoFocus style={{ ...fld, fontFamily: FFB }} />
             {draft.img && <div onClick={() => setDraft(d => ({ ...d, img: null }))} style={{ fontSize: 12, color: "#ef4444", marginTop: 6, cursor: "pointer" }}>Remove image</div>}
           </div>
           <input ref={fileRef} type="file" accept="image/*" onChange={pickImg} style={{ display: "none" }} />
         </div>
         <div style={{ display: "flex", gap: 10 }}>
-          <label style={{ flex: 1, fontSize: 11.5, color: "var(--nv-text-dim)" }}>Price<input type="number" inputMode="decimal" value={draft.price} onChange={e => setDraft(d => ({ ...d, price: e.target.value }))} placeholder="0.00" style={{ ...fld, marginTop: 3 }} /></label>
-          <label style={{ flex: 1, fontSize: 11.5, color: "var(--nv-text-dim)" }}>Purchase cost<input type="number" inputMode="decimal" value={draft.cost} onChange={e => setDraft(d => ({ ...d, cost: e.target.value }))} placeholder="0.00" style={{ ...fld, marginTop: 3 }} /></label>
+          <label style={{ flex: 1, fontSize: 11.5, color: "var(--nv-text-dim)" }}>{terms.priceLabel}<input type="number" inputMode="decimal" value={draft.price} onChange={e => setDraft(d => ({ ...d, price: e.target.value }))} placeholder="0.00" style={{ ...fld, marginTop: 3 }} /></label>
+          <label style={{ flex: 1, fontSize: 11.5, color: "var(--nv-text-dim)" }}>{terms.costLabel}<input type="number" inputMode="decimal" value={draft.cost} onChange={e => setDraft(d => ({ ...d, cost: e.target.value }))} placeholder="0.00" style={{ ...fld, marginTop: 3 }} /></label>
         </div>
         <div style={{ display: "flex", gap: 10 }}>
-          <label style={{ flex: 1, fontSize: 11.5, color: "var(--nv-text-dim)" }}>Stock<input type="number" inputMode="numeric" value={draft.stock} onChange={e => setDraft(d => ({ ...d, stock: e.target.value }))} placeholder="0" style={{ ...fld, marginTop: 3 }} /></label>
+          {terms.tracksStock && <label style={{ flex: 1, fontSize: 11.5, color: "var(--nv-text-dim)" }}>{terms.stockLabel || "Stock"}<input type="number" inputMode="numeric" value={draft.stock} onChange={e => setDraft(d => ({ ...d, stock: e.target.value }))} placeholder="0" style={{ ...fld, marginTop: 3 }} /></label>}
           <label style={{ flex: 1, fontSize: 11.5, color: "var(--nv-text-dim)" }}>Category<input value={draft.category} onChange={e => setDraft(d => ({ ...d, category: e.target.value }))} placeholder="optional" style={{ ...fld, marginTop: 3 }} /></label>
         </div>
         <div style={{ display: "flex", gap: 8, marginTop: 2 }}>
@@ -703,7 +745,7 @@ function DayGroup({ g, perDayExp }) {
               <span style={{ fontFamily: FFB, fontSize: 13.5 }}>{money(s.total)}</span>
               <span style={{ fontSize: 11, padding: "1px 7px", borderRadius: 999, background: "var(--nv-elevated)", color: "var(--nv-text-dim)" }}>{s.tender === "cash" ? "💵" : "💳"}</span>
               <span style={{ fontSize: 11.5, color: "#16a34a" }}>+{money(s.profit)}</span>
-              <span style={{ flex: 1, fontSize: 11.5, color: "var(--nv-text-dim)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{(s.lines || []).map(l => `${l.qty}× ${l.name}`).join(", ")}</span>
+              <span style={{ flex: 1, fontSize: 11.5, color: "var(--nv-text-dim)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{(s.lines || []).map(l => `${l.qty}× ${l.name}${l.units > 1 && l.unit ? ` · ${l.units} ${l.unit}` : ""}`).join(", ")}</span>
               <span style={{ fontSize: 11, color: "var(--nv-text-dim)" }}>{new Date(s.at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}</span>
             </div>
           ))}
