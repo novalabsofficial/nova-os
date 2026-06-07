@@ -46,6 +46,7 @@ const POS_TYPES = {
     items: "Rooms & services", cart: "Folio", product: "room or service", add: "Add room / service", charge: "Charge to folio",
     priceLabel: "Nightly rate", costLabel: "Maintenance cost",
     tracksStock: true, stockLabel: "Rooms available", stockWord: "free",
+    tracksCheckout: true,   // booking moves a room available → checked-out; checkout returns it
     unit: { label: "Nights", suffix: "/night", word: "nights", one: "night", default: 1 },
   },
   services: {
@@ -382,7 +383,13 @@ function Register({ AC, items, taxRate, onSale, showToast, terms = POS_TYPES.ret
       subtotal: +subtotal.toFixed(2), tax: +tax.toFixed(2), total: +total.toFixed(2),
       revenue: +subtotal.toFixed(2), cost: +cogs.toFixed(2), profit: +(subtotal - cogs).toFixed(2),
     };
-    const nextItems = items.map(it => (terms.tracksStock && cart[it.id]) ? { ...it, stock: Math.max(0, (it.stock ?? 0) - cart[it.id].qty) } : it);
+    const nextItems = items.map(it => {
+      const e = cart[it.id]; if (!e) return it;
+      let n = it;
+      if (terms.tracksStock) n = { ...n, stock: Math.max(0, (it.stock ?? 0) - e.qty) };
+      if (terms.tracksCheckout) n = { ...n, checkedOut: (it.checkedOut ?? 0) + e.qty };  // rooms now occupied
+      return n;
+    });
     onSale(sale, nextItems); setCart({}); setTender(null);
   };
 
@@ -514,6 +521,8 @@ function Items({ AC, items, onChange, showToast, terms = POS_TYPES.retail }) {
   const [draft, setDraft] = useState(null);
   const blank = () => ({ id: newId(), name: "", price: "", cost: "", stock: "", category: "", img: null });
   const adjustStock = (id, delta) => onChange(items.map(it => it.id === id ? { ...it, stock: Math.max(0, (it.stock ?? 0) + delta) } : it));
+  // Hotel: check a guest out of a room → it returns to available stock (default 1).
+  const checkout = (id, n = 1) => onChange(items.map(it => it.id === id ? { ...it, stock: (it.stock ?? 0) + n, checkedOut: Math.max(0, (it.checkedOut ?? 0) - n) } : it));
   const del = (id) => onChange(items.filter(i => i.id !== id));
   const commit = () => {
     if (!draft.name.trim()) { showToast?.("Name required"); return; }
@@ -550,6 +559,16 @@ function Items({ AC, items, onChange, showToast, terms = POS_TYPES.retail }) {
                     <div style={{ fontSize: 10, color: "var(--nv-text-dim)" }}>in stock</div>
                   </div>
                   <Stepper onClick={() => adjustStock(it.id, 1)}>+</Stepper>
+                </div>
+              )}
+              {terms.tracksCheckout && (
+                <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
+                  <div style={{ minWidth: 44, textAlign: "center" }}>
+                    <div style={{ fontFamily: FFB, fontSize: 15, color: (it.checkedOut ?? 0) > 0 ? AC : "var(--nv-text-dim)" }}>{it.checkedOut ?? 0}</div>
+                    <div style={{ fontSize: 10, color: "var(--nv-text-dim)" }}>checked out</div>
+                  </div>
+                  <button disabled={(it.checkedOut ?? 0) <= 0} onClick={() => checkout(it.id, 1)}
+                    style={{ padding: "6px 11px", borderRadius: 8, border: "1px solid var(--nv-border)", background: (it.checkedOut ?? 0) > 0 ? "var(--nv-elevated)" : "transparent", color: (it.checkedOut ?? 0) > 0 ? "var(--nv-text)" : "var(--nv-text-dim)", fontFamily: FFB, fontSize: 12, cursor: (it.checkedOut ?? 0) > 0 ? "pointer" : "default", whiteSpace: "nowrap" }}>Check out</button>
                 </div>
               )}
               <span onClick={() => setDraft({ ...it, price: String(it.price ?? ""), cost: String(it.cost ?? ""), stock: String(it.stock ?? "") })} style={{ cursor: "pointer", fontSize: 12.5, color: "var(--nv-text-dim)" }}>Edit</span>
