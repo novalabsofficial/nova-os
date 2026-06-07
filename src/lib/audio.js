@@ -252,17 +252,27 @@ function _voice(ctx, dest, freq, t, durMs, gain, type = "sine", attackMs = 8) {
   osc.stop(t + dur);
 }
 
-// v10.0 — a warmer, cleaner "tine" chime. A sine fundamental for the body,
-// a faint triangle at the fundamental for gentle warmth (soft odd harmonics),
-// a quiet octave for clarity, and a faint *consonant* twelfth (×3.0, a pure
-// octave-plus-fifth) for sparkle. Dropping the old ×3.01 inharmonic removes
-// the slight metallic "beating" that made the previous chimes read a touch
-// digital — the partials now all sit in tune, so the note rings clean.
-function _chime(ctx, dest, t, freq, durMs, gain, attackMs = 7) {
+// v11.0 sound refresh — a soft "glass bell" with a Windows-11-style wooden
+// mallet onset. The character we're after: calm, warm, rounded, never bright
+// or digital. So vs the old chime: the metallic twelfth is gone, the octave is
+// quieter (clarity without glare), the triangle warmth stays, and a *very*
+// short ×4 tap is layered on the attack for that soft mallet "knock" Win11's
+// sounds open with. The result reads as a struck wooden/glass tine that blooms
+// and rings out through the reverb bus.
+function _chime(ctx, dest, t, freq, durMs, gain, attackMs = 6) {
   _voice(ctx, dest, freq,       t, durMs,         gain,        "sine",     attackMs); // fundamental
-  _voice(ctx, dest, freq,       t, durMs * 0.85,  gain * 0.14, "triangle", attackMs); // warmth
-  _voice(ctx, dest, freq * 2.0, t, durMs * 0.50,  gain * 0.20, "sine",     attackMs); // octave (clarity)
-  _voice(ctx, dest, freq * 3.0, t, durMs * 0.26,  gain * 0.06, "sine",     attackMs); // twelfth (sparkle)
+  _voice(ctx, dest, freq,       t, durMs * 0.80,  gain * 0.12, "triangle", attackMs); // warmth
+  _voice(ctx, dest, freq * 2.0, t, durMs * 0.42,  gain * 0.13, "sine",     attackMs); // octave (gentle clarity)
+  _voice(ctx, dest, freq * 4.0, t, 55,            gain * 0.05, "sine",     2);        // soft mallet tap
+}
+
+// A soft marimba/mallet voice for the lighter, percussive moments (message
+// pings, window/app ticks): warm fundamental, a quiet octave for body, and a
+// quick wooden tap. Decays fast so it stays light and out of the way.
+function _mallet(ctx, dest, t, freq, durMs, gain, attackMs = 2) {
+  _voice(ctx, dest, freq,       t, durMs,         gain,        "sine",     attackMs);
+  _voice(ctx, dest, freq * 2.0, t, durMs * 0.45,  gain * 0.20, "sine",     attackMs);
+  _voice(ctx, dest, freq * 4.0, t, 48,            gain * 0.09, "triangle", 1);        // wooden tap
 }
 
 // A slow swelling pad: fundamental + perfect fifth + sub-octave, all with a
@@ -288,122 +298,124 @@ function _swell(ctx, dest, freq, t, durMs, gain, attackMs = 220) {
 //   C3=130.81  G3=196.00  C4=261.63  E4=329.63  G4=392.00  A4=440.00
 //   C5=523.25  D5=587.33  E5=659.25  G5=783.99  A5=880.00  C6=1046.50  G6=1568
 const SOUND_RECIPES = {
-  // Welcome chord — a clean rising major triad (C5–E5–G5) over a soft
-  // sub-octave body. With the limiter keeping it under 0dBFS and the reverb
-  // supplying the tail, the three notes ring *together* into one resonant
-  // moment. This is the sound the whole v9.0 pass was built to fix.
+  // Welcome — a warm major chord that blooms in the mid register (G4–C5–E5)
+  // over a soft low body. Voiced lower and gentler than a bright triad so it
+  // reads as a calm, premium "you're in" rather than a fanfare. The reverb
+  // carries the tail; the limiter keeps the stacked notes under 0dBFS.
   login: (ctx, t, v, r, d) => {
-    _voice(ctx, d, 130.81 * r, t + 0.00, 1500, 0.06 * v, "sine", 140);   // C3 body
-    _chime(ctx, d, t + 0.00, 523.25 * r, 900,  0.15 * v);                // C5
-    _chime(ctx, d, t + 0.10, 659.25 * r, 950,  0.15 * v);                // E5
-    _chime(ctx, d, t + 0.20, 783.99 * r, 1300, 0.16 * v);                // G5 — rings out
-    _voice(ctx, d, 1046.50 * r, t + 0.34, 760, 0.05 * v, "sine", 9);     // C6 — premium shimmer
+    _voice(ctx, d, 130.81 * r, t + 0.00, 1700, 0.05 * v, "sine", 180);   // C3 warm body
+    _chime(ctx, d, t + 0.00, 392.00 * r, 1100, 0.12 * v);                // G4
+    _chime(ctx, d, t + 0.08, 523.25 * r, 1200, 0.13 * v);                // C5
+    _chime(ctx, d, t + 0.16, 659.25 * r, 1500, 0.13 * v);                // E5 — rings out
   },
 
-  // Logout — a calm two-step descent (G5 → C5) settling onto a low C body.
-  // "Winding down" without being mournful.
+  // Logout — a calm step down (E5 → G4) settling onto a low C body.
+  // "Winding down", gentle and unhurried.
   logout: (ctx, t, v, r, d) => {
-    _chime(ctx, d, t + 0.00, 783.99 * r, 700,  0.13 * v);                // G5
-    _chime(ctx, d, t + 0.16, 523.25 * r, 900,  0.13 * v);                // C5
-    _voice(ctx, d, 130.81 * r, t + 0.10, 1500, 0.06 * v, "sine", 150);   // C3 settle
+    _chime(ctx, d, t + 0.00, 659.25 * r, 700,  0.11 * v);                // E5
+    _chime(ctx, d, t + 0.16, 392.00 * r, 1100, 0.12 * v);                // G4
+    _voice(ctx, d, 130.81 * r, t + 0.08, 1500, 0.05 * v, "sine", 160);   // C3 settle
   },
 
-  // Startup — a short cinematic pad swell, then a four-note C-major-add9
-  // arpeggio resolving an octave up. The reverb carries the tail so the
-  // notes stay clean instead of smearing into mud.
+  // Startup — a slow warm pad swell, then a gentle four-note ascending bell
+  // line (C4–E4–G4–C5) that stays in a mellow register and rings out. Calm
+  // and welcoming, not a flourish — the pad builds the space, the reverb
+  // carries the tail.
   startup: (ctx, t, v, r, d) => {
-    _swell(ctx, d, 130.81 * r, t + 0.00, 1900, 0.06 * v, 320);           // C3 pad
-    _chime(ctx, d, t + 0.30, 261.63 * r, 800,  0.11 * v);                // C4
-    _chime(ctx, d, t + 0.55, 392.00 * r, 850,  0.12 * v);                // G4
-    _chime(ctx, d, t + 0.80, 587.33 * r, 950,  0.12 * v);                // D5 (add9)
-    _chime(ctx, d, t + 1.10, 1046.50 * r, 1500, 0.13 * v);               // C6 — sparkle
+    _swell(ctx, d, 130.81 * r, t + 0.00, 2200, 0.055 * v, 420);          // C3 pad (slow build)
+    _chime(ctx, d, t + 0.35, 261.63 * r, 900,  0.10 * v);                // C4
+    _chime(ctx, d, t + 0.65, 329.63 * r, 950,  0.10 * v);                // E4
+    _chime(ctx, d, t + 0.95, 392.00 * r, 1050, 0.11 * v);                // G4
+    _chime(ctx, d, t + 1.30, 523.25 * r, 1700, 0.12 * v);                // C5 — rings out
   },
 
-  // Notification — a friendly rising perfect fourth (G5 → C6); two clean
-  // chimes that overlap into a single shimmer. Modern, not a doorbell.
+  // Notification — a soft, calm descending major third (E5 → C5). Two gentle
+  // bells that bloom together; a quiet "here's something" rather than a chime
+  // that demands attention.
   notification: (ctx, t, v, r, d) => {
-    _chime(ctx, d, t + 0.00, 783.99 * r, 850,  0.14 * v);                // G5
-    _chime(ctx, d, t + 0.12, 1046.50 * r, 1050, 0.14 * v);               // C6
+    _chime(ctx, d, t + 0.00, 659.25 * r, 700,  0.12 * v);                // E5
+    _chime(ctx, d, t + 0.13, 523.25 * r, 950,  0.13 * v);                // C5
   },
 
-  // Message ping — one soft chime with a high sparkle. A light "drop" for
-  // the frequent chat / DM moment, distinct from a full notification.
+  // Message ping — one soft mallet note with a faint high shimmer. A light,
+  // frequent "drop" for chat / DMs, distinct from a full notification.
   message: (ctx, t, v, r, d) => {
-    _chime(ctx, d, t + 0.00, 880.00 * r, 620, 0.12 * v);                 // A5
-    _voice(ctx, d, 1760.00 * r, t + 0.04, 240, 0.04 * v, "sine", 6);     // A6 air
+    _mallet(ctx, d, t + 0.00, 659.25 * r, 520, 0.11 * v);                // E5 soft mallet
+    _voice(ctx, d, 1318.51 * r, t + 0.03, 200, 0.03 * v, "sine", 5);     // E6 air
   },
 
-  // Success — a quick two-note lift to a major sixth (C5 → A5). Used for
-  // routine "saved / applied" moments, so it's brief but still smooth.
+  // Success — a gentle two-note lift to a perfect fifth (C5 → G5). Brief and
+  // smooth for routine "saved / applied" moments.
   success: (ctx, t, v, r, d) => {
-    _chime(ctx, d, t + 0.00, 523.25 * r, 600, 0.13 * v);                 // C5
-    _chime(ctx, d, t + 0.10, 880.00 * r, 800, 0.14 * v);                 // A5
+    _chime(ctx, d, t + 0.00, 523.25 * r, 600, 0.12 * v);                 // C5
+    _chime(ctx, d, t + 0.10, 783.99 * r, 850, 0.13 * v);                 // G5
   },
 
-  // Error — a soft low minor-third fall (F3 → D3). Sine-based so it's never
-  // harsh; transpose is capped at 1.0 so it can't read as cheerfully bright.
+  // Error — a soft, warm low fall (G3 → E3). Pure sines so it's rounded and
+  // never harsh; transpose capped at 1.0 so it can't read as cheerful.
   error: (ctx, t, v, r, d) => {
     const er = Math.min(1, r);
-    _voice(ctx, d, 174.61 * er, t + 0.00, 420, 0.22 * v, "sine", 14);    // F3
-    _voice(ctx, d, 146.83 * er, t + 0.10, 520, 0.18 * v, "sine", 14);    // D3
+    _voice(ctx, d, 196.00 * er, t + 0.00, 440, 0.20 * v, "sine",     16); // G3
+    _voice(ctx, d, 196.00 * er, t + 0.00, 360, 0.06 * v, "triangle", 16); // warmth
+    _voice(ctx, d, 164.81 * er, t + 0.12, 580, 0.16 * v, "sine",     16); // E3
   },
 
-  // Alert — two chimes a minor third apart (A4 → C5). Purposeful attention
-  // pull that lingers (via reverb) rather than stops the presses.
+  // Alert — two soft bells a minor third apart (A4 → C5). Purposeful attention
+  // that lingers via the reverb rather than startling.
   alert: (ctx, t, v, r, d) => {
-    _chime(ctx, d, t + 0.00, 440.00 * r, 650, 0.16 * v);                 // A4
-    _chime(ctx, d, t + 0.16, 523.25 * r, 850, 0.17 * v);                 // C5
+    _chime(ctx, d, t + 0.00, 440.00 * r, 650, 0.15 * v);                 // A4
+    _chime(ctx, d, t + 0.16, 523.25 * r, 900, 0.16 * v);                 // C5
   },
 
-  // Focus — a low swelling pad and a single mid chime; reads as "settling
-  // in", with a long attack so it doesn't punch. For entering focus/fullscreen.
+  // Focus — a low swelling pad and one soft mid bell; "settling in", with a
+  // long attack so it never punches. For entering focus / fullscreen.
   focus: (ctx, t, v, r, d) => {
-    _swell(ctx, d, 196.00 * r, t + 0.00, 1400, 0.06 * v, 260);           // G3 pad
-    _chime(ctx, d, t + 0.18, 587.33 * r, 950, 0.10 * v);                 // D5 mid bell
+    _swell(ctx, d, 196.00 * r, t + 0.00, 1500, 0.055 * v, 300);          // G3 pad
+    _chime(ctx, d, t + 0.20, 587.33 * r, 1000, 0.09 * v);                // D5 mid bell
   },
 
-  // Achievement — a four-note rising arpeggio with a held top and a final
-  // sparkle. Triumphant but graceful; the reverb tail lets the chord ring on.
+  // Achievement — a graceful four-note rising arpeggio (G4–C5–E5–G5) over a
+  // soft body, the top note held to ring out. Rewarding without a fanfare.
   achievement: (ctx, t, v, r, d) => {
-    _swell(ctx, d, 196.00 * r, t + 0.00, 1400, 0.05 * v, 120);           // G3 body
-    _chime(ctx, d, t + 0.00, 392.00 * r, 600, 0.12 * v);                 // G4
-    _chime(ctx, d, t + 0.12, 523.25 * r, 650, 0.13 * v);                 // C5
-    _chime(ctx, d, t + 0.24, 659.25 * r, 750, 0.14 * v);                 // E5
-    _chime(ctx, d, t + 0.38, 783.99 * r, 1300, 0.15 * v);                // G5 — held
-    _voice(ctx, d, 1567.98 * r, t + 0.40, 700, 0.06 * v, "sine", 6);     // G6 — sparkle
+    _swell(ctx, d, 196.00 * r, t + 0.00, 1500, 0.045 * v, 140);          // G3 body
+    _chime(ctx, d, t + 0.00, 392.00 * r, 600,  0.11 * v);                // G4
+    _chime(ctx, d, t + 0.12, 523.25 * r, 650,  0.12 * v);                // C5
+    _chime(ctx, d, t + 0.24, 659.25 * r, 750,  0.12 * v);                // E5
+    _chime(ctx, d, t + 0.38, 783.99 * r, 1500, 0.13 * v);                // G5 — held
   },
 
   // ── light UI ticks ────────────────────────────────────────────────────
   // Short, quiet, low-latency. These skip the reverb send (see playSound) so
-  // the frequent ones stay crisp and cheap.
+  // the frequent ones stay crisp and cheap. All voiced with the soft mallet so
+  // they feel like the same instrument family as the bells, just lighter.
 
-  // Window open — a quick soft upward tick.
+  // Window open — a soft upward two-note tick.
   windowOpen: (ctx, t, v, r, d) => {
-    _voice(ctx, d, 740 * r,  t + 0.00, 70,  0.07 * v, "sine", 4);
-    _voice(ctx, d, 1110 * r, t + 0.02, 120, 0.07 * v, "sine", 4);
+    _mallet(ctx, d, t + 0.00, 523.25 * r, 120, 0.06 * v);                // C5
+    _voice(ctx, d, 783.99 * r, t + 0.02, 100, 0.04 * v, "sine", 3);      // G5
   },
 
-  // Window close — a quick soft downward tick.
+  // Window close — a soft downward two-note tick.
   windowClose: (ctx, t, v, r, d) => {
-    _voice(ctx, d, 880 * r, t + 0.00, 80,  0.07 * v, "sine", 4);
-    _voice(ctx, d, 587 * r, t + 0.04, 130, 0.06 * v, "sine", 4);
+    _mallet(ctx, d, t + 0.00, 523.25 * r, 110, 0.05 * v);                // C5
+    _voice(ctx, d, 349.23 * r, t + 0.03, 130, 0.04 * v, "sine", 3);      // F4
   },
 
-  // App launch — an airy high sparkle.
+  // App launch — a soft mid note with a faint high air. Gentle, not a sparkle.
   appLaunch: (ctx, t, v, r, d) => {
-    _voice(ctx, d, 1046.50 * r, t + 0.00, 90,  0.08 * v, "sine", 4);
-    _voice(ctx, d, 1568.00 * r, t + 0.03, 150, 0.05 * v, "sine", 4);
+    _mallet(ctx, d, t + 0.00, 659.25 * r, 130, 0.06 * v);                // E5
+    _voice(ctx, d, 1318.51 * r, t + 0.03, 120, 0.03 * v, "sine", 3);     // E6 air
   },
 
-  // Toast — a very light high chime + air. Plays often, stays subtle.
+  // Toast — a very light, soft high note + air. Plays often, stays subtle.
   toast: (ctx, t, v, r, d) => {
-    _voice(ctx, d, 1046.50 * r, t + 0.00, 200, 0.080 * v, "sine", 6);    // C6
-    _voice(ctx, d, 1568.00 * r, t + 0.00, 130, 0.035 * v, "sine", 6);    // G6 air
+    _voice(ctx, d, 880.00 * r, t + 0.00, 180, 0.060 * v, "sine", 6);     // A5
+    _voice(ctx, d, 1318.51 * r, t + 0.00, 110, 0.025 * v, "sine", 6);    // E6 air
   },
 
-  // Click — a tiny short tick for buttons/menus.
+  // Click — a tiny, soft warm tick for buttons / menus.
   click: (ctx, t, v, r, d) => {
-    _voice(ctx, d, 1480 * r, t + 0.00, 28, 0.05 * v, "sine", 2);
+    _voice(ctx, d, 1100 * r, t + 0.00, 26, 0.045 * v, "sine", 2);
   },
 
   // ── v9.4 — alarm recipes (Clock app) ─────────────────────────────────
@@ -504,10 +516,10 @@ export const SOUND_NAMES = Object.keys(SOUND_RECIPES);
 // Approximate active duration per sound (ms) — used only to schedule context
 // teardown. The reverb tail is added on top when the bus has convolution.
 const SOUND_TAILS = {
-  startup: 2700, login: 1500, logout: 1700, notification: 1200,
-  achievement: 1800, focus: 1500, alert: 1100, success: 950,
-  error: 700, message: 900, toast: 450, windowOpen: 250,
-  windowClose: 300, appLaunch: 300, click: 100,
+  startup: 3200, login: 1900, logout: 1700, notification: 1100,
+  achievement: 2000, focus: 1600, alert: 1100, success: 950,
+  error: 700, message: 800, toast: 400, windowOpen: 250,
+  windowClose: 300, appLaunch: 300, click: 90,
   // v9.4 — alarm + NWS recipes ring out longer than typical UI sounds.
   alarmSunrise: 4200, alarmPulse: 3500, alarmClassic: 2500, nwsAlert: 3500,
   // v9.4 — volume preview is a quick chime, no reverb tail (see DRY_SOUNDS).
@@ -564,7 +576,7 @@ function _buildBus(ctx, withReverb) {
       // expensive midband modern OS sounds sit in.
       const lowpass = ctx.createBiquadFilter();
       lowpass.type = "lowpass";
-      lowpass.frequency.value = 9400;
+      lowpass.frequency.value = 8600;   // v11.0 — a touch warmer/rounder top end
       lowpass.Q.value = 0.5;
       lowpass.connect(limiter);
 
@@ -595,7 +607,7 @@ function _buildBus(ctx, withReverb) {
         wetHp.type = "highpass";
         wetHp.frequency.value = 320;
         const wet = ctx.createGain();
-        wet.gain.value = 0.2;
+        wet.gain.value = 0.17;   // v11.0 — slightly drier so sounds stay clean/present
         conv.connect(wetHp).connect(wet).connect(limiter);
         lowpass.connect(head);
         reverb = true;
