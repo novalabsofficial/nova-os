@@ -16,7 +16,7 @@ import { getDbUid } from "../lib/db.js";
 import { isAdmin } from "../lib/moderation.js";
 import {
   createAccount, loginAccount, createStore, loadStore, renameStore, deleteStore,
-  saveItems, saveStoreMeta, commitSale, fetchAccessList, grantAccess, revokeAccess,
+  saveItems, saveStoreMeta, setRosterLogo, commitSale, fetchAccessList, grantAccess, revokeAccess,
 } from "../lib/pos.js";
 
 const money = (n) => "$" + (Number(n) || 0).toFixed(2);
@@ -155,11 +155,18 @@ export function PosApp({ AC = "#6366f1", user, showToast, onExit }) {
     const stores = await deleteStore(account.id, storeId);
     if (stores) { setAccount(a => ({ ...a, stores })); setStore(s => s && s.id === storeId ? null : s); showToast?.("Store deleted"); }
   }, [account, showToast]);
+  const setLogo = useCallback(async (logo) => {
+    if (!store) return;
+    setStore(s => s ? { ...s, theme: { ...(s.theme || {}), logo } } : s);
+    await saveStoreMeta(store.id, { theme: { ...(store.theme || {}), logo } });
+    const stores = await setRosterLogo(account.id, store.id, logo);   // mirror into picker roster
+    if (stores) setAccount(a => ({ ...a, stores }));
+  }, [account, store]);
 
   if (!account) return <Auth AC={AC} user={user} showToast={showToast} onExit={onExit} onAuthed={setAccount} />;
   if (!store) return <StorePicker AC={AC} account={account} busy={busy} onOpen={openStore} onCreate={makeStore} onRename={renameStoreFn} onDelete={deleteStoreFn} onSignOut={() => setAccount(null)} onExit={onExit} />;
   return <Shell AC={AC} user={user} account={account} store={store} setStore={setStore} showToast={showToast} onExit={onExit}
-    onSwitch={() => setStore(null)} onRename={renameStoreFn} onDelete={deleteStoreFn} />;
+    onSwitch={() => setStore(null)} onRename={renameStoreFn} onDelete={deleteStoreFn} onSetLogo={setLogo} />;
 }
 
 // ───────────────────────────────────────────────────── account sign-in ─────
@@ -269,7 +276,7 @@ function StorePicker({ AC, account, busy, onOpen, onCreate, onRename, onDelete, 
           {stores.map(s => (
             <div key={s.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "13px 15px", borderRadius: 13, border: "1px solid var(--nv-border)", background: "var(--nv-surface-solid)" }}>
               <div onClick={() => onOpen(s.id)} style={{ flex: 1, minWidth: 0, cursor: "pointer", display: "flex", alignItems: "center", gap: 12 }}>
-                <div style={{ width: 38, height: 38, borderRadius: 10, background: AC, display: "grid", placeItems: "center", fontSize: 19 }}>🏪</div>
+                <div style={{ width: 38, height: 38, borderRadius: 10, background: s.logo ? "var(--nv-elevated)" : AC, display: "grid", placeItems: "center", fontSize: 19, overflow: "hidden", flexShrink: 0 }}>{s.logo ? <img src={s.logo} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : "🏪"}</div>
                 <span style={{ fontFamily: FFB, fontSize: 15.5 }}>{s.name}</span>
               </div>
               <button onClick={() => onOpen(s.id)} style={{ padding: "7px 14px", borderRadius: 9, border: "none", background: AC, color: "#fff", fontFamily: FFB, fontSize: 13, cursor: "pointer" }}>Open</button>
@@ -293,7 +300,7 @@ const NAV = [
   { id: "settings", label: "Settings", icon: "⚙️" },
 ];
 
-function Shell({ AC, user, account, store, setStore, showToast, onExit, onSwitch, onRename, onDelete }) {
+function Shell({ AC, user, account, store, setStore, showToast, onExit, onSwitch, onRename, onDelete, onSetLogo }) {
   const [tab, setTab] = useState("register");
   const items = store.items || [];
   const terms = posType(store.kind);
@@ -354,7 +361,7 @@ function Shell({ AC, user, account, store, setStore, showToast, onExit, onSwitch
       {/* sidebar */}
       <aside style={{ width: 176, flexShrink: 0, display: "flex", flexDirection: "column", borderRight: "1px solid var(--nv-border)", background: "var(--nv-surface-solid)", padding: "12px 11px" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 9, padding: "2px 4px 10px" }}>
-          <div style={{ width: 30, height: 30, borderRadius: 9, background: accent, display: "grid", placeItems: "center", fontSize: 16, flexShrink: 0 }}>{terms.icon}</div>
+          <div style={{ width: 30, height: 30, borderRadius: 9, background: theme.logo ? "var(--nv-elevated)" : accent, display: "grid", placeItems: "center", fontSize: 16, flexShrink: 0, overflow: "hidden" }}>{theme.logo ? <img src={theme.logo} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : terms.icon}</div>
           <div style={{ minWidth: 0 }}>
             <div style={{ fontFamily: FFB, fontSize: 13.5, lineHeight: 1.1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{store.name}</div>
             <div style={{ fontSize: 10.5, color: "var(--nv-text-dim)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>@{account.username}</div>
@@ -373,7 +380,7 @@ function Shell({ AC, user, account, store, setStore, showToast, onExit, onSwitch
         {tab === "items" && <Items AC={accent} items={items} onChange={persistItems} showToast={showToast} terms={terms} />}
         {tab === "revenue" && <Revenue AC={accent} agg={store.agg || {}} sales={store.sales || []} expenses={store.expenses || []} createdAt={store.createdAt || Date.now()} />}
         {tab === "expenses" && <Expenses AC={accent} expenses={store.expenses || []} onChange={setExpenses} />}
-        {tab === "settings" && <Settings AC={accent} osAccent={AC} store={store} kind={store.kind || "retail"} setKind={setKind} theme={theme} setTheme={setTheme} taxRate={store.taxRate || 0} setTax={setTax} stateCode={store.state || ""} setStateLoc={setStateLoc} onRename={(n) => onRename(store.id, n)} onDelete={() => onDelete(store.id)} onSwitch={onSwitch} />}
+        {tab === "settings" && <Settings AC={accent} osAccent={AC} store={store} kind={store.kind || "retail"} setKind={setKind} theme={theme} setTheme={setTheme} onSetLogo={onSetLogo} taxRate={store.taxRate || 0} setTax={setTax} stateCode={store.state || ""} setStateLoc={setStateLoc} onRename={(n) => onRename(store.id, n)} onDelete={() => onDelete(store.id)} onSwitch={onSwitch} />}
       </div>
     </div>
   );
@@ -655,7 +662,9 @@ function ItemEditor({ AC, draft, setDraft, onSave, exists, showToast, terms = PO
 }
 
 // ───────────────────────────────────────────────────────────── settings ────
-function Settings({ AC, osAccent, store, kind, setKind, theme, setTheme, taxRate, setTax, stateCode, setStateLoc, onRename, onDelete, onSwitch }) {
+function Settings({ AC, osAccent, store, kind, setKind, theme, setTheme, onSetLogo, taxRate, setTax, stateCode, setStateLoc, onRename, onDelete, onSwitch }) {
+  const logoRef = useRef(null);
+  const pickLogo = async (e) => { const f = e.target.files?.[0]; if (!f) return; const url = await downscale(f, 160, 0.72); if (url) onSetLogo(url); e.target.value = ""; };
   const rename = () => { const n = window.prompt("Store name", store.name); if (n && n.trim() && n.trim() !== store.name) onRename(n.trim()); };
   const del = () => { if (window.confirm(`Delete "${store.name}"? This removes its catalog and sales history permanently.`)) onDelete(); };
   const card = { border: "1px solid var(--nv-border)", borderRadius: 13, background: "var(--nv-surface-solid)", padding: "14px 16px", marginBottom: 12 };
@@ -701,7 +710,20 @@ function Settings({ AC, osAccent, store, kind, setKind, theme, setTheme, taxRate
       {/* Appearance / branding */}
       <div style={card}>
         <div style={{ fontFamily: FFB, fontSize: 14, marginBottom: 4 }}>Appearance</div>
-        <div style={{ fontSize: 12, color: "var(--nv-text-dim)", marginBottom: 12, lineHeight: 1.5 }}>Brand this store — its own accent, color scheme, font and layout. Saved per store.</div>
+        <div style={{ fontSize: 12, color: "var(--nv-text-dim)", marginBottom: 12, lineHeight: 1.5 }}>Brand this store — its own logo, accent, color scheme, font and layout. Saved per store.</div>
+
+        <div style={{ fontSize: 11.5, fontFamily: FFB, color: "var(--nv-text-dim)", marginBottom: 6 }}>COMPANY LOGO</div>
+        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
+          <div onClick={() => logoRef.current?.click()} style={{ width: 54, height: 54, borderRadius: 12, background: "var(--nv-elevated)", border: "1px dashed var(--nv-border)", display: "grid", placeItems: "center", overflow: "hidden", cursor: "pointer", flexShrink: 0 }}>
+            {t.logo ? <img src={t.logo} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <span style={{ fontSize: 10.5, color: "var(--nv-text-dim)", textAlign: "center" }}>Add<br />logo</span>}
+          </div>
+          <div>
+            <button onClick={() => logoRef.current?.click()} style={{ padding: "7px 13px", borderRadius: 9, border: "1px solid var(--nv-border)", background: "var(--nv-elevated)", color: "var(--nv-text)", fontFamily: FFB, fontSize: 13, cursor: "pointer" }}>{t.logo ? "Replace logo" : "Upload logo"}</button>
+            {t.logo && <span onClick={() => onSetLogo(null)} style={{ marginLeft: 10, fontSize: 12.5, color: "#ef4444", cursor: "pointer" }}>Remove</span>}
+            <div style={{ fontSize: 11, color: "var(--nv-text-dim)", marginTop: 5 }}>Replaces the emoji in the sidebar and store picker.</div>
+          </div>
+          <input ref={logoRef} type="file" accept="image/*" onChange={pickLogo} style={{ display: "none" }} />
+        </div>
 
         <div style={{ fontSize: 11.5, fontFamily: FFB, color: "var(--nv-text-dim)", marginBottom: 6 }}>ACCENT COLOR</div>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 7, alignItems: "center", marginBottom: 14 }}>

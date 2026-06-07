@@ -158,6 +158,18 @@ export async function saveStoreMeta(storeId, patch) {
   catch (e) { console.warn("[pos] saveMeta", e?.message || e); return false; }
 }
 
+// Mirror a store's logo into the account roster so the store picker can show it
+// (the picker only has the lightweight {id,name,logo} roster, not full stores).
+export async function setRosterLogo(accountId, storeId, logo) {
+  try {
+    const aref = doc(firestoreDb, ACCTS, accountId);
+    const asnap = await getDoc(aref);
+    const stores = ((asnap.exists() && asnap.data().stores) || []).map(s => s.id === storeId ? { ...s, logo: logo || null } : s);
+    await updateDoc(aref, { stores });
+    return stores;
+  } catch (e) { console.warn("[pos] setRosterLogo", e?.message || e); return null; }
+}
+
 export async function commitSale(storeId, { items, sale }) {
   try {
     const ref = doc(firestoreDb, STORES, storeId);
