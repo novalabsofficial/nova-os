@@ -38,7 +38,7 @@ const POS_TYPES = {
     label: "Restaurant / Café", icon: "🍽️", desc: "Restaurants, cafés, bars",
     items: "Menu", cart: "Order", product: "menu item", add: "Add menu item", charge: "Charge",
     priceLabel: "Price", costLabel: "Food cost",
-    tracksStock: false,
+    tracksStock: false, softStock: true,   // optional informational count, doesn't block selling
     unit: null,
   },
   hotel: {
@@ -53,7 +53,7 @@ const POS_TYPES = {
     label: "Services / Salon", icon: "💈", desc: "Salons, spas, repair, bookings",
     items: "Services", cart: "Ticket", product: "service", add: "Add service", charge: "Charge",
     priceLabel: "Price", costLabel: "Service cost",
-    tracksStock: false,
+    tracksStock: false, softStock: true,
     unit: null,
   },
 };
@@ -426,7 +426,9 @@ function Register({ AC, items, taxRate, onSale, showToast, terms = POS_TYPES.ret
     const nextItems = items.map(it => {
       const e = cart[it.id]; if (!e) return it;
       let n = it;
-      if (terms.tracksStock) n = { ...n, stock: Math.max(0, (it.stock ?? 0) - e.qty) };
+      // decrement whenever the item carries a numeric count: always for stock-
+      // tracking types, and for soft-stock items only if a count was set.
+      if (typeof it.stock === "number") n = { ...n, stock: Math.max(0, it.stock - e.qty) };
       if (terms.tracksCheckout) n = { ...n, checkedOut: (it.checkedOut ?? 0) + e.qty };  // rooms now occupied
       return n;
     });
@@ -566,7 +568,12 @@ function Items({ AC, items, onChange, showToast, terms = POS_TYPES.retail }) {
   const del = (id) => onChange(items.filter(i => i.id !== id));
   const commit = () => {
     if (!draft.name.trim()) { showToast?.("Name required"); return; }
-    const item = { ...draft, name: draft.name.trim(), price: Number(draft.price) || 0, cost: Number(draft.cost) || 0, stock: Math.max(0, Math.round(Number(draft.stock) || 0)), category: (draft.category || "").trim() };
+    const item = { ...draft, name: draft.name.trim(), price: Number(draft.price) || 0, cost: Number(draft.cost) || 0, category: (draft.category || "").trim() };
+    const raw = draft.stock;
+    const hasNum = raw !== "" && raw != null && !isNaN(Number(raw));
+    if (terms.tracksStock) item.stock = hasNum ? Math.max(0, Math.round(Number(raw))) : 0;
+    else if (terms.softStock && hasNum) item.stock = Math.max(0, Math.round(Number(raw)));
+    else delete item.stock;   // untracked → no count
     const exists = items.some(i => i.id === item.id);
     onChange(exists ? items.map(i => i.id === item.id ? item : i) : [...items, item]);
     setDraft(null);
@@ -589,7 +596,7 @@ function Items({ AC, items, onChange, showToast, terms = POS_TYPES.retail }) {
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontFamily: FFB, fontSize: 14.5 }}>{it.name}</div>
-                <div style={{ fontSize: 12, color: "var(--nv-text-dim)" }}>{money(it.price)}{terms.unit ? terms.unit.suffix : ""} · cost {money(it.cost)} · <span style={{ color: margin >= 0 ? "#16a34a" : "#ef4444" }}>{margin >= 0 ? "+" : ""}{money(margin)} margin</span>{it.category ? " · " + it.category : ""}</div>
+                <div style={{ fontSize: 12, color: "var(--nv-text-dim)" }}>{money(it.price)}{terms.unit ? terms.unit.suffix : ""} · cost {money(it.cost)} · <span style={{ color: margin >= 0 ? "#16a34a" : "#ef4444" }}>{margin >= 0 ? "+" : ""}{money(margin)} margin</span>{it.category ? " · " + it.category : ""}{terms.softStock && typeof it.stock === "number" ? <span style={{ color: it.stock <= 0 ? "#ef4444" : "var(--nv-text-dim)" }}> · {it.stock} on hand</span> : ""}</div>
               </div>
               {terms.tracksStock && (
                 <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
@@ -649,7 +656,7 @@ function ItemEditor({ AC, draft, setDraft, onSave, exists, showToast, terms = PO
           <label style={{ flex: 1, fontSize: 11.5, color: "var(--nv-text-dim)" }}>{terms.costLabel}<input type="number" inputMode="decimal" value={draft.cost} onChange={e => setDraft(d => ({ ...d, cost: e.target.value }))} placeholder="0.00" style={{ ...fld, marginTop: 3 }} /></label>
         </div>
         <div style={{ display: "flex", gap: 10 }}>
-          {terms.tracksStock && <label style={{ flex: 1, fontSize: 11.5, color: "var(--nv-text-dim)" }}>{terms.stockLabel || "Stock"}<input type="number" inputMode="numeric" value={draft.stock} onChange={e => setDraft(d => ({ ...d, stock: e.target.value }))} placeholder="0" style={{ ...fld, marginTop: 3 }} /></label>}
+          {(terms.tracksStock || terms.softStock) && <label style={{ flex: 1, fontSize: 11.5, color: "var(--nv-text-dim)" }}>{terms.tracksStock ? (terms.stockLabel || "Stock") : "On hand (optional)"}<input type="number" inputMode="numeric" value={draft.stock} onChange={e => setDraft(d => ({ ...d, stock: e.target.value }))} placeholder={terms.tracksStock ? "0" : "untracked"} style={{ ...fld, marginTop: 3 }} /></label>}
           <label style={{ flex: 1, fontSize: 11.5, color: "var(--nv-text-dim)" }}>Category<input value={draft.category} onChange={e => setDraft(d => ({ ...d, category: e.target.value }))} placeholder="optional" style={{ ...fld, marginTop: 3 }} /></label>
         </div>
         <div style={{ display: "flex", gap: 8, marginTop: 2 }}>
