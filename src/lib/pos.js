@@ -98,7 +98,7 @@ export async function createStore(accountId, name) {
   const nm = (name || "").trim().slice(0, 60) || "My Store";
   try {
     const id = newStoreId(accountId);
-    const store = { id, accountId, name: nm, taxRate: 0, state: "", items: [], sales: [], agg: emptyAgg(), expenses: [], createdAt: Date.now() };
+    const store = { id, accountId, name: nm, kind: "retail", taxRate: 0, state: "", items: [], sales: [], agg: emptyAgg(), expenses: [], createdAt: Date.now() };
     await setDoc(doc(firestoreDb, STORES, id), store);
     const aref = doc(firestoreDb, ACCTS, accountId);
     const asnap = await getDoc(aref);

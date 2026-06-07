@@ -21,6 +21,17 @@ import {
 
 const money = (n) => "$" + (Number(n) || 0).toFixed(2);
 const LS_LAST = "nova-pos-last-account";
+
+// POS types — each re-labels the register to fit the kind of business. (More can
+// be added; behaviour is the same engine, the terminology is what changes.)
+const POS_TYPES = {
+  retail:     { label: "Store / Retail",     icon: "🏪", desc: "Shops, boutiques, kiosks",        items: "Products", cart: "Cart",   product: "product",         add: "Add item",            charge: "Charge" },
+  restaurant: { label: "Restaurant / Café",  icon: "🍽️", desc: "Restaurants, cafés, bars",        items: "Menu",     cart: "Order",  product: "menu item",       add: "Add menu item",       charge: "Charge" },
+  hotel:      { label: "Hotel / Lodging",    icon: "🛎️", desc: "Hotels, motels, B&Bs",           items: "Rooms & services", cart: "Folio", product: "room or service", add: "Add room / service", charge: "Charge to folio" },
+  services:   { label: "Services / Salon",   icon: "💈", desc: "Salons, spas, repair, bookings",  items: "Services", cart: "Ticket", product: "service",         add: "Add service",         charge: "Charge" },
+};
+const POS_TYPE_LIST = Object.entries(POS_TYPES).map(([id, t]) => ({ id, ...t }));
+const posType = (k) => POS_TYPES[k] || POS_TYPES.retail;
 let _pid = 0;
 const newId = () => "i" + Date.now().toString(36) + (_pid++).toString(36);
 const startOfToday = () => { const d = new Date(); d.setHours(0, 0, 0, 0); return d.getTime(); };
@@ -241,7 +252,9 @@ const NAV = [
 function Shell({ AC, user, account, store, setStore, showToast, onExit, onSwitch, onRename, onDelete }) {
   const [tab, setTab] = useState("register");
   const items = store.items || [];
+  const terms = posType(store.kind);
 
+  const setKind = useCallback((k) => { setStore(s => ({ ...s, kind: k })); saveStoreMeta(store.id, { kind: k }); }, [store.id, setStore]);
   const persistItems = useCallback((nextItems) => { setStore(s => ({ ...s, items: nextItems })); saveItems(store.id, nextItems); }, [store.id, setStore]);
   const setTax = useCallback((rate) => { const r = Math.max(0, Math.min(100, Number(rate) || 0)); setStore(s => ({ ...s, taxRate: r })); saveStoreMeta(store.id, { taxRate: r }); }, [store.id, setStore]);
   const setStateLoc = useCallback((code) => {
@@ -282,7 +295,7 @@ function Shell({ AC, user, account, store, setStore, showToast, onExit, onSwitch
       {/* sidebar */}
       <aside style={{ width: 176, flexShrink: 0, display: "flex", flexDirection: "column", borderRight: "1px solid var(--nv-border)", background: "var(--nv-surface-solid)", padding: "12px 11px" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 9, padding: "2px 4px 10px" }}>
-          <div style={{ width: 30, height: 30, borderRadius: 9, background: AC, display: "grid", placeItems: "center", fontSize: 16, flexShrink: 0 }}>🏪</div>
+          <div style={{ width: 30, height: 30, borderRadius: 9, background: AC, display: "grid", placeItems: "center", fontSize: 16, flexShrink: 0 }}>{terms.icon}</div>
           <div style={{ minWidth: 0 }}>
             <div style={{ fontFamily: FFB, fontSize: 13.5, lineHeight: 1.1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{store.name}</div>
             <div style={{ fontSize: 10.5, color: "var(--nv-text-dim)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>@{account.username}</div>
@@ -290,25 +303,25 @@ function Shell({ AC, user, account, store, setStore, showToast, onExit, onSwitch
         </div>
         <button onClick={onSwitch} style={{ ...railBtn, marginTop: 0, marginBottom: 8 }}>⇄ Switch store</button>
         <div style={{ flex: 1 }}>
-          {NAV.map(n => <div key={n.id} style={navBtn(tab === n.id)} onClick={() => setTab(n.id)}><span style={{ fontSize: 15 }}>{n.icon}</span>{n.label}</div>)}
+          {NAV.map(n => <div key={n.id} style={navBtn(tab === n.id)} onClick={() => setTab(n.id)}><span style={{ fontSize: 15 }}>{n.icon}</span>{n.id === "items" ? terms.items : n.label}</div>)}
         </div>
         <button onClick={onExit} style={{ ...closeBtn, position: "static", width: "100%", marginTop: 6 }}>✕ Close POS</button>
       </aside>
 
       {/* content */}
       <div style={{ flex: 1, minWidth: 0 }}>
-        {tab === "register" && <Register AC={AC} items={items} taxRate={store.taxRate || 0} onSale={onSale} showToast={showToast} />}
-        {tab === "items" && <Items AC={AC} items={items} onChange={persistItems} showToast={showToast} />}
+        {tab === "register" && <Register AC={AC} items={items} taxRate={store.taxRate || 0} onSale={onSale} showToast={showToast} terms={terms} />}
+        {tab === "items" && <Items AC={AC} items={items} onChange={persistItems} showToast={showToast} terms={terms} />}
         {tab === "revenue" && <Revenue AC={AC} agg={store.agg || {}} sales={store.sales || []} expenses={store.expenses || []} createdAt={store.createdAt || Date.now()} />}
         {tab === "expenses" && <Expenses AC={AC} expenses={store.expenses || []} onChange={setExpenses} />}
-        {tab === "settings" && <Settings AC={AC} store={store} taxRate={store.taxRate || 0} setTax={setTax} stateCode={store.state || ""} setStateLoc={setStateLoc} onRename={(n) => onRename(store.id, n)} onDelete={() => onDelete(store.id)} />}
+        {tab === "settings" && <Settings AC={AC} store={store} kind={store.kind || "retail"} setKind={setKind} taxRate={store.taxRate || 0} setTax={setTax} stateCode={store.state || ""} setStateLoc={setStateLoc} onRename={(n) => onRename(store.id, n)} onDelete={() => onDelete(store.id)} onSwitch={onSwitch} />}
       </div>
     </div>
   );
 }
 
 // ──────────────────────────────────────────────────────────── register ─────
-function Register({ AC, items, taxRate, onSale, showToast }) {
+function Register({ AC, items, taxRate, onSale, showToast, terms = POS_TYPES.retail }) {
   const [cart, setCart] = useState({});
   const [q, setQ] = useState("");
   const [cat, setCat] = useState("All");
@@ -348,13 +361,13 @@ function Register({ AC, items, taxRate, onSale, showToast }) {
     <div style={{ display: "flex", height: "100%" }}>
       <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column" }}>
         <div style={{ display: "flex", gap: 8, padding: "12px 14px 8px", flexShrink: 0 }}>
-          <input value={q} onChange={e => setQ(e.target.value)} placeholder="Search products…" style={{ flex: 1, padding: "9px 12px", borderRadius: 10, border: "1px solid var(--nv-border)", background: "var(--nv-elevated)", color: "var(--nv-text)", fontFamily: FF, fontSize: 14 }} />
+          <input value={q} onChange={e => setQ(e.target.value)} placeholder={"Search " + terms.items.toLowerCase() + "…"} style={{ flex: 1, padding: "9px 12px", borderRadius: 10, border: "1px solid var(--nv-border)", background: "var(--nv-elevated)", color: "var(--nv-text)", fontFamily: FF, fontSize: 14 }} />
         </div>
         <div style={{ display: "flex", gap: 6, padding: "0 14px 10px", overflowX: "auto", flexShrink: 0 }}>
           {cats.map(c => <div key={c} onClick={() => setCat(c)} style={{ padding: "5px 12px", borderRadius: 999, fontSize: 12.5, fontFamily: FFB, cursor: "pointer", whiteSpace: "nowrap", color: cat === c ? "#fff" : "var(--nv-text-dim)", background: cat === c ? AC : "transparent", border: "1px solid " + (cat === c ? "transparent" : "var(--nv-border)") }}>{c}</div>)}
         </div>
         <div style={{ flex: 1, overflow: "auto", padding: "0 14px 16px" }}>
-          {items.length === 0 ? <Center>No products yet — add some in the <b>Items</b> tab.</Center>
+          {items.length === 0 ? <Center>Nothing here yet — add {terms.product}s in the <b>{terms.items}</b> tab.</Center>
             : shown.length === 0 ? <Center>No matches.</Center>
               : <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(124px, 1fr))", gap: 11 }}>
                   {shown.map(it => {
@@ -380,10 +393,10 @@ function Register({ AC, items, taxRate, onSale, showToast }) {
 
       <div style={{ width: 320, flexShrink: 0, borderLeft: "1px solid var(--nv-border)", display: "flex", flexDirection: "column", background: "var(--nv-surface-solid)" }}>
         <div style={{ padding: "13px 15px", borderBottom: "1px solid var(--nv-border)", display: "flex", alignItems: "center" }}>
-          <span style={{ fontFamily: FFB, fontSize: 16 }}>Cart</span>
+          <span style={{ fontFamily: FFB, fontSize: 16 }}>{terms.cart}</span>
           <span style={{ marginLeft: 8, fontSize: 12, color: "var(--nv-text-dim)" }}>{count} item{count === 1 ? "" : "s"}</span>
           <div style={{ flex: 1 }} />
-          {count > 0 && <button onClick={cancel} style={{ padding: "5px 11px", borderRadius: 8, border: "1px solid var(--nv-border)", background: "transparent", color: "#ef4444", fontFamily: FFB, fontSize: 12, cursor: "pointer" }}>Cancel cart</button>}
+          {count > 0 && <button onClick={cancel} style={{ padding: "5px 11px", borderRadius: 8, border: "1px solid var(--nv-border)", background: "transparent", color: "#ef4444", fontFamily: FFB, fontSize: 12, cursor: "pointer" }}>Cancel {terms.cart.toLowerCase()}</button>}
         </div>
         <div style={{ flex: 1, overflow: "auto", padding: "8px 10px" }}>
           {lines.length === 0 ? <Center>Tap a product to start a sale.</Center>
@@ -410,7 +423,7 @@ function Register({ AC, items, taxRate, onSale, showToast }) {
           <Row label="Total" value={money(total)} big />
           <button disabled={!lines.length} onClick={() => setTender({ method: "cash", cash: "" })}
             style={{ width: "100%", marginTop: 10, padding: "13px", borderRadius: 12, border: "none", background: lines.length ? AC : "var(--nv-border)", color: "#fff", fontFamily: FFB, fontSize: 16, cursor: lines.length ? "pointer" : "default" }}>
-            Charge {money(total)}
+            {terms.charge} {money(total)}
           </button>
         </div>
       </div>
@@ -457,7 +470,7 @@ function TenderModal({ AC, total, state, setState, onCancel, onConfirm }) {
 }
 
 // ─────────────────────────────────────────────────────────────── items ─────
-function Items({ AC, items, onChange, showToast }) {
+function Items({ AC, items, onChange, showToast, terms = POS_TYPES.retail }) {
   const [draft, setDraft] = useState(null);
   const blank = () => ({ id: newId(), name: "", price: "", cost: "", stock: "", category: "", img: null });
   const adjustStock = (id, delta) => onChange(items.map(it => it.id === id ? { ...it, stock: Math.max(0, (it.stock ?? 0) + delta) } : it));
@@ -472,10 +485,10 @@ function Items({ AC, items, onChange, showToast }) {
   return (
     <div style={{ height: "100%", overflow: "auto", padding: "16px 18px", maxWidth: 820, margin: "0 auto" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14 }}>
-        <div style={{ fontFamily: FFB, fontSize: 18 }}>Products</div>
+        <div style={{ fontFamily: FFB, fontSize: 18 }}>{terms.items}</div>
         <span style={{ fontSize: 12, color: "var(--nv-text-dim)" }}>{items.length} item{items.length === 1 ? "" : "s"}</span>
         <div style={{ flex: 1 }} />
-        <button onClick={() => setDraft(blank())} style={{ padding: "9px 15px", borderRadius: 10, border: "none", background: AC, color: "#fff", fontFamily: FFB, fontSize: 14, cursor: "pointer" }}>+ Add item</button>
+        <button onClick={() => setDraft(blank())} style={{ padding: "9px 15px", borderRadius: 10, border: "none", background: AC, color: "#fff", fontFamily: FFB, fontSize: 14, cursor: "pointer" }}>+ {terms.add}</button>
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
         {items.map(it => {
@@ -502,7 +515,7 @@ function Items({ AC, items, onChange, showToast }) {
             </div>
           );
         })}
-        {items.length === 0 && <Center>No products yet. Click <b>+ Add item</b> to build your catalog.</Center>}
+        {items.length === 0 && <Center>No {terms.product}s yet. Click <b>+ {terms.add}</b> to build your catalog.</Center>}
       </div>
       {draft && <ItemEditor AC={AC} draft={draft} setDraft={setDraft} onSave={commit} exists={items.some(i => i.id === draft.id)} showToast={showToast} />}
     </div>
@@ -548,7 +561,7 @@ function ItemEditor({ AC, draft, setDraft, onSave, exists, showToast }) {
 }
 
 // ───────────────────────────────────────────────────────────── settings ────
-function Settings({ AC, store, taxRate, setTax, stateCode, setStateLoc, onRename, onDelete }) {
+function Settings({ AC, store, kind, setKind, taxRate, setTax, stateCode, setStateLoc, onRename, onDelete, onSwitch }) {
   const rename = () => { const n = window.prompt("Store name", store.name); if (n && n.trim() && n.trim() !== store.name) onRename(n.trim()); };
   const del = () => { if (window.confirm(`Delete "${store.name}"? This removes its catalog and sales history permanently.`)) onDelete(); };
   const card = { border: "1px solid var(--nv-border)", borderRadius: 13, background: "var(--nv-surface-solid)", padding: "14px 16px", marginBottom: 12 };
@@ -564,6 +577,27 @@ function Settings({ AC, store, taxRate, setTax, stateCode, setStateLoc, onRename
             <div style={{ fontSize: 12, color: "var(--nv-text-dim)" }}>Store name</div>
           </div>
           <button onClick={rename} style={{ padding: "8px 14px", borderRadius: 9, border: "1px solid var(--nv-border)", background: "var(--nv-elevated)", color: "var(--nv-text)", fontFamily: FFB, fontSize: 13, cursor: "pointer" }}>Rename</button>
+          <button onClick={onSwitch} style={{ padding: "8px 14px", borderRadius: 9, border: "1px solid var(--nv-border)", background: "var(--nv-elevated)", color: "var(--nv-text)", fontFamily: FFB, fontSize: 13, cursor: "pointer" }}>⇄ Switch store</button>
+        </div>
+      </div>
+
+      {/* POS type */}
+      <div style={card}>
+        <div style={{ fontFamily: FFB, fontSize: 14, marginBottom: 4 }}>POS type</div>
+        <div style={{ fontSize: 12, color: "var(--nv-text-dim)", marginBottom: 12, lineHeight: 1.5 }}>Pick the kind of business — it tailors the register's wording (Products vs. Menu vs. Rooms, Cart vs. Order vs. Folio, …) to fit how you work.</div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 9 }}>
+          {POS_TYPE_LIST.map(t => {
+            const on = (kind || "retail") === t.id;
+            return (
+              <div key={t.id} onClick={() => setKind(t.id)} style={{ cursor: "pointer", display: "flex", gap: 10, alignItems: "center", padding: "11px 12px", borderRadius: 11, border: "1px solid " + (on ? "transparent" : "var(--nv-border)"), background: on ? "var(--nv-elevated)" : "transparent", boxShadow: on ? "inset 0 0 0 2px " + AC : "none" }}>
+                <span style={{ fontSize: 22 }}>{t.icon}</span>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontFamily: FFB, fontSize: 13, color: on ? AC : "var(--nv-text)" }}>{t.label}</div>
+                  <div style={{ fontSize: 11, color: "var(--nv-text-dim)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{t.desc}</div>
+                </div>
+              </div>
+            );
+          })}
         </div>
       </div>
 
