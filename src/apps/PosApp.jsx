@@ -59,6 +59,23 @@ const POS_TYPES = {
 };
 const POS_TYPE_LIST = Object.entries(POS_TYPES).map(([id, t]) => ({ id, ...t }));
 const posType = (k) => POS_TYPES[k] || POS_TYPES.retail;
+
+// Per-store appearance/branding (store.theme = { accent, font, mode, density }).
+const ACCENT_SWATCHES = ["#6366f1", "#0ea5e9", "#10b981", "#16a34a", "#f59e0b", "#ef4444", "#ec4899", "#8b5cf6", "#0d9488", "#e11d48", "#2563eb", "#7c3aed"];
+const POS_FONTS = {
+  system: { label: "System", stack: null },
+  grotesk: { label: "Grotesk", stack: "'Space Grotesk','Segoe UI',system-ui,sans-serif" },
+  rounded: { label: "Rounded", stack: "ui-rounded,'Segoe UI Variable','Segoe UI',system-ui,sans-serif" },
+  serif: { label: "Serif", stack: "Georgia,'Times New Roman',serif" },
+  slab: { label: "Slab", stack: "'Rockwell','Roboto Slab',Georgia,serif" },
+  mono: { label: "Mono", stack: "ui-monospace,'Cascadia Code','Courier New',monospace" },
+};
+// Forced light/dark token palettes (mode !== "auto" overrides the OS theme inside
+// the POS only). "auto" inherits whatever Nova OS is set to.
+const POS_SKIN = {
+  light: { "--nv-surface": "#eef1f6", "--nv-surface-solid": "#ffffff", "--nv-elevated": "#e9eef7", "--nv-border": "#d6dded", "--nv-border-strong": "#c2cbdc", "--nv-text": "#0f1626", "--nv-text-dim": "#5b647a" },
+  dark: { "--nv-surface": "#0f1120", "--nv-surface-solid": "#191d2c", "--nv-elevated": "#222840", "--nv-border": "#2c3346", "--nv-border-strong": "#3a4259", "--nv-text": "#e8ebf2", "--nv-text-dim": "#9aa3b8" },
+};
 let _pid = 0;
 const newId = () => "i" + Date.now().toString(36) + (_pid++).toString(36);
 const startOfToday = () => { const d = new Date(); d.setHours(0, 0, 0, 0); return d.getTime(); };
@@ -281,6 +298,20 @@ function Shell({ AC, user, account, store, setStore, showToast, onExit, onSwitch
   const items = store.items || [];
   const terms = posType(store.kind);
 
+  // per-store appearance
+  const theme = store.theme || {};
+  const accent = theme.accent || AC;
+  const fontStack = (POS_FONTS[theme.font] || {}).stack || null;
+  const density = theme.density || "comfortable";
+  const skinVars = theme.mode && theme.mode !== "auto" ? POS_SKIN[theme.mode] : null;
+  const themeTimer = useRef(null);
+  const setTheme = useCallback((patch) => {
+    const next = { ...(store.theme || {}), ...patch };
+    setStore(s => ({ ...s, theme: { ...(s.theme || {}), ...patch } }));
+    clearTimeout(themeTimer.current);
+    themeTimer.current = setTimeout(() => saveStoreMeta(store.id, { theme: next }), 400);
+  }, [store.id, store.theme, setStore]);
+
   const setKind = useCallback((k) => { setStore(s => ({ ...s, kind: k })); saveStoreMeta(store.id, { kind: k }); }, [store.id, setStore]);
   const persistItems = useCallback((nextItems) => { setStore(s => ({ ...s, items: nextItems })); saveItems(store.id, nextItems); }, [store.id, setStore]);
   const setTax = useCallback((rate) => { const r = Math.max(0, Math.min(100, Number(rate) || 0)); setStore(s => ({ ...s, taxRate: r })); saveStoreMeta(store.id, { taxRate: r }); }, [store.id, setStore]);
@@ -314,15 +345,16 @@ function Shell({ AC, user, account, store, setStore, showToast, onExit, onSwitch
     showToast?.(ok ? `Sale complete — ${money(sale.total)}` : "Saved locally (sync failed)");
   }, [store.id, setStore, showToast]);
 
-  const navBtn = (on) => ({ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", borderRadius: 10, fontFamily: FFB, fontSize: 13.5, cursor: "pointer", color: on ? "#fff" : "var(--nv-text)", background: on ? AC : "transparent", marginBottom: 3 });
+  const navBtn = (on) => ({ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", borderRadius: 10, fontFamily: FFB, fontSize: 13.5, cursor: "pointer", color: on ? "#fff" : "var(--nv-text)", background: on ? accent : "transparent", marginBottom: 3 });
   const railBtn = { display: "block", width: "100%", textAlign: "left", padding: "9px 11px", borderRadius: 9, border: "1px solid var(--nv-border)", background: "var(--nv-elevated)", color: "var(--nv-text)", fontFamily: FFB, fontSize: 12.5, cursor: "pointer", marginTop: 6 };
 
   return (
-    <div style={{ display: "flex", height: "100%", width: "100%", fontFamily: FF, color: "var(--nv-text)", background: "var(--nv-surface)" }}>
+    <div className="nova-pos-skin" style={{ display: "flex", height: "100%", width: "100%", fontFamily: FF, color: "var(--nv-text)", background: "var(--nv-surface)", ...(skinVars || {}) }}>
+      {fontStack && <style>{`.nova-pos-skin, .nova-pos-skin * { font-family: ${fontStack} !important; }`}</style>}
       {/* sidebar */}
       <aside style={{ width: 176, flexShrink: 0, display: "flex", flexDirection: "column", borderRight: "1px solid var(--nv-border)", background: "var(--nv-surface-solid)", padding: "12px 11px" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 9, padding: "2px 4px 10px" }}>
-          <div style={{ width: 30, height: 30, borderRadius: 9, background: AC, display: "grid", placeItems: "center", fontSize: 16, flexShrink: 0 }}>{terms.icon}</div>
+          <div style={{ width: 30, height: 30, borderRadius: 9, background: accent, display: "grid", placeItems: "center", fontSize: 16, flexShrink: 0 }}>{terms.icon}</div>
           <div style={{ minWidth: 0 }}>
             <div style={{ fontFamily: FFB, fontSize: 13.5, lineHeight: 1.1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{store.name}</div>
             <div style={{ fontSize: 10.5, color: "var(--nv-text-dim)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>@{account.username}</div>
@@ -337,19 +369,20 @@ function Shell({ AC, user, account, store, setStore, showToast, onExit, onSwitch
 
       {/* content */}
       <div style={{ flex: 1, minWidth: 0 }}>
-        {tab === "register" && <Register AC={AC} items={items} taxRate={store.taxRate || 0} onSale={onSale} showToast={showToast} terms={terms} />}
-        {tab === "items" && <Items AC={AC} items={items} onChange={persistItems} showToast={showToast} terms={terms} />}
-        {tab === "revenue" && <Revenue AC={AC} agg={store.agg || {}} sales={store.sales || []} expenses={store.expenses || []} createdAt={store.createdAt || Date.now()} />}
-        {tab === "expenses" && <Expenses AC={AC} expenses={store.expenses || []} onChange={setExpenses} />}
-        {tab === "settings" && <Settings AC={AC} store={store} kind={store.kind || "retail"} setKind={setKind} taxRate={store.taxRate || 0} setTax={setTax} stateCode={store.state || ""} setStateLoc={setStateLoc} onRename={(n) => onRename(store.id, n)} onDelete={() => onDelete(store.id)} onSwitch={onSwitch} />}
+        {tab === "register" && <Register AC={accent} items={items} taxRate={store.taxRate || 0} onSale={onSale} showToast={showToast} terms={terms} density={density} />}
+        {tab === "items" && <Items AC={accent} items={items} onChange={persistItems} showToast={showToast} terms={terms} />}
+        {tab === "revenue" && <Revenue AC={accent} agg={store.agg || {}} sales={store.sales || []} expenses={store.expenses || []} createdAt={store.createdAt || Date.now()} />}
+        {tab === "expenses" && <Expenses AC={accent} expenses={store.expenses || []} onChange={setExpenses} />}
+        {tab === "settings" && <Settings AC={accent} osAccent={AC} store={store} kind={store.kind || "retail"} setKind={setKind} theme={theme} setTheme={setTheme} taxRate={store.taxRate || 0} setTax={setTax} stateCode={store.state || ""} setStateLoc={setStateLoc} onRename={(n) => onRename(store.id, n)} onDelete={() => onDelete(store.id)} onSwitch={onSwitch} />}
       </div>
     </div>
   );
 }
 
 // ──────────────────────────────────────────────────────────── register ─────
-function Register({ AC, items, taxRate, onSale, showToast, terms = POS_TYPES.retail }) {
+function Register({ AC, items, taxRate, onSale, showToast, terms = POS_TYPES.retail, density = "comfortable" }) {
   const [cart, setCart] = useState({});
+  const cardMin = density === "compact" ? 100 : 124;
   const [q, setQ] = useState("");
   const [cat, setCat] = useState("All");
   const [tender, setTender] = useState(null);
@@ -405,7 +438,7 @@ function Register({ AC, items, taxRate, onSale, showToast, terms = POS_TYPES.ret
         <div style={{ flex: 1, overflow: "auto", padding: "0 14px 16px" }}>
           {items.length === 0 ? <Center>Nothing here yet — add {terms.product}s in the <b>{terms.items}</b> tab.</Center>
             : shown.length === 0 ? <Center>No matches.</Center>
-              : <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(124px, 1fr))", gap: 11 }}>
+              : <div style={{ display: "grid", gridTemplateColumns: `repeat(auto-fill, minmax(${cardMin}px, 1fr))`, gap: density === "compact" ? 8 : 11 }}>
                   {shown.map(it => {
                     const a = avail(it); const out = a <= 0;
                     return (
@@ -622,11 +655,14 @@ function ItemEditor({ AC, draft, setDraft, onSave, exists, showToast, terms = PO
 }
 
 // ───────────────────────────────────────────────────────────── settings ────
-function Settings({ AC, store, kind, setKind, taxRate, setTax, stateCode, setStateLoc, onRename, onDelete, onSwitch }) {
+function Settings({ AC, osAccent, store, kind, setKind, theme, setTheme, taxRate, setTax, stateCode, setStateLoc, onRename, onDelete, onSwitch }) {
   const rename = () => { const n = window.prompt("Store name", store.name); if (n && n.trim() && n.trim() !== store.name) onRename(n.trim()); };
   const del = () => { if (window.confirm(`Delete "${store.name}"? This removes its catalog and sales history permanently.`)) onDelete(); };
   const card = { border: "1px solid var(--nv-border)", borderRadius: 13, background: "var(--nv-surface-solid)", padding: "14px 16px", marginBottom: 12 };
   const fld = { padding: "8px 10px", borderRadius: 9, border: "1px solid var(--nv-border)", background: "var(--nv-elevated)", color: "var(--nv-text)", fontFamily: FF, fontSize: 13.5 };
+  const t = theme || {};
+  const pill = (on) => ({ padding: "7px 13px", borderRadius: 9, fontFamily: FFB, fontSize: 12.5, cursor: "pointer", border: "1px solid " + (on ? "transparent" : "var(--nv-border)"), background: on ? AC : "var(--nv-elevated)", color: on ? "#fff" : "var(--nv-text)" });
+  const curAccent = t.accent || osAccent;
   return (
     <div style={{ height: "100%", overflow: "auto", padding: "16px 18px", maxWidth: 620, margin: "0 auto" }}>
       <div style={{ fontFamily: FFB, fontSize: 18, marginBottom: 14 }}>Store settings</div>
@@ -659,6 +695,38 @@ function Settings({ AC, store, kind, setKind, taxRate, setTax, stateCode, setSta
               </div>
             );
           })}
+        </div>
+      </div>
+
+      {/* Appearance / branding */}
+      <div style={card}>
+        <div style={{ fontFamily: FFB, fontSize: 14, marginBottom: 4 }}>Appearance</div>
+        <div style={{ fontSize: 12, color: "var(--nv-text-dim)", marginBottom: 12, lineHeight: 1.5 }}>Brand this store — its own accent, color scheme, font and layout. Saved per store.</div>
+
+        <div style={{ fontSize: 11.5, fontFamily: FFB, color: "var(--nv-text-dim)", marginBottom: 6 }}>ACCENT COLOR</div>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 7, alignItems: "center", marginBottom: 14 }}>
+          {ACCENT_SWATCHES.map(c => (
+            <div key={c} onClick={() => setTheme({ accent: c })} title={c} style={{ width: 26, height: 26, borderRadius: 8, background: c, cursor: "pointer", boxSizing: "border-box", border: curAccent.toLowerCase() === c.toLowerCase() ? "2.5px solid var(--nv-text)" : "2px solid transparent" }} />
+          ))}
+          <label title="Custom color" style={{ width: 28, height: 28, borderRadius: 8, border: "1px solid var(--nv-border)", cursor: "pointer", display: "grid", placeItems: "center", background: "var(--nv-elevated)", fontSize: 13, position: "relative", overflow: "hidden" }}>➕
+            <input type="color" value={curAccent} onChange={e => setTheme({ accent: e.target.value })} style={{ position: "absolute", inset: 0, opacity: 0, cursor: "pointer" }} />
+          </label>
+          {t.accent && <span onClick={() => setTheme({ accent: null })} style={{ fontSize: 12, color: "var(--nv-text-dim)", cursor: "pointer" }}>Reset</span>}
+        </div>
+
+        <div style={{ fontSize: 11.5, fontFamily: FFB, color: "var(--nv-text-dim)", marginBottom: 6 }}>COLOR SCHEME</div>
+        <div style={{ display: "flex", gap: 7, marginBottom: 14 }}>
+          {[["auto", "Match Nova"], ["light", "Light"], ["dark", "Dark"]].map(([m, lbl]) => <div key={m} style={pill((t.mode || "auto") === m)} onClick={() => setTheme({ mode: m })}>{lbl}</div>)}
+        </div>
+
+        <div style={{ fontSize: 11.5, fontFamily: FFB, color: "var(--nv-text-dim)", marginBottom: 6 }}>FONT</div>
+        <div style={{ display: "flex", gap: 7, flexWrap: "wrap", marginBottom: 14 }}>
+          {Object.entries(POS_FONTS).map(([id, f]) => <div key={id} style={{ ...pill((t.font || "system") === id), fontFamily: f.stack || FFB }} onClick={() => setTheme({ font: id })}>{f.label}</div>)}
+        </div>
+
+        <div style={{ fontSize: 11.5, fontFamily: FFB, color: "var(--nv-text-dim)", marginBottom: 6 }}>REGISTER LAYOUT</div>
+        <div style={{ display: "flex", gap: 7 }}>
+          {[["comfortable", "Comfortable"], ["compact", "Compact"]].map(([d, lbl]) => <div key={d} style={pill((t.density || "comfortable") === d)} onClick={() => setTheme({ density: d })}>{lbl}</div>)}
         </div>
       </div>
 
