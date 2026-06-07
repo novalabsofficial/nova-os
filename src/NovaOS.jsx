@@ -26,7 +26,7 @@ import { PROVIDERS as AI_PROVIDERS, streamResponse as aiStream, deriveTitle as a
 import { playTone, speak, cancelSpeech, playSound, getSoundConfig, setSoundConfig, setSoundWallpaper, subscribeSoundConfig } from "./lib/audio.js";
 import { db, setDbUid, getDbUid } from "./lib/db.js";
 import { fetchAccessList as fetchPosAccess } from "./lib/pos.js";
-import { ACH_MAP, setAwardHandler } from "./lib/achievements.js";
+import { ACH_MAP, setGameWinHandler } from "./lib/achievements.js";
 import { watchMyThreads, otherParticipantName } from "./lib/dms.js";
 import { watchMyServers } from "./lib/servers.js";
 import { openExternalUrl } from "./lib/openUrl.js";
@@ -1495,12 +1495,12 @@ export default function NovaOS(){
   },[notifsOpen, markAllNotificationsRead]);
   const updateData    =useCallback((patch)=>{setData(prev=>{const next=typeof patch==="function"?patch(prev):{...prev,...patch};saveData(next);return next;});},[saveData]);
 
-  // ── Achievements (v11.0 Phase D) ────────────────────────────────────────
-  // Unlock state lives in data.achievements ({id:unlockedAt}); refs hold the
-  // latest values so award() never re-fires and never spams Firestore.
+  // ── Achievements (v11.0 Phase D) — GAMES ONLY ───────────────────────────
+  // Unlock state lives in data.achievements ({id:unlockedAt}); the set of games
+  // a personal best has been set in lives in data.gamePBs. Refs hold the latest
+  // values so unlocks never re-fire and never spam Firestore.
   const achRef = useRef({}); achRef.current = data?.achievements || {};
-  const openedRef = useRef([]); openedRef.current = data?.openedApps || [];
-  const OPENABLE = APPS.filter(a => !a.restricted).length;
+  const gamePBRef = useRef([]); gamePBRef.current = data?.gamePBs || [];
   const unlock = useCallback((id) => {
     const a = ACH_MAP[id]; if (!a) return;
     if (achRef.current[id]) return;                       // already earned
@@ -1509,30 +1509,21 @@ export default function NovaOS(){
     playSound("notification");
     showToast("🏆 Achievement unlocked — " + a.title);
   }, [updateData, showToast]);
-  const bumpApp = useCallback((appId) => {
-    const cur = openedRef.current;
-    unlock("first_app");
-    if (cur.includes(appId)) return;
-    const next = [...cur, appId]; openedRef.current = next;
-    updateData(p => ({ ...p, openedApps: Array.from(new Set([...(p.openedApps || []), appId])) }));
-    if (next.length >= 10) unlock("explorer");
-    if (next.length >= 25) unlock("power_user");
-    if (next.length >= OPENABLE) unlock("completionist");
-  }, [updateData, unlock, OPENABLE]);
-  useEffect(() => { setAwardHandler(unlock); return () => setAwardHandler(null); }, [unlock]);
-  useEffect(() => { if (screen === "desktop" && user) { unlock("welcome"); const h = new Date().getHours(); if (h >= 0 && h < 5) unlock("night_owl"); } }, [screen, user, unlock]);
-  useEffect(() => { if (spotlightOpen) unlock("seeker"); }, [spotlightOpen, unlock]);
-  useEffect(() => { if (commandOpen) unlock("commander"); }, [commandOpen, unlock]);
-  useEffect(() => { if (deskCount > 1) unlock("juggler"); }, [deskCount, unlock]);
-  useEffect(() => { if (isFs) unlock("big_screen"); }, [isFs, unlock]);
+  // A leaderboard game reports a fresh personal best; track distinct games and
+  // unlock the milestone badges.
+  const recordGameWin = useCallback((gameId) => {
+    unlock("first_score");
+    const cur = gamePBRef.current;
+    if (cur.includes(gameId)) return;
+    const next = [...cur, gameId]; gamePBRef.current = next;
+    updateData(p => p ? ({ ...p, gamePBs: Array.from(new Set([...(p.gamePBs || []), gameId])) }) : p);
+    if (next.length >= 3) unlock("hat_trick");
+    if (next.length >= 6) unlock("arcade_master");
+    if (next.length >= 10) unlock("all_star");
+  }, [updateData, unlock]);
+  useEffect(() => { setGameWinHandler(recordGameWin); return () => setGameWinHandler(null); }, [recordGameWin]);
 
-  const updateSettings=useCallback((patch)=>{
-    updateData(prev=>({...prev,settings:{...(prev.settings||{}),...patch}}));
-    if (patch.wallpaper || patch.wallpaperLight) unlock("decorator");
-    if (patch.accent) unlock("colorful");
-    if (patch.glass) unlock("glassmorphic");
-    if ("theme" in patch) unlock("day_night");
-  },[updateData, unlock]);
+  const updateSettings=useCallback((patch)=>{updateData(prev=>({...prev,settings:{...(prev.settings||{}),...patch}}));},[updateData]);
   const handleCustomWallpaper=useCallback(async(url)=>{setCustomWp(url);await db.set("user:"+user+":wpimg",url);updateSettings({[theme==="light"?"wallpaperLight":"wallpaper"]:"custom"});showToast("Custom wallpaper set ✓");},[user,updateSettings,showToast,theme]);
   // v11.0 Phase B — desktop sticky notes (stored in data.stickyNotes, so they
   // ride along in profile backups). Text persists on blur; position/color/delete persist on the action.
@@ -1656,9 +1647,7 @@ export default function NovaOS(){
     // even via a stale restored window or desktop pin. posAccessRef already
     // folds in the NovaMod (isAdmin) check, so this also lets NovaMod through.
     // POS opens as a full-screen kiosk overlay (no window), not a desktop window.
-    if(appId==="pos" && !posAccessRef.current) return;
-    bumpApp(appId);    // achievements: track distinct apps opened
-    if(appId==="pos"){ setMenuOpen(false); setPosMode(true); return; }
+    if(appId==="pos"){ if(!posAccessRef.current) return; setMenuOpen(false); setPosMode(true); return; }
     setMenuOpen(false);
     // v8.1: opening an app clears its notification badge. Special-cased
     // for "chat" inside markAppNotificationsRead (bumps lastChatOpenTs

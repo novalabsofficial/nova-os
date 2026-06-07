@@ -126,13 +126,14 @@ solid. This combined release **absorbs everything that was tentatively scoped as
 ## D · Smaller wins to fold in  ✅ COMPLETE
 - **Asset Studio — paste & drop images.** ✅ Ctrl/Cmd+V a copied image and
   drag-drop image files onto the canvas, to edit / cut out immediately.
-- **Achievements / badges.** ✅ 18-badge catalog (lib/achievements.js) + a tiny
-  award() pub/sub so any app can unlock one. Unlocks persist in data.achievements
-  (syncs + backs up). Triggered by OS events (welcome, first app, 10/25/all apps,
-  wallpaper, accent, glass, theme, command bar, Spotlight, 2nd desktop, fullscreen,
-  night-owl) and app events (Paint save, Forum post, POS sale, game personal best).
-  Achievements app shows progress + categories, with dimmed/locked + secret (???)
-  badges. Unlock pops a "🏆 Achievement unlocked" toast + sound.
+- **Achievements / badges.** ✅ **Scoped strictly to games** (Steam-style) to keep
+  the rest of the OS feeling like a serious, professional OS rather than a game
+  project. lib/achievements.js holds the catalog + a recordGameWin() channel;
+  scores.js fires it on a personal best, and NovaOS tracks the set of distinct
+  games topped (data.gamePBs) to unlock milestone badges: On the board (1st PB),
+  Hat trick (3 games), Arcade master (6), Nova all-star (10, secret). Unlocks
+  persist in data.achievements (syncs + backs up) and pop a toast + sound. The
+  Achievements app shows progress + locked/secret badges.
 
 **All four phases (A–D) of the 11.0 arc are complete.**
 

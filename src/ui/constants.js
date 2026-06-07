@@ -139,7 +139,7 @@ export const APPS = [
   {id:"code",       icon:"💻",label:"Code",         desc:"Code editor with live preview"},
   {id:"forum",      icon:"💬",label:"Forum",        desc:"Discuss & vote — Nova's community board"},
   {id:"sheets",     icon:"🔢",label:"Sheets",       desc:"Spreadsheet with formulas & CSV"},
-  {id:"achievements",icon:"🏆",label:"Achievements", desc:"Badges you've unlocked"},
+  {id:"achievements",icon:"🏆",label:"Achievements", desc:"Game badges & milestones"},
   // v11.0 — POS is RESTRICTED: hidden from the launcher unless the signed-in
   // user is a moderator (NovaMod) or has been granted access. See gating in
   // NovaOS.jsx (visibleApps) — the `restricted` flag is what triggers the check.

@@ -8,7 +8,6 @@ import { FF, FFB } from "../ui/styles.js";
 import { getDbUid } from "../lib/db.js";
 import { isAdmin } from "../lib/moderation.js";
 import { createPost, fetchPosts, votePost, addComment, deletePost, deleteComment } from "../lib/forum.js";
-import { award } from "../lib/achievements.js";
 
 const TOPICS = [
   { id: "general",  label: "General",  color: "#6366f1" },
@@ -86,7 +85,7 @@ export function ForumApp({ AC = "#6366f1", user, showToast }) {
 
   const submitPost = useCallback(async ({ title, body, topic }) => {
     const post = await createPost({ title, body, topic, uid: myUid, user: me });
-    if (post) { setPosts(ps => [post, ...ps]); setView("feed"); setFilter("all"); setSort("new"); showToast?.("Posted"); award("town_crier"); }
+    if (post) { setPosts(ps => [post, ...ps]); setView("feed"); setFilter("all"); setSort("new"); showToast?.("Posted"); }
     else showToast?.("Could not post");
   }, [myUid, me, showToast]);
 

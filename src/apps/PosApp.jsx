@@ -16,7 +16,6 @@ import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { FF, FFB } from "../ui/styles.js";
 import { getDbUid } from "../lib/db.js";
 import { isAdmin } from "../lib/moderation.js";
-import { award } from "../lib/achievements.js";
 import {
   createStore, loginStore, saveItems, saveTaxRate, saveStoreMeta, commitSale,
   fetchAccessList, grantAccess, revokeAccess,
@@ -218,7 +217,6 @@ function Shell({ AC, user, showToast, onExit, store, setStore }) {
         },
       };
     });
-    award("shopkeeper");
     const ok = await commitSale(store.id, { items: nextItems, sale });
     showToast?.(ok ? `Sale complete — ${money(sale.total)}` : "Saved locally (sync failed)");
   }, [store.id, setStore, showToast]);

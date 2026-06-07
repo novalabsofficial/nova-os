@@ -18,7 +18,6 @@ import { useState, useEffect, useRef } from "react";
 import { FF, FFB, FFM } from "../ui/styles.js";
 import { fill, bdr } from "../lib/format.js";
 import { PAINT_COLORS } from "../ui/constants.js";
-import { award } from "../lib/achievements.js";
 
 const DEFAULT_W = 1000, DEFAULT_H = 680;   // fallback until the stage is measured
 const UNDO_LIMIT = 20;
@@ -281,7 +280,7 @@ export function PaintApp({ showToast, AC, onSetWallpaper }) {
 
   // ── actions ────────────────────────────────────────────────────────────
   const clearLayer = () => { beginAction(); const ctx = actx(); ctx.globalCompositeOperation = "source-over"; ctx.clearRect(0, 0, CW, CH); };
-  const save = () => { const a = document.createElement("a"); a.download = "nova-paint.png"; a.href = composite(false).toDataURL("image/png"); a.click(); showToast?.("Saved ✓"); award("artist"); };
+  const save = () => { const a = document.createElement("a"); a.download = "nova-paint.png"; a.href = composite(false).toDataURL("image/png"); a.click(); showToast?.("Saved ✓"); };
   const setWallpaper = () => { if (onSetWallpaper) onSetWallpaper(composite(true).toDataURL("image/png")); };
   const importImage = (e) => {
     const f = e.target.files?.[0]; if (!f) return; const url = URL.createObjectURL(f); const img = new Image();
