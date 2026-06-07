@@ -66,7 +66,7 @@ const splitImgs = (items) => {
   return { meta, imgs };
 };
 const mergeImgs = (meta, imgs) => (meta || []).map(it => ({ ...it, img: (imgs || {})[it.id] || null }));
-const emptyAgg = () => ({ revenue: 0, cost: 0, profit: 0, tax: 0, gross: 0, count: 0 });
+const emptyAgg = () => ({ revenue: 0, cost: 0, profit: 0, tax: 0, gross: 0, count: 0, purchases: 0 });
 
 // ───────────────────────────────── accounts ─────────────────────────────────
 export async function createAccount({ username, password, byUid }) {
@@ -179,6 +179,7 @@ export async function commitSale(storeId, { items, sale }) {
     const sales = [sale, ...(cur.sales || [])].slice(0, 200);
     const a = { ...emptyAgg(), ...(cur.agg || {}) };
     const agg = {
+      ...a,   // preserve purchases + any future fields
       revenue: round2(a.revenue + sale.revenue), cost: round2(a.cost + sale.cost),
       profit: round2(a.profit + sale.profit), tax: round2(a.tax + sale.tax),
       gross: round2(a.gross + sale.total), count: a.count + 1,

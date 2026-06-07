@@ -32,13 +32,15 @@ const POS_TYPES = {
     items: "Products", cart: "Cart", product: "product", add: "Add item", charge: "Charge",
     priceLabel: "Price", costLabel: "Purchase cost",
     tracksStock: true, stockLabel: "Stock", stockWord: "left",
+    restockCharges: true,   // receiving a shipment charges (units x cost) against revenue
     unit: null,
   },
   restaurant: {
     label: "Restaurant / Café", icon: "🍽️", desc: "Restaurants, cafés, bars",
     items: "Menu", cart: "Order", product: "menu item", add: "Add menu item", charge: "Charge",
-    priceLabel: "Price", costLabel: "Food cost",
+    priceLabel: "Price", costLabel: "Purchase cost",
     tracksStock: false, softStock: true,   // optional informational count, doesn't block selling
+    restockCharges: true,   // receiving a shipment charges (units x cost) against revenue
     unit: null,
   },
   hotel: {
@@ -342,6 +344,7 @@ function Shell({ AC, user, account, store, setStore, showToast, onExit, onSwitch
       return {
         ...s, items: nextItems, sales: [sale, ...(s.sales || [])].slice(0, 200),
         agg: {
+          ...a,   // preserve purchases
           revenue: (a.revenue || 0) + sale.revenue, cost: (a.cost || 0) + sale.cost,
           profit: (a.profit || 0) + sale.profit, tax: (a.tax || 0) + sale.tax,
           gross: (a.gross || 0) + sale.total, count: (a.count || 0) + 1,
@@ -351,6 +354,21 @@ function Shell({ AC, user, account, store, setStore, showToast, onExit, onSwitch
     const ok = await commitSale(store.id, { items: nextItems, sale });
     showToast?.(ok ? `Sale complete — ${money(sale.total)}` : "Saved locally (sync failed)");
   }, [store.id, setStore, showToast]);
+
+  // Receiving inventory (a shipment) charges units x cost against revenue —
+  // cash-basis: you pay for stock when it arrives. Updates items + agg.purchases.
+  const receiveStock = useCallback((itemId, units) => {
+    const u = Math.max(0, Math.round(units || 0)); if (!u) return;
+    const it = (store.items || []).find(x => x.id === itemId); if (!it) return;
+    const charge = u * (Number(it.cost) || 0);
+    const nextItems = (store.items || []).map(x => x.id === itemId ? { ...x, stock: (x.stock ?? 0) + u } : x);
+    const a = store.agg || {};
+    const nextAgg = { ...a, purchases: (a.purchases || 0) + charge };
+    setStore(s => ({ ...s, items: nextItems, agg: { ...(s.agg || {}), purchases: ((s.agg || {}).purchases || 0) + charge } }));
+    saveItems(store.id, nextItems);
+    saveStoreMeta(store.id, { agg: nextAgg });
+    showToast?.(charge > 0 ? `Received ${u} × ${it.name} — ${money(charge)} inventory cost` : `Received ${u} × ${it.name}`);
+  }, [store.id, store.items, store.agg, setStore, showToast]);
 
   const navBtn = (on) => ({ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", borderRadius: 10, fontFamily: FFB, fontSize: 13.5, cursor: "pointer", color: on ? "#fff" : "var(--nv-text)", background: on ? accent : "transparent", marginBottom: 3 });
   const railBtn = { display: "block", width: "100%", textAlign: "left", padding: "9px 11px", borderRadius: 9, border: "1px solid var(--nv-border)", background: "var(--nv-elevated)", color: "var(--nv-text)", fontFamily: FFB, fontSize: 12.5, cursor: "pointer", marginTop: 6 };
@@ -377,8 +395,8 @@ function Shell({ AC, user, account, store, setStore, showToast, onExit, onSwitch
       {/* content */}
       <div style={{ flex: 1, minWidth: 0 }}>
         {tab === "register" && <Register AC={accent} items={items} taxRate={store.taxRate || 0} onSale={onSale} showToast={showToast} terms={terms} density={density} />}
-        {tab === "items" && <Items AC={accent} items={items} onChange={persistItems} showToast={showToast} terms={terms} />}
-        {tab === "revenue" && <Revenue AC={accent} agg={store.agg || {}} sales={store.sales || []} expenses={store.expenses || []} createdAt={store.createdAt || Date.now()} />}
+        {tab === "items" && <Items AC={accent} items={items} onChange={persistItems} onReceive={receiveStock} showToast={showToast} terms={terms} />}
+        {tab === "revenue" && <Revenue AC={accent} agg={store.agg || {}} sales={store.sales || []} expenses={store.expenses || []} createdAt={store.createdAt || Date.now()} usePurchases={!!terms.restockCharges} />}
         {tab === "expenses" && <Expenses AC={accent} expenses={store.expenses || []} onChange={setExpenses} />}
         {tab === "settings" && <Settings AC={accent} osAccent={AC} store={store} kind={store.kind || "retail"} setKind={setKind} theme={theme} setTheme={setTheme} onSetLogo={onSetLogo} taxRate={store.taxRate || 0} setTax={setTax} stateCode={store.state || ""} setStateLoc={setStateLoc} onRename={(n) => onRename(store.id, n)} onDelete={() => onDelete(store.id)} onSwitch={onSwitch} />}
       </div>
@@ -559,10 +577,17 @@ function TenderModal({ AC, total, state, setState, onCancel, onConfirm }) {
 }
 
 // ─────────────────────────────────────────────────────────────── items ─────
-function Items({ AC, items, onChange, showToast, terms = POS_TYPES.retail }) {
+function Items({ AC, items, onChange, onReceive, showToast, terms = POS_TYPES.retail }) {
   const [draft, setDraft] = useState(null);
   const blank = () => ({ id: newId(), name: "", price: "", cost: "", stock: "", category: "", img: null });
   const adjustStock = (id, delta) => onChange(items.map(it => it.id === id ? { ...it, stock: Math.max(0, (it.stock ?? 0) + delta) } : it));
+  const recvBtn = { padding: "6px 11px", borderRadius: 8, border: "1px solid var(--nv-border)", background: "var(--nv-elevated)", color: "var(--nv-text)", fontFamily: FFB, fontSize: 12, cursor: "pointer", whiteSpace: "nowrap" };
+  const receive = (it) => {
+    const ans = window.prompt(`New shipment — how many "${it.name}" received? (charges ${money(it.cost || 0)} each to revenue)`, "1");
+    if (ans == null) return;
+    const n = Math.max(0, Math.round(Number(ans) || 0));
+    if (n > 0) onReceive(it.id, n);
+  };
   // Hotel: check a guest out of a room → it returns to available stock (default 1).
   const checkout = (id, n = 1) => onChange(items.map(it => it.id === id ? { ...it, stock: (it.stock ?? 0) + n, checkedOut: Math.max(0, (it.checkedOut ?? 0) - n) } : it));
   const del = (id) => onChange(items.filter(i => i.id !== id));
@@ -605,8 +630,13 @@ function Items({ AC, items, onChange, showToast, terms = POS_TYPES.retail }) {
                     <div style={{ fontFamily: FFB, fontSize: 15, color: (it.stock ?? 0) <= 0 ? "#ef4444" : "var(--nv-text)" }}>{it.stock ?? 0}</div>
                     <div style={{ fontSize: 10, color: "var(--nv-text-dim)" }}>in stock</div>
                   </div>
-                  <Stepper onClick={() => adjustStock(it.id, 1)}>+</Stepper>
+                  {terms.restockCharges
+                    ? <button onClick={() => receive(it)} style={recvBtn} title="Log a new shipment (charges inventory cost)">Receive</button>
+                    : <Stepper onClick={() => adjustStock(it.id, 1)}>+</Stepper>}
                 </div>
+              )}
+              {terms.softStock && terms.restockCharges && (
+                <button onClick={() => receive(it)} style={recvBtn} title="Log a new shipment (charges inventory cost)">Receive</button>
               )}
               {terms.tracksCheckout && (
                 <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
@@ -790,12 +820,15 @@ function Settings({ AC, osAccent, store, kind, setKind, theme, setTheme, onSetLo
 }
 
 // ────────────────────────────────────────────────────────────── revenue ────
-function Revenue({ AC, agg, sales, expenses, createdAt }) {
+function Revenue({ AC, agg, sales, expenses, createdAt, usePurchases }) {
   const perDayExp = dailyExpenseTotal(expenses);
   const daysOpen = Math.max(0, (Date.now() - (createdAt || Date.now())) / 86400000);
   const opEx = perDayExp * daysOpen;
-  const grossProfit = agg.profit || 0;
-  const net = grossProfit - opEx;
+  const purchases = agg.purchases || 0;
+  const grossProfit = agg.profit || 0;        // revenue − COGS (cogs model: hotel/services)
+  // Restock-model types (retail/restaurant) recognize cost when inventory is
+  // bought, so net = revenue − inventory purchases − operating expenses.
+  const net = usePurchases ? ((agg.revenue || 0) - purchases - opEx) : (grossProfit - opEx);
 
   const today = useMemo(() => { const t = startOfToday(); return (sales || []).filter(s => s.at >= t); }, [sales]);
   const tRev = today.reduce((s, x) => s + (x.revenue || 0), 0);
@@ -816,10 +849,12 @@ function Revenue({ AC, agg, sales, expenses, createdAt }) {
       <div style={{ fontFamily: FFB, fontSize: 18, marginBottom: 12 }}>Revenue & profit</div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(165px, 1fr))", gap: 11, marginBottom: 16 }}>
         <Stat label="Total revenue" value={money(agg.revenue)} sub="Pre-tax sales" AC={AC} big />
-        <Stat label="Net profit" value={money(net)} sub="Profit − expenses to date" color={net >= 0 ? "#16a34a" : "#ef4444"} big />
-        <Stat label="Gross profit" value={money(grossProfit)} sub="Revenue − cost of goods" />
+        <Stat label="Net profit" value={money(net)} sub={usePurchases ? "Revenue − purchases − expenses" : "Gross profit − expenses"} color={net >= 0 ? "#16a34a" : "#ef4444"} big />
+        {usePurchases
+          ? <Stat label="Inventory purchases" value={money(purchases)} sub="Spent receiving shipments" color="#ef4444" />
+          : <Stat label="Gross profit" value={money(grossProfit)} sub="Revenue − cost of goods" />}
         <Stat label="Operating expenses" value={money(opEx)} sub={perDayExp > 0 ? `${money(perDayExp)}/day · accrued` : "None set → Expenses tab"} />
-        <Stat label="Cost of goods" value={money(agg.cost)} sub="Paid for sold stock" />
+        {!usePurchases && <Stat label="Cost of goods" value={money(agg.cost)} sub="Paid for sold stock" />}
         <Stat label="Tax collected" value={money(agg.tax)} sub="Set aside for remittance" />
         <Stat label="Gross collected" value={money(agg.gross)} sub="Incl. tax" />
         <Stat label="Transactions" value={String(agg.count || 0)} sub="Completed sales" />
@@ -827,20 +862,20 @@ function Revenue({ AC, agg, sales, expenses, createdAt }) {
 
       <div style={{ display: "flex", gap: 11, marginBottom: 18, flexWrap: "wrap" }}>
         <Stat label="Today's revenue" value={money(tRev)} sub={`${today.length} sale${today.length === 1 ? "" : "s"}`} AC={AC} />
-        <Stat label="Today's profit" value={money(tProfit)} sub="Before expenses" color="#16a34a" />
-        {perDayExp > 0 && <Stat label="Today's net" value={money(tProfit - perDayExp)} sub={`after ${money(perDayExp)} expenses`} color={(tProfit - perDayExp) >= 0 ? "#16a34a" : "#ef4444"} />}
+        {!usePurchases && <Stat label="Today's profit" value={money(tProfit)} sub="Before expenses" color="#16a34a" />}
+        {!usePurchases && perDayExp > 0 && <Stat label="Today's net" value={money(tProfit - perDayExp)} sub={`after ${money(perDayExp)} expenses`} color={(tProfit - perDayExp) >= 0 ? "#16a34a" : "#ef4444"} />}
       </div>
 
       <div style={{ fontFamily: FFB, fontSize: 14.5, marginBottom: 8 }}>Sales by day</div>
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
         {days.length === 0 ? <Center>No sales recorded yet.</Center>
-          : days.map(g => <DayGroup key={g.day} g={g} perDayExp={perDayExp} />)}
+          : days.map(g => <DayGroup key={g.day} g={g} perDayExp={perDayExp} usePurchases={usePurchases} />)}
       </div>
     </div>
   );
 }
 
-function DayGroup({ g, perDayExp }) {
+function DayGroup({ g, perDayExp, usePurchases }) {
   const [open, setOpen] = useState(false);
   const net = g.profit - perDayExp;
   return (
@@ -850,17 +885,18 @@ function DayGroup({ g, perDayExp }) {
         <span style={{ fontFamily: FFB, fontSize: 14 }}>{dayLabel(g.day)}</span>
         <span style={{ fontSize: 11.5, color: "var(--nv-text-dim)" }}>{g.sales.length} sale{g.sales.length === 1 ? "" : "s"}</span>
         <div style={{ flex: 1 }} />
-        <span style={{ fontSize: 12.5, color: "var(--nv-text-dim)" }}>Rev {money(g.revenue)}</span>
-        <span style={{ fontFamily: FFB, fontSize: 13.5, color: perDayExp > 0 ? (net >= 0 ? "#16a34a" : "#ef4444") : "#16a34a" }}>{perDayExp > 0 ? `Net ${money(net)}` : `+${money(g.profit)}`}</span>
+        {usePurchases
+          ? <span style={{ fontFamily: FFB, fontSize: 13.5 }}>Rev {money(g.revenue)}</span>
+          : <><span style={{ fontSize: 12.5, color: "var(--nv-text-dim)" }}>Rev {money(g.revenue)}</span><span style={{ fontFamily: FFB, fontSize: 13.5, color: perDayExp > 0 ? (net >= 0 ? "#16a34a" : "#ef4444") : "#16a34a" }}>{perDayExp > 0 ? `Net ${money(net)}` : `+${money(g.profit)}`}</span></>}
       </div>
       {open && (
         <div style={{ borderTop: "1px solid var(--nv-border)", padding: "4px 12px 8px" }}>
-          {perDayExp > 0 && <div style={{ fontSize: 11.5, color: "var(--nv-text-dim)", padding: "6px 0" }}>Revenue {money(g.revenue)} · profit {money(g.profit)} − expenses {money(perDayExp)} = <b style={{ color: net >= 0 ? "#16a34a" : "#ef4444" }}>net {money(net)}</b></div>}
+          {!usePurchases && perDayExp > 0 && <div style={{ fontSize: 11.5, color: "var(--nv-text-dim)", padding: "6px 0" }}>Revenue {money(g.revenue)} · profit {money(g.profit)} − expenses {money(perDayExp)} = <b style={{ color: net >= 0 ? "#16a34a" : "#ef4444" }}>net {money(net)}</b></div>}
           {g.sales.map(s => (
             <div key={s.id} style={{ display: "flex", alignItems: "center", gap: 9, padding: "6px 2px", borderTop: "1px solid var(--nv-border)" }}>
               <span style={{ fontFamily: FFB, fontSize: 13.5 }}>{money(s.total)}</span>
               <span style={{ fontSize: 11, padding: "1px 7px", borderRadius: 999, background: "var(--nv-elevated)", color: "var(--nv-text-dim)" }}>{s.tender === "cash" ? "💵" : "💳"}</span>
-              <span style={{ fontSize: 11.5, color: "#16a34a" }}>+{money(s.profit)}</span>
+              {!usePurchases && <span style={{ fontSize: 11.5, color: "#16a34a" }}>+{money(s.profit)}</span>}
               <span style={{ flex: 1, fontSize: 11.5, color: "var(--nv-text-dim)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{(s.lines || []).map(l => `${l.qty}× ${l.name}${l.units > 1 && l.unit ? ` · ${l.units} ${l.unit}` : ""}`).join(", ")}</span>
               <span style={{ fontSize: 11, color: "var(--nv-text-dim)" }}>{new Date(s.at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}</span>
             </div>
