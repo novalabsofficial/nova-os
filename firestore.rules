@@ -565,10 +565,19 @@ service cloud.firestore {
     // backend-verified auth.
     //   nova_pos_stores/{storeId} — credentials + catalog + sales + totals
     //   nova_pos_imgs/{storeId}   — item image blobs (kept out of the store doc)
-    match /nova_pos_stores/{storeId} {
+    // v11.0 — POS accounts own a roster of stores. The account password is
+    // SHA-256 hashed client-side and compared after a read, so the account doc
+    // must be readable to signed-in users (same client-trust model as the
+    // stores). Store docs now carry an accountId; deletion is allowed for any
+    // signed-in user who can open the POS (the launcher gate is the real fence).
+    match /nova_pos_accounts/{accountId} {
       allow read: if signedIn();
       allow create, update: if signedIn();
       allow delete: if isMod();
+    }
+    match /nova_pos_stores/{storeId} {
+      allow read: if signedIn();
+      allow create, update, delete: if signedIn();
     }
     match /nova_pos_imgs/{storeId} {
       allow read: if signedIn();

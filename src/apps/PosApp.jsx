@@ -1,59 +1,31 @@
-// Point of Sale — v11.0 (remastered). A full-screen register that takes over the
-// Nova OS UI (launched as a kiosk overlay from NovaOS; "Close POS" calls onExit).
+// Point of Sale — v11.0. A full-screen register that takes over the Nova OS UI
+// (launched as a kiosk overlay from NovaOS; "Close POS" calls onExit).
 //
-// Flow: open → store sign-in (per-store username/password) → register / items /
-// revenue. Each store owns its catalog (items with image, price, purchase cost,
-// stock), sales ledger and running revenue/profit totals. Adding to a cart draws
-// down available stock; completing a sale decrements real stock and rolls the
-// revenue/profit numbers. Card payments are RECORD-ONLY (a pure web app can't talk
-// to a physical Square reader — that needs a native app or a backend + Terminal API).
+// Model: ONE account login (username + password). An account owns any number of
+// STORES. Flow: sign in → pick a store (or create/rename/delete) → run the POS
+// for that store. Inside, a left sidebar organizes Register / Items / Revenue /
+// Expenses / Settings, and "Switch store" jumps back to the picker.
 //
-// The Nova-OS launcher gate (who can even open this app) is separate and lives in
-// NovaOS.jsx; NovaMod manages that allowlist from the admin panel on the sign-in
-// screen here.
+// Card payments are RECORD-ONLY (a pure web app can't drive a physical reader).
+// The Nova-OS launcher gate (who can even open this app) is separate, in NovaOS;
+// NovaMod manages that allowlist from the admin panel on the sign-in screen.
 
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
-import { FF, FFB } from "../ui/styles.js";
+import { FF, FFB, FFM } from "../ui/styles.js";
 import { getDbUid } from "../lib/db.js";
 import { isAdmin } from "../lib/moderation.js";
 import {
-  createStore, loginStore, saveItems, saveTaxRate, saveStoreMeta, commitSale,
-  fetchAccessList, grantAccess, revokeAccess,
+  createAccount, loginAccount, createStore, loadStore, renameStore, deleteStore,
+  saveItems, saveStoreMeta, commitSale, fetchAccessList, grantAccess, revokeAccess,
 } from "../lib/pos.js";
 
 const money = (n) => "$" + (Number(n) || 0).toFixed(2);
-
-// US statewide base sales-tax rates (%), used to auto-fill the register's tax.
-// These are STATE-level base rates — county/city taxes can add more, so the rate
-// stays editable for local adjustment. AK/DE/MT/NH/OR have no state sales tax.
-const US_STATE_TAX = {
-  AL: 4.0, AK: 0.0, AZ: 5.6, AR: 6.5, CA: 7.25, CO: 2.9, CT: 6.35, DE: 0.0, DC: 6.0,
-  FL: 6.0, GA: 4.0, HI: 4.0, ID: 6.0, IL: 6.25, IN: 7.0, IA: 6.0, KS: 6.5, KY: 6.0,
-  LA: 5.0, ME: 5.5, MD: 6.0, MA: 6.25, MI: 6.0, MN: 6.875, MS: 7.0, MO: 4.225,
-  MT: 0.0, NE: 5.5, NV: 6.85, NH: 0.0, NJ: 6.625, NM: 4.875, NY: 4.0, NC: 4.75,
-  ND: 5.0, OH: 5.75, OK: 4.5, OR: 0.0, PA: 6.0, RI: 7.0, SC: 6.0, SD: 4.2, TN: 7.0,
-  TX: 6.25, UT: 6.1, VT: 6.0, VA: 5.3, WA: 6.5, WV: 6.0, WI: 5.0, WY: 4.0,
-};
-const US_STATES = [
-  ["AL","Alabama"],["AK","Alaska"],["AZ","Arizona"],["AR","Arkansas"],["CA","California"],
-  ["CO","Colorado"],["CT","Connecticut"],["DE","Delaware"],["DC","District of Columbia"],
-  ["FL","Florida"],["GA","Georgia"],["HI","Hawaii"],["ID","Idaho"],["IL","Illinois"],
-  ["IN","Indiana"],["IA","Iowa"],["KS","Kansas"],["KY","Kentucky"],["LA","Louisiana"],
-  ["ME","Maine"],["MD","Maryland"],["MA","Massachusetts"],["MI","Michigan"],["MN","Minnesota"],
-  ["MS","Mississippi"],["MO","Missouri"],["MT","Montana"],["NE","Nebraska"],["NV","Nevada"],
-  ["NH","New Hampshire"],["NJ","New Jersey"],["NM","New Mexico"],["NY","New York"],
-  ["NC","North Carolina"],["ND","North Dakota"],["OH","Ohio"],["OK","Oklahoma"],["OR","Oregon"],
-  ["PA","Pennsylvania"],["RI","Rhode Island"],["SC","South Carolina"],["SD","South Dakota"],
-  ["TN","Tennessee"],["TX","Texas"],["UT","Utah"],["VT","Vermont"],["VA","Virginia"],
-  ["WA","Washington"],["WV","West Virginia"],["WI","Wisconsin"],["WY","Wyoming"],
-];
-const LS_LAST = "nova-pos-last-store";
+const LS_LAST = "nova-pos-last-account";
 let _pid = 0;
 const newId = () => "i" + Date.now().toString(36) + (_pid++).toString(36);
 const startOfToday = () => { const d = new Date(); d.setHours(0, 0, 0, 0); return d.getTime(); };
 
-// Recurring-expense accrual. Each expense has { name, amount, period }; we convert
-// to a per-day rate so costs (rent, payroll…) accrue automatically over time.
+// recurring-expense accrual
 const PERIODS = [{ id: "daily", label: "Per day", days: 1 }, { id: "weekly", label: "Per week", days: 7 }, { id: "monthly", label: "Per month", days: 30.4368 }, { id: "yearly", label: "Per year", days: 365.25 }];
 const periodDays = (p) => (PERIODS.find(x => x.id === p) || PERIODS[2]).days;
 const dailyRate = (e) => (Number(e.amount) || 0) / periodDays(e.period);
@@ -67,7 +39,28 @@ function dayLabel(ts) {
   return d.toLocaleDateString([], { weekday: "short", month: "short", day: "numeric", ...(d.getFullYear() !== new Date().getFullYear() ? { year: "numeric" } : {}) });
 }
 
-// downscale an uploaded image to a small JPEG dataURL (keeps the store doc light)
+const US_STATE_TAX = {
+  AL: 4.0, AK: 0.0, AZ: 5.6, AR: 6.5, CA: 7.25, CO: 2.9, CT: 6.35, DE: 0.0, DC: 6.0,
+  FL: 6.0, GA: 4.0, HI: 4.0, ID: 6.0, IL: 6.25, IN: 7.0, IA: 6.0, KS: 6.5, KY: 6.0,
+  LA: 5.0, ME: 5.5, MD: 6.0, MA: 6.25, MI: 6.0, MN: 6.875, MS: 7.0, MO: 4.225,
+  MT: 0.0, NE: 5.5, NV: 6.85, NH: 0.0, NJ: 6.625, NM: 4.875, NY: 4.0, NC: 4.75,
+  ND: 5.0, OH: 5.75, OK: 4.5, OR: 0.0, PA: 6.0, RI: 7.0, SC: 6.0, SD: 4.2, TN: 7.0,
+  TX: 6.25, UT: 6.1, VT: 6.0, VA: 5.3, WA: 6.5, WV: 6.0, WI: 5.0, WY: 4.0,
+};
+const US_STATES = [
+  ["AL", "Alabama"], ["AK", "Alaska"], ["AZ", "Arizona"], ["AR", "Arkansas"], ["CA", "California"],
+  ["CO", "Colorado"], ["CT", "Connecticut"], ["DE", "Delaware"], ["DC", "District of Columbia"],
+  ["FL", "Florida"], ["GA", "Georgia"], ["HI", "Hawaii"], ["ID", "Idaho"], ["IL", "Illinois"],
+  ["IN", "Indiana"], ["IA", "Iowa"], ["KS", "Kansas"], ["KY", "Kentucky"], ["LA", "Louisiana"],
+  ["ME", "Maine"], ["MD", "Maryland"], ["MA", "Massachusetts"], ["MI", "Michigan"], ["MN", "Minnesota"],
+  ["MS", "Mississippi"], ["MO", "Missouri"], ["MT", "Montana"], ["NE", "Nebraska"], ["NV", "Nevada"],
+  ["NH", "New Hampshire"], ["NJ", "New Jersey"], ["NM", "New Mexico"], ["NY", "New York"],
+  ["NC", "North Carolina"], ["ND", "North Dakota"], ["OH", "Ohio"], ["OK", "Oklahoma"], ["OR", "Oregon"],
+  ["PA", "Pennsylvania"], ["RI", "Rhode Island"], ["SC", "South Carolina"], ["SD", "South Dakota"],
+  ["TN", "Tennessee"], ["TX", "Texas"], ["UT", "Utah"], ["VT", "Vermont"], ["VA", "Virginia"],
+  ["WA", "Washington"], ["WV", "West Virginia"], ["WI", "Wisconsin"], ["WY", "Wyoming"],
+];
+
 function downscale(file, max = 200, q = 0.62) {
   return new Promise((res) => {
     const url = URL.createObjectURL(file); const img = new Image();
@@ -85,16 +78,39 @@ function downscale(file, max = 200, q = 0.62) {
 }
 
 export function PosApp({ AC = "#6366f1", user, showToast, onExit }) {
+  const [account, setAccount] = useState(null);
   const [store, setStore] = useState(null);
-  if (!store) return <StoreAuth AC={AC} user={user} showToast={showToast} onExit={onExit} onAuthed={setStore} />;
-  return <Shell AC={AC} user={user} showToast={showToast} onExit={onExit} store={store} setStore={setStore} />;
+  const [busy, setBusy] = useState(false);
+
+  const openStore = useCallback(async (storeId) => {
+    setBusy(true); const r = await loadStore(storeId); setBusy(false);
+    if (r.error) { showToast?.(r.error); return; }
+    setStore(r.store);
+  }, [showToast]);
+  const makeStore = useCallback(async (name) => {
+    setBusy(true); const r = await createStore(account.id, name); setBusy(false);
+    if (r.error) { showToast?.(r.error); return; }
+    setAccount(a => ({ ...a, stores: r.stores })); setStore(r.store); showToast?.("Store created");
+  }, [account, showToast]);
+  const renameStoreFn = useCallback(async (storeId, name) => {
+    const stores = await renameStore(account.id, storeId, name);
+    if (stores) { setAccount(a => ({ ...a, stores })); setStore(s => s && s.id === storeId ? { ...s, name } : s); }
+  }, [account]);
+  const deleteStoreFn = useCallback(async (storeId) => {
+    const stores = await deleteStore(account.id, storeId);
+    if (stores) { setAccount(a => ({ ...a, stores })); setStore(s => s && s.id === storeId ? null : s); showToast?.("Store deleted"); }
+  }, [account, showToast]);
+
+  if (!account) return <Auth AC={AC} user={user} showToast={showToast} onExit={onExit} onAuthed={setAccount} />;
+  if (!store) return <StorePicker AC={AC} account={account} busy={busy} onOpen={openStore} onCreate={makeStore} onRename={renameStoreFn} onDelete={deleteStoreFn} onSignOut={() => setAccount(null)} onExit={onExit} />;
+  return <Shell AC={AC} user={user} account={account} store={store} setStore={setStore} showToast={showToast} onExit={onExit}
+    onSwitch={() => setStore(null)} onRename={renameStoreFn} onDelete={deleteStoreFn} />;
 }
 
-// ───────────────────────────────────────────────────────────── sign-in ─────
-function StoreAuth({ AC, user, showToast, onExit, onAuthed }) {
-  const [mode, setMode] = useState("signin");          // signin | create
+// ───────────────────────────────────────────────────── account sign-in ─────
+function Auth({ AC, user, showToast, onExit, onAuthed }) {
+  const [mode, setMode] = useState("signin");
   const [u, setU] = useState(() => localStorage.getItem(LS_LAST) || "");
-  const [name, setName] = useState("");
   const [pw, setPw] = useState("");
   const [pw2, setPw2] = useState("");
   const [busy, setBusy] = useState(false);
@@ -108,16 +124,15 @@ function StoreAuth({ AC, user, showToast, onExit, onAuthed }) {
     setBusy(true);
     if (mode === "create") {
       if (pw !== pw2) { setErr("Passwords don't match."); setBusy(false); return; }
-      const r = await createStore({ name, username: u, password: pw, byUid: getDbUid() });
+      const r = await createAccount({ username: u, password: pw, byUid: getDbUid() });
       if (r.error) { setErr(r.error); setBusy(false); return; }
-      localStorage.setItem(LS_LAST, r.store.username); showToast?.("Store created"); onAuthed(r.store);
+      localStorage.setItem(LS_LAST, r.account.username); showToast?.("Account created"); onAuthed(r.account);
     } else {
-      const r = await loginStore({ username: u, password: pw });
+      const r = await loginAccount({ username: u, password: pw });
       if (r.error) { setErr(r.error); setBusy(false); return; }
-      localStorage.setItem(LS_LAST, r.store.username); onAuthed(r.store);
+      localStorage.setItem(LS_LAST, r.account.username); onAuthed(r.account);
     }
   };
-
   const fld = { width: "100%", padding: "12px 13px", borderRadius: 11, border: "1px solid var(--nv-border)", background: "var(--nv-elevated)", color: "var(--nv-text)", fontFamily: FF, fontSize: 15, boxSizing: "border-box" };
 
   return (
@@ -127,26 +142,22 @@ function StoreAuth({ AC, user, showToast, onExit, onAuthed }) {
         <div style={{ textAlign: "center", marginBottom: 22 }}>
           <div style={{ width: 60, height: 60, borderRadius: 17, background: AC, display: "grid", placeItems: "center", fontSize: 32, margin: "0 auto 12px", boxShadow: "0 12px 30px " + AC + "55" }}>🛒</div>
           <div style={{ fontFamily: FFB, fontSize: 24 }}>Nova POS</div>
-          <div style={{ fontSize: 13, color: "var(--nv-text-dim)", marginTop: 2 }}>{mode === "create" ? "Set up a new store" : "Sign in to your store"}</div>
+          <div style={{ fontSize: 13, color: "var(--nv-text-dim)", marginTop: 2 }}>{mode === "create" ? "Create your account" : "Sign in to your account"}</div>
         </div>
-
         <div style={{ display: "flex", gap: 6, background: "var(--nv-elevated)", padding: 4, borderRadius: 12, marginBottom: 16 }}>
           {["signin", "create"].map(m => (
-            <div key={m} onClick={() => { setMode(m); setErr(""); }} style={{ flex: 1, textAlign: "center", padding: "8px", borderRadius: 9, cursor: "pointer", fontFamily: FFB, fontSize: 13.5, background: mode === m ? AC : "transparent", color: mode === m ? "#fff" : "var(--nv-text-dim)" }}>{m === "signin" ? "Sign in" : "Create store"}</div>
+            <div key={m} onClick={() => { setMode(m); setErr(""); }} style={{ flex: 1, textAlign: "center", padding: "8px", borderRadius: 9, cursor: "pointer", fontFamily: FFB, fontSize: 13.5, background: mode === m ? AC : "transparent", color: mode === m ? "#fff" : "var(--nv-text-dim)" }}>{m === "signin" ? "Sign in" : "Create account"}</div>
           ))}
         </div>
-
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          {mode === "create" && <input value={name} onChange={e => setName(e.target.value)} placeholder="Store name (e.g. Corner Café)" style={fld} />}
-          <input value={u} onChange={e => setU(e.target.value)} placeholder="Store username" autoCapitalize="none" style={fld} />
+          <input value={u} onChange={e => setU(e.target.value)} placeholder="Account username" autoCapitalize="none" style={fld} />
           <input value={pw} onChange={e => setPw(e.target.value)} type="password" placeholder="Password" onKeyDown={e => e.key === "Enter" && mode === "signin" && go()} style={fld} />
           {mode === "create" && <input value={pw2} onChange={e => setPw2(e.target.value)} type="password" placeholder="Confirm password" onKeyDown={e => e.key === "Enter" && go()} style={fld} />}
           {err && <div style={{ color: "#ef4444", fontSize: 13, textAlign: "center" }}>{err}</div>}
           <button onClick={go} disabled={busy} style={{ marginTop: 4, padding: "13px", borderRadius: 12, border: "none", background: AC, color: "#fff", fontFamily: FFB, fontSize: 15.5, cursor: busy ? "default" : "pointer", opacity: busy ? 0.7 : 1 }}>
-            {busy ? "Please wait…" : mode === "create" ? "Create store" : "Sign in"}
+            {busy ? "Please wait…" : mode === "create" ? "Create account" : "Sign in"}
           </button>
         </div>
-
         {mod && (
           <div style={{ marginTop: 22, borderTop: "1px solid var(--nv-border)", paddingTop: 14 }}>
             <div onClick={() => setAdminOpen(o => !o)} style={{ fontSize: 12.5, color: "var(--nv-text-dim)", cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}>
@@ -160,7 +171,6 @@ function StoreAuth({ AC, user, showToast, onExit, onAuthed }) {
   );
 }
 
-// NovaMod-only: manage which Nova accounts can even see/open the POS app.
 function AccessAdmin({ AC, showToast }) {
   const [list, setList] = useState(null);
   const [name, setName] = useState("");
@@ -170,7 +180,7 @@ function AccessAdmin({ AC, showToast }) {
   const fld = { flex: 1, padding: "8px 10px", borderRadius: 9, border: "1px solid var(--nv-border)", background: "var(--nv-elevated)", color: "var(--nv-text)", fontFamily: FF, fontSize: 13 };
   return (
     <div style={{ marginTop: 10 }}>
-      <div style={{ fontSize: 12, color: "var(--nv-text-dim)", marginBottom: 8, lineHeight: 1.4 }}>The POS app is hidden from regular Nova users. Add a Nova username to make the app visible on their account (you, NovaMod, always have it).</div>
+      <div style={{ fontSize: 12, color: "var(--nv-text-dim)", marginBottom: 8, lineHeight: 1.4 }}>The POS app is hidden from regular Nova users. Add a Nova username to make the app appear on their account (you, NovaMod, always have it).</div>
       <div style={{ display: "flex", gap: 6, marginBottom: 8 }}>
         <input value={name} onChange={e => setName(e.target.value)} onKeyDown={e => e.key === "Enter" && add()} placeholder="Nova username" style={fld} />
         <button onClick={add} style={{ padding: "8px 13px", borderRadius: 9, border: "none", background: AC, color: "#fff", fontFamily: FFB, fontSize: 13, cursor: "pointer" }}>Grant</button>
@@ -181,22 +191,59 @@ function AccessAdmin({ AC, showToast }) {
   );
 }
 
-// ───────────────────────────────────────────────────────────── shell ───────
-function Shell({ AC, user, showToast, onExit, store, setStore }) {
+// ───────────────────────────────────────────────────────── store picker ────
+function StorePicker({ AC, account, busy, onOpen, onCreate, onRename, onDelete, onSignOut, onExit }) {
+  const stores = account.stores || [];
+  const newStore = () => { const n = window.prompt("Store name", "My Store"); if (n && n.trim()) onCreate(n.trim()); };
+  const rename = (s) => { const n = window.prompt("Rename store", s.name); if (n && n.trim() && n.trim() !== s.name) onRename(s.id, n.trim()); };
+  const del = (s) => { if (window.confirm(`Delete "${s.name}"? This removes its catalog and sales history permanently.`)) onDelete(s.id); };
+
+  return (
+    <div style={{ position: "relative", height: "100%", width: "100%", display: "grid", placeItems: "center", fontFamily: FF, color: "var(--nv-text)", background: "radial-gradient(1200px 600px at 50% -10%, " + AC + "18, transparent), var(--nv-surface)" }}>
+      <div style={{ position: "absolute", top: 16, left: 18, fontSize: 12.5, color: "var(--nv-text-dim)" }}>Signed in as <b style={{ color: "var(--nv-text)" }}>@{account.username}</b></div>
+      <div style={{ position: "absolute", top: 14, right: 16, display: "flex", gap: 8 }}>
+        <button onClick={onSignOut} style={{ ...closeBtn, position: "static", background: "var(--nv-elevated)", color: "var(--nv-text)", border: "1px solid var(--nv-border)" }}>Sign out</button>
+        <button onClick={onExit} style={{ ...closeBtn, position: "static" }}>✕ Close POS</button>
+      </div>
+      <div style={{ width: 460, maxWidth: "92vw" }}>
+        <div style={{ fontFamily: FFB, fontSize: 22, marginBottom: 4 }}>Your stores</div>
+        <div style={{ fontSize: 13, color: "var(--nv-text-dim)", marginBottom: 16 }}>Pick a store to open the register, or create a new one.</div>
+        {busy && <div style={{ fontSize: 13, color: "var(--nv-text-dim)", marginBottom: 10 }}>Opening…</div>}
+        <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
+          {stores.length === 0 && <div style={{ padding: "26px", textAlign: "center", color: "var(--nv-text-dim)", border: "1px dashed var(--nv-border)", borderRadius: 14, fontSize: 13.5 }}>No stores yet — create your first one below.</div>}
+          {stores.map(s => (
+            <div key={s.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "13px 15px", borderRadius: 13, border: "1px solid var(--nv-border)", background: "var(--nv-surface-solid)" }}>
+              <div onClick={() => onOpen(s.id)} style={{ flex: 1, minWidth: 0, cursor: "pointer", display: "flex", alignItems: "center", gap: 12 }}>
+                <div style={{ width: 38, height: 38, borderRadius: 10, background: AC, display: "grid", placeItems: "center", fontSize: 19 }}>🏪</div>
+                <span style={{ fontFamily: FFB, fontSize: 15.5 }}>{s.name}</span>
+              </div>
+              <button onClick={() => onOpen(s.id)} style={{ padding: "7px 14px", borderRadius: 9, border: "none", background: AC, color: "#fff", fontFamily: FFB, fontSize: 13, cursor: "pointer" }}>Open</button>
+              <span onClick={() => rename(s)} style={{ cursor: "pointer", fontSize: 12.5, color: "var(--nv-text-dim)" }}>Rename</span>
+              <span onClick={() => del(s)} style={{ cursor: "pointer", fontSize: 12.5, color: "#ef4444" }}>Delete</span>
+            </div>
+          ))}
+        </div>
+        <button onClick={newStore} style={{ marginTop: 14, width: "100%", padding: "13px", borderRadius: 12, border: "1px dashed var(--nv-border)", background: "var(--nv-elevated)", color: "var(--nv-text)", fontFamily: FFB, fontSize: 14.5, cursor: "pointer" }}>+ New store</button>
+      </div>
+    </div>
+  );
+}
+
+// ──────────────────────────────────────────────────────────────── shell ────
+const NAV = [
+  { id: "register", label: "Register", icon: "🧾" },
+  { id: "items", label: "Items", icon: "🏷️" },
+  { id: "revenue", label: "Revenue", icon: "📈" },
+  { id: "expenses", label: "Expenses", icon: "🧮" },
+  { id: "settings", label: "Settings", icon: "⚙️" },
+];
+
+function Shell({ AC, user, account, store, setStore, showToast, onExit, onSwitch, onRename, onDelete }) {
   const [tab, setTab] = useState("register");
   const items = store.items || [];
 
-  const persistItems = useCallback((nextItems) => {
-    setStore(s => ({ ...s, items: nextItems }));
-    saveItems(store.id, nextItems);
-  }, [store.id, setStore]);
-
-  const setTax = useCallback((rate) => {
-    const r = Math.max(0, Math.min(100, Number(rate) || 0));
-    setStore(s => ({ ...s, taxRate: r })); saveTaxRate(store.id, r);
-  }, [store.id, setStore]);
-
-  // Pick a US state → auto-apply its base sales-tax rate (still editable after).
+  const persistItems = useCallback((nextItems) => { setStore(s => ({ ...s, items: nextItems })); saveItems(store.id, nextItems); }, [store.id, setStore]);
+  const setTax = useCallback((rate) => { const r = Math.max(0, Math.min(100, Number(rate) || 0)); setStore(s => ({ ...s, taxRate: r })); saveStoreMeta(store.id, { taxRate: r }); }, [store.id, setStore]);
   const setStateLoc = useCallback((code) => {
     const rate = code in US_STATE_TAX ? US_STATE_TAX[code] : 0;
     setStore(s => ({ ...s, state: code, taxRate: rate }));
@@ -204,8 +251,14 @@ function Shell({ AC, user, showToast, onExit, store, setStore }) {
     if (code) showToast?.(`${code} sales tax ${rate}% now applies to every sale`);
   }, [store.id, setStore, showToast]);
 
+  const expTimer = useRef(null);
+  const setExpenses = useCallback((next) => {
+    setStore(s => ({ ...s, expenses: next }));
+    clearTimeout(expTimer.current);
+    expTimer.current = setTimeout(() => saveStoreMeta(store.id, { expenses: next }), 600);
+  }, [store.id, setStore]);
+
   const onSale = useCallback(async (sale, nextItems) => {
-    // optimistic local roll of the ledger + totals
     setStore(s => {
       const a = s.agg || {};
       return {
@@ -221,42 +274,34 @@ function Shell({ AC, user, showToast, onExit, store, setStore }) {
     showToast?.(ok ? `Sale complete — ${money(sale.total)}` : "Saved locally (sync failed)");
   }, [store.id, setStore, showToast]);
 
-  // expenses update instantly in the UI; the Firestore write is debounced so
-  // typing in the expense fields doesn't fire a write per keystroke.
-  const expTimer = useRef(null);
-  const setExpenses = useCallback((next) => {
-    setStore(s => ({ ...s, expenses: next }));
-    clearTimeout(expTimer.current);
-    expTimer.current = setTimeout(() => saveStoreMeta(store.id, { expenses: next }), 600);
-  }, [store.id, setStore]);
-
-  const TABS = [{ id: "register", label: "Register", icon: "🧾" }, { id: "items", label: "Items", icon: "🏷️" }, { id: "revenue", label: "Revenue", icon: "📈" }, { id: "expenses", label: "Expenses", icon: "🧮" }];
-  const tabBtn = (on) => ({ display: "flex", alignItems: "center", gap: 7, padding: "8px 15px", borderRadius: 10, fontFamily: FFB, fontSize: 13.5, cursor: "pointer", border: "1px solid " + (on ? "transparent" : "var(--nv-border)"), background: on ? AC : "var(--nv-elevated)", color: on ? "#fff" : "var(--nv-text)" });
-  const signOut = () => { setStore(null); };
+  const navBtn = (on) => ({ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", borderRadius: 10, fontFamily: FFB, fontSize: 13.5, cursor: "pointer", color: on ? "#fff" : "var(--nv-text)", background: on ? AC : "transparent", marginBottom: 3 });
+  const railBtn = { display: "block", width: "100%", textAlign: "left", padding: "9px 11px", borderRadius: 9, border: "1px solid var(--nv-border)", background: "var(--nv-elevated)", color: "var(--nv-text)", fontFamily: FFB, fontSize: 12.5, cursor: "pointer", marginTop: 6 };
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100%", width: "100%", fontFamily: FF, color: "var(--nv-text)", background: "var(--nv-surface)" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "11px 16px", borderBottom: "1px solid var(--nv-border)", flexShrink: 0 }}>
-        <div style={{ width: 30, height: 30, borderRadius: 9, background: AC, display: "grid", placeItems: "center", fontSize: 17 }}>🛒</div>
-        <div style={{ minWidth: 0 }}>
-          <div style={{ fontFamily: FFB, fontSize: 16, lineHeight: 1.1 }}>{store.name}</div>
-          <div style={{ fontSize: 11.5, color: "var(--nv-text-dim)" }}>@{store.username} · cashier {user}</div>
+    <div style={{ display: "flex", height: "100%", width: "100%", fontFamily: FF, color: "var(--nv-text)", background: "var(--nv-surface)" }}>
+      {/* sidebar */}
+      <aside style={{ width: 176, flexShrink: 0, display: "flex", flexDirection: "column", borderRight: "1px solid var(--nv-border)", background: "var(--nv-surface-solid)", padding: "12px 11px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 9, padding: "2px 4px 10px" }}>
+          <div style={{ width: 30, height: 30, borderRadius: 9, background: AC, display: "grid", placeItems: "center", fontSize: 16, flexShrink: 0 }}>🏪</div>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontFamily: FFB, fontSize: 13.5, lineHeight: 1.1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{store.name}</div>
+            <div style={{ fontSize: 10.5, color: "var(--nv-text-dim)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>@{account.username}</div>
+          </div>
         </div>
-        <div style={{ display: "flex", gap: 7, marginLeft: 14 }}>{TABS.map(t => <div key={t.id} style={tabBtn(tab === t.id)} onClick={() => setTab(t.id)}>{t.icon} {t.label}</div>)}</div>
-        {(() => { const r = Number(store.taxRate) || 0; return (
-          <div title="Sales tax applied to every sale — set it in the Items tab" onClick={() => setTab("items")} style={{ cursor: "pointer", marginLeft: 6, fontSize: 11.5, fontFamily: FFB, padding: "5px 11px", borderRadius: 999, background: r > 0 ? AC : "var(--nv-elevated)", color: r > 0 ? "#fff" : "var(--nv-text-dim)", border: r > 0 ? "none" : "1px solid var(--nv-border)" }}>
-            {r > 0 ? `Tax ${r}%${store.state ? " · " + store.state : ""}` : "No tax — set state"}
-          </div>); })()}
-        <div style={{ flex: 1 }} />
-        <button onClick={signOut} style={{ ...closeBtn, position: "static", background: "var(--nv-elevated)", color: "var(--nv-text)", border: "1px solid var(--nv-border)" }}>Sign out</button>
-        <button onClick={onExit} style={{ ...closeBtn, position: "static" }}>✕ Close POS</button>
-      </div>
+        <button onClick={onSwitch} style={{ ...railBtn, marginTop: 0, marginBottom: 8 }}>⇄ Switch store</button>
+        <div style={{ flex: 1 }}>
+          {NAV.map(n => <div key={n.id} style={navBtn(tab === n.id)} onClick={() => setTab(n.id)}><span style={{ fontSize: 15 }}>{n.icon}</span>{n.label}</div>)}
+        </div>
+        <button onClick={onExit} style={{ ...closeBtn, position: "static", width: "100%", marginTop: 6 }}>✕ Close POS</button>
+      </aside>
 
-      <div style={{ flex: 1, minHeight: 0 }}>
+      {/* content */}
+      <div style={{ flex: 1, minWidth: 0 }}>
         {tab === "register" && <Register AC={AC} items={items} taxRate={store.taxRate || 0} onSale={onSale} showToast={showToast} />}
-        {tab === "items" && <Items AC={AC} items={items} taxRate={store.taxRate || 0} setTax={setTax} stateCode={store.state || ""} setStateLoc={setStateLoc} onChange={persistItems} showToast={showToast} />}
+        {tab === "items" && <Items AC={AC} items={items} onChange={persistItems} showToast={showToast} />}
         {tab === "revenue" && <Revenue AC={AC} agg={store.agg || {}} sales={store.sales || []} expenses={store.expenses || []} createdAt={store.createdAt || Date.now()} />}
-        {tab === "expenses" && <Expenses AC={AC} expenses={store.expenses || []} onChange={setExpenses} showToast={showToast} />}
+        {tab === "expenses" && <Expenses AC={AC} expenses={store.expenses || []} onChange={setExpenses} />}
+        {tab === "settings" && <Settings AC={AC} store={store} taxRate={store.taxRate || 0} setTax={setTax} stateCode={store.state || ""} setStateLoc={setStateLoc} onRename={(n) => onRename(store.id, n)} onDelete={() => onDelete(store.id)} />}
       </div>
     </div>
   );
@@ -264,10 +309,10 @@ function Shell({ AC, user, showToast, onExit, store, setStore }) {
 
 // ──────────────────────────────────────────────────────────── register ─────
 function Register({ AC, items, taxRate, onSale, showToast }) {
-  const [cart, setCart] = useState({});          // { itemId: qty }
+  const [cart, setCart] = useState({});
   const [q, setQ] = useState("");
   const [cat, setCat] = useState("All");
-  const [tender, setTender] = useState(null);    // { method, cash }
+  const [tender, setTender] = useState(null);
 
   const cats = useMemo(() => ["All", ...Array.from(new Set(items.map(i => i.category).filter(Boolean)))], [items]);
   const shown = items.filter(i => (cat === "All" || i.category === cat) && i.name.toLowerCase().includes(q.toLowerCase()));
@@ -279,7 +324,7 @@ function Register({ AC, items, taxRate, onSale, showToast }) {
 
   const lines = useMemo(() => Object.entries(cart).map(([id, qty]) => {
     const it = items.find(x => x.id === id); if (!it) return null;
-    return { id, name: it.name, price: it.price || 0, cost: it.cost || 0, emoji: it.img ? null : "📦", img: it.img, qty, lineTotal: (it.price || 0) * qty };
+    return { id, name: it.name, price: it.price || 0, cost: it.cost || 0, img: it.img, qty, lineTotal: (it.price || 0) * qty };
   }).filter(Boolean), [cart, items]);
   const subtotal = useMemo(() => lines.reduce((s, l) => s + l.lineTotal, 0), [lines]);
   const rate = Number(taxRate) || 0;
@@ -290,14 +335,13 @@ function Register({ AC, items, taxRate, onSale, showToast }) {
   const complete = ({ method, paid }) => {
     const cogs = lines.reduce((s, l) => s + l.cost * l.qty, 0);
     const sale = {
-      id: newId(), at: Date.now(), tender: method, paid: +(+paid).toFixed(2), cashier: "",
+      id: newId(), at: Date.now(), tender: method, paid: +(+paid).toFixed(2),
       lines: lines.map(l => ({ id: l.id, name: l.name, price: l.price, cost: l.cost, qty: l.qty })),
       subtotal: +subtotal.toFixed(2), tax: +tax.toFixed(2), total: +total.toFixed(2),
       revenue: +subtotal.toFixed(2), cost: +cogs.toFixed(2), profit: +(subtotal - cogs).toFixed(2),
     };
     const nextItems = items.map(it => cart[it.id] ? { ...it, stock: Math.max(0, (it.stock ?? 0) - cart[it.id]) } : it);
-    onSale(sale, nextItems);
-    setCart({}); setTender(null);
+    onSale(sale, nextItems); setCart({}); setTender(null);
   };
 
   return (
@@ -334,7 +378,6 @@ function Register({ AC, items, taxRate, onSale, showToast }) {
         </div>
       </div>
 
-      {/* cart */}
       <div style={{ width: 320, flexShrink: 0, borderLeft: "1px solid var(--nv-border)", display: "flex", flexDirection: "column", background: "var(--nv-surface-solid)" }}>
         <div style={{ padding: "13px 15px", borderBottom: "1px solid var(--nv-border)", display: "flex", alignItems: "center" }}>
           <span style={{ fontFamily: FFB, fontSize: 16 }}>Cart</span>
@@ -382,11 +425,10 @@ function TenderModal({ AC, total, state, setState, onCancel, onConfirm }) {
   const change = cashNum - total;
   const quick = [total, Math.ceil(total), Math.ceil(total / 5) * 5, Math.ceil(total / 10) * 10].filter((v, i, a) => a.indexOf(v) === i);
   const ok = state.method === "card" || cashNum >= total;
-  const downRef = useRef(false);   // only dismiss if the press STARTED on the backdrop
+  const downRef = useRef(false);
   return (
-    <div onPointerDown={e => { downRef.current = e.target === e.currentTarget; }}
-         onClick={e => { if (downRef.current && e.target === e.currentTarget) onCancel(); }}
-         style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.55)", display: "grid", placeItems: "center", zIndex: 30 }}>
+    <div onPointerDown={e => { downRef.current = e.target === e.currentTarget; }} onClick={e => { if (downRef.current && e.target === e.currentTarget) onCancel(); }}
+      style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.55)", display: "grid", placeItems: "center", zIndex: 30 }}>
       <div onPointerDown={e => e.stopPropagation()} onClick={e => e.stopPropagation()} style={{ width: 360, background: "var(--nv-surface-solid)", border: "1px solid var(--nv-border)", borderRadius: 18, padding: 20, fontFamily: FF }}>
         <div style={{ fontFamily: FFB, fontSize: 18 }}>Take payment</div>
         <div style={{ fontSize: 13.5, color: "var(--nv-text-dim)", marginBottom: 16 }}>Amount due <b style={{ color: "var(--nv-text)" }}>{money(total)}</b></div>
@@ -415,10 +457,9 @@ function TenderModal({ AC, total, state, setState, onCancel, onConfirm }) {
 }
 
 // ─────────────────────────────────────────────────────────────── items ─────
-function Items({ AC, items, taxRate, setTax, stateCode, setStateLoc, onChange, showToast }) {
+function Items({ AC, items, onChange, showToast }) {
   const [draft, setDraft] = useState(null);
   const blank = () => ({ id: newId(), name: "", price: "", cost: "", stock: "", category: "", img: null });
-
   const adjustStock = (id, delta) => onChange(items.map(it => it.id === id ? { ...it, stock: Math.max(0, (it.stock ?? 0) + delta) } : it));
   const del = (id) => onChange(items.filter(i => i.id !== id));
   const commit = () => {
@@ -428,28 +469,14 @@ function Items({ AC, items, taxRate, setTax, stateCode, setStateLoc, onChange, s
     onChange(exists ? items.map(i => i.id === item.id ? item : i) : [...items, item]);
     setDraft(null);
   };
-
   return (
     <div style={{ height: "100%", overflow: "auto", padding: "16px 18px", maxWidth: 820, margin: "0 auto" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 6, flexWrap: "wrap" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14 }}>
         <div style={{ fontFamily: FFB, fontSize: 18 }}>Products</div>
+        <span style={{ fontSize: 12, color: "var(--nv-text-dim)" }}>{items.length} item{items.length === 1 ? "" : "s"}</span>
         <div style={{ flex: 1 }} />
-        <label style={{ fontSize: 12.5, color: "var(--nv-text-dim)", display: "flex", alignItems: "center", gap: 6 }}>
-          State
-          <select value={stateCode} onChange={e => setStateLoc(e.target.value)} style={{ padding: "7px 9px", borderRadius: 9, border: "1px solid var(--nv-border)", background: "var(--nv-elevated)", color: "var(--nv-text)", fontFamily: FF, fontSize: 13, maxWidth: 160 }}>
-            <option value="">— Select —</option>
-            {US_STATES.map(([code, name]) => <option key={code} value={code}>{name} ({US_STATE_TAX[code]}%)</option>)}
-          </select>
-        </label>
-        <label style={{ fontSize: 12.5, color: "var(--nv-text-dim)", display: "flex", alignItems: "center", gap: 6 }}>
-          Tax <input type="number" value={taxRate} onChange={e => setTax(e.target.value)} style={{ width: 64, padding: "7px 9px", borderRadius: 9, border: "1px solid var(--nv-border)", background: "var(--nv-elevated)", color: "var(--nv-text)", fontFamily: FF, fontSize: 13 }} /> %
-        </label>
         <button onClick={() => setDraft(blank())} style={{ padding: "9px 15px", borderRadius: 10, border: "none", background: AC, color: "#fff", fontFamily: FFB, fontSize: 14, cursor: "pointer" }}>+ Add item</button>
       </div>
-      <div style={{ fontSize: 11.5, color: "var(--nv-text-dim)", marginBottom: 14 }}>
-        Picking a state fills in its base sales-tax rate. County/city taxes vary — adjust the % above if your local rate differs. Tax applies to every sale at the register.
-      </div>
-
       <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
         {items.map(it => {
           const margin = (it.price || 0) - (it.cost || 0);
@@ -477,7 +504,6 @@ function Items({ AC, items, taxRate, setTax, stateCode, setStateLoc, onChange, s
         })}
         {items.length === 0 && <Center>No products yet. Click <b>+ Add item</b> to build your catalog.</Center>}
       </div>
-
       {draft && <ItemEditor AC={AC} draft={draft} setDraft={setDraft} onSave={commit} exists={items.some(i => i.id === draft.id)} showToast={showToast} />}
     </div>
   );
@@ -485,18 +511,13 @@ function Items({ AC, items, taxRate, setTax, stateCode, setStateLoc, onChange, s
 
 function ItemEditor({ AC, draft, setDraft, onSave, exists, showToast }) {
   const fileRef = useRef(null);
-  const downRef = useRef(false);   // only dismiss if the press STARTED on the backdrop
+  const downRef = useRef(false);
   const close = () => setDraft(null);
   const fld = { padding: "10px 12px", borderRadius: 10, border: "1px solid var(--nv-border)", background: "var(--nv-elevated)", color: "var(--nv-text)", fontFamily: FF, fontSize: 14, boxSizing: "border-box", width: "100%" };
-  const pickImg = async (e) => {
-    const f = e.target.files?.[0]; if (!f) return;
-    const url = await downscale(f);
-    if (url) setDraft(d => ({ ...d, img: url })); else showToast?.("Couldn't read that image");
-  };
+  const pickImg = async (e) => { const f = e.target.files?.[0]; if (!f) return; const url = await downscale(f); if (url) setDraft(d => ({ ...d, img: url })); else showToast?.("Couldn't read that image"); };
   return (
-    <div onPointerDown={e => { downRef.current = e.target === e.currentTarget; }}
-         onClick={e => { if (downRef.current && e.target === e.currentTarget) close(); }}
-         style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.55)", display: "grid", placeItems: "center", zIndex: 30 }}>
+    <div onPointerDown={e => { downRef.current = e.target === e.currentTarget; }} onClick={e => { if (downRef.current && e.target === e.currentTarget) close(); }}
+      style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.55)", display: "grid", placeItems: "center", zIndex: 30 }}>
       <div onPointerDown={e => e.stopPropagation()} onClick={e => e.stopPropagation()} style={{ width: 380, maxWidth: "92vw", background: "var(--nv-surface-solid)", border: "1px solid var(--nv-border)", borderRadius: 18, padding: 20, fontFamily: FF, display: "flex", flexDirection: "column", gap: 12 }}>
         <div style={{ fontFamily: FFB, fontSize: 17 }}>{exists ? "Edit item" : "New item"}</div>
         <div style={{ display: "flex", gap: 13, alignItems: "center" }}>
@@ -518,8 +539,58 @@ function ItemEditor({ AC, draft, setDraft, onSave, exists, showToast }) {
           <label style={{ flex: 1, fontSize: 11.5, color: "var(--nv-text-dim)" }}>Category<input value={draft.category} onChange={e => setDraft(d => ({ ...d, category: e.target.value }))} placeholder="optional" style={{ ...fld, marginTop: 3 }} /></label>
         </div>
         <div style={{ display: "flex", gap: 8, marginTop: 2 }}>
-          <button onClick={() => setDraft(null)} style={{ flex: 1, padding: "11px", borderRadius: 11, border: "1px solid var(--nv-border)", background: "var(--nv-elevated)", color: "var(--nv-text)", fontFamily: FFB, fontSize: 14, cursor: "pointer" }}>Cancel</button>
+          <button onClick={close} style={{ flex: 1, padding: "11px", borderRadius: 11, border: "1px solid var(--nv-border)", background: "var(--nv-elevated)", color: "var(--nv-text)", fontFamily: FFB, fontSize: 14, cursor: "pointer" }}>Cancel</button>
           <button onClick={onSave} style={{ flex: 1, padding: "11px", borderRadius: 11, border: "none", background: AC, color: "#fff", fontFamily: FFB, fontSize: 14, cursor: "pointer" }}>Save</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ───────────────────────────────────────────────────────────── settings ────
+function Settings({ AC, store, taxRate, setTax, stateCode, setStateLoc, onRename, onDelete }) {
+  const rename = () => { const n = window.prompt("Store name", store.name); if (n && n.trim() && n.trim() !== store.name) onRename(n.trim()); };
+  const del = () => { if (window.confirm(`Delete "${store.name}"? This removes its catalog and sales history permanently.`)) onDelete(); };
+  const card = { border: "1px solid var(--nv-border)", borderRadius: 13, background: "var(--nv-surface-solid)", padding: "14px 16px", marginBottom: 12 };
+  const fld = { padding: "8px 10px", borderRadius: 9, border: "1px solid var(--nv-border)", background: "var(--nv-elevated)", color: "var(--nv-text)", fontFamily: FF, fontSize: 13.5 };
+  return (
+    <div style={{ height: "100%", overflow: "auto", padding: "16px 18px", maxWidth: 620, margin: "0 auto" }}>
+      <div style={{ fontFamily: FFB, fontSize: 18, marginBottom: 14 }}>Store settings</div>
+
+      <div style={card}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontFamily: FFB, fontSize: 14 }}>{store.name}</div>
+            <div style={{ fontSize: 12, color: "var(--nv-text-dim)" }}>Store name</div>
+          </div>
+          <button onClick={rename} style={{ padding: "8px 14px", borderRadius: 9, border: "1px solid var(--nv-border)", background: "var(--nv-elevated)", color: "var(--nv-text)", fontFamily: FFB, fontSize: 13, cursor: "pointer" }}>Rename</button>
+        </div>
+      </div>
+
+      <div style={card}>
+        <div style={{ fontFamily: FFB, fontSize: 14, marginBottom: 4 }}>Sales tax</div>
+        <div style={{ fontSize: 12, color: "var(--nv-text-dim)", marginBottom: 12, lineHeight: 1.5 }}>Pick your state to auto-fill its base rate, or set the % directly. Applies to every sale at the register. County/city taxes vary — adjust if your local rate differs.</div>
+        <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+          <label style={{ fontSize: 12.5, color: "var(--nv-text-dim)", display: "flex", alignItems: "center", gap: 6 }}>
+            State
+            <select value={stateCode} onChange={e => setStateLoc(e.target.value)} style={{ ...fld, maxWidth: 180 }}>
+              <option value="">— Select —</option>
+              {US_STATES.map(([code, name]) => <option key={code} value={code}>{name} ({US_STATE_TAX[code]}%)</option>)}
+            </select>
+          </label>
+          <label style={{ fontSize: 12.5, color: "var(--nv-text-dim)", display: "flex", alignItems: "center", gap: 6 }}>
+            Tax rate <input type="number" value={taxRate} onChange={e => setTax(e.target.value)} style={{ ...fld, width: 70 }} /> %
+          </label>
+        </div>
+      </div>
+
+      <div style={{ ...card, borderColor: "rgba(239,68,68,0.4)" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontFamily: FFB, fontSize: 14, color: "#ef4444" }}>Delete this store</div>
+            <div style={{ fontSize: 12, color: "var(--nv-text-dim)" }}>Removes its catalog and sales history permanently.</div>
+          </div>
+          <button onClick={del} style={{ padding: "8px 14px", borderRadius: 9, border: "none", background: "#ef4444", color: "#fff", fontFamily: FFB, fontSize: 13, cursor: "pointer" }}>Delete</button>
         </div>
       </div>
     </div>
@@ -530,7 +601,7 @@ function ItemEditor({ AC, draft, setDraft, onSave, exists, showToast }) {
 function Revenue({ AC, agg, sales, expenses, createdAt }) {
   const perDayExp = dailyExpenseTotal(expenses);
   const daysOpen = Math.max(0, (Date.now() - (createdAt || Date.now())) / 86400000);
-  const opEx = perDayExp * daysOpen;                 // operating expenses accrued to date
+  const opEx = perDayExp * daysOpen;
   const grossProfit = agg.profit || 0;
   const net = grossProfit - opEx;
 
@@ -538,7 +609,6 @@ function Revenue({ AC, agg, sales, expenses, createdAt }) {
   const tRev = today.reduce((s, x) => s + (x.revenue || 0), 0);
   const tProfit = today.reduce((s, x) => s + (x.profit || 0), 0);
 
-  // group sales by calendar day, newest first
   const days = useMemo(() => {
     const m = new Map();
     for (const s of (sales || [])) {
@@ -556,7 +626,7 @@ function Revenue({ AC, agg, sales, expenses, createdAt }) {
         <Stat label="Total revenue" value={money(agg.revenue)} sub="Pre-tax sales" AC={AC} big />
         <Stat label="Net profit" value={money(net)} sub="Profit − expenses to date" color={net >= 0 ? "#16a34a" : "#ef4444"} big />
         <Stat label="Gross profit" value={money(grossProfit)} sub="Revenue − cost of goods" />
-        <Stat label="Operating expenses" value={money(opEx)} sub={perDayExp > 0 ? `${money(perDayExp)}/day · accrued` : "None set →  Expenses tab"} />
+        <Stat label="Operating expenses" value={money(opEx)} sub={perDayExp > 0 ? `${money(perDayExp)}/day · accrued` : "None set → Expenses tab"} />
         <Stat label="Cost of goods" value={money(agg.cost)} sub="Paid for sold stock" />
         <Stat label="Tax collected" value={money(agg.tax)} sub="Set aside for remittance" />
         <Stat label="Gross collected" value={money(agg.gross)} sub="Incl. tax" />
@@ -609,7 +679,8 @@ function DayGroup({ g, perDayExp }) {
   );
 }
 
-function Expenses({ AC, expenses, onChange, showToast }) {
+// ───────────────────────────────────────────────────────────── expenses ────
+function Expenses({ AC, expenses, onChange }) {
   const monthly = (expenses || []).reduce((s, e) => s + monthlyExpense(e), 0);
   const update = (id, patch) => onChange(expenses.map(e => e.id === id ? { ...e, ...patch } : e));
   const add = () => onChange([...(expenses || []), { id: newId(), name: "", amount: "", period: "monthly" }]);

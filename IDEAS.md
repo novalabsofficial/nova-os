@@ -71,6 +71,12 @@ solid. This combined release **absorbs everything that was tentatively scoped as
 > Cancel cart; cash (change calc) + record-only card; **Revenue page** auto-computes
 > total revenue / profit / COGS / tax / transactions + today + history. Still gated
 > by the NovaMod launcher allowlist (managed from the POS sign-in admin panel). Card
+> **POS now account→multi-store** — one login per account (nova_pos_accounts); an
+> account owns many stores (roster on the account, each store its own
+> nova_pos_stores doc). Sign in → store picker (open / new / rename / delete) →
+> POS organized as a left sidebar (Register / Items / Revenue / Expenses /
+> Settings); "Switch store" jumps back to the picker. Tax/state moved into
+> Settings to declutter. Card
 > readers (Square): a pure web/Tauri app can't drive a physical reader — needs a
 > native app or backend + Terminal API, so shipped record-only card. **Sheets shipped**
 > (mini spreadsheet — lib/sheets.js formula engine: cell refs, ranges, arithmetic,
