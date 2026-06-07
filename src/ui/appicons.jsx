@@ -340,6 +340,15 @@ const SPECS = {
       <line x1="13" y1="30.5" x2="35" y2="30.5" stroke="#1a8f5a" strokeWidth="1.8" />
     </>),
   },
+  achievements: {
+    color: "#f59e0b",
+    glyph: (<>
+      <path d="M17 13 h14 v6 a7 7 0 0 1 -14 0 Z" fill="#fff" />
+      <path d="M17 14.5 h-3 a4 4 0 0 0 4 4.5 M31 14.5 h3 a4 4 0 0 1 -4 4.5" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" />
+      <rect x="22" y="25" width="4" height="5" fill="#fff" />
+      <rect x="18" y="30" width="12" height="3.5" rx="1.2" fill="#fff" />
+    </>),
+  },
   atlas: {
     color: "#16b3a0",
     glyph: (<>

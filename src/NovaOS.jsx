@@ -26,6 +26,7 @@ import { PROVIDERS as AI_PROVIDERS, streamResponse as aiStream, deriveTitle as a
 import { playTone, speak, cancelSpeech, playSound, getSoundConfig, setSoundConfig, setSoundWallpaper, subscribeSoundConfig } from "./lib/audio.js";
 import { db, setDbUid, getDbUid } from "./lib/db.js";
 import { fetchAccessList as fetchPosAccess } from "./lib/pos.js";
+import { ACH_MAP, setAwardHandler } from "./lib/achievements.js";
 import { watchMyThreads, otherParticipantName } from "./lib/dms.js";
 import { watchMyServers } from "./lib/servers.js";
 import { openExternalUrl } from "./lib/openUrl.js";
@@ -141,6 +142,7 @@ const CodeApp         = lazyApp(() => import("./apps/CodeApp.jsx").then(m       
 const ForumApp        = lazyApp(() => import("./apps/ForumApp.jsx").then(m        => ({default: m.ForumApp})));
 const PosApp          = lazyApp(() => import("./apps/PosApp.jsx").then(m          => ({default: m.PosApp})));
 const SheetsApp       = lazyApp(() => import("./apps/SheetsApp.jsx").then(m       => ({default: m.SheetsApp})));
+const AchievementsApp = lazyApp(() => import("./apps/AchievementsApp.jsx").then(m => ({default: m.AchievementsApp})));
 const AtlasApp        = lazyApp(() => import("./apps/AtlasApp.jsx").then(m        => ({default: m.AtlasApp})));
 // v10.9 — utilities pack
 const CurrencyApp     = lazyApp(() => import("./apps/CurrencyApp.jsx").then(m     => ({default: m.CurrencyApp})));
@@ -1492,7 +1494,45 @@ export default function NovaOS(){
     return ()=>clearTimeout(id);
   },[notifsOpen, markAllNotificationsRead]);
   const updateData    =useCallback((patch)=>{setData(prev=>{const next=typeof patch==="function"?patch(prev):{...prev,...patch};saveData(next);return next;});},[saveData]);
-  const updateSettings=useCallback((patch)=>{updateData(prev=>({...prev,settings:{...(prev.settings||{}),...patch}}));},[updateData]);
+
+  // ── Achievements (v11.0 Phase D) ────────────────────────────────────────
+  // Unlock state lives in data.achievements ({id:unlockedAt}); refs hold the
+  // latest values so award() never re-fires and never spams Firestore.
+  const achRef = useRef({}); achRef.current = data?.achievements || {};
+  const openedRef = useRef([]); openedRef.current = data?.openedApps || [];
+  const OPENABLE = APPS.filter(a => !a.restricted).length;
+  const unlock = useCallback((id) => {
+    const a = ACH_MAP[id]; if (!a) return;
+    if (achRef.current[id]) return;                       // already earned
+    achRef.current = { ...achRef.current, [id]: Date.now() };   // guard rapid double-calls
+    updateData(p => p ? ({ ...p, achievements: { ...(p.achievements || {}), [id]: Date.now() } }) : p);
+    playSound("notification");
+    showToast("🏆 Achievement unlocked — " + a.title);
+  }, [updateData, showToast]);
+  const bumpApp = useCallback((appId) => {
+    const cur = openedRef.current;
+    unlock("first_app");
+    if (cur.includes(appId)) return;
+    const next = [...cur, appId]; openedRef.current = next;
+    updateData(p => ({ ...p, openedApps: Array.from(new Set([...(p.openedApps || []), appId])) }));
+    if (next.length >= 10) unlock("explorer");
+    if (next.length >= 25) unlock("power_user");
+    if (next.length >= OPENABLE) unlock("completionist");
+  }, [updateData, unlock, OPENABLE]);
+  useEffect(() => { setAwardHandler(unlock); return () => setAwardHandler(null); }, [unlock]);
+  useEffect(() => { if (screen === "desktop" && user) { unlock("welcome"); const h = new Date().getHours(); if (h >= 0 && h < 5) unlock("night_owl"); } }, [screen, user, unlock]);
+  useEffect(() => { if (spotlightOpen) unlock("seeker"); }, [spotlightOpen, unlock]);
+  useEffect(() => { if (commandOpen) unlock("commander"); }, [commandOpen, unlock]);
+  useEffect(() => { if (deskCount > 1) unlock("juggler"); }, [deskCount, unlock]);
+  useEffect(() => { if (isFs) unlock("big_screen"); }, [isFs, unlock]);
+
+  const updateSettings=useCallback((patch)=>{
+    updateData(prev=>({...prev,settings:{...(prev.settings||{}),...patch}}));
+    if (patch.wallpaper || patch.wallpaperLight) unlock("decorator");
+    if (patch.accent) unlock("colorful");
+    if (patch.glass) unlock("glassmorphic");
+    if ("theme" in patch) unlock("day_night");
+  },[updateData, unlock]);
   const handleCustomWallpaper=useCallback(async(url)=>{setCustomWp(url);await db.set("user:"+user+":wpimg",url);updateSettings({[theme==="light"?"wallpaperLight":"wallpaper"]:"custom"});showToast("Custom wallpaper set ✓");},[user,updateSettings,showToast,theme]);
   // v11.0 Phase B — desktop sticky notes (stored in data.stickyNotes, so they
   // ride along in profile backups). Text persists on blur; position/color/delete persist on the action.
@@ -1616,7 +1656,9 @@ export default function NovaOS(){
     // even via a stale restored window or desktop pin. posAccessRef already
     // folds in the NovaMod (isAdmin) check, so this also lets NovaMod through.
     // POS opens as a full-screen kiosk overlay (no window), not a desktop window.
-    if(appId==="pos"){ if(!posAccessRef.current) return; setMenuOpen(false); setPosMode(true); return; }
+    if(appId==="pos" && !posAccessRef.current) return;
+    bumpApp(appId);    // achievements: track distinct apps opened
+    if(appId==="pos"){ setMenuOpen(false); setPosMode(true); return; }
     setMenuOpen(false);
     // v8.1: opening an app clears its notification badge. Special-cased
     // for "chat" inside markAppNotificationsRead (bumps lastChatOpenTs
@@ -1657,7 +1699,7 @@ export default function NovaOS(){
       if(ptrRef.current) launchPt.current[newId]={x:ptrRef.current.x,y:ptrRef.current.y};
       markFx(newId,"entering",340);
     }
-  },[deviceMode,markAppNotificationsRead,markFx]);
+  },[deviceMode,markAppNotificationsRead,markFx,bumpApp]);
   // v10.0 — virtual-desktop operations.
   const addDesktop=useCallback(()=>{
     setDeskCount(c=>{ if(c>=MAX_DESKTOPS) return c; setCurDesk(c); return c+1; });
@@ -1760,6 +1802,7 @@ export default function NovaOS(){
         {appId==="code"       &&<CodeApp AC={AC} showToast={showToast}/>}
         {appId==="forum"      &&<ForumApp AC={AC} user={user} showToast={showToast}/>}
         {appId==="sheets"     &&<SheetsApp AC={AC} showToast={showToast}/>}
+        {appId==="achievements"&&<AchievementsApp AC={AC} data={data}/>}
         {/* POS renders as a full-screen kiosk overlay (see posMode), not a window. */}
         {appId==="atlas"      &&<AtlasApp AC={AC} showToast={showToast}/>}
         {appId==="currency"   &&<CurrencyApp AC={AC}/>}

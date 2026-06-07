@@ -17,6 +17,7 @@
 
 import { collection, doc, getDoc, setDoc, query, where, limit, getDocs } from "firebase/firestore";
 import { firestoreDb } from "../firebase.js";
+import { award } from "./achievements.js";
 
 function scoreId(gameId, uid) { return gameId + "_" + uid; }
 
@@ -36,6 +37,7 @@ export async function submitScore(gameId, score, dir, uid, username) {
       if (!improved) return false;
     }
     await setDoc(ref, { gameId, uid, user: username || "", score, ts: Date.now() });
+    award("high_scorer");
     return true;
   } catch (e) {
     console.warn("[scores] submit failed:", e?.message || e);

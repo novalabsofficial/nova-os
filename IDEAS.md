@@ -123,10 +123,18 @@ solid. This combined release **absorbs everything that was tentatively scoped as
   ffmpeg.wasm for export).
 - Code editor · Whiteboard · Mini Spreadsheet · full Paint competitor.
 
-## D · Smaller wins to fold in
-- **Asset Studio — paste & drop images.** Ctrl/Cmd+V a copied image and
+## D · Smaller wins to fold in  ✅ COMPLETE
+- **Asset Studio — paste & drop images.** ✅ Ctrl/Cmd+V a copied image and
   drag-drop image files onto the canvas, to edit / cut out immediately.
-- **Achievements / badges.**
+- **Achievements / badges.** ✅ 18-badge catalog (lib/achievements.js) + a tiny
+  award() pub/sub so any app can unlock one. Unlocks persist in data.achievements
+  (syncs + backs up). Triggered by OS events (welcome, first app, 10/25/all apps,
+  wallpaper, accent, glass, theme, command bar, Spotlight, 2nd desktop, fullscreen,
+  night-owl) and app events (Paint save, Forum post, POS sale, game personal best).
+  Achievements app shows progress + categories, with dimmed/locked + secret (???)
+  badges. Unlock pops a "🏆 Achievement unlocked" toast + sound.
+
+**All four phases (A–D) of the 11.0 arc are complete.**
 
 ---
 
