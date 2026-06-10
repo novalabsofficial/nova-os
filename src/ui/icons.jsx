@@ -6,10 +6,20 @@
 // HAS_SVG_ICON (in ui/constants.js) determines which ids route to NovaSvgIcon.
 // Anything else falls back to the app's emoji icon.
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { HAS_SVG_ICON, STORE_META } from "./constants.js";
 import { fill, bdr } from "../lib/format.js";
 import { NovaAppIcon, NOVA_ICONS } from "./appicons.jsx";
+import { getCustomLogo, subscribeLogo } from "../lib/logo.js";
+
+// v11.0 — live subscription to the user's custom brand logo (uploaded in
+// Settings). Returns { url, fit, shape } or null. Lets <NovaLogo> swap to the
+// uploaded image without any prop-drilling through the 4 places it's used.
+function useCustomLogo() {
+  const [logo, setLogo] = useState(getCustomLogo);
+  useEffect(() => subscribeLogo(setLogo), []);
+  return logo;
+}
 
 // v8.5 — shared user avatar. Renders the user's saved profile picture
 // (a base64 data URL in `img`) when present, otherwise the classic
@@ -600,36 +610,36 @@ export function WindowControlIcon({ type, size = 10 }) {
   return null;
 }
 
-// v11.0 — Nova OS brand mark. A flowing violet→blue "N" ribbon with a bright
-// nova sparkle nestled in its upper counter, rendered on a transparent ground
-// (no tile) so it pops on the dark boot / login / taskbar surfaces. The square
-// tiled app-icon variant (dark rounded tile behind the same glyph) lives in
-// public/nova-icon.svg and src/assets/logo/nova-mark.svg. Self-contained SVG;
-// unique id suffix per render size so multiple instances never collide.
+// v11.0 — Nova OS brand mark. If the user has uploaded a custom logo (Settings
+// → Personalization → Brand logo; see lib/logo.js), that image is rendered here
+// fitted to a square at the requested size, with the chosen corner shape — the
+// same image then drives the boot splash, login, taskbar start button, Store
+// header, and the browser favicon. Otherwise this falls back to the built-in
+// gradient "N": a self-contained SVG with a unique gradient id per render size
+// so multiple instances never collide.
 export function NovaLogo({ size = 22 }) {
-  const u = "novaN" + size;
+  const custom = useCustomLogo();
+  if (custom && custom.url) {
+    const radius = custom.shape === "circle" ? "50%" : custom.shape === "square" ? 0 : Math.round(size * 0.22);
+    return (
+      <img src={custom.url} width={size} height={size} alt="Nova OS" draggable={false}
+        style={{ display: "block", width: size, height: size, objectFit: custom.fit === "cover" ? "cover" : "contain", borderRadius: radius }} />
+    );
+  }
+  const gradId = "novaLogoBg-" + size; // unique per render so multiple instances don't share id
   return (
-    <svg width={size} height={size} viewBox="0 0 1024 1024" role="img" aria-label="Nova OS" style={{display: "block"}}>
+    <svg width={size} height={size} viewBox="0 0 1024 1024" role="img" aria-label="Nova OS" style={{ display: "block" }}>
       <defs>
-        <linearGradient id={u + "_rib"} x1="330" y1="350" x2="690" y2="712" gradientUnits="userSpaceOnUse">
-          <stop offset="0"   stopColor="#8b5cf6"/>
-          <stop offset="0.5" stopColor="#5b6cf4"/>
-          <stop offset="1"   stopColor="#3b9bff"/>
+        <linearGradient id={gradId} x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%"   stopColor="#6366f1"/>
+          <stop offset="50%"  stopColor="#a855f7"/>
+          <stop offset="100%" stopColor="#06b6d4"/>
         </linearGradient>
-        <radialGradient id={u + "_halo"} cx="0.5" cy="0.5" r="0.5">
-          <stop offset="0" stopColor="#bcd4ff" stopOpacity="0.5"/>
-          <stop offset="1" stopColor="#bcd4ff" stopOpacity="0"/>
-        </radialGradient>
-        <radialGradient id={u + "_spk"} cx="0.5" cy="0.42" r="0.62">
-          <stop offset="0"    stopColor="#ffffff"/>
-          <stop offset="0.65" stopColor="#eef4ff"/>
-          <stop offset="1"    stopColor="#cdddff"/>
-        </radialGradient>
       </defs>
-      <path d="M360,706 C344,580 352,470 372,360 C452,470 560,600 652,706 C672,580 660,470 676,360"
-            fill="none" stroke={"url(#" + u + "_rib)"} strokeWidth="140" strokeLinecap="round" strokeLinejoin="round"/>
-      <circle cx="558" cy="394" r="150" fill={"url(#" + u + "_halo)"}/>
-      <path transform="translate(558 394)" d="M0,-100 C12,-32 16,-28 86,0 C16,28 12,32 0,100 C-12,32 -16,28 -86,0 C-16,-28 -12,-32 0,-100 Z" fill={"url(#" + u + "_spk)"}/>
+      <rect width="1024" height="1024" rx="200" fill={"url(#" + gradId + ")"}/>
+      <text x="512" y="720" textAnchor="middle"
+            fontFamily="Space Grotesk, Helvetica, sans-serif"
+            fontSize="640" fontWeight="700" fill="white">N</text>
     </svg>
   );
 }

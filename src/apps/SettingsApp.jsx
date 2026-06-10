@@ -3,6 +3,7 @@ import { FF, FFB, FFM, INP, SEC } from "../ui/styles.js";
 import { fill, bdr } from "../lib/format.js";
 import { WALLPAPERS, ACCENT_PRESETS, WIDGET_CONFIGS, NOVA_VERSION } from "../ui/constants.js";
 import { Toggle } from "../ui/Toggle.jsx";
+import { NovaLogo } from "../ui/icons.jsx";
 import { getSoundConfig, setSoundConfig, playSound, setSoundWallpaper } from "../lib/audio.js";
 import { db } from "../lib/db.js";
 import { isFullscreen, toggleFullscreen, onFullscreenChange } from "../lib/fullscreen.js";
@@ -10,6 +11,7 @@ import { isNative, exitApp } from "../lib/native.js";
 import { isDesktop, quitApp } from "../lib/system.js";
 import { getLitePref, setLitePref } from "../lib/lite.js";
 import { CUSTOM_LIGHT_WP, CUSTOM_DARK_WP } from "../ui/wallpapers.jsx";
+import { processLogoFile, getCustomLogo, subscribeLogo } from "../lib/logo.js";
 
 // ── v9.0 sidebar glyphs ──────────────────────────────────────────────────
 // Small monochrome line-icons for the left rail. Stroke uses currentColor so
@@ -58,7 +60,7 @@ const SECTIONS = [
   { id: "about",      label: "About" },
 ];
 
-export function SettingsApp({ user, data, updateSettings, showToast, AC, onCustomWallpaper, onLogout, initialSection }) {
+export function SettingsApp({ user, data, updateSettings, showToast, AC, onCustomWallpaper, onCustomLogo, onLogout, initialSection }) {
   // v9.0: Settings is now a two-pane layout (Windows-style) — a left rail of
   // categories + a scrolling content pane. `section` tracks the active pane;
   // `initialSection` lets the taskbar quick-settings deep-link straight to
@@ -135,6 +137,28 @@ export function SettingsApp({ user, data, updateSettings, showToast, AC, onCusto
     };
     reader.readAsDataURL(file); e.target.value = "";
   }
+
+  // v11.0 — custom brand logo. Upload, paste, or drop a PNG; lib/logo.js fits it
+  // into every logo slot (boot, login, taskbar start, Store header, favicon).
+  const [logo, setLogo] = useState(getCustomLogo);
+  useEffect(() => subscribeLogo(setLogo), []);
+  const logoFileRef = useRef(null);
+  async function applyLogoFile(file) {
+    if (!file) return;
+    if (file.size > 8 * 1024 * 1024) { showToast("Image too large (max 8MB)"); return; }
+    try {
+      const url = await processLogoFile(file);
+      onCustomLogo && onCustomLogo({ url, fit: (logo && logo.fit) || "contain", shape: (logo && logo.shape) || "rounded" });
+    } catch { showToast("Couldn't read that image"); }
+  }
+  function onLogoInput(e) { const f = e.target.files[0]; if (f) applyLogoFile(f); e.target.value = ""; }
+  function onLogoPaste(e) {
+    const items = (e.clipboardData && e.clipboardData.items) || [];
+    for (const it of items) { if (it.type && it.type.indexOf("image/") === 0) { const f = it.getAsFile(); if (f) { applyLogoFile(f); e.preventDefault(); return; } } }
+  }
+  function onLogoDrop(e) { e.preventDefault(); const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]; if (f) applyLogoFile(f); }
+  function setLogoOpt(patch) { if (logo && logo.url && onCustomLogo) onCustomLogo({ ...logo, ...patch }); }
+
   // v11.0 — wallpaper is stored per-theme so Light/Dark each remember their own
   // pick (Light defaults to the new Lumina light wallpaper). The picker reads
   // and writes whichever slot matches the active theme.
@@ -225,6 +249,37 @@ export function SettingsApp({ user, data, updateSettings, showToast, AC, onCusto
           <button onClick={() => fileRef.current.click()} style={{ width: "100%", padding: "10px", background: wpId === "custom" ? fill(AC) : "rgba(255,255,255,0.06)", border: "1px solid " + (wpId === "custom" ? bdr(AC) : "rgba(255,255,255,0.12)"), borderRadius: 8, cursor: "pointer", fontFamily: FFB, fontWeight: 600, fontSize: 12, color: wpId === "custom" ? AC : "var(--nv-text)", marginBottom: 10 }}>{wpId === "custom" ? "✓ Custom Wallpaper Active — Click to Change" : "📁 Upload Custom Wallpaper"}</button>
           <Toggle label="Animate wallpaper" value={!!settings.wallpaperAnimated} onChange={v => updateSettings({ wallpaperAnimated: v })} ac={AC} />
           <div style={{ fontSize: 10, color: "var(--nv-text-dim)", fontStyle: "italic", marginBottom: 22, marginTop: 2 }}>“Auto” changes the wallpaper through the day · “Animate” adds gentle motion.</div>
+
+          <div style={SEC}>Brand Logo</div>
+          <div style={{ fontSize: 10, color: "var(--nv-text-dim)", fontStyle: "italic", marginBottom: 10, fontFamily: FF }}>Upload, paste, or drop an image — Nova fits it to the boot screen, login, taskbar button &amp; browser tab. Transparent PNGs look best.</div>
+          <input ref={logoFileRef} type="file" accept="image/*" onChange={onLogoInput} style={{ display: "none" }} />
+          <div tabIndex={0} onPaste={onLogoPaste} onDrop={onLogoDrop} onDragOver={e => e.preventDefault()} onClick={() => logoFileRef.current && logoFileRef.current.click()}
+            style={{ display: "flex", alignItems: "center", gap: 14, padding: 14, borderRadius: 12, border: "1.5px dashed " + (logo ? bdr(AC) : "var(--nv-border)"), background: "var(--nv-elevated)", cursor: "pointer", marginBottom: 10 }}>
+            <div style={{ width: 60, height: 60, flexShrink: 0, borderRadius: logo && logo.shape === "circle" ? "50%" : logo && logo.shape === "square" ? 6 : 14, overflow: "hidden", background: "rgba(127,127,127,0.12)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              {logo && logo.url
+                ? <img src={logo.url} alt="logo preview" style={{ width: "100%", height: "100%", objectFit: logo.fit === "cover" ? "cover" : "contain" }} />
+                : <NovaLogo size={44} />}
+            </div>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontFamily: FFB, fontWeight: 600, fontSize: 13, color: "var(--nv-text)" }}>{logo ? "Custom logo active" : "Click, paste, or drop an image"}</div>
+              <div style={{ fontSize: 10.5, color: "var(--nv-text-dim)", marginTop: 2 }}>{logo ? "Tap to replace · PNG · JPG · SVG" : "Replaces the Nova mark everywhere"}</div>
+            </div>
+          </div>
+          {logo ? (<>
+            <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
+              {[{ id: "contain", label: "Fit (whole logo)" }, { id: "cover", label: "Fill (crop)" }].map(o => {
+                const active = (logo.fit || "contain") === o.id;
+                return <button key={o.id} onClick={() => setLogoOpt({ fit: o.id })} style={{ flex: 1, padding: "8px 10px", borderRadius: 9, cursor: "pointer", fontFamily: FFB, fontWeight: 600, fontSize: 11.5, background: active ? fill(AC) : "var(--nv-elevated)", border: "1px solid " + (active ? bdr(AC) : "var(--nv-border)"), color: active ? AC : "var(--nv-text)" }}>{o.label}</button>;
+              })}
+            </div>
+            <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
+              {[{ id: "rounded", label: "Rounded" }, { id: "square", label: "Square" }, { id: "circle", label: "Circle" }].map(o => {
+                const active = (logo.shape || "rounded") === o.id;
+                return <button key={o.id} onClick={() => setLogoOpt({ shape: o.id })} style={{ flex: 1, padding: "8px 10px", borderRadius: 9, cursor: "pointer", fontFamily: FFB, fontWeight: 600, fontSize: 11.5, background: active ? fill(AC) : "var(--nv-elevated)", border: "1px solid " + (active ? bdr(AC) : "var(--nv-border)"), color: active ? AC : "var(--nv-text)" }}>{o.label}</button>;
+              })}
+            </div>
+            <button onClick={() => onCustomLogo && onCustomLogo(null)} style={{ width: "100%", padding: "9px", background: "rgba(255,80,80,0.10)", border: "1px solid rgba(255,80,80,0.30)", borderRadius: 8, cursor: "pointer", fontFamily: FFB, fontWeight: 600, fontSize: 12, color: "#ff6b6b", marginBottom: 22 }}>Reset to default logo</button>
+          </>) : <div style={{ marginBottom: 22 }} />}
 
           <div style={SEC}>Taskbar Color</div>
           <div style={{ display: "flex", gap: 7, marginBottom: 6, flexWrap: "wrap" }}>
