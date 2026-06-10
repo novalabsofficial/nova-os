@@ -1,18 +1,42 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024" role="img" aria-label="Nova OS">
   <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%"   stop-color="#6366f1"/>
-      <stop offset="50%"  stop-color="#a855f7"/>
-      <stop offset="100%" stop-color="#06b6d4"/>
+    <linearGradient id="novaIcon_tile" x1="0" y1="0" x2="1024" y2="1024" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#6366f1"/>
+      <stop offset="0.52" stop-color="#a855f7"/>
+      <stop offset="1" stop-color="#06b6d4"/>
     </linearGradient>
-    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
-      <feGaussianBlur in="SourceGraphic" stdDeviation="20"/>
-      <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
-    </filter>
+    <linearGradient id="novaIcon_sheen" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.26"/>
+      <stop offset="46%" stop-color="#ffffff" stop-opacity="0"/>
+    </linearGradient>
+    <radialGradient id="novaIcon_halo" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.92"/>
+      <stop offset="45%" stop-color="#dbeafe" stop-opacity="0.34"/>
+      <stop offset="100%" stop-color="#dbeafe" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="novaIcon_core" cx="0.42" cy="0.4" r="0.62">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="50%" stop-color="#ffffff"/>
+      <stop offset="82%" stop-color="#eaf4ff"/>
+      <stop offset="100%" stop-color="#bcd9ff"/>
+    </radialGradient>
+    <linearGradient id="novaIcon_ring" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.25"/>
+      <stop offset="50%" stop-color="#ffffff" stop-opacity="0.95"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0.3"/>
+    </linearGradient>
+    <clipPath id="novaIcon_clip"><rect x="0" y="0" width="1024" height="1024" rx="224"/></clipPath>
   </defs>
-  <rect width="1024" height="1024" rx="200" fill="url(#bg)"/>
-  <text x="512" y="720" text-anchor="middle"
-        font-family="Space Grotesk, Helvetica, sans-serif"
-        font-size="640" font-weight="700"
-        fill="white" filter="url(#glow)">N</text>
+  <g clip-path="url(#novaIcon_clip)">
+    <rect x="0" y="0" width="1024" height="1024" fill="url(#novaIcon_tile)"/>
+    <rect x="0" y="0" width="1024" height="1024" fill="url(#novaIcon_sheen)"/>
+    <g transform="translate(512 512)">
+      <circle r="300" fill="url(#novaIcon_halo)"/>
+      <g transform="rotate(-29)"><ellipse cx="0" cy="0" rx="372" ry="143" fill="none" stroke="url(#novaIcon_ring)" stroke-width="14"/></g>
+      <g fill="#eaf4ff" opacity="0.8" transform="rotate(45)"><path d="M0,-150 C18,-44 22,-40 150,0 C22,40 18,44 0,150 C-18,44 -22,40 -150,0 C-22,-40 -18,-44 0,-150 Z"/></g>
+      <g fill="#ffffff"><path d="M0,-392 C34,-150 40,-138 392,0 C40,138 34,150 0,392 C-34,150 -40,138 -392,0 C-40,-138 -34,-150 0,-392 Z"/></g>
+      <circle r="118" fill="url(#novaIcon_core)"/>
+      <circle r="118" fill="none" stroke="#ffffff" stroke-opacity="0.55" stroke-width="12"/>
+    </g>
+  </g>
 </svg>
