@@ -6,20 +6,10 @@
 // HAS_SVG_ICON (in ui/constants.js) determines which ids route to NovaSvgIcon.
 // Anything else falls back to the app's emoji icon.
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { HAS_SVG_ICON, STORE_META } from "./constants.js";
 import { fill, bdr } from "../lib/format.js";
 import { NovaAppIcon, NOVA_ICONS } from "./appicons.jsx";
-import { getCustomLogo, subscribeLogo } from "../lib/logo.js";
-
-// v11.0 — live subscription to the user's custom brand logo (uploaded in
-// Settings). Returns { url, fit, shape } or null. Lets <NovaLogo> swap to the
-// uploaded image without any prop-drilling through the 4 places it's used.
-function useCustomLogo() {
-  const [logo, setLogo] = useState(getCustomLogo);
-  useEffect(() => subscribeLogo(setLogo), []);
-  return logo;
-}
 
 // v8.5 — shared user avatar. Renders the user's saved profile picture
 // (a base64 data URL in `img`) when present, otherwise the classic
@@ -610,22 +600,9 @@ export function WindowControlIcon({ type, size = 10 }) {
   return null;
 }
 
-// v11.0 — Nova OS brand mark. If the user has uploaded a custom logo (Settings
-// → Personalization → Brand logo; see lib/logo.js), that image is rendered here
-// fitted to a square at the requested size, with the chosen corner shape — the
-// same image then drives the boot splash, login, taskbar start button, Store
-// header, and the browser favicon. Otherwise this falls back to the built-in
-// gradient "N": a self-contained SVG with a unique gradient id per render size
-// so multiple instances never collide.
+// v7.7 — Nova OS brand mark. Self-contained SVG so it scales cleanly at any
+// size. Used in the boot splash, login mark, and taskbar start button.
 export function NovaLogo({ size = 22 }) {
-  const custom = useCustomLogo();
-  if (custom && custom.url) {
-    const radius = custom.shape === "circle" ? "50%" : custom.shape === "square" ? 0 : Math.round(size * 0.22);
-    return (
-      <img src={custom.url} width={size} height={size} alt="Nova OS" draggable={false}
-        style={{ display: "block", width: size, height: size, objectFit: custom.fit === "cover" ? "cover" : "contain", borderRadius: radius }} />
-    );
-  }
   const gradId = "novaLogoBg-" + size; // unique per render so multiple instances don't share id
   return (
     <svg width={size} height={size} viewBox="0 0 1024 1024" role="img" aria-label="Nova OS" style={{ display: "block" }}>

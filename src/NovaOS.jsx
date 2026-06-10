@@ -25,7 +25,6 @@ import { wmoIcon, wmoLabel, geocodeUrl, parseGeocode, forecastUrl, parseForecast
 import { PROVIDERS as AI_PROVIDERS, streamResponse as aiStream, deriveTitle as aiDeriveTitle } from "./lib/ai.js";
 import { playTone, speak, cancelSpeech, playSound, getSoundConfig, setSoundConfig, setSoundWallpaper, subscribeSoundConfig } from "./lib/audio.js";
 import { db, setDbUid, getDbUid } from "./lib/db.js";
-import { setCustomLogo } from "./lib/logo.js";
 import { fetchAccessList as fetchPosAccess } from "./lib/pos.js";
 import { ACH_MAP, setGameWinHandler } from "./lib/achievements.js";
 import { watchMyThreads, otherParticipantName } from "./lib/dms.js";
@@ -832,9 +831,6 @@ export default function NovaOS(){
     }));
   },[deviceMode]);
   useEffect(()=>{if(user&&wpId==="custom")db.get("user:"+user+":wpimg").then(url=>{if(url)setCustomWp(url);});},[user,wpId]);
-  // v11.0 — load the user's custom brand logo on sign-in (broadcasts to <NovaLogo>
-  // + the favicon via lib/logo.js); clear it when signed out.
-  useEffect(()=>{if(user){db.get("user:"+user+":logoimg").then(obj=>{setCustomLogo(obj||null);});}else{setCustomLogo(null);}},[user]);
   // v11.0 Phase C — pull the POS access allowlist on sign-in so the restricted
   // POS app appears in the launcher for granted users (NovaMod is always allowed,
   // checked separately). Re-fetches when the POS admin grants/revokes (posGrantsBump).
@@ -1529,9 +1525,6 @@ export default function NovaOS(){
 
   const updateSettings=useCallback((patch)=>{updateData(prev=>({...prev,settings:{...(prev.settings||{}),...patch}}));},[updateData]);
   const handleCustomWallpaper=useCallback(async(url)=>{setCustomWp(url);await db.set("user:"+user+":wpimg",url);updateSettings({[theme==="light"?"wallpaperLight":"wallpaper"]:"custom"});showToast("Custom wallpaper set ✓");},[user,updateSettings,showToast,theme]);
-  // v11.0 — custom brand logo: persist the { url, fit, shape } object per-user
-  // (or null to reset) and broadcast it to <NovaLogo> + the favicon immediately.
-  const handleCustomLogo=useCallback(async(logo)=>{setCustomLogo(logo);await db.set("user:"+user+":logoimg",logo||null);showToast(logo?"Logo updated ✓":"Logo reset to default ✓");},[user,showToast]);
   // v11.0 Phase B — desktop sticky notes (stored in data.stickyNotes, so they
   // ride along in profile backups). Text persists on blur; position/color/delete persist on the action.
   const addStickyNote=useCallback((x,y)=>{const id="note-"+Date.now()+"-"+Math.floor(Math.random()*1000);const W=212;const nx=Math.max(8,Math.min((x||140)-30,window.innerWidth-W-8));const ny=Math.max(8,Math.min((y||140)-12,window.innerHeight-200));updateData(d=>({...d,stickyNotes:[...(d.stickyNotes||[]),{id,text:"",color:"yellow",x:nx,y:ny}]}));showToast("Sticky note added");},[updateData,showToast]);
@@ -1771,7 +1764,7 @@ export default function NovaOS(){
         {appId==="store"    &&<StoreApp    user={user} data={data} updateData={updateData} showToast={showToast} AC={AC}/>}
         {appId==="terminal" &&<TerminalApp user={user} AC={AC} openApp={openApp} showToast={showToast}/>}
         {appId==="chat"     &&<ChatApp     user={user} AC={AC} data={data} updateData={updateData}/>}
-        {appId==="settings" &&<SettingsApp user={user} data={data} updateSettings={updateSettings} showToast={showToast} AC={AC} onCustomWallpaper={handleCustomWallpaper} onCustomLogo={handleCustomLogo} onLogout={logout} initialSection={settingsSection}/>}
+        {appId==="settings" &&<SettingsApp user={user} data={data} updateSettings={updateSettings} showToast={showToast} AC={AC} onCustomWallpaper={handleCustomWallpaper} onLogout={logout} initialSection={settingsSection}/>}
         {appId==="profile"  &&<ProfileApp  user={user} data={data} updateData={updateData} showToast={showToast} AC={AC}/>}
         {appId==="calculator" &&<CalculatorApp AC={AC}/>}
         {appId==="clock"      &&<ClockApp AC={AC} data={data} updateSettings={updateSettings}/>}
@@ -2183,7 +2176,7 @@ export default function NovaOS(){
     playSound("logout");
     await authLogout();
     setDbUid(null);
-    setUser(null);setUid(null);setData(null);setCustomWp(null);setCustomLogo(null);setWins([]);setMaxZ(100);setMenuOpen(false);
+    setUser(null);setUid(null);setData(null);setCustomWp(null);setWins([]);setMaxZ(100);setMenuOpen(false);
     setDeskCount(1);setCurDesk(0);setTaskViewOpen(false);
     Object.values(fxTimers.current).forEach(t=>clearTimeout(t)); fxTimers.current={}; setWinFx({}); launchPt.current={};
     setIconPos({});setIconDrag(null);setWidgetState(DEFAULT_WIDGET_STATE);setWidgetDrag(null);setWidgetResize(null);
