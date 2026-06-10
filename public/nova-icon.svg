@@ -1,42 +1,29 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024" role="img" aria-label="Nova OS">
   <defs>
     <linearGradient id="novaIcon_tile" x1="0" y1="0" x2="1024" y2="1024" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#6366f1"/>
-      <stop offset="0.52" stop-color="#a855f7"/>
-      <stop offset="1" stop-color="#06b6d4"/>
+      <stop offset="0" stop-color="#0c1126"/>
+      <stop offset="1" stop-color="#0a1838"/>
     </linearGradient>
-    <linearGradient id="novaIcon_sheen" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.26"/>
-      <stop offset="46%" stop-color="#ffffff" stop-opacity="0"/>
+    <linearGradient id="novaIcon_rib" x1="330" y1="350" x2="690" y2="712" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#8b5cf6"/>
+      <stop offset="0.5" stop-color="#5b6cf4"/>
+      <stop offset="1" stop-color="#3b9bff"/>
     </linearGradient>
     <radialGradient id="novaIcon_halo" cx="0.5" cy="0.5" r="0.5">
-      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.92"/>
-      <stop offset="45%" stop-color="#dbeafe" stop-opacity="0.34"/>
-      <stop offset="100%" stop-color="#dbeafe" stop-opacity="0"/>
+      <stop offset="0" stop-color="#bcd4ff" stop-opacity="0.5"/>
+      <stop offset="1" stop-color="#bcd4ff" stop-opacity="0"/>
     </radialGradient>
-    <radialGradient id="novaIcon_core" cx="0.42" cy="0.4" r="0.62">
-      <stop offset="0%" stop-color="#ffffff"/>
-      <stop offset="50%" stop-color="#ffffff"/>
-      <stop offset="82%" stop-color="#eaf4ff"/>
-      <stop offset="100%" stop-color="#bcd9ff"/>
+    <radialGradient id="novaIcon_spk" cx="0.5" cy="0.42" r="0.62">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="0.65" stop-color="#eef4ff"/>
+      <stop offset="1" stop-color="#cdddff"/>
     </radialGradient>
-    <linearGradient id="novaIcon_ring" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.25"/>
-      <stop offset="50%" stop-color="#ffffff" stop-opacity="0.95"/>
-      <stop offset="100%" stop-color="#ffffff" stop-opacity="0.3"/>
-    </linearGradient>
-    <clipPath id="novaIcon_clip"><rect x="0" y="0" width="1024" height="1024" rx="224"/></clipPath>
+    <clipPath id="novaIcon_clip"><rect width="1024" height="1024" rx="232"/></clipPath>
   </defs>
   <g clip-path="url(#novaIcon_clip)">
-    <rect x="0" y="0" width="1024" height="1024" fill="url(#novaIcon_tile)"/>
-    <rect x="0" y="0" width="1024" height="1024" fill="url(#novaIcon_sheen)"/>
-    <g transform="translate(512 512)">
-      <circle r="300" fill="url(#novaIcon_halo)"/>
-      <g transform="rotate(-29)"><ellipse cx="0" cy="0" rx="372" ry="143" fill="none" stroke="url(#novaIcon_ring)" stroke-width="14"/></g>
-      <g fill="#eaf4ff" opacity="0.8" transform="rotate(45)"><path d="M0,-150 C18,-44 22,-40 150,0 C22,40 18,44 0,150 C-18,44 -22,40 -150,0 C-22,-40 -18,-44 0,-150 Z"/></g>
-      <g fill="#ffffff"><path d="M0,-392 C34,-150 40,-138 392,0 C40,138 34,150 0,392 C-34,150 -40,138 -392,0 C-40,-138 -34,-150 0,-392 Z"/></g>
-      <circle r="118" fill="url(#novaIcon_core)"/>
-      <circle r="118" fill="none" stroke="#ffffff" stroke-opacity="0.55" stroke-width="12"/>
-    </g>
+    <rect width="1024" height="1024" fill="url(#novaIcon_tile)"/>
+    <path d="M360,706 C344,580 352,470 372,360 C452,470 560,600 652,706 C672,580 660,470 676,360" fill="none" stroke="url(#novaIcon_rib)" stroke-width="140" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="558" cy="394" r="150" fill="url(#novaIcon_halo)"/>
+    <path transform="translate(558 394)" d="M0,-100 C12,-32 16,-28 86,0 C16,28 12,32 0,100 C-12,32 -16,28 -86,0 C-16,-28 -12,-32 0,-100 Z" fill="url(#novaIcon_spk)"/>
   </g>
 </svg>

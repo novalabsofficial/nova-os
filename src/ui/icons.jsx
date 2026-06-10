@@ -600,68 +600,36 @@ export function WindowControlIcon({ type, size = 10 }) {
   return null;
 }
 
-// v11.0 — Nova OS brand mark ("Nova Supernova"). A four-point nova burst with
-// concave (pinched) rays + a glowing radial core over the signature
-// indigo→purple→cyan tile, with one tilted elliptical orbit ring — "a star
-// system you operate." The whole burst is built from white light over the
-// gradient, so it stays meaningful when the tile is re-themed to any accent.
-// Self-contained SVG that scales cleanly from a 16px favicon to a 512px splash;
-// all content sits inside a ~784px-diameter safe zone so PWA/iOS icon masking
-// never clips the ray tips. Used in the boot splash, login mark, and taskbar
-// start button. Designed via the v11 logo workflow (6 concepts → 3-lens judge
-// panel → synthesis → SVG QA verify).
+// v11.0 — Nova OS brand mark. A flowing violet→blue "N" ribbon with a bright
+// nova sparkle nestled in its upper counter, rendered on a transparent ground
+// (no tile) so it pops on the dark boot / login / taskbar surfaces. The square
+// tiled app-icon variant (dark rounded tile behind the same glyph) lives in
+// public/nova-icon.svg and src/assets/logo/nova-mark.svg. Self-contained SVG;
+// unique id suffix per render size so multiple instances never collide.
 export function NovaLogo({ size = 22 }) {
-  const u = "novaMark" + size; // unique id suffix per size so multiple instances don't collide
+  const u = "novaN" + size;
   return (
     <svg width={size} height={size} viewBox="0 0 1024 1024" role="img" aria-label="Nova OS" style={{display: "block"}}>
       <defs>
-        <linearGradient id={u + "_tile"} x1="0" y1="0" x2="1024" y2="1024" gradientUnits="userSpaceOnUse">
-          <stop offset="0"    stopColor="#6366f1"/>
-          <stop offset="0.52" stopColor="#a855f7"/>
-          <stop offset="1"    stopColor="#06b6d4"/>
-        </linearGradient>
-        <linearGradient id={u + "_sheen"} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%"  stopColor="#ffffff" stopOpacity="0.26"/>
-          <stop offset="46%" stopColor="#ffffff" stopOpacity="0"/>
+        <linearGradient id={u + "_rib"} x1="330" y1="350" x2="690" y2="712" gradientUnits="userSpaceOnUse">
+          <stop offset="0"   stopColor="#8b5cf6"/>
+          <stop offset="0.5" stopColor="#5b6cf4"/>
+          <stop offset="1"   stopColor="#3b9bff"/>
         </linearGradient>
         <radialGradient id={u + "_halo"} cx="0.5" cy="0.5" r="0.5">
-          <stop offset="0%"   stopColor="#ffffff" stopOpacity="0.92"/>
-          <stop offset="45%"  stopColor="#dbeafe" stopOpacity="0.34"/>
-          <stop offset="100%" stopColor="#dbeafe" stopOpacity="0"/>
+          <stop offset="0" stopColor="#bcd4ff" stopOpacity="0.5"/>
+          <stop offset="1" stopColor="#bcd4ff" stopOpacity="0"/>
         </radialGradient>
-        <radialGradient id={u + "_core"} cx="0.42" cy="0.4" r="0.62">
-          <stop offset="0%"   stopColor="#ffffff"/>
-          <stop offset="50%"  stopColor="#ffffff"/>
-          <stop offset="82%"  stopColor="#eaf4ff"/>
-          <stop offset="100%" stopColor="#bcd9ff"/>
+        <radialGradient id={u + "_spk"} cx="0.5" cy="0.42" r="0.62">
+          <stop offset="0"    stopColor="#ffffff"/>
+          <stop offset="0.65" stopColor="#eef4ff"/>
+          <stop offset="1"    stopColor="#cdddff"/>
         </radialGradient>
-        <linearGradient id={u + "_ring"} x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0%"   stopColor="#ffffff" stopOpacity="0.25"/>
-          <stop offset="50%"  stopColor="#ffffff" stopOpacity="0.95"/>
-          <stop offset="100%" stopColor="#ffffff" stopOpacity="0.3"/>
-        </linearGradient>
-        <clipPath id={u + "_clip"}>
-          <rect x="0" y="0" width="1024" height="1024" rx="224"/>
-        </clipPath>
       </defs>
-      <g clipPath={"url(#" + u + "_clip)"}>
-        <rect x="0" y="0" width="1024" height="1024" fill={"url(#" + u + "_tile)"}/>
-        <rect x="0" y="0" width="1024" height="1024" fill={"url(#" + u + "_sheen)"}/>
-        <g transform="translate(512 512)">
-          <circle r="300" fill={"url(#" + u + "_halo)"}/>
-          <g transform="rotate(-29)">
-            <ellipse cx="0" cy="0" rx="372" ry="143" fill="none" stroke={"url(#" + u + "_ring)"} strokeWidth="14"/>
-          </g>
-          <g fill="#eaf4ff" opacity="0.8" transform="rotate(45)">
-            <path d="M0,-150 C18,-44 22,-40 150,0 C22,40 18,44 0,150 C-18,44 -22,40 -150,0 C-22,-40 -18,-44 0,-150 Z"/>
-          </g>
-          <g fill="#ffffff">
-            <path d="M0,-392 C34,-150 40,-138 392,0 C40,138 34,150 0,392 C-34,150 -40,138 -392,0 C-40,-138 -34,-150 0,-392 Z"/>
-          </g>
-          <circle r="118" fill={"url(#" + u + "_core)"}/>
-          <circle r="118" fill="none" stroke="#ffffff" strokeOpacity="0.55" strokeWidth="12"/>
-        </g>
-      </g>
+      <path d="M360,706 C344,580 352,470 372,360 C452,470 560,600 652,706 C672,580 660,470 676,360"
+            fill="none" stroke={"url(#" + u + "_rib)"} strokeWidth="140" strokeLinecap="round" strokeLinejoin="round"/>
+      <circle cx="558" cy="394" r="150" fill={"url(#" + u + "_halo)"}/>
+      <path transform="translate(558 394)" d="M0,-100 C12,-32 16,-28 86,0 C16,28 12,32 0,100 C-12,32 -16,28 -86,0 C-16,-28 -12,-32 0,-100 Z" fill={"url(#" + u + "_spk)"}/>
     </svg>
   );
 }
