@@ -18,8 +18,8 @@ beforeEach(() => {
 
 describe('defaultIconPos', () => {
   // At 768px tall: availH = 768 - TASKBAR_H(66) - TOP(46) - 10 = 646;
-  // rows = floor(646 / (ICON_H 78 + ICON_GAP 6 = 84)) = 7.
-  const ROWS = 7;
+  // rows = floor(646 / (ICON_H 66 + ICON_GAP 6 = 72)) = 8.
+  const ROWS = 8;
   const CW = ICON_W + ICON_GAP; // column width
   const CH = ICON_H + ICON_GAP; // row height
 
@@ -85,9 +85,9 @@ describe('snapToFreeGrid', () => {
   });
 
   it('clamps to the rightmost column when raw x is beyond screen width', () => {
-    // maxC = floor((1024 - 10) / (ICON_W 76 + ICON_GAP 6 = 82)) = 12 → valid columns 0..11
+    // maxC = floor((1024 - 10) / (ICON_W 64 + ICON_GAP 6 = 70)) = 14 → valid columns 0..13
     const result = snapToFreeGrid('icon-A', 9999, TOP, {});
-    expect(result).toEqual(pixelAt(11, 0));
+    expect(result).toEqual(pixelAt(13, 0));
   });
 
   it('clamps to row 0 when raw y is negative', () => {

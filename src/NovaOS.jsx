@@ -2702,8 +2702,8 @@ export default function NovaOS(){
         const wrap={
           position:"absolute",left:pos.x,top:pos.y,width:ICON_W,height:ICON_H,
           zIndex:(isDrg||inGroupDrag)?500:2,cursor:(isDrg||inGroupDrag)?"grabbing":"grab",userSelect:"none",
-          display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:6,
-          padding:"6px 4px",borderRadius:12,
+          display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:5,
+          padding:"5px 4px",borderRadius:12,
           background:isDrg?"rgba(20,22,40,0.5)":isSel?"rgba("+hexRgb(AC)+",0.22)":"transparent",
           border:"1px solid "+(isDrg?"rgba(255,255,255,0.16)":isSel?"rgba("+hexRgb(AC)+",0.6)":"transparent"),
           backdropFilter:(isDrg||isSel)?"blur(8px)":"none",
@@ -2714,7 +2714,7 @@ export default function NovaOS(){
           // v11.0 drag-to-merge — highlight + pop the tile being hovered as a folder target
           ...(isMergeTarget?{background:"rgba("+hexRgb(AC)+",0.32)",border:"2px solid "+AC,transform:"scale(1.12)",backdropFilter:"blur(8px)",WebkitBackdropFilter:"blur(8px)"}:{}),
         };
-        const labelStyle={fontFamily:FFB,fontWeight:600,fontSize:10.5,color:lightT?"var(--nv-text-strong)":"#fff",textAlign:"center",lineHeight:1.25,textShadow:lightT?"0 1px 3px rgba(255,255,255,0.95), 0 0 10px rgba(255,255,255,0.7)":"0 1px 3px rgba(0,0,0,0.9), 0 0 8px rgba(0,0,0,0.5)",pointerEvents:"none",letterSpacing:0.15,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",maxWidth:"100%"};
+        const labelStyle={fontFamily:FFB,fontWeight:500,fontSize:10,color:lightT?"var(--nv-text-strong)":"rgba(255,255,255,0.92)",textAlign:"center",lineHeight:1.25,textShadow:lightT?"0 1px 3px rgba(255,255,255,0.95), 0 0 10px rgba(255,255,255,0.7)":"0 1px 3px rgba(0,0,0,0.85), 0 0 7px rgba(0,0,0,0.45)",pointerEvents:"none",letterSpacing:0.15,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",maxWidth:"100%"};
 
         // ── FOLDER ENTRY ──
         if(entry.folder){
@@ -2728,8 +2728,8 @@ export default function NovaOS(){
                 {type:"divider"},
                 {icon:"✕",label:"Unfold (delete folder)",danger:true,onClick:()=>updateData(p=>{const fs={...(p.settings?.desktopFolders||{})};delete fs[entry.fid];return {...p,settings:{...(p.settings||{}),desktopFolders:fs}};})},
               ])}>
-              <div style={{position:"relative",pointerEvents:"none",width:40,height:40,borderRadius:11,background:"var(--nv-surface)",border:"1px solid var(--nv-border)",backdropFilter:"blur(10px)",WebkitBackdropFilter:"blur(10px)",display:"grid",gridTemplateColumns:"1fr 1fr",gridTemplateRows:"1fr 1fr",gap:2,padding:4,boxSizing:"border-box",boxShadow:"0 3px 8px rgba(0,0,0,0.4)"}}>
-                {fapps.slice(0,4).map(a=>(<div key={a.id} style={{display:"flex",alignItems:"center",justifyContent:"center",overflow:"hidden"}}><AppIconDisplay app={{id:a.id,icon:a.icon}} size={14} glass={glass}/></div>))}
+              <div style={{position:"relative",pointerEvents:"none",width:34,height:34,borderRadius:10,background:"var(--nv-surface)",border:"1px solid var(--nv-border)",backdropFilter:"blur(10px)",WebkitBackdropFilter:"blur(10px)",display:"grid",gridTemplateColumns:"1fr 1fr",gridTemplateRows:"1fr 1fr",gap:2,padding:3,boxSizing:"border-box",boxShadow:"0 2px 6px rgba(0,0,0,0.35)"}}>
+                {fapps.slice(0,4).map(a=>(<div key={a.id} style={{display:"flex",alignItems:"center",justifyContent:"center",overflow:"hidden"}}><AppIconDisplay app={{id:a.id,icon:a.icon}} size={12} glass={glass}/></div>))}
               </div>
               <span style={labelStyle}>{entry.folder.name||"Folder"}</span>
             </div>
@@ -2766,7 +2766,7 @@ export default function NovaOS(){
               {icon:"📋", label:"Copy app name", onClick:()=>{try{navigator.clipboard?.writeText(app.label);showToast("Copied");}catch{}}},
             ])}>
             <div style={{position:"relative",pointerEvents:"none",display:"flex",alignItems:"center",justifyContent:"center",filter:"drop-shadow(0 2px 5px rgba(0,0,0,0.4))"}}>
-              <AppIconDisplay app={app} size={38} glass={glass}/>
+              <AppIconDisplay app={app} size={30} glass={glass}/>
               {appBadgeCounts[app.id]>0 && (
                 <div style={{position:"absolute",top:-4,right:-4,minWidth:16,height:16,padding:"0 4px",borderRadius:8,background:"#ff4d4f",color:"#fff",fontFamily:FFB,fontWeight:700,fontSize:10,display:"flex",alignItems:"center",justifyContent:"center",lineHeight:1,boxShadow:"0 0 8px rgba(255,77,79,0.55), 0 1px 2px rgba(0,0,0,0.6)",border:"1.5px solid rgba(10,12,24,0.85)"}}>
                   {appBadgeCounts[app.id]>9?"9+":appBadgeCounts[app.id]}

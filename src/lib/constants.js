@@ -12,11 +12,11 @@ export const TASKBAR_H  = 66;
 export const TOPBAR_H   = 32;
 export const MIN_W      = 280;
 export const MIN_H      = 200;
-export const ICON_W     = 76;
-// v11.0 — tiles are now a fixed height = ICON_H, so the row gap equals the column
-// gap (ICON_GAP) instead of leaving a big void below each short tile. 78 keeps a
-// near-square tile that still fits a two-line label; 6px gap reads balanced.
-export const ICON_H     = 78;
+export const ICON_W     = 64;
+// v11.0 — tiles are a fixed height = ICON_H so the row gap equals the column gap
+// (ICON_GAP). v11.1 — shrunk the desktop grid (76x78 -> 64x66, icon 38 -> 30) so
+// it reads as a compact, professional column instead of a big phone-launcher grid.
+export const ICON_H     = 66;
 export const ICON_GAP   = 6;
 export const ICON_PAD_X = 10;
 export const ICON_PAD_Y = 14;
