@@ -270,6 +270,10 @@ export const CSS = `
   /* Taskbar window chip — lifts slightly on hover */
   .tb{transition:all 0.2s var(--nv-ease);}
   .tb:hover{background:rgba(255,255,255,0.14)!important;border-color:rgba(255,255,255,0.2)!important;transform:translateY(-1px);}
+  /* v11.1 — macOS-style dock tiles: icon magnifies in place on hover (no plate). */
+  .dock-ico{transition:transform 0.16s var(--nv-ease);}
+  .dock-tile:hover .dock-ico{transform:scale(1.18);}
+  .dock-tile:active .dock-ico{transform:scale(1.05);}
 
   /* Window controls — close turns red, minimize/maximize gain subtle hovers */
   .wx{transition:background 0.18s var(--nv-ease),color 0.18s var(--nv-ease);}

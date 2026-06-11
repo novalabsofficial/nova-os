@@ -3109,7 +3109,7 @@ export default function NovaOS(){
         {/* v7.7: Start menu button — shows the Nova OS brand mark. The button
             lights up with the accent color when the menu is open. */}
         <button className="sb" data-start-btn onClick={()=>{setMenuAnchor("dock");setMenuOpen(o=>!o);setMenuSrch("");}} title="Nova OS" style={{
-          width:46,height:46,borderRadius:12,
+          width:44,height:44,borderRadius:11,
           background:menuOpen?fill(AC):"var(--nv-hover)",
           border:"1px solid "+(menuOpen?bdr(AC):"var(--nv-border)"),
           boxShadow:menuOpen?"0 0 16px "+fill(AC)+", 0 2px 8px rgba(0,0,0,0.3) inset":"none",
@@ -3117,9 +3117,9 @@ export default function NovaOS(){
           transition:"all 0.2s var(--nv-ease)",
           padding:0,
         }}>
-          <NovaLogo size={30}/>
+          <NovaLogo size={28}/>
         </button>
-        <div style={{width:1,height:26,background:"linear-gradient(180deg, transparent, var(--nv-border-strong) 50%, transparent)",margin:"0 3px"}}/>
+        <div style={{width:1,height:24,background:"linear-gradient(180deg, transparent, var(--nv-border-strong) 50%, transparent)",margin:"0 4px"}}/>
         {/* v11.1 — Search / Ask Nova / Task View / weather lifted UP into the
             top status bar (left side); the dock is now the Nova launcher + your
             apps only. The launcher stays here as the Launchpad-style button. */}
@@ -3130,7 +3130,7 @@ export default function NovaOS(){
             screens — it scrolls within the available space instead. (Was
             position:absolute with a fixed width cap, which spilled over the
             clusters once they were wider than that budget.) */}
-        <div className="no-sb" style={{display:"flex",alignItems:"center",justifyContent:"flex-start",gap:7,maxWidth:"58vw",overflowX:"auto",overflowY:"hidden",padding:"5px 0",zIndex:1}}>
+        <div className="no-sb" style={{display:"flex",alignItems:"center",justifyContent:"flex-start",gap:5,maxWidth:"58vw",overflowX:"auto",overflowY:"hidden",padding:"5px 0",zIndex:1}}>
         {/* v8.0 — Taskbar: pinned apps + running windows.
             Pinned apps with NO running windows render as compact icon-only
             "launcher" chips (40x40, no label). Pinned apps WITH running
@@ -3221,63 +3221,34 @@ export default function NovaOS(){
               },
             }:{};
 
-            // Compact pinned-only chip — icon only, fixed 46x46 square.
-            if(slot.pinned&&!hasRunning){
-              const badgeCount = appBadgeCounts[slot.appId] || 0;
-              return(
-                <button {...dragProps} key={slot.key} className="tb"
-                  onClick={wrappedClick}
-                  onContextMenu={e=>openContextMenu(e,buildMenu())}
-                  title={app.label + (badgeCount > 0 ? " — " + badgeCount + " unread" : "")}
-                  style={{
-                    width:46,height:46,padding:0,
-                    background:"var(--nv-elevated)",
-                    border:"1px solid var(--nv-border)",
-                    borderRadius:12,cursor:isDragging?"grabbing":"pointer",
-                    display:"flex",alignItems:"center",justifyContent:"center",
-                    transition:"all 0.18s var(--nv-ease)",
-                    flexShrink:0,position:"relative",
-                    ...dragStyle,
-                  }}>
-                  <AppIconDisplay app={{id:app.id,icon:app.icon}} size={26} glass={glass}/>
-                  {badgeCount > 0 && (
-                    <div style={{position:"absolute",top:-2,right:-2,minWidth:14,height:14,padding:"0 3px",borderRadius:7,background:"#ff4d4f",color:"#fff",fontFamily:FFB,fontWeight:700,fontSize:9,display:"flex",alignItems:"center",justifyContent:"center",lineHeight:1,boxShadow:"0 0 6px rgba(255,77,79,0.6)"}}>
-                      {badgeCount > 9 ? "9+" : badgeCount}
-                    </div>
-                  )}
-                </button>
-              );
-            }
-
-            // Full chip — running (whether pinned or not). Icon + label
-            // (on non-mobile) + glowing accent underline when focused.
+            // v11.1 — macOS-style dock tile: one icon-only squircle for both
+            // pinned and running slots, with a running DOT underneath (no label,
+            // no underline) and a pure hover-magnify on the icon (no plate). The
+            // dot glows brighter when this app owns the focused window.
+            const badgeCount = appBadgeCounts[slot.appId] || 0;
             return(
-              <button {...dragProps} key={slot.key} className="tb"
+              <button {...dragProps} key={slot.key} className="dock-tile"
                 onClick={wrappedClick}
                 onContextMenu={e=>openContextMenu(e,buildMenu())}
+                title={app.label + (hasRunning&&!allMin?" — running":"") + (badgeCount>0?" — "+badgeCount+" unread":"")}
                 style={{
-                  height:46,padding:"0 14px",
-                  background:isTop?"var(--nv-border-strong)":"var(--nv-elevated)",
-                  border:"1px solid "+(isTop?"var(--nv-border-strong)":"var(--nv-border)"),
-                  borderRadius:12,cursor:isDragging?"grabbing":"pointer",
-                  fontFamily:FF,fontSize:13,fontWeight:600,
-                  color:allMin?"var(--nv-text-dim)":"var(--nv-text-strong)",
-                  whiteSpace:"nowrap",
-                  transition:"all 0.22s var(--nv-ease)",
-                  display:"flex",alignItems:"center",gap:7,position:"relative",
-                  flexShrink:0,
+                  width:44,height:46,padding:"3px 0 0",border:"none",background:"transparent",
+                  cursor:isDragging?"grabbing":"pointer",
+                  display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"flex-start",gap:2,
+                  position:"relative",flexShrink:0,opacity:allMin?0.72:1,
                   ...dragStyle,
                 }}>
-                <div style={{position:"relative",pointerEvents:"none",display:"flex",alignItems:"center"}}>
-                  <AppIconDisplay app={{id:app.id,icon:app.icon}} size={22} glass={glass}/>
-                  {appBadgeCounts[slot.appId]>0 && (
-                    <div style={{position:"absolute",top:-5,right:-7,minWidth:13,height:13,padding:"0 3px",borderRadius:6.5,background:"#ff4d4f",color:"#fff",fontFamily:FFB,fontWeight:700,fontSize:8.5,display:"flex",alignItems:"center",justifyContent:"center",lineHeight:1,boxShadow:"0 0 5px rgba(255,77,79,0.6)"}}>
-                      {appBadgeCounts[slot.appId]>9?"9+":appBadgeCounts[slot.appId]}
+                <div className="dock-ico" style={{position:"relative",pointerEvents:"none",display:"flex",alignItems:"center",justifyContent:"center"}}>
+                  <AppIconDisplay app={{id:app.id,icon:app.icon}} size={32} glass={glass}/>
+                  {badgeCount>0 && (
+                    <div style={{position:"absolute",top:-4,right:-5,minWidth:14,height:14,padding:"0 3px",borderRadius:7,background:"#ff4d4f",color:"#fff",fontFamily:FFB,fontWeight:700,fontSize:9,display:"flex",alignItems:"center",justifyContent:"center",lineHeight:1,boxShadow:"0 0 6px rgba(255,77,79,0.6)"}}>
+                      {badgeCount>9?"9+":badgeCount}
                     </div>
                   )}
                 </div>
-                {deviceMode!=="mobile"&&<span>{app.label}</span>}
-                {hasRunning&&!allMin&&<div style={{position:"absolute",bottom:-1,left:"50%",transform:"translateX(-50%)",width:isTop?28:10,height:3,borderRadius:3,background:AC,boxShadow:isTop?"0 0 10px "+AC+", 0 0 4px "+AC:"none",transition:"width 0.25s var(--nv-ease), box-shadow 0.25s var(--nv-ease)"}}/>}
+                <div style={{height:6,display:"flex",alignItems:"center",justifyContent:"center"}}>
+                  {hasRunning&&<div style={{width:isTop?6:5,height:isTop?6:5,borderRadius:"50%",background:allMin?"var(--nv-text-dim)":AC,boxShadow:isTop?"0 0 7px "+AC:"none",transition:"all 0.22s var(--nv-ease)"}}/>}
+                </div>
               </button>
             );
           });
