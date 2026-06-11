@@ -3246,18 +3246,9 @@ export default function NovaOS(){
         {/* RIGHT cluster — profile, system tray (notifications + settings),
             clock. Pills share a height so they sit on the same baseline. */}
         <div style={{display:"flex",alignItems:"center",gap:8,zIndex:2,flexShrink:0}}>
-        {deviceMode!=="mobile"&&
-          <button className="sb" onClick={()=>openApp("profile")} title="Profile" style={{
-            height:44,display:"flex",alignItems:"center",gap:8,
-            padding:"0 14px 0 8px",borderRadius:12,
-            background:"var(--nv-elevated)",border:"1px solid var(--nv-border)",
-            cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:12.5,color:AC,
-            transition:"all 0.18s var(--nv-ease)",
-          }}>
-            <UserAvatar name={user} img={data?.avatar} ac={AC} size={24} ring={false}/>
-            @{user}
-          </button>
-        }
+        {/* v11.x — account chip removed from the taskbar (the @username + avatar
+            pill). Your profile + Logout still live in the start menu, so nothing
+            is lost; the bar just reads cleaner. */}
         <div style={{
           height:44,display:"flex",alignItems:"center",gap:3,padding:"0 4px",
           background:"var(--nv-elevated)",border:"1px solid var(--nv-border)",borderRadius:12,
