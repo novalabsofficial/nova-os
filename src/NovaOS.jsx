@@ -1878,7 +1878,7 @@ export default function NovaOS(){
   // previews the zone (ghost overlay) and commits it on release. Keyboard
   // Alt+Arrow snaps the active window the same way.
   function snapZoneRect(zone){
-    const W=window.innerWidth, AH=window.innerHeight-TASKBAR_H-TOPBAR_H, T=TOPBAR_H;
+    const W=window.innerWidth, AH=window.innerHeight-TOPBAR_H, T=TOPBAR_H;
     const hw=Math.round(W/2), hh=Math.round(AH/2);
     switch(zone){
       case "max":   return {x:0,y:T,width:W,height:AH};
@@ -2929,7 +2929,7 @@ export default function NovaOS(){
         const dg = isDrg && dragGeomRef.current ? dragGeomRef.current : null;
         const gx = dg ? dg.x : win.x, gy = dg ? dg.y : win.y;
         const gw = (dg && dg.width != null) ? dg.width : win.width, gh = (dg && dg.height != null) ? dg.height : win.height;
-        const winStyle=isMax?{position:"absolute",top:TOPBAR_H,left:0,width:"100vw",bottom:TASKBAR_H+"px",zIndex:win.z,borderRadius:0}:{position:"absolute",left:gx,top:gy,width:gw,height:gh,zIndex:win.z,borderRadius:winRadius};
+        const winStyle=isMax?{position:"absolute",top:TOPBAR_H,left:0,width:"100vw",bottom:0,zIndex:win.z,borderRadius:0}:{position:"absolute",left:gx,top:gy,width:gw,height:gh,zIndex:win.z,borderRadius:winRadius};
         const minimizedStyle=isMin?{display:"none"}:{};
         // v10.0 — fx-driven open/close/minimize/restore animation. A settled
         // window has no animation (so it never re-plays on re-render); the
@@ -2944,7 +2944,7 @@ export default function NovaOS(){
         let enterAnim = "win-in 0.2s cubic-bezier(0.16,1,0.3,1)";
         if(lp){
           const wL=isMax?0:win.x, wT=isMax?0:win.y;
-          const wW=isMax?window.innerWidth:win.width, wH=isMax?(window.innerHeight-TASKBAR_H-TOPBAR_H):win.height;
+          const wW=isMax?window.innerWidth:win.width, wH=isMax?(window.innerHeight-TOPBAR_H):win.height;
           const ox=Math.max(0,Math.min(wW, lp.x-wL)), oy=Math.max(0,Math.min(wH, lp.y-wT));
           fxOrigin = ox+"px "+oy+"px";
           enterAnim = "win-launch 0.22s cubic-bezier(0.16,1,0.3,1)";
@@ -3112,7 +3112,7 @@ export default function NovaOS(){
           width:54,height:56,padding:0,border:"none",background:"transparent",
           cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,position:"relative",
         }}>
-          <div className="dock-ico" style={{display:"flex",alignItems:"center",justifyContent:"center"}}><NovaLogo size={42}/></div>
+          <div className="dock-ico" style={{display:"flex",alignItems:"center",justifyContent:"center"}}><NovaLogo size={48}/></div>
           {menuOpen&&<div style={{position:"absolute",bottom:3,left:"50%",transform:"translateX(-50%)",width:5,height:5,borderRadius:"50%",background:AC,boxShadow:"0 0 7px "+AC}}/>}
         </button>
         {/* v11.1 — Search / Ask Nova / Task View / weather lifted UP into the
@@ -3234,14 +3234,14 @@ export default function NovaOS(){
                   ...dragStyle,
                 }}>
                 <div className="dock-ico" style={{position:"relative",pointerEvents:"none",display:"flex",alignItems:"center",justifyContent:"center"}}>
-                  <AppIconDisplay app={{id:app.id,icon:app.icon}} size={42} glass={glass}/>
+                  <AppIconDisplay app={{id:app.id,icon:app.icon}} size={48} glass={glass}/>
                   {badgeCount>0 && (
                     <div style={{position:"absolute",top:-4,right:-5,minWidth:14,height:14,padding:"0 3px",borderRadius:7,background:"#ff4d4f",color:"#fff",fontFamily:FFB,fontWeight:700,fontSize:9,display:"flex",alignItems:"center",justifyContent:"center",lineHeight:1,boxShadow:"0 0 6px rgba(255,77,79,0.6)"}}>
                       {badgeCount>9?"9+":badgeCount}
                     </div>
                   )}
                 </div>
-                {hasRunning&&<div style={{position:"absolute",bottom:3,left:"50%",transform:"translateX(-50%)",width:isTop?6:5,height:isTop?6:5,borderRadius:"50%",background:allMin?"var(--nv-text-dim)":AC,boxShadow:isTop?"0 0 7px "+AC:"none",transition:"all 0.22s var(--nv-ease)"}}/>}
+                {hasRunning&&<div style={{position:"absolute",bottom:2,left:"50%",transform:"translateX(-50%)",width:isTop?6:5,height:isTop?6:5,borderRadius:"50%",background:allMin?"var(--nv-text-dim)":AC,boxShadow:isTop?"0 0 7px "+AC:"none",transition:"all 0.22s var(--nv-ease)"}}/>}
               </button>
             );
           });
