@@ -694,6 +694,7 @@ export default function NovaOS(){
   const [menuOpen,   setMenuOpen]   = useState(false);
   const [menuAnchor, setMenuAnchor] = useState("dock"); // "dock" = float up above the centered dock launcher; "top" = drop down under the top-bar glyph
   const [dockW,      setDockW]      = useState(0);       // measured floating-dock width — the launcher panel matches it
+  const [dockPeek,   setDockPeek]   = useState(false);   // v11.1 — auto-hide: dock is "peeked" up while the bottom edge / dock is hovered
   const menuW = Math.max(dockW || 420, 340);             // launcher width = dock width (floored so it never gets unusably narrow)
   const [menuSrch,   setMenuSrch]   = useState("");
   const [iconPos,    setIconPos]    = useState({});
@@ -3092,9 +3093,28 @@ export default function NovaOS(){
         // ON — a user-picked taskbarColor still wins. Three zones: a left
         // cluster (Start + weather), the apps absolutely centered (Windows 11
         // style), and a right system-tray cluster.
+        // v11.1 — macOS-style auto-hide: tuck the dock away when a window on this
+        // desktop overlaps its footprint (maximized always counts). A bottom-edge
+        // hover (the reveal strip) or an open launcher menu peeks it back up.
+        const dockShouldHide = deviceMode!=="mobile" && (()=>{
+          const dw = dockW||420;
+          const dl = window.innerWidth/2 - dw/2, dr = window.innerWidth/2 + dw/2;
+          const dTop = window.innerHeight - 76;
+          return wins.some(w=>{
+            if((w.desk||0)!==curDesk || w.state==="minimized") return false;
+            if(w.state==="maximized") return true;
+            return (w.x < dr) && (w.x + w.width > dl) && (w.y + w.height > dTop);
+          });
+        })();
+        const dockHidden = dockShouldHide && !dockPeek && !menuOpen;
         return(
-      <div data-drop="none" ref={dockRef} style={{
-        position:"fixed",bottom:10,left:"50%",transform:"translateX(-50%)",height:66,maxWidth:"calc(100vw - 24px)",
+      <>
+      {/* auto-hide reveal strip — a thin bottom-edge hot zone that peeks the dock
+          back up while it's tucked away under a window. */}
+      {dockShouldHide && <div onPointerEnter={()=>setDockPeek(true)} style={{position:"fixed",left:0,right:0,bottom:0,height:8,zIndex:9998}}/>}
+      <div data-drop="none" ref={dockRef} onPointerEnter={()=>setDockPeek(true)} onPointerLeave={()=>setDockPeek(false)} style={{
+        position:"fixed",bottom:10,left:"50%",transform:dockHidden?"translateX(-50%) translateY(calc(100% + 12px))":"translateX(-50%)",height:66,maxWidth:"calc(100vw - 24px)",
+        transition:"transform 0.28s cubic-bezier(0.22,1,0.36,1)",
         background:tbBg,
         backdropFilter:"blur(var(--nv-glass-blur)) saturate(160%)",
         WebkitBackdropFilter:"blur(var(--nv-glass-blur)) saturate(160%)",
@@ -3253,6 +3273,7 @@ export default function NovaOS(){
             floating island. Next iteration: lift Search/Ask Nova/Task View up to
             the top bar so the dock becomes apps-only. */}
       </div>
+      </>
         );
       })()}
       {/* v9.0 — Quick-settings flyout (network status, Nova volume, glass). */}
