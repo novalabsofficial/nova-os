@@ -257,7 +257,7 @@ function TaskbarWeather({ data, onClick, compact = false }) {
   // the chunkier dock pill.
   const pill = compact ? {
     height: 24, display: "flex", alignItems: "center", gap: 5, padding: "0 8px",
-    borderRadius: 7, background: "transparent",
+    borderRadius: 8, background: "transparent",
     border: "1px solid transparent", cursor: "pointer",
     fontFamily: FF, flexShrink: 0, transition: "all 0.15s var(--nv-ease)",
   } : {
@@ -2802,7 +2802,7 @@ export default function NovaOS(){
       }}>
         {/* Search bar — gains an accent-tinged border on focus via CSS focus-visible */}
         <div style={{padding:"18px 18px 12px",flexShrink:0}}>
-          <div style={{display:"flex",alignItems:"center",gap:10,background:"var(--nv-elevated)",border:"1px solid var(--nv-border)",borderRadius:11,padding:"11px 16px",transition:"border-color 0.2s, background 0.2s"}}>
+          <div style={{display:"flex",alignItems:"center",gap:10,background:"var(--nv-elevated)",border:"1px solid var(--nv-border)",borderRadius:10,padding:"11px 16px",transition:"border-color 0.2s, background 0.2s"}}>
             <span style={{color:"var(--nv-text-dim)",display:"flex",opacity:0.9}}><SearchGlyph size={14}/></span>
             <input value={menuSrch} onChange={e=>setMenuSrch(e.target.value)} placeholder="Search apps…" autoFocus style={{flex:1,background:"none",border:"none",outline:"none",color:"var(--nv-text-strong)",fontFamily:FF,fontSize:14}}/>
             {menuSrch&&<button onClick={()=>setMenuSrch("")} style={{background:"var(--nv-hover)",border:"none",color:"var(--nv-text-dim)",cursor:"pointer",fontSize:11,width:20,height:20,borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center"}}>✕</button>}
@@ -2829,7 +2829,7 @@ export default function NovaOS(){
                     ? {icon:"+",label:"Add to desktop",onClick:()=>addAppToDesktop(app.id)}
                     : {icon:"–",label:"Remove from desktop",danger:true,onClick:()=>hideAppFromDesktop(app.id)},
                 ]);}}
-                style={{display:"flex",flexDirection:"column",alignItems:"center",gap:7,padding:"14px 6px 12px",borderRadius:11,cursor:"pointer",position:"relative"}}>
+                style={{display:"flex",flexDirection:"column",alignItems:"center",gap:7,padding:"14px 6px 12px",borderRadius:10,cursor:"pointer",position:"relative"}}>
                 {isRunning&&<div style={{position:"absolute",bottom:5,left:"50%",transform:"translateX(-50%)",width:5,height:5,borderRadius:"50%",background:AC,boxShadow:"0 0 6px "+AC}}/>}
                 <div style={{display:"flex",alignItems:"center",justifyContent:"center",opacity:isHidden?0.5:1}}><AppIconDisplay app={app} size={28} glass={glass}/></div>
                 <span style={{fontFamily:FF,fontWeight:600,fontSize:10.5,color:isHidden?"var(--nv-text-dim)":"var(--nv-text-strong)",textAlign:"center",lineHeight:1.3,letterSpacing:0.1}}>{app.label}</span>
@@ -3021,9 +3021,9 @@ export default function NovaOS(){
           here now. Desktop only; reserved height = TOPBAR_H. */}
       {deviceMode!=="mobile" && (()=>{
         const muted = !soundCfg.enabled || soundCfg.volume<=0;
-        const tbBtn=(active)=>({height:24,minWidth:30,padding:"0 7px",borderRadius:7,background:active?fill(AC):"transparent",border:"1px solid "+(active?bdr(AC):"transparent"),cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",color:active?AC:"var(--nv-text)",transition:"all 0.15s var(--nv-ease)"});
+        const tbBtn=(active)=>({height:24,minWidth:30,padding:"0 7px",borderRadius:8,background:active?fill(AC):"transparent",border:"1px solid "+(active?bdr(AC):"transparent"),cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",color:active?AC:"var(--nv-text)",transition:"all 0.15s var(--nv-ease)"});
         // text-button variant for the lifted launchers (Search / Ask Nova / Task View)
-        const tbItem=(active)=>({height:24,padding:"0 9px",borderRadius:7,background:active?fill(AC):"transparent",border:"1px solid "+(active?bdr(AC):"transparent"),cursor:"pointer",display:"flex",alignItems:"center",gap:6,fontFamily:FF,fontSize:12,color:active?AC:"var(--nv-text-dim)",whiteSpace:"nowrap",transition:"all 0.15s var(--nv-ease)"});
+        const tbItem=(active)=>({height:24,padding:"0 9px",borderRadius:8,background:active?fill(AC):"transparent",border:"1px solid "+(active?bdr(AC):"transparent"),cursor:"pointer",display:"flex",alignItems:"center",gap:6,fontFamily:FF,fontSize:12,color:active?AC:"var(--nv-text-dim)",whiteSpace:"nowrap",transition:"all 0.15s var(--nv-ease)"});
         return (
         <div style={{position:"fixed",top:0,left:0,right:0,height:TOPBAR_H,background:"var(--nv-surface)",backdropFilter:"blur(var(--nv-glass-blur)) saturate(160%)",WebkitBackdropFilter:"blur(var(--nv-glass-blur)) saturate(160%)",borderBottom:"1px solid var(--nv-border)",display:"flex",alignItems:"center",justifyContent:"space-between",padding:"0 8px",gap:3,zIndex:9998,fontFamily:FF}}>
           {/* LEFT — Nova menu glyph (sits like the macOS Apple logo, top-left)
@@ -3285,7 +3285,7 @@ export default function NovaOS(){
               <div key={t.id} onClick={()=>{dismissNotifToast(t.id); if(t.appId) openApp(t.appId);}}
                 style={{position:"relative",pointerEvents:"auto",cursor:"pointer",width:"min(360px, calc(100vw - 28px))",display:"flex",gap:12,alignItems:"flex-start",padding:"13px 30px 13px 15px",background:"var(--nv-surface-solid)",backdropFilter:"blur(44px) saturate(180%)",WebkitBackdropFilter:"blur(44px) saturate(180%)",border:"1px solid var(--nv-border)",borderRadius:16,boxShadow:"var(--nv-popover-shadow)",animation:"panel-in-right 0.34s cubic-bezier(0.22,1,0.36,1)",overflow:"hidden"}}>
                 <div style={{position:"absolute",left:0,top:0,bottom:0,width:3,background:kc,boxShadow:"0 0 12px "+kc+"99"}}/>
-                <div style={{flexShrink:0,width:38,height:38,borderRadius:11,display:"flex",alignItems:"center",justifyContent:"center",background:fill(kc),border:"1px solid "+bdr(kc)}}>
+                <div style={{flexShrink:0,width:38,height:38,borderRadius:10,display:"flex",alignItems:"center",justifyContent:"center",background:fill(kc),border:"1px solid "+bdr(kc)}}>
                   {appObj ? <AppIconDisplay app={{id:appObj.id,icon:appObj.icon}} size={24} glass={glass}/> : <span style={{fontSize:18}}>🔔</span>}
                 </div>
                 <div style={{flex:1,minWidth:0}}>
@@ -3319,8 +3319,8 @@ export default function NovaOS(){
             <div style={{padding:"16px 18px",borderBottom:"1px solid var(--nv-border)",display:"flex",alignItems:"center",gap:10,flexShrink:0,background:"linear-gradient(180deg, rgba(255,255,255,0.03), transparent)"}}>
               <span style={{fontSize:16,filter:"drop-shadow(0 0 8px "+AC+"55)"}}>🔔</span>
               <div style={{flex:1,fontFamily:FFB,fontWeight:700,fontSize:14,color:"var(--nv-text-strong)",letterSpacing:0.2}}>Notifications</div>
-              {notifications.length>0 && <button onClick={clearAllNotifications} style={{padding:"5px 11px",background:"rgba(255,80,80,0.08)",border:"1px solid rgba(255,80,80,0.25)",borderRadius:7,cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:10,color:"rgba(255,130,130,0.9)",letterSpacing:0.3,transition:"all 0.15s"}}>Clear all</button>}
-              <button onClick={()=>setNotifsOpen(false)} title="Close" style={{width:26,height:26,borderRadius:7,background:"var(--nv-elevated)",border:"1px solid var(--nv-border)",cursor:"pointer",color:"var(--nv-text-dim)",fontSize:12,display:"flex",alignItems:"center",justifyContent:"center",padding:0,transition:"all 0.15s"}}>✕</button>
+              {notifications.length>0 && <button onClick={clearAllNotifications} style={{padding:"5px 11px",background:"rgba(255,80,80,0.08)",border:"1px solid rgba(255,80,80,0.25)",borderRadius:8,cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:10,color:"rgba(255,130,130,0.9)",letterSpacing:0.3,transition:"all 0.15s"}}>Clear all</button>}
+              <button onClick={()=>setNotifsOpen(false)} title="Close" style={{width:26,height:26,borderRadius:8,background:"var(--nv-elevated)",border:"1px solid var(--nv-border)",cursor:"pointer",color:"var(--nv-text-dim)",fontSize:12,display:"flex",alignItems:"center",justifyContent:"center",padding:0,transition:"all 0.15s"}}>✕</button>
             </div>
             <div style={{flex:1,overflowY:"auto",minHeight:0,padding:"10px"}}>
               {notifications.length===0 ? (
