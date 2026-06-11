@@ -3044,14 +3044,14 @@ export default function NovaOS(){
         // style), and a right system-tray cluster.
         return(
       <div data-drop="none" style={{
-        position:"fixed",bottom:8,left:8,right:8,height:TASKBAR_H-12,
+        position:"fixed",bottom:10,left:"50%",transform:"translateX(-50%)",height:56,maxWidth:"calc(100vw - 24px)",
         background:tbBg,
         backdropFilter:"blur(var(--nv-glass-blur)) saturate(160%)",
         WebkitBackdropFilter:"blur(var(--nv-glass-blur)) saturate(160%)",
         border:"1px solid var(--nv-border)",
-        borderRadius:18,
-        boxShadow:"0 1px 0 rgba(255,255,255,0.07) inset, 0 14px 44px -10px rgba(0,0,0,0.6)",
-        display:"flex",alignItems:"center",justifyContent:"space-between",
+        borderRadius:20,
+        boxShadow:"0 1px 0 rgba(255,255,255,0.08) inset, 0 18px 50px -12px rgba(0,0,0,0.6)",
+        display:"flex",alignItems:"center",
         padding:"0 10px",gap:8,zIndex:9999,
       }}>
         {/* LEFT cluster — Start button, divider, weather pill */}
@@ -3119,7 +3119,7 @@ export default function NovaOS(){
             screens — it scrolls within the available space instead. (Was
             position:absolute with a fixed width cap, which spilled over the
             clusters once they were wider than that budget.) */}
-        <div className="no-sb" style={{flex:1,minWidth:0,display:"flex",alignItems:"center",justifyContent:"safe center",gap:7,overflowX:"auto",overflowY:"hidden",padding:"5px 0",zIndex:1}}>
+        <div className="no-sb" style={{display:"flex",alignItems:"center",justifyContent:"flex-start",gap:7,maxWidth:"58vw",overflowX:"auto",overflowY:"hidden",padding:"5px 0",zIndex:1}}>
         {/* v8.0 — Taskbar: pinned apps + running windows.
             Pinned apps with NO running windows render as compact icon-only
             "launcher" chips (40x40, no label). Pinned apps WITH running
@@ -3272,16 +3272,11 @@ export default function NovaOS(){
           });
         })()}
         </div>
-        {/* RIGHT cluster — profile, system tray (notifications + settings),
-            clock. Pills share a height so they sit on the same baseline. */}
-        <div style={{display:"flex",alignItems:"center",gap:8,zIndex:2,flexShrink:0}}>
-        {/* v11.x — account chip removed from the taskbar (the @username + avatar
-            pill). Your profile + Logout still live in the start menu, so nothing
-            is lost; the bar just reads cleaner. */}
-        {/* v11.1 — volume / wifi / notifications / settings + the clock moved UP
-            to the macOS-style top status bar; the bottom bar is being slimmed
-            into an apps-only dock. */}
-        </div>
+        {/* RIGHT cluster removed (v11.1) — system tray + clock now live in the
+            top status bar, and the account chip was retired. The dock is now
+            just the left cluster + apps, sized to its content and centered as a
+            floating island. Next iteration: lift Search/Ask Nova/Task View up to
+            the top bar so the dock becomes apps-only. */}
       </div>
         );
       })()}
