@@ -2945,15 +2945,20 @@ export default function NovaOS(){
                   rendered inconsistently across platforms and weren't pixel-
                   aligned within their hit boxes. Now stroke-based icons that
                   inherit the button color via currentColor. */}
-              <div style={{display:"flex",alignItems:"center",gap:2,padding:2,borderRadius:9}}>
-                <button className="wn" onPointerDown={e=>e.stopPropagation()} onClick={e=>{e.stopPropagation();minimizeWin(win.id);}} title="Minimize" style={{width:28,height:28,borderRadius:7,background:"transparent",border:"1px solid transparent",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",color:isFocused?"var(--nv-text)":"var(--nv-text-dim)",flexShrink:0,padding:0}}>
-                  <WindowControlIcon type="minimize" size={11}/>
+              {/* v11.x — hybrid window controls: kept in the Windows position
+                  (top-right) and Windows order (minimize · maximize · close),
+                  but recolored as macOS traffic-lights (yellow / green / red).
+                  Glyphs show on the focused window; dots go a neutral grey when
+                  the window is unfocused, the macOS way. Same handlers/titles. */}
+              <div style={{display:"flex",alignItems:"center",gap:4,padding:"0 2px"}}>
+                <button onPointerDown={e=>e.stopPropagation()} onClick={e=>{e.stopPropagation();minimizeWin(win.id);}} title="Minimize" style={{width:22,height:22,background:"transparent",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,padding:0}}>
+                  <span style={{width:14,height:14,borderRadius:"50%",background:isFocused?"#febc2e":"var(--nv-border-strong)",display:"flex",alignItems:"center",justifyContent:"center",color:isFocused?"#6d4d00":"transparent",transition:"background 0.15s, color 0.15s"}}><WindowControlIcon type="minimize" size={8}/></span>
                 </button>
-                <button className="wm" onPointerDown={e=>e.stopPropagation()} onClick={e=>{e.stopPropagation();maximizeWin(win.id);}} title={isMax?"Restore":"Maximize"} style={{width:28,height:28,borderRadius:7,background:"transparent",border:"1px solid transparent",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",color:isFocused?"var(--nv-text)":"var(--nv-text-dim)",flexShrink:0,padding:0}}>
-                  <WindowControlIcon type={isMax?"restore":"maximize"} size={11}/>
+                <button onPointerDown={e=>e.stopPropagation()} onClick={e=>{e.stopPropagation();maximizeWin(win.id);}} title={isMax?"Restore":"Maximize"} style={{width:22,height:22,background:"transparent",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,padding:0}}>
+                  <span style={{width:14,height:14,borderRadius:"50%",background:isFocused?"#28c840":"var(--nv-border-strong)",display:"flex",alignItems:"center",justifyContent:"center",color:isFocused?"#0b4a16":"transparent",transition:"background 0.15s, color 0.15s"}}><WindowControlIcon type={isMax?"restore":"maximize"} size={8}/></span>
                 </button>
-                <button className="wx" onPointerDown={e=>e.stopPropagation()} onClick={e=>{e.stopPropagation();closeWin(win.id);}} title="Close" style={{width:28,height:28,borderRadius:7,background:"transparent",border:"1px solid transparent",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",color:isFocused?"var(--nv-text)":"var(--nv-text-dim)",flexShrink:0,padding:0}}>
-                  <WindowControlIcon type="close" size={11}/>
+                <button onPointerDown={e=>e.stopPropagation()} onClick={e=>{e.stopPropagation();closeWin(win.id);}} title="Close" style={{width:22,height:22,background:"transparent",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,padding:0}}>
+                  <span style={{width:14,height:14,borderRadius:"50%",background:isFocused?"#ff5f57":"var(--nv-border-strong)",display:"flex",alignItems:"center",justifyContent:"center",color:isFocused?"#6e1410":"transparent",transition:"background 0.15s, color 0.15s"}}><WindowControlIcon type="close" size={8}/></span>
                 </button>
               </div>
             </div>
