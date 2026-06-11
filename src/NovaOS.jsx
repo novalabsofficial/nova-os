@@ -2687,7 +2687,9 @@ export default function NovaOS(){
           when the window resizes. `viewport.w/h` are referenced inside the
           IIFE so the React renderer treats this expression as depending on
           the viewport state and recomputes on resize. */}
-      {(() => { const positions = layoutIcons(desktopEntries, iconPos);
+      {/* v11.1 — desktop app grid REMOVED for a clean macOS desktop. Apps now
+          live in the dock + the Launchpad (Start menu). Flip `false` to restore. */}
+      {false && (() => { const positions = layoutIcons(desktopEntries, iconPos);
                 void viewport.w; void viewport.h;
                 const lightT=theme==="light";
                 return desktopEntries.map((entry, idx) => {
@@ -2825,9 +2827,7 @@ export default function NovaOS(){
                     ? {icon:"📌", label:"Unpin from taskbar", onClick:()=>unpinAppFromTaskbar(app.id)}
                     : {icon:"📌", label:"Pin to taskbar", onClick:()=>pinAppToTaskbar(app.id)}
                   ]),
-                  isHidden
-                    ? {icon:"+",label:"Add to desktop",onClick:()=>addAppToDesktop(app.id)}
-                    : {icon:"–",label:"Remove from desktop",danger:true,onClick:()=>hideAppFromDesktop(app.id)},
+                  /* "Add/Remove from desktop" removed — no desktop app grid (v11.1). */
                 ]);}}
                 style={{display:"flex",flexDirection:"column",alignItems:"center",gap:7,padding:"14px 6px 12px",borderRadius:10,cursor:"pointer",position:"relative"}}>
                 {isRunning&&<div style={{position:"absolute",bottom:5,left:"50%",transform:"translateX(-50%)",width:5,height:5,borderRadius:"50%",background:AC,boxShadow:"0 0 6px "+AC}}/>}
@@ -3094,12 +3094,12 @@ export default function NovaOS(){
         // style), and a right system-tray cluster.
         return(
       <div data-drop="none" ref={dockRef} style={{
-        position:"fixed",bottom:10,left:"50%",transform:"translateX(-50%)",height:56,maxWidth:"calc(100vw - 24px)",
+        position:"fixed",bottom:10,left:"50%",transform:"translateX(-50%)",height:66,maxWidth:"calc(100vw - 24px)",
         background:tbBg,
         backdropFilter:"blur(var(--nv-glass-blur)) saturate(160%)",
         WebkitBackdropFilter:"blur(var(--nv-glass-blur)) saturate(160%)",
         border:"1px solid var(--nv-border)",
-        borderRadius:20,
+        borderRadius:22,
         boxShadow:"0 1px 0 rgba(255,255,255,0.08) inset, 0 18px 50px -12px rgba(0,0,0,0.6)",
         display:"flex",alignItems:"center",
         padding:"0 10px",gap:5,zIndex:9999,
@@ -3109,10 +3109,10 @@ export default function NovaOS(){
         {/* v7.7: Start menu button — shows the Nova OS brand mark. The button
             lights up with the accent color when the menu is open. */}
         <button className="dock-tile" data-start-btn onClick={()=>{setMenuAnchor("dock");setMenuOpen(o=>!o);setMenuSrch("");}} title="Nova OS — menu" style={{
-          width:44,height:46,padding:0,border:"none",background:"transparent",
+          width:54,height:56,padding:0,border:"none",background:"transparent",
           cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,position:"relative",
         }}>
-          <div className="dock-ico" style={{display:"flex",alignItems:"center",justifyContent:"center"}}><NovaLogo size={32}/></div>
+          <div className="dock-ico" style={{display:"flex",alignItems:"center",justifyContent:"center"}}><NovaLogo size={42}/></div>
           {menuOpen&&<div style={{position:"absolute",bottom:3,left:"50%",transform:"translateX(-50%)",width:5,height:5,borderRadius:"50%",background:AC,boxShadow:"0 0 7px "+AC}}/>}
         </button>
         {/* v11.1 — Search / Ask Nova / Task View / weather lifted UP into the
@@ -3187,7 +3187,7 @@ export default function NovaOS(){
               items.push(slot.pinned
                 ?{icon:"📌",label:"Unpin from taskbar",onClick:()=>unpinAppFromTaskbar(slot.appId)}
                 :{icon:"📌",label:"Pin to taskbar",onClick:()=>pinAppToTaskbar(slot.appId)});
-              if(isHidden)items.push({icon:"+",label:"Add to desktop",onClick:()=>addAppToDesktop(slot.appId)});
+              // "Add to desktop" removed — no desktop app grid (v11.1).
               if(hasRunning){
                 items.push({type:"divider"});
                 items.push({icon:"✕",label:"Close",danger:true,onClick:()=>closeWin(topWin.id)});
@@ -3227,14 +3227,14 @@ export default function NovaOS(){
                 onContextMenu={e=>openContextMenu(e,buildMenu())}
                 title={app.label + (hasRunning&&!allMin?" — running":"") + (badgeCount>0?" — "+badgeCount+" unread":"")}
                 style={{
-                  width:44,height:46,padding:0,border:"none",background:"transparent",
+                  width:54,height:56,padding:0,border:"none",background:"transparent",
                   cursor:isDragging?"grabbing":"pointer",
                   display:"flex",alignItems:"center",justifyContent:"center",
                   position:"relative",flexShrink:0,opacity:allMin?0.72:1,
                   ...dragStyle,
                 }}>
                 <div className="dock-ico" style={{position:"relative",pointerEvents:"none",display:"flex",alignItems:"center",justifyContent:"center"}}>
-                  <AppIconDisplay app={{id:app.id,icon:app.icon}} size={32} glass={glass}/>
+                  <AppIconDisplay app={{id:app.id,icon:app.icon}} size={42} glass={glass}/>
                   {badgeCount>0 && (
                     <div style={{position:"absolute",top:-4,right:-5,minWidth:14,height:14,padding:"0 3px",borderRadius:7,background:"#ff4d4f",color:"#fff",fontFamily:FFB,fontWeight:700,fontSize:9,display:"flex",alignItems:"center",justifyContent:"center",lineHeight:1,boxShadow:"0 0 6px rgba(255,77,79,0.6)"}}>
                       {badgeCount>9?"9+":badgeCount}

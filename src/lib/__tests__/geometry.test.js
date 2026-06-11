@@ -17,8 +17,8 @@ beforeEach(() => {
 });
 
 describe('defaultIconPos', () => {
-  // At 768px tall: availH = 768 - TASKBAR_H(66) - TOP(46) - 10 = 646;
-  // rows = floor(646 / (ICON_H 66 + ICON_GAP 6 = 72)) = 8.
+  // At 768px tall: availH = 768 - TASKBAR_H(78) - TOP(46) - 10 = 634;
+  // rows = floor(634 / (ICON_H 66 + ICON_GAP 6 = 72)) = 8.
   const ROWS = 8;
   const CW = ICON_W + ICON_GAP; // column width
   const CH = ICON_H + ICON_GAP; // row height
