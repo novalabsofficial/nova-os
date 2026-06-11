@@ -617,9 +617,9 @@ export function NovaLogo({ size = 22 }) {
 // sparkle extracted from the brand mark, no gradient tile). For the macOS-style
 // top status bar, where it sits at the top-left like the Apple logo. Rendered
 // "contain" (full shape, never cropped) and unrounded.
-export function NovaGlyph({ size = 18, style }) {
+export function NovaGlyph({ size = 18, style, className }) {
   return (
-    <img src={novaMarkWhiteImg} width={size} height={size} alt="Nova OS" draggable={false}
+    <img src={novaMarkWhiteImg} className={className} width={size} height={size} alt="Nova OS" draggable={false}
       style={{ display: "block", width: size, height: size, objectFit: "contain", ...style }} />
   );
 }

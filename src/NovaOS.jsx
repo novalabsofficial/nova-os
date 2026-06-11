@@ -692,6 +692,7 @@ export default function NovaOS(){
   // actually render there (previously only catalog apps did).
   const [commApps, setCommApps] = useState([]);
   const [menuOpen,   setMenuOpen]   = useState(false);
+  const [menuAnchor, setMenuAnchor] = useState("dock"); // "dock" = float up above the centered dock launcher; "top" = drop down under the top-bar glyph
   const [menuSrch,   setMenuSrch]   = useState("");
   const [iconPos,    setIconPos]    = useState({});
   // v9.3 — viewport size, bumped on window resize so layoutIcons re-runs
@@ -1209,7 +1210,7 @@ export default function NovaOS(){
         if(widgetResize.edge.includes("e"))nw=Math.max(cfg.minW,widgetResize.w0+dx);
         if(widgetResize.edge.includes("s"))nh=Math.max(cfg.minH,widgetResize.h0+dy);
         if(widgetResize.edge.includes("w")){nw=Math.max(cfg.minW,widgetResize.w0-dx);nx=widgetResize.x0+widgetResize.w0-nw;}
-        if(widgetResize.edge.includes("n")){nh=Math.max(cfg.minH,widgetResize.h0-dy);ny=widgetResize.y0+widgetResize.h0-nh;}
+        if(widgetResize.edge.includes("n")){nh=Math.max(cfg.minH,widgetResize.h0-dy);ny=widgetResize.y0+widgetResize.h0-nh;if(ny<TOPBAR_H){ny=TOPBAR_H;nh=widgetResize.y0+widgetResize.h0-TOPBAR_H;}}
         return {...prev,[widgetResize.id]:{...s,x:nx,y:ny,w:nw,h:nh}};
       });
     }
@@ -2048,8 +2049,8 @@ export default function NovaOS(){
     const groupStart={};group.forEach(gid=>{groupStart[gid]=positions[gid]||{x:0,y:0};});
     setIconDrag({id:appId,ox:e.clientX-pos.x,oy:e.clientY-pos.y,user,allIcons:[...allIcons],layout:positions,group,groupStart});
   }
-  function onWidgetDragStart(e,id){if(e.button!==0)return;e.stopPropagation();e.preventDefault();const s=widgetState[id]||DEFAULT_WIDGET_STATE[id];setWidgetDrag({id,ox:e.clientX-s.x,oy:e.clientY-s.y});}
-  function onWidgetResizeStart(e,id,edge){if(e.button!==0)return;e.stopPropagation();e.preventDefault();const s=widgetState[id]||DEFAULT_WIDGET_STATE[id];setWidgetResize({id,edge,sx:e.clientX,sy:e.clientY,x0:s.x,y0:s.y,w0:s.w,h0:s.h});}
+  function onWidgetDragStart(e,id){if(e.button!==0)return;e.stopPropagation();e.preventDefault();const r=widgetState[id]||DEFAULT_WIDGET_STATE[id];const s={...r,y:Math.max(TOPBAR_H,r.y)};setWidgetDrag({id,ox:e.clientX-s.x,oy:e.clientY-s.y});}
+  function onWidgetResizeStart(e,id,edge){if(e.button!==0)return;e.stopPropagation();e.preventDefault();const r=widgetState[id]||DEFAULT_WIDGET_STATE[id];const s={...r,y:Math.max(TOPBAR_H,r.y)};setWidgetResize({id,edge,sx:e.clientX,sy:e.clientY,x0:s.x,y0:s.y,w0:s.w,h0:s.h});}
   function closeWidget(id){updateSettings({widgets:{...widgets,[id]:false}});}
 
   // Mobile splash visibility — only show when the effective mode actually
@@ -2650,7 +2651,7 @@ export default function NovaOS(){
       {/* Desktop widgets */}
       {Object.keys(WIDGET_CONFIGS).map(id=>{
         if(!widgets[id])return null;
-        const s=widgetState[id]||DEFAULT_WIDGET_STATE[id]||{x:200,y:200,w:240,h:140};
+        const r=widgetState[id]||DEFAULT_WIDGET_STATE[id]||{x:200,y:200,w:240,h:140};const s={...r,y:Math.max(TOPBAR_H,r.y)};
         return(
           <WidgetShell key={id} id={id} state={s} onDragStart={onWidgetDragStart} onResizeStart={onWidgetResizeStart} onClose={()=>closeWidget(id)} touchy={touchy}>
             {id==="clock"   &&<ClockWidgetContent   state={s} tick={tick} use24h={use24h} AC={AC}/>}
@@ -2774,7 +2775,11 @@ export default function NovaOS(){
           the left edge — the menu looks like a floating panel, not glued to
           the screen edge. */}
       {menuOpen&&(<div ref={menuRef} style={{
-        position:"fixed",bottom:TASKBAR_H+8,left:8,width:420,maxHeight:"70vh",
+        position:"fixed",
+        ...(menuAnchor==="top"
+          ?{top:TOPBAR_H+6,left:8,animation:"menu-down 0.26s cubic-bezier(0.16,1,0.3,1)"}
+          :{bottom:TASKBAR_H+8,left:"50%",marginLeft:-210,animation:"menu-up 0.26s cubic-bezier(0.16,1,0.3,1)"}),
+        width:420,maxHeight:"70vh",
         background:"var(--nv-surface-solid)",
         backdropFilter:"blur(40px) saturate(180%)",
         WebkitBackdropFilter:"blur(40px) saturate(180%)",
@@ -2782,7 +2787,6 @@ export default function NovaOS(){
         borderRadius:16,
         boxShadow:"var(--nv-popover-shadow)",
         zIndex:9998,display:"flex",flexDirection:"column",
-        animation:"menu-up 0.26s cubic-bezier(0.16,1,0.3,1)",
         overflow:"hidden",
       }}>
         {/* Search bar — gains an accent-tinged border on focus via CSS focus-visible */}
@@ -3014,8 +3018,8 @@ export default function NovaOS(){
           {/* LEFT — Nova menu glyph (sits like the macOS Apple logo, top-left)
               + the launchers lifted up off the dock so the dock is apps-only. */}
           <div style={{display:"flex",alignItems:"center",gap:2,minWidth:0,overflow:"hidden"}}>
-            <button className="sb" data-start-btn onClick={()=>{setMenuOpen(o=>!o);setMenuSrch("");}} title="Nova OS — menu" style={{...tbBtn(menuOpen),padding:"0 8px"}}>
-              <NovaGlyph size={17}/>
+            <button className="sb" data-start-btn onClick={()=>{setMenuAnchor("top");setMenuOpen(o=>!o);setMenuSrch("");}} title="Nova OS — menu" style={{...tbBtn(menuOpen),padding:"0 7px"}}>
+              <NovaGlyph size={22} className="nova-glyph-topbar"/>
             </button>
             <div style={{width:1,height:15,background:"var(--nv-border-strong)",margin:"0 5px",flexShrink:0}}/>
             {deviceMode!=="mobile" && (
@@ -3093,7 +3097,7 @@ export default function NovaOS(){
         <div style={{display:"flex",alignItems:"center",gap:8,zIndex:2,flexShrink:0}}>
         {/* v7.7: Start menu button — shows the Nova OS brand mark. The button
             lights up with the accent color when the menu is open. */}
-        <button className="sb" data-start-btn onClick={()=>{setMenuOpen(o=>!o);setMenuSrch("");}} title="Nova OS" style={{
+        <button className="sb" data-start-btn onClick={()=>{setMenuAnchor("dock");setMenuOpen(o=>!o);setMenuSrch("");}} title="Nova OS" style={{
           width:46,height:46,borderRadius:12,
           background:menuOpen?fill(AC):"var(--nv-hover)",
           border:"1px solid "+(menuOpen?bdr(AC):"var(--nv-border)"),
