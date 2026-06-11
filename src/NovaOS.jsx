@@ -49,7 +49,7 @@ import { TaskView } from "./ui/TaskView.jsx";
 import { MobileShell } from "./ui/MobileShell.jsx";
 import { SetupWizard } from "./ui/SetupWizard.jsx";
 import { WeatherGlyph } from "./ui/WeatherGlyph.jsx";
-import { NovaSvgIcon, AppIconDisplay, NovaLogo, WindowControlIcon, UserAvatar } from "./ui/icons.jsx";
+import { NovaSvgIcon, AppIconDisplay, NovaLogo, NovaGlyph, WindowControlIcon, UserAvatar } from "./ui/icons.jsx";
 import { subscribeDrag, moveDrag, endDrag, getDrag } from "./lib/dragStore.js";
 import { Toggle } from "./ui/Toggle.jsx";
 import { BrowserNav } from "./ui/BrowserNav.jsx";
@@ -210,7 +210,7 @@ function GearGlyph({ size = 16 }) {
 // visible), it only falls back to browser geolocation when that permission
 // has ALREADY been granted; otherwise it shows a gentle "Weather" prompt
 // that opens Atmos so the user can pin a location.
-function TaskbarWeather({ data, onClick }) {
+function TaskbarWeather({ data, onClick, compact = false }) {
   const [wx, setWx] = useState(null);                  // { temp, code }
   const [status, setStatus] = useState("loading");     // loading | ok | noloc | error
   const savedLoc = data?.settings?.weatherLocation || null;
@@ -252,7 +252,15 @@ function TaskbarWeather({ data, onClick }) {
     return () => { dead = true; };
   }, [savedLoc?.lat, savedLoc?.lon, tempUnit]);
 
-  const pill = {
+  // v11.1 — `compact` renders a thin transparent pill for the top status bar
+  // (sits on the same baseline as the other top-bar buttons); the default is
+  // the chunkier dock pill.
+  const pill = compact ? {
+    height: 24, display: "flex", alignItems: "center", gap: 5, padding: "0 8px",
+    borderRadius: 7, background: "transparent",
+    border: "1px solid transparent", cursor: "pointer",
+    fontFamily: FF, flexShrink: 0, transition: "all 0.15s var(--nv-ease)",
+  } : {
     height: 42, display: "flex", alignItems: "center", gap: 7, padding: "0 13px",
     borderRadius: 12, background: "rgba(255,255,255,0.04)",
     border: "1px solid rgba(255,255,255,0.07)", cursor: "pointer",
@@ -263,15 +271,15 @@ function TaskbarWeather({ data, onClick }) {
     const city = savedLoc?.label ? savedLoc.label.split(",")[0].trim() : "";
     return (
       <button className="sb" onClick={onClick} title={(city ? city + " · " : "") + wx.temp + tempSymbol + " — open Atmos"} style={pill}>
-        <span style={{ display: "flex", lineHeight: 1 }}><WeatherGlyph code={wx.code} size={20} /></span>
-        <span style={{ fontFamily: FFM, fontWeight: 500, fontSize: 14, color: "var(--nv-text-strong)", lineHeight: 1 }}>{wx.temp}°</span>
+        <span style={{ display: "flex", lineHeight: 1 }}><WeatherGlyph code={wx.code} size={compact ? 15 : 20} /></span>
+        <span style={{ fontFamily: FFM, fontWeight: 500, fontSize: compact ? 12.5 : 14, color: "var(--nv-text-strong)", lineHeight: 1 }}>{wx.temp}°</span>
       </button>
     );
   }
   return (
     <button className="sb" onClick={onClick} title="Set your location in Atmos" style={{ ...pill, opacity: status === "loading" ? 0.55 : 0.8 }}>
-      <span style={{ fontSize: 18, lineHeight: 1 }}>⛅</span>
-      <span style={{ fontFamily: FF, fontSize: 12, color: "var(--nv-text-dim)", lineHeight: 1 }}>{status === "loading" ? "…" : "Weather"}</span>
+      <span style={{ fontSize: compact ? 14 : 18, lineHeight: 1 }}>⛅</span>
+      <span style={{ fontFamily: FF, fontSize: compact ? 11 : 12, color: "var(--nv-text-dim)", lineHeight: 1 }}>{status === "loading" ? "…" : "Weather"}</span>
     </button>
   );
 }
@@ -2999,8 +3007,34 @@ export default function NovaOS(){
       {deviceMode!=="mobile" && (()=>{
         const muted = !soundCfg.enabled || soundCfg.volume<=0;
         const tbBtn=(active)=>({height:24,minWidth:30,padding:"0 7px",borderRadius:7,background:active?fill(AC):"transparent",border:"1px solid "+(active?bdr(AC):"transparent"),cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",color:active?AC:"var(--nv-text)",transition:"all 0.15s var(--nv-ease)"});
+        // text-button variant for the lifted launchers (Search / Ask Nova / Task View)
+        const tbItem=(active)=>({height:24,padding:"0 9px",borderRadius:7,background:active?fill(AC):"transparent",border:"1px solid "+(active?bdr(AC):"transparent"),cursor:"pointer",display:"flex",alignItems:"center",gap:6,fontFamily:FF,fontSize:12,color:active?AC:"var(--nv-text-dim)",whiteSpace:"nowrap",transition:"all 0.15s var(--nv-ease)"});
         return (
-        <div style={{position:"fixed",top:0,left:0,right:0,height:TOPBAR_H,background:"var(--nv-surface)",backdropFilter:"blur(var(--nv-glass-blur)) saturate(160%)",WebkitBackdropFilter:"blur(var(--nv-glass-blur)) saturate(160%)",borderBottom:"1px solid var(--nv-border)",display:"flex",alignItems:"center",justifyContent:"flex-end",padding:"0 10px",gap:3,zIndex:9998,fontFamily:FF}}>
+        <div style={{position:"fixed",top:0,left:0,right:0,height:TOPBAR_H,background:"var(--nv-surface)",backdropFilter:"blur(var(--nv-glass-blur)) saturate(160%)",WebkitBackdropFilter:"blur(var(--nv-glass-blur)) saturate(160%)",borderBottom:"1px solid var(--nv-border)",display:"flex",alignItems:"center",justifyContent:"space-between",padding:"0 8px",gap:3,zIndex:9998,fontFamily:FF}}>
+          {/* LEFT — Nova menu glyph (sits like the macOS Apple logo, top-left)
+              + the launchers lifted up off the dock so the dock is apps-only. */}
+          <div style={{display:"flex",alignItems:"center",gap:2,minWidth:0,overflow:"hidden"}}>
+            <button className="sb" data-start-btn onClick={()=>{setMenuOpen(o=>!o);setMenuSrch("");}} title="Nova OS — menu" style={{...tbBtn(menuOpen),padding:"0 8px"}}>
+              <NovaGlyph size={17}/>
+            </button>
+            <div style={{width:1,height:15,background:"var(--nv-border-strong)",margin:"0 5px",flexShrink:0}}/>
+            {deviceMode!=="mobile" && (
+              <button className="sb" onClick={()=>setSpotlightOpen(true)} title="Search (Ctrl+K)" style={tbItem(false)}>
+                <SearchGlyph size={14}/><span>Search</span>
+              </button>
+            )}
+            <button className="sb" onClick={()=>setCommandOpen(o=>!o)} title="Nova AI command bar (Ctrl+J)" style={tbItem(commandOpen)}>
+              <span style={{display:"flex",filter:commandOpen?"drop-shadow(0 0 6px rgba("+hexRgb(AC)+",0.5))":"none"}}><SparkGlyph size={14}/></span>
+              {deviceMode!=="mobile" && <span style={{fontFamily:FFB,fontWeight:600}}>Ask Nova</span>}
+            </button>
+            <button className="sb" onClick={()=>setTaskViewOpen(o=>!o)} title="Task View — virtual desktops (Ctrl+Alt+↑)" style={tbItem(taskViewOpen)}>
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" style={{flexShrink:0}}><rect x="3.5" y="3.5" width="9" height="7.5" rx="1.5" stroke="currentColor" strokeWidth="1.4"/><path d="M5.5 13.2h7" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/></svg>
+              {deviceMode!=="mobile" && <span style={{fontFamily:FFM,fontSize:11,letterSpacing:0.3}}>{curDesk+1}/{deskCount}</span>}
+            </button>
+            {deviceMode!=="mobile" && <TaskbarWeather data={data} onClick={()=>openApp("atmos")} compact />}
+          </div>
+          {/* RIGHT — system tray + clock */}
+          <div style={{display:"flex",alignItems:"center",gap:3,flexShrink:0}}>
           <button className="sb" onClick={()=>setQsOpen(o=>!o)} title={muted?"Muted — click to adjust":"Volume "+Math.round(soundCfg.volume*100)+"%"} style={tbBtn(qsOpen)}><VolumeGlyph size={16} muted={muted}/></button>
           <button className="sb" onClick={()=>setQsOpen(o=>!o)} title="Quick settings" style={tbBtn(qsOpen)}><WifiGlyph size={16}/></button>
           <button className="sb" onClick={()=>setNotifsOpen(o=>!o)} title={unreadCount>0?unreadCount+" unread":"Notifications"} style={{...tbBtn(notifsOpen),position:"relative"}}>
@@ -3012,6 +3046,7 @@ export default function NovaOS(){
           <div style={{display:"flex",alignItems:"baseline",gap:7,cursor:"default",paddingRight:4}}>
             <span style={{fontFamily:FFM,fontWeight:500,fontSize:12.5,color:"var(--nv-text-strong)",letterSpacing:0.3}}>{fmtTime(tick)}</span>
             <span style={{fontFamily:FF,fontSize:11,color:"var(--nv-text-dim)"}}>{fmtDate(tick)}</span>
+          </div>
           </div>
         </div>
         );
@@ -3070,48 +3105,9 @@ export default function NovaOS(){
           <NovaLogo size={30}/>
         </button>
         <div style={{width:1,height:26,background:"linear-gradient(180deg, transparent, var(--nv-border-strong) 50%, transparent)",margin:"0 3px"}}/>
-        {/* v9.4 — Spotlight launcher. Opens the global-search palette. */}
-        {deviceMode!=="mobile" && (
-          <button className="sb" onClick={()=>setSpotlightOpen(true)} title="Search (Ctrl+K)" style={{
-            height:42,display:"flex",alignItems:"center",gap:8,padding:"0 14px",borderRadius:12,
-            background:"var(--nv-elevated)",border:"1px solid var(--nv-border)",
-            cursor:"pointer",fontFamily:FF,fontSize:12.5,color:"var(--nv-text-dim)",
-            transition:"all 0.18s var(--nv-ease)",flexShrink:0,
-          }}>
-            <span style={{display:"flex"}}><SearchGlyph size={15}/></span>
-            <span>Search</span>
-          </button>
-        )}
-        {/* v10.0 Supernova — Nova AI command bar launcher. Accent-tinted so it
-            stands out; opens the natural-language command palette (Ctrl/Cmd+J). */}
-        <button className="sb" onClick={()=>setCommandOpen(o=>!o)} title="Nova AI command bar (Ctrl+J)" style={{
-          height:42,display:"flex",alignItems:"center",gap:7,padding:deviceMode==="mobile"?"0 11px":"0 13px",borderRadius:12,
-          background:commandOpen?fill(AC):"var(--nv-elevated)",
-          border:"1px solid "+(commandOpen?bdr(AC):"var(--nv-border)"),
-          cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:12.5,color:commandOpen?AC:"var(--nv-text-dim)",
-          transition:"all 0.18s var(--nv-ease)",flexShrink:0,
-        }}>
-          <span style={{display:"flex",filter:commandOpen?"drop-shadow(0 0 8px rgba("+hexRgb(AC)+",0.5))":"none"}}><SparkGlyph size={15}/></span>
-          {deviceMode!=="mobile" && <span>Ask Nova</span>}
-        </button>
-        {/* v10.0 Supernova — Task View launcher (virtual desktops). Shows the
-            current/total desktop count; opens the Task View overview. */}
-        <button className="sb" onClick={()=>setTaskViewOpen(o=>!o)} title="Task View — virtual desktops (Ctrl+Alt+↑)" style={{
-          height:42,display:"flex",alignItems:"center",gap:8,padding:deviceMode==="mobile"?"0 11px":"0 13px",borderRadius:12,
-          background:taskViewOpen?fill(AC):"var(--nv-elevated)",
-          border:"1px solid "+(taskViewOpen?bdr(AC):"var(--nv-border)"),
-          cursor:"pointer",fontFamily:FFB,fontWeight:600,fontSize:12.5,color:taskViewOpen?AC:"var(--nv-text-dim)",
-          transition:"all 0.18s var(--nv-ease)",flexShrink:0,
-        }}>
-          {/* stacked-windows glyph */}
-          <svg width="15" height="15" viewBox="0 0 16 16" fill="none" style={{flexShrink:0}}>
-            <rect x="3.5" y="3.5" width="9" height="7.5" rx="1.5" stroke="currentColor" strokeWidth="1.4"/>
-            <path d="M5.5 13.2h7" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
-          </svg>
-          {deviceMode!=="mobile" && <span style={{fontFamily:FFM,fontSize:11.5,letterSpacing:0.3}}>{curDesk+1}/{deskCount}</span>}
-        </button>
-        {/* v9.0 — Windows 11-style weather pill in the bottom-left corner. */}
-        {deviceMode!=="mobile" && <TaskbarWeather data={data} onClick={()=>openApp("atmos")} />}
+        {/* v11.1 — Search / Ask Nova / Task View / weather lifted UP into the
+            top status bar (left side); the dock is now the Nova launcher + your
+            apps only. The launcher stays here as the Launchpad-style button. */}
         </div>
         {/* CENTER cluster — pinned + running apps. In-flow flex:1 between the
             left/right clusters with `safe center` + horizontal scroll, so a long

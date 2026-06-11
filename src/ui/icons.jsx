@@ -11,6 +11,7 @@ import { HAS_SVG_ICON, STORE_META } from "./constants.js";
 import { fill, bdr } from "../lib/format.js";
 import { NovaAppIcon, NOVA_ICONS } from "./appicons.jsx";
 import novaMarkImg from "../assets/logo/nova-mark.png";
+import novaMarkWhiteImg from "../assets/logo/nova-mark-white.png";
 
 // v8.5 — shared user avatar. Renders the user's saved profile picture
 // (a base64 data URL in `img`) when present, otherwise the classic
@@ -609,5 +610,16 @@ export function NovaLogo({ size = 22 }) {
   return (
     <img src={novaMarkImg} width={size} height={size} alt="Nova OS" draggable={false}
       style={{ display: "block", width: size, height: size, objectFit: "cover", borderRadius: Math.round(size * 0.22) }} />
+  );
+}
+
+// v11.1 — monochrome white glyph on a transparent background (the swoosh +
+// sparkle extracted from the brand mark, no gradient tile). For the macOS-style
+// top status bar, where it sits at the top-left like the Apple logo. Rendered
+// "contain" (full shape, never cropped) and unrounded.
+export function NovaGlyph({ size = 18, style }) {
+  return (
+    <img src={novaMarkWhiteImg} width={size} height={size} alt="Nova OS" draggable={false}
+      style={{ display: "block", width: size, height: size, objectFit: "contain", ...style }} />
   );
 }
