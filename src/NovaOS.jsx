@@ -693,6 +693,8 @@ export default function NovaOS(){
   const [commApps, setCommApps] = useState([]);
   const [menuOpen,   setMenuOpen]   = useState(false);
   const [menuAnchor, setMenuAnchor] = useState("dock"); // "dock" = float up above the centered dock launcher; "top" = drop down under the top-bar glyph
+  const [dockW,      setDockW]      = useState(0);       // measured floating-dock width — the launcher panel matches it
+  const menuW = Math.max(dockW || 420, 340);             // launcher width = dock width (floored so it never gets unusably narrow)
   const [menuSrch,   setMenuSrch]   = useState("");
   const [iconPos,    setIconPos]    = useState({});
   // v9.3 — viewport size, bumped on window resize so layoutIcons re-runs
@@ -735,6 +737,7 @@ export default function NovaOS(){
   const iconPosRef    = useRef({});
   const widgetRef     = useRef(DEFAULT_WIDGET_STATE);
   const menuRef       = useRef(null);
+  const dockRef       = useRef(null);   // the floating dock island — measured so the launcher can match its width
   const winsRef       = useRef(wins);
   useEffect(()=>{iconPosRef.current=iconPos;},[iconPos]);
   useEffect(()=>{widgetRef.current=widgetState;},[widgetState]);
@@ -867,6 +870,14 @@ export default function NovaOS(){
   },[wins, user, data?.settings?.restoreOnSignin]);
   // Outside-click closes menu. pointerdown covers both mouse and touch in one go.
   useEffect(()=>{if(!menuOpen)return;function h(e){if(e.target&&e.target.closest&&e.target.closest("[data-start-btn]"))return;/* let the Start button's own onClick toggle it closed */if(menuRef.current&&!menuRef.current.contains(e.target))setMenuOpen(false);}setTimeout(()=>document.addEventListener("pointerdown",h),0);return()=>document.removeEventListener("pointerdown",h);},[menuOpen]);
+  // v11.1 — measure the floating dock's width so the app launcher can match it (keeps them visually aligned as a clean stacked pair).
+  useEffect(()=>{
+    const el=dockRef.current; if(!el) return;
+    const measure=()=>setDockW(Math.round(el.getBoundingClientRect().width));
+    measure();
+    const ro=new ResizeObserver(measure); ro.observe(el);
+    return ()=>ro.disconnect();
+  },[deviceMode]);
 
   // All drag/resize tracking uses Pointer Events (pointermove/pointerup/pointercancel).
   // Pointer Events fire for mouse, touch, AND pen with a unified API — this is what
@@ -2778,8 +2789,8 @@ export default function NovaOS(){
         position:"fixed",
         ...(menuAnchor==="top"
           ?{top:TOPBAR_H+6,left:8,animation:"menu-down 0.26s cubic-bezier(0.16,1,0.3,1)"}
-          :{bottom:TASKBAR_H+8,left:"50%",marginLeft:-210,animation:"menu-up 0.26s cubic-bezier(0.16,1,0.3,1)"}),
-        width:420,maxHeight:"70vh",
+          :{bottom:TASKBAR_H+8,left:"50%",marginLeft:-(menuW/2),animation:"menu-up 0.26s cubic-bezier(0.16,1,0.3,1)"}),
+        width:menuW,maxHeight:"70vh",
         background:"var(--nv-surface-solid)",
         backdropFilter:"blur(40px) saturate(180%)",
         WebkitBackdropFilter:"blur(40px) saturate(180%)",
@@ -2799,7 +2810,7 @@ export default function NovaOS(){
         </div>
         <div style={{padding:"0 16px 18px",flex:1,overflowY:"auto",minHeight:0}}>
           <div style={SEC}>{menuSrch?`Results for "${menuSrch}"`:"All Apps"}</div>
-          <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:6}}>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill, minmax(80px, 1fr))",gap:6}}>
             {filteredMenu.map(app=>{
               const isHidden=!desktopSet.has(app.id);
               const isRunning=wins.some(w=>w.app===app.id);
@@ -2825,7 +2836,7 @@ export default function NovaOS(){
               </div>
               );
             })}
-            {filteredMenu.length===0&&<div style={{gridColumn:"span 4",color:"var(--nv-text-dim)",fontFamily:FF,fontStyle:"italic",fontSize:12,textAlign:"center",padding:"24px 0"}}>No apps found</div>}
+            {filteredMenu.length===0&&<div style={{gridColumn:"1 / -1",color:"var(--nv-text-dim)",fontFamily:FF,fontStyle:"italic",fontSize:12,textAlign:"center",padding:"24px 0"}}>No apps found</div>}
           </div>
         </div>
         {/* User card — accent-tinged background for a subtle highlight,
@@ -3082,7 +3093,7 @@ export default function NovaOS(){
         // cluster (Start + weather), the apps absolutely centered (Windows 11
         // style), and a right system-tray cluster.
         return(
-      <div data-drop="none" style={{
+      <div data-drop="none" ref={dockRef} style={{
         position:"fixed",bottom:10,left:"50%",transform:"translateX(-50%)",height:56,maxWidth:"calc(100vw - 24px)",
         background:tbBg,
         backdropFilter:"blur(var(--nv-glass-blur)) saturate(160%)",
