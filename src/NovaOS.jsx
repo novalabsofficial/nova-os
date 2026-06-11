@@ -7,7 +7,7 @@ import { doc, getDoc, setDoc, updateDoc, deleteDoc, collection, addDoc, query, o
 import { firestoreDb } from "./firebase.js";
 // Lib (pure helpers, testable)
 import {
-  TASKBAR_H, MIN_W, MIN_H,
+  TASKBAR_H, TOPBAR_H, MIN_W, MIN_H,
   ICON_W, ICON_H, ICON_GAP, ICON_PAD_X, ICON_PAD_Y,
   WIDGET_SNAP,
 } from "./lib/constants.js";
@@ -919,12 +919,12 @@ export default function NovaOS(){
     }
     function onMove(e){
       const nx=Math.max(0,Math.min(e.clientX-iconDrag.ox,window.innerWidth-ICON_W));
-      const ny=Math.max(0,Math.min(e.clientY-iconDrag.oy,window.innerHeight-TASKBAR_H-ICON_H));
+      const ny=Math.max(TOPBAR_H,Math.min(e.clientY-iconDrag.oy,window.innerHeight-TASKBAR_H-ICON_H));
       const group=iconDrag.group||[iconDrag.id];
       if(group.length>1){   // move the whole selection rigidly; no folder-merge
         const start=iconDrag.groupStart||{};const base=start[iconDrag.id]||{x:nx,y:ny};
         const dx=nx-base.x,dy=ny-base.y;
-        setIconPos(prev=>{const n={...prev};group.forEach(gid=>{const s=start[gid];if(!s)return;n[gid]={x:Math.max(0,Math.min(s.x+dx,window.innerWidth-ICON_W)),y:Math.max(0,Math.min(s.y+dy,window.innerHeight-TASKBAR_H-ICON_H))};});return n;});
+        setIconPos(prev=>{const n={...prev};group.forEach(gid=>{const s=start[gid];if(!s)return;n[gid]={x:Math.max(0,Math.min(s.x+dx,window.innerWidth-ICON_W)),y:Math.max(TOPBAR_H,Math.min(s.y+dy,window.innerHeight-TASKBAR_H-ICON_H))};});return n;});
         setMergeTarget(null);
       }else{
         setIconPos(prev=>({...prev,[iconDrag.id]:{x:nx,y:ny}}));
@@ -1184,7 +1184,7 @@ export default function NovaOS(){
   // Widget drag — free move, snap to 20px grid on release
   useEffect(()=>{
     if(!widgetDrag)return;
-    function onMove(e){const nx=Math.max(0,Math.min(e.clientX-widgetDrag.ox,window.innerWidth-100));const ny=Math.max(0,Math.min(e.clientY-widgetDrag.oy,window.innerHeight-TASKBAR_H-60));setWidgetState(prev=>({...prev,[widgetDrag.id]:{...prev[widgetDrag.id],x:nx,y:ny}}));}
+    function onMove(e){const nx=Math.max(0,Math.min(e.clientX-widgetDrag.ox,window.innerWidth-100));const ny=Math.max(TOPBAR_H,Math.min(e.clientY-widgetDrag.oy,window.innerHeight-TASKBAR_H-60));setWidgetState(prev=>({...prev,[widgetDrag.id]:{...prev[widgetDrag.id],x:nx,y:ny}}));}
     function onUp(){setWidgetState(prev=>{const s=prev[widgetDrag.id];const snapped=snapW(s.x,s.y);const np={...prev,[widgetDrag.id]:{...s,...snapped}};const fin=np;updateData(d=>({...d,settings:{...(d.settings||{}),widgetState:fin}}));return fin;});setWidgetDrag(null);}
     window.addEventListener("pointermove",onMove);window.addEventListener("pointerup",onUp);window.addEventListener("pointercancel",onUp);return()=>{window.removeEventListener("pointermove",onMove);window.removeEventListener("pointerup",onUp);window.removeEventListener("pointercancel",onUp);};
   },[widgetDrag]);
@@ -1858,16 +1858,16 @@ export default function NovaOS(){
   // previews the zone (ghost overlay) and commits it on release. Keyboard
   // Alt+Arrow snaps the active window the same way.
   function snapZoneRect(zone){
-    const W=window.innerWidth, AH=window.innerHeight-TASKBAR_H;
+    const W=window.innerWidth, AH=window.innerHeight-TASKBAR_H-TOPBAR_H, T=TOPBAR_H;
     const hw=Math.round(W/2), hh=Math.round(AH/2);
     switch(zone){
-      case "max":   return {x:0,y:0,width:W,height:AH};
-      case "left":  return {x:0,y:0,width:hw,height:AH};
-      case "right": return {x:W-hw,y:0,width:hw,height:AH};
-      case "tl":    return {x:0,y:0,width:hw,height:hh};
-      case "tr":    return {x:W-hw,y:0,width:hw,height:hh};
-      case "bl":    return {x:0,y:AH-hh,width:hw,height:hh};
-      case "br":    return {x:W-hw,y:AH-hh,width:hw,height:hh};
+      case "max":   return {x:0,y:T,width:W,height:AH};
+      case "left":  return {x:0,y:T,width:hw,height:AH};
+      case "right": return {x:W-hw,y:T,width:hw,height:AH};
+      case "tl":    return {x:0,y:T,width:hw,height:hh};
+      case "tr":    return {x:W-hw,y:T,width:hw,height:hh};
+      case "bl":    return {x:0,y:T+AH-hh,width:hw,height:hh};
+      case "br":    return {x:W-hw,y:T+AH-hh,width:hw,height:hh};
       default:      return null;
     }
   }
@@ -2906,7 +2906,7 @@ export default function NovaOS(){
         const dg = isDrg && dragGeomRef.current ? dragGeomRef.current : null;
         const gx = dg ? dg.x : win.x, gy = dg ? dg.y : win.y;
         const gw = (dg && dg.width != null) ? dg.width : win.width, gh = (dg && dg.height != null) ? dg.height : win.height;
-        const winStyle=isMax?{position:"absolute",top:0,left:0,width:"100vw",bottom:TASKBAR_H+"px",zIndex:win.z,borderRadius:0}:{position:"absolute",left:gx,top:gy,width:gw,height:gh,zIndex:win.z,borderRadius:winRadius};
+        const winStyle=isMax?{position:"absolute",top:TOPBAR_H,left:0,width:"100vw",bottom:TASKBAR_H+"px",zIndex:win.z,borderRadius:0}:{position:"absolute",left:gx,top:gy,width:gw,height:gh,zIndex:win.z,borderRadius:winRadius};
         const minimizedStyle=isMin?{display:"none"}:{};
         // v10.0 — fx-driven open/close/minimize/restore animation. A settled
         // window has no animation (so it never re-plays on re-render); the
@@ -2921,7 +2921,7 @@ export default function NovaOS(){
         let enterAnim = "win-in 0.28s cubic-bezier(0.16,1,0.3,1)";
         if(lp){
           const wL=isMax?0:win.x, wT=isMax?0:win.y;
-          const wW=isMax?window.innerWidth:win.width, wH=isMax?(window.innerHeight-TASKBAR_H):win.height;
+          const wW=isMax?window.innerWidth:win.width, wH=isMax?(window.innerHeight-TASKBAR_H-TOPBAR_H):win.height;
           const ox=Math.max(0,Math.min(wW, lp.x-wL)), oy=Math.max(0,Math.min(wH, lp.y-wT));
           fxOrigin = ox+"px "+oy+"px";
           enterAnim = "win-launch 0.3s cubic-bezier(0.16,1,0.3,1)";
@@ -2992,6 +2992,30 @@ export default function NovaOS(){
           ))}
         </div>
       )}
+
+      {/* v11.1 — macOS-style top status bar (clock + system tray, top-right).
+          The bottom bar is becoming an apps-only dock; system status lives up
+          here now. Desktop only; reserved height = TOPBAR_H. */}
+      {deviceMode!=="mobile" && (()=>{
+        const muted = !soundCfg.enabled || soundCfg.volume<=0;
+        const tbBtn=(active)=>({height:24,minWidth:30,padding:"0 7px",borderRadius:7,background:active?fill(AC):"transparent",border:"1px solid "+(active?bdr(AC):"transparent"),cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",color:active?AC:"var(--nv-text)",transition:"all 0.15s var(--nv-ease)"});
+        return (
+        <div style={{position:"fixed",top:0,left:0,right:0,height:TOPBAR_H,background:"var(--nv-surface)",backdropFilter:"blur(var(--nv-glass-blur)) saturate(160%)",WebkitBackdropFilter:"blur(var(--nv-glass-blur)) saturate(160%)",borderBottom:"1px solid var(--nv-border)",display:"flex",alignItems:"center",justifyContent:"flex-end",padding:"0 10px",gap:3,zIndex:9998,fontFamily:FF}}>
+          <button className="sb" onClick={()=>setQsOpen(o=>!o)} title={muted?"Muted — click to adjust":"Volume "+Math.round(soundCfg.volume*100)+"%"} style={tbBtn(qsOpen)}><VolumeGlyph size={16} muted={muted}/></button>
+          <button className="sb" onClick={()=>setQsOpen(o=>!o)} title="Quick settings" style={tbBtn(qsOpen)}><WifiGlyph size={16}/></button>
+          <button className="sb" onClick={()=>setNotifsOpen(o=>!o)} title={unreadCount>0?unreadCount+" unread":"Notifications"} style={{...tbBtn(notifsOpen),position:"relative"}}>
+            <BellGlyph size={16}/>
+            {unreadCount>0 && <span style={{position:"absolute",top:1,right:1,minWidth:13,height:13,padding:"0 2px",borderRadius:7,background:"#ff5555",color:"#fff",fontFamily:FFB,fontWeight:700,fontSize:8.5,display:"flex",alignItems:"center",justifyContent:"center",lineHeight:1}}>{unreadCount>9?"9+":unreadCount}</span>}
+          </button>
+          <button className="sb" onClick={()=>openApp("settings")} title="Settings" style={tbBtn(false)}><GearGlyph size={16}/></button>
+          <div style={{width:1,height:16,background:"var(--nv-border-strong)",margin:"0 6px"}}/>
+          <div style={{display:"flex",alignItems:"baseline",gap:7,cursor:"default",paddingRight:4}}>
+            <span style={{fontFamily:FFM,fontWeight:500,fontSize:12.5,color:"var(--nv-text-strong)",letterSpacing:0.3}}>{fmtTime(tick)}</span>
+            <span style={{fontFamily:FF,fontSize:11,color:"var(--nv-text-dim)"}}>{fmtDate(tick)}</span>
+          </div>
+        </div>
+        );
+      })()}
 
       {/* Taskbar — v7.7 visual overhaul.
           Frosted-glass background with a subtle top-edge highlight, slightly
@@ -3254,71 +3278,9 @@ export default function NovaOS(){
         {/* v11.x — account chip removed from the taskbar (the @username + avatar
             pill). Your profile + Logout still live in the start menu, so nothing
             is lost; the bar just reads cleaner. */}
-        <div style={{
-          height:44,display:"flex",alignItems:"center",gap:3,padding:"0 4px",
-          background:"var(--nv-elevated)",border:"1px solid var(--nv-border)",borderRadius:12,
-        }}>
-          {/* v9.3 (#22) — Dedicated volume button so the slider is one click
-              away without opening Settings. Same flyout as the network
-              button; both are at-a-glance indicators that share quick
-              settings. The icon reflects the current mute state. */}
-          {/* v9.3 (#22) — Dedicated volume button so the slider is one click
-              away without opening Settings. Same flyout as the network
-              button; both are at-a-glance indicators that share quick
-              settings. The icon reflects the current mute state. */}
-          {(() => {
-            const muted = !soundCfg.enabled || soundCfg.volume <= 0;
-            return (
-              <button className="sb" onClick={()=>setQsOpen(o=>!o)} title={muted ? "Muted — click to adjust" : "Volume " + Math.round(soundCfg.volume*100) + "%"} style={{
-                width:36,height:36,borderRadius:9,
-                background:qsOpen?fill(AC):"transparent",
-                border:qsOpen?"1px solid "+bdr(AC):"1px solid transparent",
-                cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",
-                color:qsOpen?AC:(muted?"var(--nv-text-dim)":"var(--nv-text)"),
-                transition:"all 0.18s var(--nv-ease)",
-              }}><VolumeGlyph size={17} muted={muted}/></button>
-            );
-          })()}
-          {/* v9.0 — Network/quick-settings button. Opens the same flyout. */}
-          <button className="sb" onClick={()=>setQsOpen(o=>!o)} title="Quick settings" style={{
-            width:36,height:36,borderRadius:9,
-            background:qsOpen?fill(AC):"transparent",
-            border:qsOpen?"1px solid "+bdr(AC):"1px solid transparent",
-            cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",
-            color:qsOpen?AC:"var(--nv-text)",
-            transition:"all 0.18s var(--nv-ease)",
-          }}><WifiGlyph size={17}/></button>
-          {/* Notification bell — badge shows unread count, click toggles the panel.
-              v9.0: monochrome glass glyph (inherits color via currentColor). */}
-          <button className="sb" onClick={()=>setNotifsOpen(o=>!o)} title={unreadCount>0?unreadCount+" unread":"Notifications"} style={{
-            position:"relative",width:36,height:36,borderRadius:9,
-            background:notifsOpen?fill(AC):"transparent",
-            border:notifsOpen?"1px solid "+bdr(AC):"1px solid transparent",
-            cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",
-            color:notifsOpen?AC:"var(--nv-text)",
-            transition:"all 0.18s var(--nv-ease)",
-          }}>
-            <BellGlyph size={17}/>
-            {unreadCount>0 && <span style={{position:"absolute",top:3,right:3,minWidth:14,height:14,padding:"0 3px",borderRadius:7,background:"#ff5555",color:"#fff",fontFamily:FFB,fontWeight:700,fontSize:9,display:"flex",alignItems:"center",justifyContent:"center",lineHeight:1,boxShadow:"0 0 8px rgba(255,85,85,0.5)"}}>{unreadCount>9?"9+":unreadCount}</span>}
-          </button>
-          <button className="sb" onClick={()=>openApp("settings")} title="Settings" style={{
-            width:36,height:36,borderRadius:9,
-            background:"transparent",border:"1px solid transparent",
-            cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",
-            color:"var(--nv-text)",
-            transition:"all 0.18s var(--nv-ease)",
-          }}><GearGlyph size={17}/></button>
-        </div>
-        <div style={{
-          height:44,display:"flex",flexDirection:"column",justifyContent:"center",
-          textAlign:"right",cursor:"default",
-          padding:"0 14px",borderRadius:12,
-          background:"var(--nv-elevated)",border:"1px solid var(--nv-border)",
-          minWidth:64,
-        }}>
-          <div style={{fontFamily:FFM,fontWeight:500,fontSize:13,color:"var(--nv-text-strong)",letterSpacing:0.3,lineHeight:1.1}}>{fmtTime(tick)}</div>
-          {deviceMode!=="mobile"&&<div style={{fontFamily:FF,fontSize:9,color:"var(--nv-text-dim)",marginTop:1,lineHeight:1.1}}>{fmtDate(tick)}</div>}
-        </div>
+        {/* v11.1 — volume / wifi / notifications / settings + the clock moved UP
+            to the macOS-style top status bar; the bottom bar is being slimmed
+            into an apps-only dock. */}
         </div>
       </div>
         );
@@ -3369,7 +3331,7 @@ export default function NovaOS(){
         <>
           <div onClick={()=>setNotifsOpen(false)} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.25)",zIndex:9997}}/>
           <div style={{
-            position:"fixed",top:10,right:10,bottom:TASKBAR_H+10,width:"min(360px, calc(100vw - 20px))",
+            position:"fixed",top:TOPBAR_H+10,right:10,bottom:TASKBAR_H+10,width:"min(360px, calc(100vw - 20px))",
             background:"var(--nv-surface-solid)",
             backdropFilter:"blur(40px) saturate(180%)",
             WebkitBackdropFilter:"blur(40px) saturate(180%)",

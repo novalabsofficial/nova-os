@@ -3,6 +3,7 @@
 
 import {
   TASKBAR_H,
+  TOPBAR_H,
   ICON_W,
   ICON_H,
   ICON_GAP,
@@ -11,12 +12,17 @@ import {
   WIDGET_SNAP,
 } from "./constants.js";
 
+// v11.1 — the desktop icon grid starts BELOW the top status bar. `top` is the
+// y-origin of the first row (icon padding + the reserved top-bar band); availH
+// is what's left between it and the taskbar.
+
 export function defaultIconPos(i) {
-  const availH = window.innerHeight - TASKBAR_H - ICON_PAD_Y - 10;
+  const top = ICON_PAD_Y + TOPBAR_H;
+  const availH = window.innerHeight - TASKBAR_H - top - 10;
   const rows = Math.max(1, Math.floor(availH / (ICON_H + ICON_GAP)));
   return {
     x: ICON_PAD_X + Math.floor(i / rows) * (ICON_W + ICON_GAP),
-    y: ICON_PAD_Y + (i % rows) * (ICON_H + ICON_GAP),
+    y: top + (i % rows) * (ICON_H + ICON_GAP),
   };
 }
 
@@ -39,8 +45,9 @@ export function defaultIconPos(i) {
 export function layoutIcons(icons, savedPos) {
   const cW = ICON_W + ICON_GAP;
   const cH = ICON_H + ICON_GAP;
+  const top = ICON_PAD_Y + TOPBAR_H;
   const maxC = Math.max(1, Math.floor((window.innerWidth - ICON_PAD_X) / cW));
-  const availH = window.innerHeight - TASKBAR_H - ICON_PAD_Y - 10;
+  const availH = window.innerHeight - TASKBAR_H - top - 10;
   const maxR = Math.max(1, Math.floor(availH / cH));
   const occupied = new Set();
   const out = {};
@@ -52,12 +59,12 @@ export function layoutIcons(icons, savedPos) {
     const s = savedPos[icon.id];
     if (!s) continue;
     const col = Math.round((s.x - ICON_PAD_X) / cW);
-    const row = Math.round((s.y - ICON_PAD_Y) / cH);
+    const row = Math.round((s.y - top) / cH);
     if (col < 0 || col >= maxC || row < 0 || row >= maxR) continue;
     const key = col + "," + row;
     if (occupied.has(key)) continue;
     occupied.add(key);
-    out[icon.id] = { x: ICON_PAD_X + col * cW, y: ICON_PAD_Y + row * cH };
+    out[icon.id] = { x: ICON_PAD_X + col * cW, y: top + row * cH };
   }
 
   // Pass 2: assign every remaining icon to the next unoccupied grid slot in
@@ -72,13 +79,13 @@ export function layoutIcons(icons, savedPos) {
       const key = col + "," + row;
       if (!occupied.has(key)) {
         occupied.add(key);
-        out[icon.id] = { x: ICON_PAD_X + col * cW, y: ICON_PAD_Y + row * cH };
+        out[icon.id] = { x: ICON_PAD_X + col * cW, y: top + row * cH };
         break;
       }
     }
     // If we ran out of cells (more icons than fit), stack the extras at
     // (0,0) — bad case but graceful (rather than blowing up).
-    if (!out[icon.id]) out[icon.id] = { x: ICON_PAD_X, y: ICON_PAD_Y };
+    if (!out[icon.id]) out[icon.id] = { x: ICON_PAD_X, y: top };
   }
 
   return out;
@@ -87,21 +94,22 @@ export function layoutIcons(icons, savedPos) {
 export function snapToFreeGrid(dragId, rawX, rawY, allPos) {
   const cW = ICON_W + ICON_GAP;
   const cH = ICON_H + ICON_GAP;
+  const top = ICON_PAD_Y + TOPBAR_H;
   const maxC = Math.floor((window.innerWidth - ICON_PAD_X) / cW);
-  const maxR = Math.floor((window.innerHeight - TASKBAR_H - ICON_PAD_Y) / cH);
+  const maxR = Math.floor((window.innerHeight - TASKBAR_H - top) / cH);
   const tc = Math.max(0, Math.min(Math.round((rawX - ICON_PAD_X) / cW), maxC - 1));
-  const tr = Math.max(0, Math.min(Math.round((rawY - ICON_PAD_Y) / cH), maxR - 1));
+  const tr = Math.max(0, Math.min(Math.round((rawY - top) / cH), maxR - 1));
   const occ = new Set();
   Object.entries(allPos).forEach(([id, pos]) => {
     if (id === dragId) return;
-    occ.add(Math.round((pos.x - ICON_PAD_X) / cW) + "," + Math.round((pos.y - ICON_PAD_Y) / cH));
+    occ.add(Math.round((pos.x - ICON_PAD_X) / cW) + "," + Math.round((pos.y - top) / cH));
   });
   const vis = new Set([tc + "," + tr]);
   const q = [[tc, tr]];
   while (q.length) {
     const [c, r] = q.shift();
     if (c >= 0 && r >= 0 && c < maxC && r < maxR && !occ.has(c + "," + r)) {
-      return { x: ICON_PAD_X + c * cW, y: ICON_PAD_Y + r * cH };
+      return { x: ICON_PAD_X + c * cW, y: top + r * cH };
     }
     for (const [dc, dr] of [[0, 1], [1, 0], [0, -1], [-1, 0], [1, 1], [1, -1], [-1, 1], [-1, -1]]) {
       const nk = (c + dc) + "," + (r + dr);
@@ -111,7 +119,7 @@ export function snapToFreeGrid(dragId, rawX, rawY, allPos) {
       }
     }
   }
-  return { x: ICON_PAD_X + tc * cW, y: ICON_PAD_Y + tr * cH };
+  return { x: ICON_PAD_X + tc * cW, y: top + tr * cH };
 }
 
 export function snapW(x, y) {

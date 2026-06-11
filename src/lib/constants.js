@@ -6,6 +6,10 @@
 // its 8px bottom margin plus a few px of clearance so maximized windows and
 // desktop icons never tuck under the floating dock.
 export const TASKBAR_H  = 66;
+// v11.1 — macOS chrome: a slim status bar across the very top (clock + tray).
+// TOPBAR_H is reserved at the top of the workspace so maximized windows, the
+// desktop icon grid, and top-anchored panels sit BELOW it instead of under it.
+export const TOPBAR_H   = 32;
 export const MIN_W      = 280;
 export const MIN_H      = 200;
 export const ICON_W     = 76;
