@@ -1854,7 +1854,7 @@ export default function NovaOS(){
       setWinFx(f=>{ const n={...f}; delete n[id]; return n; });
       delete fxTimers.current[id];
       delete launchPt.current[id];
-    },220);
+    },160);
   }
   // v10.0 — minimize animates down toward the taskbar, then hides; toggling a
   // minimized window restores it with the matching pop-up (via restoreWin).
@@ -2703,12 +2703,12 @@ export default function NovaOS(){
           position:"absolute",left:pos.x,top:pos.y,width:ICON_W,height:ICON_H,
           zIndex:(isDrg||inGroupDrag)?500:2,cursor:(isDrg||inGroupDrag)?"grabbing":"grab",userSelect:"none",
           display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:6,
-          padding:"6px 4px",borderRadius:13,
+          padding:"6px 4px",borderRadius:12,
           background:isDrg?"rgba(20,22,40,0.5)":isSel?"rgba("+hexRgb(AC)+",0.22)":"transparent",
           border:"1px solid "+(isDrg?"rgba(255,255,255,0.16)":isSel?"rgba("+hexRgb(AC)+",0.6)":"transparent"),
           backdropFilter:(isDrg||isSel)?"blur(8px)":"none",
           WebkitBackdropFilter:(isDrg||isSel)?"blur(8px)":"none",
-          transition:(isDrg||inGroupDrag)?"none":"background 0.22s var(--nv-ease), border-color 0.22s var(--nv-ease), left 0.28s var(--nv-ease), top 0.28s var(--nv-ease), transform 0.2s cubic-bezier(0.22,1,0.36,1)",
+          transition:(isDrg||inGroupDrag)?"none":"background 0.2s var(--nv-ease), border-color 0.2s var(--nv-ease), left 0.18s var(--nv-ease), top 0.18s var(--nv-ease), transform 0.2s cubic-bezier(0.22,1,0.36,1)",
           boxShadow:isDrg?"0 10px 30px rgba(0,0,0,0.5), 0 1px 0 rgba(255,255,255,0.08) inset":"none",
           ...(iconsRevealed?{}:{animation:"icon-pop 0.44s cubic-bezier(0.16,1,0.3,1) both",animationDelay:(Math.min(idx,16)*0.03)+"s"}),
           // v11.0 drag-to-merge — highlight + pop the tile being hovered as a folder target
@@ -2765,8 +2765,8 @@ export default function NovaOS(){
               {type:"divider"},
               {icon:"📋", label:"Copy app name", onClick:()=>{try{navigator.clipboard?.writeText(app.label);showToast("Copied");}catch{}}},
             ])}>
-            <div style={{position:"relative",pointerEvents:"none",display:"flex",alignItems:"center",justifyContent:"center",filter:"drop-shadow(0 3px 8px rgba(0,0,0,0.55))"}}>
-              <AppIconDisplay app={app} size={40} glass={glass}/>
+            <div style={{position:"relative",pointerEvents:"none",display:"flex",alignItems:"center",justifyContent:"center",filter:"drop-shadow(0 2px 5px rgba(0,0,0,0.4))"}}>
+              <AppIconDisplay app={app} size={38} glass={glass}/>
               {appBadgeCounts[app.id]>0 && (
                 <div style={{position:"absolute",top:-4,right:-4,minWidth:16,height:16,padding:"0 4px",borderRadius:8,background:"#ff4d4f",color:"#fff",fontFamily:FFB,fontWeight:700,fontSize:10,display:"flex",alignItems:"center",justifyContent:"center",lineHeight:1,boxShadow:"0 0 8px rgba(255,77,79,0.55), 0 1px 2px rgba(0,0,0,0.6)",border:"1.5px solid rgba(10,12,24,0.85)"}}>
                   {appBadgeCounts[app.id]>9?"9+":appBadgeCounts[app.id]}
@@ -2788,8 +2788,8 @@ export default function NovaOS(){
       {menuOpen&&(<div ref={menuRef} style={{
         position:"fixed",
         ...(menuAnchor==="top"
-          ?{top:TOPBAR_H+6,left:8,animation:"menu-down 0.26s cubic-bezier(0.16,1,0.3,1)"}
-          :{bottom:TASKBAR_H+8,left:"50%",marginLeft:-(menuW/2),animation:"menu-up 0.26s cubic-bezier(0.16,1,0.3,1)"}),
+          ?{top:TOPBAR_H+6,left:8,animation:"menu-down 0.2s cubic-bezier(0.16,1,0.3,1)"}
+          :{bottom:TASKBAR_H+8,left:"50%",marginLeft:-(menuW/2),animation:"menu-up 0.2s cubic-bezier(0.16,1,0.3,1)"}),
         width:menuW,maxHeight:"70vh",
         background:"var(--nv-surface-solid)",
         backdropFilter:"blur(40px) saturate(180%)",
@@ -2941,22 +2941,22 @@ export default function NovaOS(){
         // the window box, clamped inside it).
         const lp = fx==="entering" ? launchPt.current[win.id] : null;
         let fxOrigin = (fx==="minimizing"||fx==="restoring") ? "50% 100%" : "50% 50%";
-        let enterAnim = "win-in 0.28s cubic-bezier(0.16,1,0.3,1)";
+        let enterAnim = "win-in 0.2s cubic-bezier(0.16,1,0.3,1)";
         if(lp){
           const wL=isMax?0:win.x, wT=isMax?0:win.y;
           const wW=isMax?window.innerWidth:win.width, wH=isMax?(window.innerHeight-TASKBAR_H-TOPBAR_H):win.height;
           const ox=Math.max(0,Math.min(wW, lp.x-wL)), oy=Math.max(0,Math.min(wH, lp.y-wT));
           fxOrigin = ox+"px "+oy+"px";
-          enterAnim = "win-launch 0.3s cubic-bezier(0.16,1,0.3,1)";
+          enterAnim = "win-launch 0.22s cubic-bezier(0.16,1,0.3,1)";
         }
-        const winAnim = fx==="closing"    ? "win-out 0.22s cubic-bezier(0.4,0,1,1) forwards"
-                      : fx==="minimizing" ? "win-min 0.19s cubic-bezier(0.4,0,1,1) forwards"
-                      : fx==="restoring"  ? "win-restore 0.3s cubic-bezier(0.22,1,0.36,1)"
+        const winAnim = fx==="closing"    ? "win-out 0.16s cubic-bezier(0.4,0,1,1) forwards"
+                      : fx==="minimizing" ? "win-min 0.16s cubic-bezier(0.4,0,1,1) forwards"
+                      : fx==="restoring"  ? "win-restore 0.22s cubic-bezier(0.22,1,0.36,1)"
                       : fx==="entering"   ? enterAnim
                       : "none";
         const fxBusy = fx==="closing"||fx==="minimizing";
         return(
-          <div key={win.id} data-win="1" data-win-id={win.id} data-drop={win.app==="profile"?"avatar":"none"} onClick={()=>focusWin(win.id)} style={{...winStyle,...minimizedStyle,pointerEvents:fxBusy?"none":"auto",transformOrigin:fxOrigin,background:winBg,border:"1px solid "+(isFocused?"var(--nv-border-strong)":"var(--nv-border)"),boxShadow:winShadow,display:isMin?"none":"flex",flexDirection:"column",animation:winAnim,backdropFilter:winBackdrop,WebkitBackdropFilter:winBackdrop,transition:isDrg?"box-shadow 0.18s var(--nv-ease)":"box-shadow 0.22s var(--nv-ease), left 0.28s var(--nv-ease), top 0.28s var(--nv-ease), width 0.28s var(--nv-ease), height 0.28s var(--nv-ease)",overflow:"hidden"}}>
+          <div key={win.id} data-win="1" data-win-id={win.id} data-drop={win.app==="profile"?"avatar":"none"} onClick={()=>focusWin(win.id)} style={{...winStyle,...minimizedStyle,pointerEvents:fxBusy?"none":"auto",transformOrigin:fxOrigin,background:winBg,border:"1px solid "+(isFocused?"var(--nv-border-strong)":"var(--nv-border)"),boxShadow:winShadow,display:isMin?"none":"flex",flexDirection:"column",animation:winAnim,backdropFilter:winBackdrop,WebkitBackdropFilter:winBackdrop,transition:isDrg?"box-shadow 0.16s var(--nv-ease)":"box-shadow 0.16s var(--nv-ease), left 0.18s var(--nv-ease), top 0.18s var(--nv-ease), width 0.18s var(--nv-ease), height 0.18s var(--nv-ease)",overflow:"hidden"}}>
             {!isMax&&<ResizeHandles winId={win.id} onStartResize={startResize} touchy={touchy}/>}
             {/* v8.3 F1: title bar is now draggable even when maximized —
                 dragging restores the window and tears it off (Windows-style),
@@ -3109,13 +3109,11 @@ export default function NovaOS(){
         {/* v7.7: Start menu button — shows the Nova OS brand mark. The button
             lights up with the accent color when the menu is open. */}
         <button className="dock-tile" data-start-btn onClick={()=>{setMenuAnchor("dock");setMenuOpen(o=>!o);setMenuSrch("");}} title="Nova OS — menu" style={{
-          width:44,height:46,padding:"3px 0 0",border:"none",background:"transparent",
-          cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"flex-start",gap:2,flexShrink:0,position:"relative",
+          width:44,height:46,padding:0,border:"none",background:"transparent",
+          cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,position:"relative",
         }}>
           <div className="dock-ico" style={{display:"flex",alignItems:"center",justifyContent:"center"}}><NovaLogo size={32}/></div>
-          <div style={{height:6,display:"flex",alignItems:"center",justifyContent:"center"}}>
-            {menuOpen&&<div style={{width:5,height:5,borderRadius:"50%",background:AC,boxShadow:"0 0 7px "+AC}}/>}
-          </div>
+          {menuOpen&&<div style={{position:"absolute",bottom:3,left:"50%",transform:"translateX(-50%)",width:5,height:5,borderRadius:"50%",background:AC,boxShadow:"0 0 7px "+AC}}/>}
         </button>
         {/* v11.1 — Search / Ask Nova / Task View / weather lifted UP into the
             top status bar (left side); the dock is now the Nova launcher + your
@@ -3229,9 +3227,9 @@ export default function NovaOS(){
                 onContextMenu={e=>openContextMenu(e,buildMenu())}
                 title={app.label + (hasRunning&&!allMin?" — running":"") + (badgeCount>0?" — "+badgeCount+" unread":"")}
                 style={{
-                  width:44,height:46,padding:"3px 0 0",border:"none",background:"transparent",
+                  width:44,height:46,padding:0,border:"none",background:"transparent",
                   cursor:isDragging?"grabbing":"pointer",
-                  display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"flex-start",gap:2,
+                  display:"flex",alignItems:"center",justifyContent:"center",
                   position:"relative",flexShrink:0,opacity:allMin?0.72:1,
                   ...dragStyle,
                 }}>
@@ -3243,9 +3241,7 @@ export default function NovaOS(){
                     </div>
                   )}
                 </div>
-                <div style={{height:6,display:"flex",alignItems:"center",justifyContent:"center"}}>
-                  {hasRunning&&<div style={{width:isTop?6:5,height:isTop?6:5,borderRadius:"50%",background:allMin?"var(--nv-text-dim)":AC,boxShadow:isTop?"0 0 7px "+AC:"none",transition:"all 0.22s var(--nv-ease)"}}/>}
-                </div>
+                {hasRunning&&<div style={{position:"absolute",bottom:3,left:"50%",transform:"translateX(-50%)",width:isTop?6:5,height:isTop?6:5,borderRadius:"50%",background:allMin?"var(--nv-text-dim)":AC,boxShadow:isTop?"0 0 7px "+AC:"none",transition:"all 0.22s var(--nv-ease)"}}/>}
               </button>
             );
           });
