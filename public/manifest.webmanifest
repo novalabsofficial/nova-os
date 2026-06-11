@@ -15,25 +15,25 @@
   "categories": ["productivity", "utilities"],
   "icons": [
     {
-      "src": "/nova-icon-192.png",
+      "src": "/nova-icon-192.png?v=2",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/nova-icon-512.png",
+      "src": "/nova-icon-512.png?v=2",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/nova-icon-512.png",
+      "src": "/nova-icon-512.png?v=2",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable"
     },
     {
-      "src": "/nova-icon.png",
+      "src": "/nova-icon.png?v=2",
       "sizes": "1024x1024",
       "type": "image/png",
       "purpose": "any"
