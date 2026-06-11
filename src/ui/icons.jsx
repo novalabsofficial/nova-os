@@ -10,6 +10,7 @@ import { useState } from "react";
 import { HAS_SVG_ICON, STORE_META } from "./constants.js";
 import { fill, bdr } from "../lib/format.js";
 import { NovaAppIcon, NOVA_ICONS } from "./appicons.jsx";
+import novaMarkImg from "../assets/logo/nova-mark.png";
 
 // v8.5 — shared user avatar. Renders the user's saved profile picture
 // (a base64 data URL in `img`) when present, otherwise the classic
@@ -600,25 +601,13 @@ export function WindowControlIcon({ type, size = 10 }) {
   return null;
 }
 
-// v7.7 — Nova OS brand mark. Used in the taskbar start menu button (replaces
-// the previous "◈" glyph) and re-usable for any future "Nova OS logo here"
-// surface. Self-contained SVG so it scales cleanly at any size without
-// pulling in the heavier filtered version from /public/nova-icon.svg.
+// v11.0 — Nova OS brand mark: the official logo image, baked in. Rendered as a
+// rounded square at any requested size — boot splash, login, taskbar start
+// button, Store header. The matching favicon / PWA icons are the same artwork
+// in /public/nova-icon*.png.
 export function NovaLogo({ size = 22 }) {
-  const gradId = "novaLogoBg-" + size; // unique per render so multiple instances don't share id
   return (
-    <svg width={size} height={size} viewBox="0 0 1024 1024" style={{display: "block"}}>
-      <defs>
-        <linearGradient id={gradId} x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0%"   stopColor="#6366f1"/>
-          <stop offset="50%"  stopColor="#a855f7"/>
-          <stop offset="100%" stopColor="#06b6d4"/>
-        </linearGradient>
-      </defs>
-      <rect width="1024" height="1024" rx="200" fill={"url(#" + gradId + ")"}/>
-      <text x="512" y="720" textAnchor="middle"
-            fontFamily="Space Grotesk, Helvetica, sans-serif"
-            fontSize="640" fontWeight="700" fill="white">N</text>
-    </svg>
+    <img src={novaMarkImg} width={size} height={size} alt="Nova OS" draggable={false}
+      style={{ display: "block", width: size, height: size, objectFit: "cover", borderRadius: Math.round(size * 0.22) }} />
   );
 }

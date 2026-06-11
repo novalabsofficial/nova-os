@@ -14,7 +14,7 @@
        browser chrome). Kept in sync with manifest.webmanifest theme_color. -->
   <meta name="theme-color" content="#07080f" />
   <meta name="description" content="A browser-based desktop OS with apps, widgets, AI integration, and cross-device sync." />
-  <link rel="icon" type="image/svg+xml" href="/nova-icon.svg" />
+  <link rel="icon" type="image/png" href="/nova-icon.png" />
   <link rel="apple-touch-icon" href="/nova-icon.png" />
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -45,10 +45,18 @@
         }
         el.textContent += msg + '\n\n';
       }
+      // Only TAKE OVER the screen for a genuine boot failure (React never
+      // mounted). Once the app is up (#root has content), a stray async error
+      // must NOT blank the whole OS — just log it to the console. (A masked
+      // post-boot "Script error." used to paint this opaque overlay over a
+      // perfectly-running desktop — e.g. the gapi/CORS error on Tauri Linux.)
+      function booted() { var r = document.getElementById('root'); return !!(r && r.childElementCount > 0); }
       window.addEventListener('error', function (e) {
+        if (booted()) { try { console.error('[nova] post-boot error:', (e && e.message) || (e.error && e.error.message) || (e && e.error)); } catch (_) {} return; }
         show('JS error: ' + (e.message || (e.error && e.error.message) || e.error) + (e.filename ? ('\n@ ' + e.filename + ':' + e.lineno + ':' + e.colno) : '') + (e.error && e.error.stack ? ('\n' + e.error.stack) : ''));
       });
       window.addEventListener('unhandledrejection', function (e) {
+        if (booted()) { try { console.error('[nova] post-boot rejection:', e && e.reason); } catch (_) {} return; }
         var r = e.reason; show('Promise rejection: ' + ((r && (r.stack || r.message)) || r));
       });
       setTimeout(function () {

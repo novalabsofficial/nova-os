@@ -136,8 +136,8 @@ export const CSS = `
     --nv-ease:cubic-bezier(0.22,1,0.36,1);
     --nv-spring:cubic-bezier(0.34,1.56,0.64,1);
     --nv-body-bg:#07080f;
-    --nv-surface:rgba(15,17,32,0.72);
-    --nv-surface-solid:rgba(10,12,24,0.92);
+    --nv-surface:rgba(15,17,32,0.86);
+    --nv-surface-solid:rgba(10,12,24,0.94);
     --nv-elevated:rgba(255,255,255,0.04);
     --nv-border:rgba(255,255,255,0.09);
     --nv-border-strong:rgba(255,255,255,0.16);
@@ -182,18 +182,19 @@ export const CSS = `
      taskbar + widgets + windows read as one consistent material (was 0.66 vs 0.8,
      which made the glassy taskbar/widgets look greyer than the windows). */
   html[data-theme="light"][data-glass="on"]{
-    --nv-surface:rgba(245,247,251,0.88);
-    --nv-surface-solid:rgba(246,248,251,0.92);
+    --nv-surface:rgba(245,247,251,0.93);
+    --nv-surface-solid:rgba(246,248,251,0.96);
   }
 
-  /* ── v9.0 Liquid Glass. When enabled (html[data-glass="on"]), surfaces get
-     noticeably sheerer + a heavier blur so the wallpaper frosts through —
-     the "pane of glass" feel. Glass-off values equal the originals, so the
-     default look is unchanged. (Dark-theme tuned; light+glass comes when
-     light mode is rebuilt.) */
+  /* ── v11.1 Liquid Glass = FROST, not transparency. When enabled
+     (html[data-glass="on"]) surfaces gain a heavier blur for the frosted
+     "pane of glass" feel, but stay highly opaque (>=0.80) so the chrome is
+     always readable over any wallpaper. (Earlier this dropped to 0.44/0.52 —
+     nearly see-through — which made the taskbar/widgets/start menu unreadable
+     on busy wallpapers; that was the reported regression.) */
   html[data-glass="on"]{
-    --nv-surface:rgba(15,17,32,0.44);
-    --nv-surface-solid:rgba(10,12,24,0.52);
+    --nv-surface:rgba(15,17,32,0.80);
+    --nv-surface-solid:rgba(10,12,24,0.90);
     --nv-glass-blur:40px;
   }
 
