@@ -1,6 +1,6 @@
 import { initializeApp } from 'firebase/app';
 import { getFirestore } from 'firebase/firestore';
-import { getAuth } from 'firebase/auth';
+import { initializeAuth, indexedDBLocalPersistence, browserLocalPersistence, inMemoryPersistence } from 'firebase/auth';
 
 // Firebase web config. The env vars win when present (Vercel sets them), and
 // these literals are the fallback so builds WITHOUT env vars still work — e.g.
@@ -24,4 +24,26 @@ const app = initializeApp(firebaseConfig);
 
 // Export Database and Authentication so the rest of your app can use them
 export const firestoreDb = getFirestore(app);
-export const auth = getAuth(app);
+
+// v11.0.1 — Auth is initialized WITHOUT a popupRedirectResolver. This is the fix
+// for the Tauri *Linux* (WebKitGTK) boot crash:
+//
+//   getAuth(app) — what we used before — automatically wires
+//   browserPopupRedirectResolver, which lazily loads Google's gapi auth-helper
+//   iframe from apis.google.com. Under the Tauri Linux origin "tauri://localhost",
+//   WebKit's CORS blocks that cross-origin load (apis.google.com 301-redirects to
+//   developers.google.com, which the Access-Control policy refuses) — so
+//   gapi.iframes never loads and the SDK throws, uncaught:
+//     "TypeError: undefined is not an object (evaluating 'gapi.iframes.getContext')"
+//   That crashed the Linux desktop build at boot. It worked everywhere else
+//   (Windows/WebView2, all browsers) because those origins are http(s), which gapi
+//   tolerates. Nova uses ONLY email/password auth — no Google OAuth popup/redirect
+//   — so the resolver is unused dead weight. Omitting it means gapi is NEVER
+//   loaded, on any platform, killing the crash at the source.
+//
+// Persistence is an ordered fallback: IndexedDB -> localStorage -> in-memory, so
+// auth still initializes even on a WebView that restricts storage for a custom
+// URL scheme.
+export const auth = initializeAuth(app, {
+  persistence: [indexedDBLocalPersistence, browserLocalPersistence, inMemoryPersistence],
+});
