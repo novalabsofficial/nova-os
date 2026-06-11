@@ -228,7 +228,7 @@ export const CSS = `
      minimize shrinks down toward the taskbar; restore reverses it. The min/
      restore pair uses transform-origin:50% 100% (set inline) so it collapses
      toward the bottom edge where the taskbar lives. */
-  @keyframes win-out{from{opacity:1;transform:none;}to{opacity:0;transform:scale(0.86) translateY(10px);}}
+  @keyframes win-out{from{opacity:1;transform:none;}to{opacity:0;transform:scale(0.80) translateY(6px);}}
   @keyframes win-min{from{opacity:1;transform:none;}to{opacity:0;transform:scale(0.45) translateY(34vh);}}
   @keyframes win-restore{from{opacity:0;transform:scale(0.6) translateY(26vh);}to{opacity:1;transform:none;}}
   /* v10.0 — launch zoom: a window grows out of the point that opened it
@@ -237,6 +237,9 @@ export const CSS = `
   /* v10.0 — desktop icons fade+rise in on login, staggered by index. */
   @keyframes icon-pop{from{opacity:0;transform:translateY(12px) scale(0.86);}to{opacity:1;transform:none;}}
   @keyframes menu-up{from{opacity:0;transform:translateY(16px) scale(0.97);}to{opacity:1;transform:none;}}
+  @keyframes menu-down{from{opacity:0;transform:translateY(-16px) scale(0.97);}to{opacity:1;transform:none;}}
+  /* v11.1 — the top-bar Nova glyph is a white PNG; invert it to dark in light mode so it stays visible. */
+  html[data-theme="light"] .nova-glyph-topbar{filter:invert(1);}
   @keyframes toast-in{from{opacity:0;transform:translateY(-12px) scale(0.95);}to{opacity:1;transform:none;}}
   @keyframes spin{to{transform:rotate(360deg);}}
   @keyframes ss-fade{from{opacity:0;}to{opacity:1;}}
@@ -267,6 +270,12 @@ export const CSS = `
   /* Taskbar window chip — lifts slightly on hover */
   .tb{transition:all 0.2s var(--nv-ease);}
   .tb:hover{background:rgba(255,255,255,0.14)!important;border-color:rgba(255,255,255,0.2)!important;transform:translateY(-1px);}
+  /* v11.1 — macOS-style dock tiles: icon magnifies in place on hover (no plate). */
+  .dock-ico{transition:transform 0.16s var(--nv-ease);}
+  .dock-tile:hover .dock-ico{transform:scale(1.18);}
+  .dock-tile:active .dock-ico{transform:scale(1.05);}
+  /* v11.1 — widget close button fades in only on hover (clean frosted card at rest). */
+  .wgt:hover .wgt-x{opacity:1!important;}
 
   /* Window controls — close turns red, minimize/maximize gain subtle hovers */
   .wx{transition:background 0.18s var(--nv-ease),color 0.18s var(--nv-ease);}

@@ -35,10 +35,10 @@ export function ContextMenu({ x, y, items, onClose, AC }) {
       backdropFilter: "blur(32px) saturate(180%)",
       WebkitBackdropFilter: "blur(32px) saturate(180%)",
       border: "1px solid var(--nv-border)",
-      borderRadius: 11,
+      borderRadius: 10,
       boxShadow: "var(--nv-popover-shadow)",
-      padding: "6px 5px",
-      animation: "menu-up 0.2s cubic-bezier(0.16,1,0.3,1)",
+      padding: "5px 6px",
+      animation: "menu-up 0.16s cubic-bezier(0.16,1,0.3,1)",
       fontFamily: FF,
     }}>
       {items.map((it, i) => {
@@ -51,8 +51,8 @@ export function ContextMenu({ x, y, items, onClose, AC }) {
           <div key={i}
             onClick={disabled ? undefined : () => { try { it.onClick(); } catch {} onClose(); }}
             style={{
-              padding: "8px 12px", borderRadius: 7, cursor: disabled ? "default" : "pointer",
-              fontSize: 12, fontWeight: 500,
+              padding: "7px 11px", borderRadius: 6, cursor: disabled ? "default" : "pointer",
+              fontSize: 13, fontWeight: 500,
               color: disabled ? "var(--nv-text-dim)" : danger ? "var(--nv-danger, rgba(229,72,77,0.95))" : "var(--nv-text-strong)",
               display: "flex", alignItems: "center", gap: 10, opacity: disabled ? 0.5 : 1,
               transition: "background 0.15s, color 0.15s",
@@ -60,8 +60,10 @@ export function ContextMenu({ x, y, items, onClose, AC }) {
             }}
             onPointerEnter={e => {
               if (disabled) return;
-              e.currentTarget.style.background = danger ? "rgba(255,80,80,0.14)" : "rgba("+hexAccent(AC)+",0.18)";
-              if (!danger) e.currentTarget.style.color = AC || "#fff";
+              // macOS-style: the whole row fills with a solid accent (or red) and
+              // the text/icon go white on hover — not a subtle tint.
+              e.currentTarget.style.background = danger ? "rgba(229,72,77,0.95)" : (AC || "#4f9eff");
+              e.currentTarget.style.color = "#fff";
             }}
             onPointerLeave={e => {
               e.currentTarget.style.background = "transparent";
@@ -69,7 +71,7 @@ export function ContextMenu({ x, y, items, onClose, AC }) {
             }}>
             {it.icon && <span style={{width: 18, textAlign: "center", fontSize: 13, opacity: 0.9, flexShrink: 0}}>{it.icon}</span>}
             <span style={{flex: 1}}>{it.label}</span>
-            {it.shortcut && <span style={{fontSize: 10, fontFamily: FFM, color: "var(--nv-text-dim)", letterSpacing: 0.2}}>{it.shortcut}</span>}
+            {it.shortcut && <span style={{fontSize: 10, fontFamily: FFM, color: "inherit", opacity: 0.6, letterSpacing: 0.2}}>{it.shortcut}</span>}
           </div>
         );
       })}
