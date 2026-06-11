@@ -38,17 +38,19 @@ export function WidgetShell({ id, state, onDragStart, onResizeStart, onClose, ch
       {handles.map(hh => (
         <div key={hh.id} onPointerDown={e => { e.stopPropagation(); onResizeStart(e, id, hh.id); }} style={{position:"absolute",...hh.s,zIndex:12,touchAction:"none"}}/>
       ))}
+      {/* v11.1 — cleaner macOS-style header: a flush drag strip (no divider, no
+          gradient), a subtle sentence-case label, and a close button that fades
+          in only on hover (always shown on touch) so the widget reads as a clean
+          frosted card at rest. */}
       <div onPointerDown={e => { e.stopPropagation(); onDragStart(e, id); }}
         style={{
-          height:28,display:"flex",alignItems:"center",padding:"0 6px 0 12px",gap:6,
-          background:"linear-gradient(180deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.01) 100%)",
-          borderBottom:"1px solid var(--nv-border)",
+          height:26,display:"flex",alignItems:"center",padding:"0 6px 0 13px",gap:6,
           cursor:"grab",userSelect:"none",flexShrink:0,zIndex:11,touchAction:"none",
         }}>
-        <span style={{fontFamily:FFB,fontWeight:600,fontSize:9.5,letterSpacing:1.4,color:"var(--nv-text-dim)",textTransform:"uppercase",flex:1}}>{cfg?.label || id}</span>
-        <button onClick={e => { e.stopPropagation(); onClose(); }}
+        <span style={{fontFamily:FFB,fontWeight:600,fontSize:10.5,letterSpacing:0.3,color:"var(--nv-text-dim)",textTransform:"capitalize",opacity:0.7,flex:1}}>{cfg?.label || id}</span>
+        <button className="wgt-x" onClick={e => { e.stopPropagation(); onClose(); }}
           title="Hide widget"
-          style={{width:18,height:18,borderRadius:5,background:"transparent",border:"none",cursor:"pointer",color:"var(--nv-text-dim)",fontSize:10,display:"flex",alignItems:"center",justifyContent:"center",padding:0,transition:"all 0.15s var(--nv-ease)"}}
+          style={{width:18,height:18,borderRadius:6,background:"transparent",border:"none",cursor:"pointer",color:"var(--nv-text-dim)",fontSize:10,display:"flex",alignItems:"center",justifyContent:"center",padding:0,opacity:touchy?1:0,transition:"all 0.15s var(--nv-ease)"}}
           onMouseEnter={e=>{e.currentTarget.style.background="rgba(255,80,80,0.15)";e.currentTarget.style.color="rgba(255,130,130,0.9)";}}
           onMouseLeave={e=>{e.currentTarget.style.background="transparent";e.currentTarget.style.color="rgba(255,255,255,0.35)";}}>✕</button>
       </div>

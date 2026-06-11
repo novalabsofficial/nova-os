@@ -274,6 +274,8 @@ export const CSS = `
   .dock-ico{transition:transform 0.16s var(--nv-ease);}
   .dock-tile:hover .dock-ico{transform:scale(1.18);}
   .dock-tile:active .dock-ico{transform:scale(1.05);}
+  /* v11.1 — widget close button fades in only on hover (clean frosted card at rest). */
+  .wgt:hover .wgt-x{opacity:1!important;}
 
   /* Window controls — close turns red, minimize/maximize gain subtle hovers */
   .wx{transition:background 0.18s var(--nv-ease),color 0.18s var(--nv-ease);}
