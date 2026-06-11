@@ -228,7 +228,7 @@ export const CSS = `
      minimize shrinks down toward the taskbar; restore reverses it. The min/
      restore pair uses transform-origin:50% 100% (set inline) so it collapses
      toward the bottom edge where the taskbar lives. */
-  @keyframes win-out{from{opacity:1;transform:none;}to{opacity:0;transform:scale(0.86) translateY(10px);}}
+  @keyframes win-out{from{opacity:1;transform:none;}to{opacity:0;transform:scale(0.80) translateY(6px);}}
   @keyframes win-min{from{opacity:1;transform:none;}to{opacity:0;transform:scale(0.45) translateY(34vh);}}
   @keyframes win-restore{from{opacity:0;transform:scale(0.6) translateY(26vh);}to{opacity:1;transform:none;}}
   /* v10.0 — launch zoom: a window grows out of the point that opened it

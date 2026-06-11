@@ -1854,7 +1854,7 @@ export default function NovaOS(){
       setWinFx(f=>{ const n={...f}; delete n[id]; return n; });
       delete fxTimers.current[id];
       delete launchPt.current[id];
-    },190);
+    },220);
   }
   // v10.0 — minimize animates down toward the taskbar, then hides; toggling a
   // minimized window restores it with the matching pop-up (via restoreWin).
@@ -2949,7 +2949,7 @@ export default function NovaOS(){
           fxOrigin = ox+"px "+oy+"px";
           enterAnim = "win-launch 0.3s cubic-bezier(0.16,1,0.3,1)";
         }
-        const winAnim = fx==="closing"    ? "win-out 0.19s cubic-bezier(0.4,0,1,1) forwards"
+        const winAnim = fx==="closing"    ? "win-out 0.22s cubic-bezier(0.4,0,1,1) forwards"
                       : fx==="minimizing" ? "win-min 0.19s cubic-bezier(0.4,0,1,1) forwards"
                       : fx==="restoring"  ? "win-restore 0.3s cubic-bezier(0.22,1,0.36,1)"
                       : fx==="entering"   ? enterAnim
@@ -3102,24 +3102,21 @@ export default function NovaOS(){
         borderRadius:20,
         boxShadow:"0 1px 0 rgba(255,255,255,0.08) inset, 0 18px 50px -12px rgba(0,0,0,0.6)",
         display:"flex",alignItems:"center",
-        padding:"0 10px",gap:8,zIndex:9999,
+        padding:"0 10px",gap:5,zIndex:9999,
       }}>
         {/* LEFT cluster — Start button, divider, weather pill */}
         <div style={{display:"flex",alignItems:"center",gap:8,zIndex:2,flexShrink:0}}>
         {/* v7.7: Start menu button — shows the Nova OS brand mark. The button
             lights up with the accent color when the menu is open. */}
-        <button className="sb" data-start-btn onClick={()=>{setMenuAnchor("dock");setMenuOpen(o=>!o);setMenuSrch("");}} title="Nova OS" style={{
-          width:44,height:44,borderRadius:11,
-          background:menuOpen?fill(AC):"var(--nv-hover)",
-          border:"1px solid "+(menuOpen?bdr(AC):"var(--nv-border)"),
-          boxShadow:menuOpen?"0 0 16px "+fill(AC)+", 0 2px 8px rgba(0,0,0,0.3) inset":"none",
-          cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,
-          transition:"all 0.2s var(--nv-ease)",
-          padding:0,
+        <button className="dock-tile" data-start-btn onClick={()=>{setMenuAnchor("dock");setMenuOpen(o=>!o);setMenuSrch("");}} title="Nova OS — menu" style={{
+          width:44,height:46,padding:"3px 0 0",border:"none",background:"transparent",
+          cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"flex-start",gap:2,flexShrink:0,position:"relative",
         }}>
-          <NovaLogo size={28}/>
+          <div className="dock-ico" style={{display:"flex",alignItems:"center",justifyContent:"center"}}><NovaLogo size={32}/></div>
+          <div style={{height:6,display:"flex",alignItems:"center",justifyContent:"center"}}>
+            {menuOpen&&<div style={{width:5,height:5,borderRadius:"50%",background:AC,boxShadow:"0 0 7px "+AC}}/>}
+          </div>
         </button>
-        <div style={{width:1,height:24,background:"linear-gradient(180deg, transparent, var(--nv-border-strong) 50%, transparent)",margin:"0 4px"}}/>
         {/* v11.1 — Search / Ask Nova / Task View / weather lifted UP into the
             top status bar (left side); the dock is now the Nova launcher + your
             apps only. The launcher stays here as the Launchpad-style button. */}
