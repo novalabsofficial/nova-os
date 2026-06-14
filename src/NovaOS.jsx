@@ -738,7 +738,20 @@ export default function NovaOS(){
   const iconPosRef    = useRef({});
   const widgetRef     = useRef(DEFAULT_WIDGET_STATE);
   const menuRef       = useRef(null);
-  const dockRef       = useRef(null);   // the floating dock island — measured so the launcher can match its width
+  // v11.1 — the floating dock island, measured (border-box width) so the launcher
+  // matches it. A CALLBACK ref (not a mount effect) so the ResizeObserver attaches
+  // the moment the dock actually renders post-login; the old [deviceMode] effect
+  // ran at mount before login when the dock didn't exist, leaving dockW stuck at 0.
+  const dockRoRef     = useRef(null);
+  const dockRef       = useCallback((el)=>{
+    if(dockRoRef.current){ dockRoRef.current.disconnect(); dockRoRef.current=null; }
+    if(el){
+      const measure=()=>setDockW(Math.round(el.getBoundingClientRect().width));
+      measure();
+      dockRoRef.current=new ResizeObserver(measure);
+      dockRoRef.current.observe(el);
+    }
+  },[]);
   const winsRef       = useRef(wins);
   useEffect(()=>{iconPosRef.current=iconPos;},[iconPos]);
   useEffect(()=>{widgetRef.current=widgetState;},[widgetState]);
@@ -871,14 +884,7 @@ export default function NovaOS(){
   },[wins, user, data?.settings?.restoreOnSignin]);
   // Outside-click closes menu. pointerdown covers both mouse and touch in one go.
   useEffect(()=>{if(!menuOpen)return;function h(e){if(e.target&&e.target.closest&&e.target.closest("[data-start-btn]"))return;/* let the Start button's own onClick toggle it closed */if(menuRef.current&&!menuRef.current.contains(e.target))setMenuOpen(false);}setTimeout(()=>document.addEventListener("pointerdown",h),0);return()=>document.removeEventListener("pointerdown",h);},[menuOpen]);
-  // v11.1 — measure the floating dock's width so the app launcher can match it (keeps them visually aligned as a clean stacked pair).
-  useEffect(()=>{
-    const el=dockRef.current; if(!el) return;
-    const measure=()=>setDockW(Math.round(el.getBoundingClientRect().width));
-    measure();
-    const ro=new ResizeObserver(measure); ro.observe(el);
-    return ()=>ro.disconnect();
-  },[deviceMode]);
+  // (dock width is measured via the dockRef callback ref above — see dockRoRef.)
 
   // All drag/resize tracking uses Pointer Events (pointermove/pointerup/pointercancel).
   // Pointer Events fire for mouse, touch, AND pen with a unified API — this is what
