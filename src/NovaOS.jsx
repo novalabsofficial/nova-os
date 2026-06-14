@@ -2821,12 +2821,11 @@ export default function NovaOS(){
           <div style={SEC}>{menuSrch?`Results for "${menuSrch}"`:"All Apps"}</div>
           <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill, minmax(80px, 1fr))",gap:6}}>
             {filteredMenu.map(app=>{
-              const isHidden=!desktopSet.has(app.id);
               const isRunning=wins.some(w=>w.app===app.id);
               return(
               <div key={app.id} className="ma"
                 onClick={()=>{setMenuOpen(false);if(app.storeApp){if(app.storeApp.newTab)openExternalUrl(app.storeApp.url);else openApp("browser");}else openApp(app.id);}}
-                onContextMenu={e=>{setMenuOpen(false);openContextMenu(e,[
+                onContextMenu={e=>{openContextMenu(e,[
                   {icon:"▶",label:"Open",onClick:()=>{if(app.storeApp){if(app.storeApp.newTab)openExternalUrl(app.storeApp.url);else openApp("browser");}else openApp(app.id);}},
                   // v8.0: pin/unpin to taskbar (storeApps can't be pinned —
                   // they don't have a stable launch target on the taskbar).
@@ -2838,8 +2837,8 @@ export default function NovaOS(){
                 ]);}}
                 style={{display:"flex",flexDirection:"column",alignItems:"center",gap:7,padding:"14px 6px 12px",borderRadius:10,cursor:"pointer",position:"relative"}}>
                 {isRunning&&<div style={{position:"absolute",bottom:5,left:"50%",transform:"translateX(-50%)",width:5,height:5,borderRadius:"50%",background:AC,boxShadow:"0 0 6px "+AC}}/>}
-                <div style={{display:"flex",alignItems:"center",justifyContent:"center",opacity:isHidden?0.5:1}}><AppIconDisplay app={app} size={28} glass={glass}/></div>
-                <span style={{fontFamily:FF,fontWeight:600,fontSize:10.5,color:isHidden?"var(--nv-text-dim)":"var(--nv-text-strong)",textAlign:"center",lineHeight:1.3,letterSpacing:0.1}}>{app.label}</span>
+                <div style={{display:"flex",alignItems:"center",justifyContent:"center"}}><AppIconDisplay app={app} size={28} glass={glass}/></div>
+                <span style={{fontFamily:FF,fontWeight:600,fontSize:10.5,color:"var(--nv-text-strong)",textAlign:"center",lineHeight:1.3,letterSpacing:0.1}}>{app.label}</span>
               </div>
               );
             })}
