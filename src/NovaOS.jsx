@@ -2036,18 +2036,19 @@ export default function NovaOS(){
         h.setTaskViewOpen(o=>!o);
         return;
       }
-      // v8.5 — Alt + Arrow snaps the active window (the web-safe stand-in for
-      // Win+Arrow, which the OS itself intercepts). Left/Right → halves,
-      // Up → maximize, Down → un-maximize or minimize. preventDefault stops
-      // Alt+Left/Right from triggering browser back/forward navigation.
+      // v11.1 — plain Alt+Left/Right switch virtual desktops (per request). Alt+Up
+      // maximizes the active window, Alt+Down un-maximizes / minimizes it. Snapping
+      // a window to a half is still available by dragging it to a screen edge, and
+      // Ctrl/Cmd+Alt+Arrow also switches desktops. preventDefault stops Alt+Left/
+      // Right from triggering browser back/forward navigation.
       if(e.altKey && !mod && !isTyping && (e.key==="ArrowLeft"||e.key==="ArrowRight"||e.key==="ArrowUp"||e.key==="ArrowDown")){
         e.preventDefault();
+        if(e.key==="ArrowLeft")  { h.switchDeskBy(-1); return; }
+        if(e.key==="ArrowRight") { h.switchDeskBy(1);  return; }
         const top=topOnDesk();
         if(!top)return;
-        if(e.key==="ArrowLeft")      h.applySnap(top.id,"left");
-        else if(e.key==="ArrowRight")h.applySnap(top.id,"right");
-        else if(e.key==="ArrowUp")   h.applySnap(top.id,"max");
-        else                         h.snapDown(top.id);
+        if(e.key==="ArrowUp")    h.applySnap(top.id,"max");
+        else                     h.snapDown(top.id);
         return;
       }
     }
