@@ -3010,9 +3010,9 @@ export default function NovaOS(){
           "slider" stays on the base desktop; the prev/next arrow bars live in
           Task View (the overview), not on the live desktop. */}
       {deskCount>1 && (
-        <div style={{position:"fixed",left:"50%",bottom:TASKBAR_H+14,transform:"translateX(-50%)",zIndex:9996,display:"flex",gap:8,padding:"7px 12px",borderRadius:20,background:"rgba(16,18,28,0.42)",border:"1px solid rgba(255,255,255,0.12)",backdropFilter:"blur(12px)",WebkitBackdropFilter:"blur(12px)",boxShadow:"0 8px 26px rgba(0,0,0,0.4)"}}>
+        <div style={{position:"fixed",left:"50%",bottom:TASKBAR_H+22,transform:"translateX(-50%)",zIndex:9996,display:"flex",gap:8,padding:"7px 12px",borderRadius:14,background:"var(--nv-surface)",border:"1px solid var(--nv-border)",backdropFilter:"blur(var(--nv-glass-blur)) saturate(160%)",WebkitBackdropFilter:"blur(var(--nv-glass-blur)) saturate(160%)",boxShadow:"var(--nv-card-shadow)"}}>
           {Array.from({length:deskCount},(_,di)=>(
-            <button key={"dot-"+di} onClick={()=>setCurDesk(di)} title={"Desktop "+(di+1)} style={{width:di===curDesk?22:9,height:9,borderRadius:5,border:"none",cursor:"pointer",padding:0,background:di===curDesk?AC:"rgba(255,255,255,0.32)",transition:"width 0.25s cubic-bezier(0.22,1,0.36,1), background 0.2s"}}/>
+            <button key={"dot-"+di} onClick={()=>setCurDesk(di)} title={"Desktop "+(di+1)} style={{width:di===curDesk?22:9,height:9,borderRadius:5,border:"none",cursor:"pointer",padding:0,background:di===curDesk?AC:"var(--nv-text-dim)",transition:"width 0.25s cubic-bezier(0.22,1,0.36,1), background 0.2s"}}/>
           ))}
         </div>
       )}
@@ -3100,13 +3100,16 @@ export default function NovaOS(){
         // the viewport width (clamped) so the dock keeps macOS-like proportions on
         // any screen — small laptop to 4K. Re-runs on resize via `viewport` state.
         const _vw = (viewport && viewport.w) || window.innerWidth;
-        const dockIcon = Math.max(44, Math.min(Math.round(_vw * 0.037), 64)); // app/launcher icon px
+        const dockIcon = Math.max(42, Math.min(Math.round(_vw * 0.034), 58)); // app/launcher icon px (v11.1 — a touch smaller, still responsive)
         const dockTile = dockIcon + 8;                       // tile (hit-target) size
         const dockHpx  = dockIcon + 20;                      // dock panel height
         const dockGap  = Math.max(5, Math.round(dockIcon * 0.11));  // gap between tiles
         const dockRad  = Math.round(dockHpx * 0.32);         // panel corner radius
-        const dockDotN = Math.max(4, Math.round(dockIcon * 0.10));  // running dot
-        const dockDotT = Math.max(5, Math.round(dockIcon * 0.13));  // focused running dot
+        // running indicator = a Win11-style underline BAR (not a dot): wider + glowing
+        // when the app owns the focused window.
+        const dockBarT = Math.round(dockIcon * 0.5);  // focused-app bar width
+        const dockBarN = Math.round(dockIcon * 0.3);  // running-app bar width
+        const dockBarH = Math.max(3, Math.round(dockIcon * 0.05));  // bar thickness
         const dockShouldHide = deviceMode!=="mobile" && (()=>{
           const dw = dockW||420;
           const dl = window.innerWidth/2 - dw/2, dr = window.innerWidth/2 + dw/2;
@@ -3144,7 +3147,7 @@ export default function NovaOS(){
           cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,position:"relative",
         }}>
           <div className="dock-ico" style={{display:"flex",alignItems:"center",justifyContent:"center"}}><NovaLogo size={dockIcon}/></div>
-          {menuOpen&&<div style={{position:"absolute",bottom:3,left:"50%",transform:"translateX(-50%)",width:dockDotN,height:dockDotN,borderRadius:"50%",background:AC,boxShadow:"0 0 7px "+AC}}/>}
+          {menuOpen&&<div style={{position:"absolute",bottom:1,left:"50%",transform:"translateX(-50%)",width:dockBarT,height:dockBarH,borderRadius:dockBarH,background:AC,boxShadow:"0 0 8px "+AC+", 0 0 3px "+AC}}/>}
         </button>
         {/* v11.1 — Search / Ask Nova / Task View / weather lifted UP into the
             top status bar (left side); the dock is now the Nova launcher + your
@@ -3272,7 +3275,7 @@ export default function NovaOS(){
                     </div>
                   )}
                 </div>
-                {hasRunning&&<div style={{position:"absolute",bottom:2,left:"50%",transform:"translateX(-50%)",width:isTop?dockDotT:dockDotN,height:isTop?dockDotT:dockDotN,borderRadius:"50%",background:allMin?"var(--nv-text-dim)":AC,boxShadow:isTop?"0 0 7px "+AC:"none",transition:"all 0.22s var(--nv-ease)"}}/>}
+                {hasRunning&&<div style={{position:"absolute",bottom:1,left:"50%",transform:"translateX(-50%)",width:isTop?dockBarT:dockBarN,height:dockBarH,borderRadius:dockBarH,background:allMin?"var(--nv-text-dim)":AC,boxShadow:isTop?"0 0 8px "+AC+", 0 0 3px "+AC:"none",transition:"all 0.22s var(--nv-ease)"}}/>}
               </button>
             );
           });
