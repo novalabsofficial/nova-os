@@ -3096,10 +3096,21 @@ export default function NovaOS(){
         // v11.1 — macOS-style auto-hide: tuck the dock away when a window on this
         // desktop overlaps its footprint (maximized always counts). A bottom-edge
         // hover (the reveal strip) or an open launcher menu peeks it back up.
+        // v11.1 — device-responsive, macOS-scale dock: derive every dimension from
+        // the viewport width (clamped) so the dock keeps macOS-like proportions on
+        // any screen — small laptop to 4K. Re-runs on resize via `viewport` state.
+        const _vw = (viewport && viewport.w) || window.innerWidth;
+        const dockIcon = Math.max(44, Math.min(Math.round(_vw * 0.037), 64)); // app/launcher icon px
+        const dockTile = dockIcon + 8;                       // tile (hit-target) size
+        const dockHpx  = dockIcon + 20;                      // dock panel height
+        const dockGap  = Math.max(5, Math.round(dockIcon * 0.11));  // gap between tiles
+        const dockRad  = Math.round(dockHpx * 0.32);         // panel corner radius
+        const dockDotN = Math.max(4, Math.round(dockIcon * 0.10));  // running dot
+        const dockDotT = Math.max(5, Math.round(dockIcon * 0.13));  // focused running dot
         const dockShouldHide = deviceMode!=="mobile" && (()=>{
           const dw = dockW||420;
           const dl = window.innerWidth/2 - dw/2, dr = window.innerWidth/2 + dw/2;
-          const dTop = window.innerHeight - 76;
+          const dTop = window.innerHeight - (dockHpx + 10);
           return wins.some(w=>{
             if((w.desk||0)!==curDesk || w.state==="minimized") return false;
             if(w.state==="maximized") return true;
@@ -3113,27 +3124,27 @@ export default function NovaOS(){
           back up while it's tucked away under a window. */}
       {dockShouldHide && <div onPointerEnter={()=>setDockPeek(true)} style={{position:"fixed",left:0,right:0,bottom:0,height:8,zIndex:9998}}/>}
       <div data-drop="none" ref={dockRef} onPointerEnter={()=>setDockPeek(true)} onPointerLeave={()=>setDockPeek(false)} style={{
-        position:"fixed",bottom:10,left:"50%",transform:dockHidden?"translateX(-50%) translateY(calc(100% + 12px))":"translateX(-50%)",height:66,maxWidth:"calc(100vw - 24px)",
+        position:"fixed",bottom:10,left:"50%",transform:dockHidden?"translateX(-50%) translateY(calc(100% + 12px))":"translateX(-50%)",height:dockHpx,maxWidth:"calc(100vw - 24px)",
         transition:"transform 0.28s cubic-bezier(0.22,1,0.36,1)",
         background:tbBg,
         backdropFilter:"blur(var(--nv-glass-blur)) saturate(160%)",
         WebkitBackdropFilter:"blur(var(--nv-glass-blur)) saturate(160%)",
         border:"1px solid var(--nv-border)",
-        borderRadius:22,
+        borderRadius:dockRad,
         boxShadow:"0 1px 0 rgba(255,255,255,0.08) inset, 0 18px 50px -12px rgba(0,0,0,0.6)",
         display:"flex",alignItems:"center",
-        padding:"0 10px",gap:5,zIndex:9999,
+        padding:"0 "+(dockGap*2)+"px",gap:dockGap,zIndex:9999,
       }}>
         {/* LEFT cluster — Start button, divider, weather pill */}
         <div style={{display:"flex",alignItems:"center",gap:8,zIndex:2,flexShrink:0}}>
         {/* v7.7: Start menu button — shows the Nova OS brand mark. The button
             lights up with the accent color when the menu is open. */}
         <button className="dock-tile" data-start-btn onClick={()=>{setMenuAnchor("dock");setMenuOpen(o=>!o);setMenuSrch("");}} title="Nova OS — menu" style={{
-          width:54,height:56,padding:0,border:"none",background:"transparent",
+          width:dockTile,height:dockTile,padding:0,border:"none",background:"transparent",
           cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,position:"relative",
         }}>
-          <div className="dock-ico" style={{display:"flex",alignItems:"center",justifyContent:"center"}}><NovaLogo size={48}/></div>
-          {menuOpen&&<div style={{position:"absolute",bottom:3,left:"50%",transform:"translateX(-50%)",width:5,height:5,borderRadius:"50%",background:AC,boxShadow:"0 0 7px "+AC}}/>}
+          <div className="dock-ico" style={{display:"flex",alignItems:"center",justifyContent:"center"}}><NovaLogo size={dockIcon}/></div>
+          {menuOpen&&<div style={{position:"absolute",bottom:3,left:"50%",transform:"translateX(-50%)",width:dockDotN,height:dockDotN,borderRadius:"50%",background:AC,boxShadow:"0 0 7px "+AC}}/>}
         </button>
         {/* v11.1 — Search / Ask Nova / Task View / weather lifted UP into the
             top status bar (left side); the dock is now the Nova launcher + your
@@ -3145,7 +3156,7 @@ export default function NovaOS(){
             screens — it scrolls within the available space instead. (Was
             position:absolute with a fixed width cap, which spilled over the
             clusters once they were wider than that budget.) */}
-        <div className="no-sb" style={{display:"flex",alignItems:"center",justifyContent:"flex-start",gap:5,maxWidth:"58vw",overflowX:"auto",overflowY:"hidden",padding:"5px 0",zIndex:1}}>
+        <div className="no-sb" style={{display:"flex",alignItems:"center",justifyContent:"flex-start",gap:dockGap,maxWidth:"58vw",overflowX:"auto",overflowY:"hidden",padding:"5px 0",zIndex:1}}>
         {/* v8.0 — Taskbar: pinned apps + running windows.
             Pinned apps with NO running windows render as compact icon-only
             "launcher" chips (40x40, no label). Pinned apps WITH running
@@ -3247,21 +3258,21 @@ export default function NovaOS(){
                 onContextMenu={e=>openContextMenu(e,buildMenu())}
                 title={app.label + (hasRunning&&!allMin?" — running":"") + (badgeCount>0?" — "+badgeCount+" unread":"")}
                 style={{
-                  width:54,height:56,padding:0,border:"none",background:"transparent",
+                  width:dockTile,height:dockTile,padding:0,border:"none",background:"transparent",
                   cursor:isDragging?"grabbing":"pointer",
                   display:"flex",alignItems:"center",justifyContent:"center",
                   position:"relative",flexShrink:0,opacity:allMin?0.72:1,
                   ...dragStyle,
                 }}>
                 <div className="dock-ico" style={{position:"relative",pointerEvents:"none",display:"flex",alignItems:"center",justifyContent:"center"}}>
-                  <AppIconDisplay app={{id:app.id,icon:app.icon}} size={48} glass={glass}/>
+                  <AppIconDisplay app={{id:app.id,icon:app.icon}} size={dockIcon} glass={glass}/>
                   {badgeCount>0 && (
                     <div style={{position:"absolute",top:-4,right:-5,minWidth:14,height:14,padding:"0 3px",borderRadius:7,background:"#ff4d4f",color:"#fff",fontFamily:FFB,fontWeight:700,fontSize:9,display:"flex",alignItems:"center",justifyContent:"center",lineHeight:1,boxShadow:"0 0 6px rgba(255,77,79,0.6)"}}>
                       {badgeCount>9?"9+":badgeCount}
                     </div>
                   )}
                 </div>
-                {hasRunning&&<div style={{position:"absolute",bottom:2,left:"50%",transform:"translateX(-50%)",width:isTop?6:5,height:isTop?6:5,borderRadius:"50%",background:allMin?"var(--nv-text-dim)":AC,boxShadow:isTop?"0 0 7px "+AC:"none",transition:"all 0.22s var(--nv-ease)"}}/>}
+                {hasRunning&&<div style={{position:"absolute",bottom:2,left:"50%",transform:"translateX(-50%)",width:isTop?dockDotT:dockDotN,height:isTop?dockDotT:dockDotN,borderRadius:"50%",background:allMin?"var(--nv-text-dim)":AC,boxShadow:isTop?"0 0 7px "+AC:"none",transition:"all 0.22s var(--nv-ease)"}}/>}
               </button>
             );
           });
