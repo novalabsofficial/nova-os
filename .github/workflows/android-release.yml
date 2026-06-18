@@ -40,11 +40,19 @@ jobs:
         run: npx cap add android
 
       - name: Brand the launcher icon
+        # @capacitor/assets is a pinned devDependency (installed by `npm ci`
+        # above), so this runs the LOCAL binary — no build-time `npx` download
+        # that could flake on the runner and silently fall back to Capacitor's
+        # default icon. Source is public/nova-icon.png (the Nova mark), so the
+        # APK launcher icon tracks whatever logo ships in the web build.
+        # continue-on-error keeps a release from ever being blocked by branding;
+        # the `ls` prints the generated icons so a failure is visible in the log.
         continue-on-error: true
         run: |
           mkdir -p resources
           cp public/nova-icon.png resources/icon.png
-          npx @capacitor/assets generate --android
+          npx capacitor-assets generate --android
+          echo "Generated launcher icons:" && ls -R android/app/src/main/res/mipmap-* || true
 
       - name: Sync web build into Android
         run: npx cap sync android

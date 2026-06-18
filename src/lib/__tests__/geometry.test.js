@@ -17,8 +17,9 @@ beforeEach(() => {
 });
 
 describe('defaultIconPos', () => {
-  // At 768px tall: availH = 768 - TASKBAR_H(78) - TOP(46) - 10 = 634;
-  // rows = floor(634 / (ICON_H 66 + ICON_GAP 6 = 72)) = 8.
+  // At 768px tall (jsdom default 1024-wide → TOPBAR_H 36, TOP = 14+36 = 50):
+  // availH = 768 - TASKBAR_H(78) - TOP(50) - 10 = 630;
+  // rows = floor(630 / (ICON_H 66 + ICON_GAP 6 = 72)) = 8.
   const ROWS = 8;
   const CW = ICON_W + ICON_GAP; // column width
   const CH = ICON_H + ICON_GAP; // row height

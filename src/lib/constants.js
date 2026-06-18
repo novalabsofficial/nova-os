@@ -9,7 +9,13 @@ export const TASKBAR_H  = 78;
 // v11.1 — macOS chrome: a slim status bar across the very top (clock + tray).
 // TOPBAR_H is reserved at the top of the workspace so maximized windows, the
 // desktop icon grid, and top-anchored panels sit BELOW it instead of under it.
-export const TOPBAR_H   = 32;
+// v11.1.3 — the bar now scales to the device: its height is derived once at load
+// from the viewport width (clamped 36–46) so it's comfortably clickable on small
+// laptops and proportionally larger on big / high-DPI screens, mirroring the
+// responsive dock. This single value drives every top-anchored layout offset, so
+// the bar and everything below it stay in lockstep. (Was a flat 32.)
+const _tbVw = typeof window !== "undefined" ? window.innerWidth : 1366;
+export const TOPBAR_H   = Math.max(36, Math.min(Math.round(_tbVw * 0.026), 46));
 export const MIN_W      = 280;
 export const MIN_H      = 200;
 export const ICON_W     = 64;

@@ -3028,46 +3028,61 @@ export default function NovaOS(){
           here now. Desktop only; reserved height = TOPBAR_H. */}
       {deviceMode!=="mobile" && (()=>{
         const muted = !soundCfg.enabled || soundCfg.volume<=0;
-        const tbBtn=(active)=>({height:24,minWidth:30,padding:"0 7px",borderRadius:8,background:active?fill(AC):"transparent",border:"1px solid "+(active?bdr(AC):"transparent"),cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",color:active?AC:"var(--nv-text)",transition:"all 0.15s var(--nv-ease)"});
+        // v11.1.3 — every dimension scales with the (device-derived) bar height
+        // TOPBAR_H, so the bar grows proportionally on bigger / high-DPI screens
+        // and stays comfortably clickable on small laptops, matching the dock.
+        const tbH    = TOPBAR_H;
+        const btnH   = Math.round(tbH * 0.68);                              // tray-button height
+        const padX   = Math.max(7, Math.round(tbH * 0.2));                  // button horizontal padding
+        const rad    = Math.round(tbH * 0.24);                              // button corner radius
+        const fsItem = Math.max(12, Math.min(Math.round(tbH * 0.34), 15));  // launcher label size
+        const icSm   = Math.round(tbH * 0.39);                              // small glyphs (Search / Ask Nova / Task View)
+        const icMd   = Math.round(tbH * 0.45);                              // tray glyphs (volume / wifi / bell / gear)
+        const glyph  = Math.round(tbH * 0.61);                              // Nova menu mark
+        const gap    = Math.max(3, Math.round(tbH * 0.085));                // inter-item gap
+        const divH   = Math.round(tbH * 0.45);                              // vertical divider height
+        const fsClock= Math.max(12, Math.min(Math.round(tbH * 0.35), 16));
+        const fsDate = Math.max(11, Math.min(Math.round(tbH * 0.31), 14));
+        const tbBtn=(active)=>({height:btnH,minWidth:Math.round(btnH*1.25),padding:"0 "+padX+"px",borderRadius:rad,background:active?fill(AC):"transparent",border:"1px solid "+(active?bdr(AC):"transparent"),cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",color:active?AC:"var(--nv-text)",transition:"all 0.15s var(--nv-ease)"});
         // text-button variant for the lifted launchers (Search / Ask Nova / Task View)
-        const tbItem=(active)=>({height:24,padding:"0 9px",borderRadius:8,background:active?fill(AC):"transparent",border:"1px solid "+(active?bdr(AC):"transparent"),cursor:"pointer",display:"flex",alignItems:"center",gap:6,fontFamily:FF,fontSize:12,color:active?AC:"var(--nv-text-dim)",whiteSpace:"nowrap",transition:"all 0.15s var(--nv-ease)"});
+        const tbItem=(active)=>({height:btnH,padding:"0 "+(padX+2)+"px",borderRadius:rad,background:active?fill(AC):"transparent",border:"1px solid "+(active?bdr(AC):"transparent"),cursor:"pointer",display:"flex",alignItems:"center",gap:Math.round(gap*1.8),fontFamily:FF,fontSize:fsItem,color:active?AC:"var(--nv-text-dim)",whiteSpace:"nowrap",transition:"all 0.15s var(--nv-ease)"});
         return (
-        <div style={{position:"fixed",top:0,left:0,right:0,height:TOPBAR_H,background:"var(--nv-surface)",backdropFilter:"blur(var(--nv-glass-blur)) saturate(160%)",WebkitBackdropFilter:"blur(var(--nv-glass-blur)) saturate(160%)",borderBottom:"1px solid var(--nv-border)",display:"flex",alignItems:"center",justifyContent:"space-between",padding:"0 8px",gap:3,zIndex:9998,fontFamily:FF}}>
+        <div style={{position:"fixed",top:0,left:0,right:0,height:tbH,background:"var(--nv-surface)",backdropFilter:"blur(var(--nv-glass-blur)) saturate(160%)",WebkitBackdropFilter:"blur(var(--nv-glass-blur)) saturate(160%)",borderBottom:"1px solid var(--nv-border)",display:"flex",alignItems:"center",justifyContent:"space-between",padding:"0 "+Math.round(tbH*0.28)+"px",gap:gap,zIndex:9998,fontFamily:FF}}>
           {/* LEFT — Nova menu glyph (sits like the macOS Apple logo, top-left)
               + the launchers lifted up off the dock so the dock is apps-only. */}
           <div style={{display:"flex",alignItems:"center",gap:2,minWidth:0,overflow:"hidden"}}>
-            <button className="sb" data-start-btn onClick={()=>{setMenuAnchor("top");setMenuOpen(o=>!o);setMenuSrch("");}} title="Nova OS — menu" style={{...tbBtn(menuOpen),padding:"0 7px"}}>
-              <NovaGlyph size={22} className="nova-glyph-topbar"/>
+            <button className="sb" data-start-btn onClick={()=>{setMenuAnchor("top");setMenuOpen(o=>!o);setMenuSrch("");}} title="Nova OS — menu" style={{...tbBtn(menuOpen),padding:"0 "+padX+"px"}}>
+              <NovaGlyph size={glyph} className="nova-glyph-topbar"/>
             </button>
-            <div style={{width:1,height:15,background:"var(--nv-border-strong)",margin:"0 5px",flexShrink:0}}/>
+            <div style={{width:1,height:divH,background:"var(--nv-border-strong)",margin:"0 "+Math.round(gap*1.6)+"px",flexShrink:0}}/>
             {deviceMode!=="mobile" && (
               <button className="sb" onClick={()=>setSpotlightOpen(true)} title="Search (Ctrl+K)" style={tbItem(false)}>
-                <SearchGlyph size={14}/><span>Search</span>
+                <SearchGlyph size={icSm}/><span>Search</span>
               </button>
             )}
             <button className="sb" onClick={()=>setCommandOpen(o=>!o)} title="Nova AI command bar (Ctrl+J)" style={tbItem(commandOpen)}>
-              <span style={{display:"flex",filter:commandOpen?"drop-shadow(0 0 6px rgba("+hexRgb(AC)+",0.5))":"none"}}><SparkGlyph size={14}/></span>
+              <span style={{display:"flex",filter:commandOpen?"drop-shadow(0 0 6px rgba("+hexRgb(AC)+",0.5))":"none"}}><SparkGlyph size={icSm}/></span>
               {deviceMode!=="mobile" && <span style={{fontFamily:FFB,fontWeight:600}}>Ask Nova</span>}
             </button>
             <button className="sb" onClick={()=>setTaskViewOpen(o=>!o)} title="Task View — virtual desktops (Ctrl+Alt+↑)" style={tbItem(taskViewOpen)}>
-              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" style={{flexShrink:0}}><rect x="3.5" y="3.5" width="9" height="7.5" rx="1.5" stroke="currentColor" strokeWidth="1.4"/><path d="M5.5 13.2h7" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/></svg>
-              {deviceMode!=="mobile" && <span style={{fontFamily:FFM,fontSize:11,letterSpacing:0.3}}>{curDesk+1}/{deskCount}</span>}
+              <svg width={icSm} height={icSm} viewBox="0 0 16 16" fill="none" style={{flexShrink:0}}><rect x="3.5" y="3.5" width="9" height="7.5" rx="1.5" stroke="currentColor" strokeWidth="1.4"/><path d="M5.5 13.2h7" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/></svg>
+              {deviceMode!=="mobile" && <span style={{fontFamily:FFM,fontSize:fsItem-1,letterSpacing:0.3}}>{curDesk+1}/{deskCount}</span>}
             </button>
             {deviceMode!=="mobile" && <TaskbarWeather data={data} onClick={()=>openApp("atmos")} compact />}
           </div>
           {/* RIGHT — system tray + clock */}
-          <div style={{display:"flex",alignItems:"center",gap:3,flexShrink:0}}>
-          <button className="sb" onClick={()=>setQsOpen(o=>!o)} title={muted?"Muted — click to adjust":"Volume "+Math.round(soundCfg.volume*100)+"%"} style={tbBtn(qsOpen)}><VolumeGlyph size={16} muted={muted}/></button>
-          <button className="sb" onClick={()=>setQsOpen(o=>!o)} title="Quick settings" style={tbBtn(qsOpen)}><WifiGlyph size={16}/></button>
+          <div style={{display:"flex",alignItems:"center",gap:gap,flexShrink:0}}>
+          <button className="sb" onClick={()=>setQsOpen(o=>!o)} title={muted?"Muted — click to adjust":"Volume "+Math.round(soundCfg.volume*100)+"%"} style={tbBtn(qsOpen)}><VolumeGlyph size={icMd} muted={muted}/></button>
+          <button className="sb" onClick={()=>setQsOpen(o=>!o)} title="Quick settings" style={tbBtn(qsOpen)}><WifiGlyph size={icMd}/></button>
           <button className="sb" onClick={()=>setNotifsOpen(o=>!o)} title={unreadCount>0?unreadCount+" unread":"Notifications"} style={{...tbBtn(notifsOpen),position:"relative"}}>
-            <BellGlyph size={16}/>
+            <BellGlyph size={icMd}/>
             {unreadCount>0 && <span style={{position:"absolute",top:1,right:1,minWidth:13,height:13,padding:"0 2px",borderRadius:7,background:"#ff5555",color:"#fff",fontFamily:FFB,fontWeight:700,fontSize:8.5,display:"flex",alignItems:"center",justifyContent:"center",lineHeight:1}}>{unreadCount>9?"9+":unreadCount}</span>}
           </button>
-          <button className="sb" onClick={()=>openApp("settings")} title="Settings" style={tbBtn(false)}><GearGlyph size={16}/></button>
-          <div style={{width:1,height:16,background:"var(--nv-border-strong)",margin:"0 6px"}}/>
-          <div style={{display:"flex",alignItems:"baseline",gap:7,cursor:"default",paddingRight:4}}>
-            <span style={{fontFamily:FFM,fontWeight:500,fontSize:12.5,color:"var(--nv-text-strong)",letterSpacing:0.3}}>{fmtTime(tick)}</span>
-            <span style={{fontFamily:FF,fontSize:11,color:"var(--nv-text-dim)"}}>{fmtDate(tick)}</span>
+          <button className="sb" onClick={()=>openApp("settings")} title="Settings" style={tbBtn(false)}><GearGlyph size={icMd}/></button>
+          <div style={{width:1,height:divH,background:"var(--nv-border-strong)",margin:"0 "+Math.round(gap*2)+"px"}}/>
+          <div style={{display:"flex",alignItems:"baseline",gap:Math.round(gap*2.3),cursor:"default",paddingRight:4}}>
+            <span style={{fontFamily:FFM,fontWeight:500,fontSize:fsClock,color:"var(--nv-text-strong)",letterSpacing:0.3}}>{fmtTime(tick)}</span>
+            <span style={{fontFamily:FF,fontSize:fsDate,color:"var(--nv-text-dim)"}}>{fmtDate(tick)}</span>
           </div>
           </div>
         </div>
